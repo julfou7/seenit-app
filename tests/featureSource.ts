@@ -6,6 +6,7 @@ const featureFiles = {
     'src/screens/DiscoverView.tsx',
     'src/screens/DiscoverViewCore.tsx',
     'src/screens/DiscoverHero.tsx',
+    'src/components/DiscoverSearchDock.tsx',
     'src/screens/discoverPresentation.tsx',
   ],
   watchList: [

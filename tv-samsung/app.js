@@ -10,14 +10,15 @@
   var launchPending = false, sportState = 'normal';
   var enterTimer = null, enterTarget = null, longActivated = false, selectedAppId = '';
   var storage;
-  try { storage = window.localStorage; } catch (e) { storage = { getItem: function () {}, setItem: function () {} }; }
+  try { storage = window.localStorage; } catch (e) { storage = { getItem: function () {}, setItem: function () {}, removeItem: function () {} }; }
   var prefs = TVModel.preferences(storage, '');
   var demoEvents = [
     { when: 'Exemple · 20:45', title: 'Monaco — Lille', meta: 'Ligue 1', home: { id: 'preview-monaco', name: 'Monaco', logo: 'assets/sport/monaco.svg' }, away: { id: 'preview-lille', name: 'Lille', logo: 'assets/sport/lille.png' } },
     { when: 'Exemple · 21:00', title: 'Monaco — Benfica', meta: 'Champions League', home: { id: 'preview-monaco', name: 'Monaco', logo: 'assets/sport/monaco.svg' }, away: { id: 'preview-benfica', name: 'Benfica', logo: 'assets/sport/benfica.png' } },
     { when: 'Exemple · 20:45', title: 'France — Italie', meta: 'International', home: { id: 'preview-france', name: 'France', logo: 'assets/sport/france.svg' }, away: { id: 'preview-italy', name: 'Italie', logo: 'assets/sport/italy.svg' } }
   ];
-  var dynamicIds = ['appRow', 'homeSources', 'homeEvents', 'recentApps', 'filmApps', 'calendarList', 'sourceGrid', 'allAppsGrid'];
+  var dynamicIds = ['appRow', 'homeSources', 'homeEvents', 'recentApps', 'filmApps', 'calendarList', 'sourceGrid', 'allAppsGrid', 'linkedFilms'];
+  var lastQr = '';
   function el(id) { return document.getElementById(id); }
   function hidden() { return document.hidden === true; }
   function addClass(node, name) { if (node && !new RegExp('(^|\\s)' + name + '(\\s|$)').test(node.className)) node.className += ' ' + name; }
@@ -56,6 +57,11 @@
     if (!isVisible(node) || hidden()) return;
     for (i = 0; i < old.length; i++) removeClass(old[i], 'focused');
     addClass(node, 'focused'); node.focus();
+    if (currentScreen === 'screenHome') {
+      var lower = /\bhome-setting-card\b/.test(node.className), row = el('appRow');
+      el('screenHome').setAttribute('data-lower', lower ? 'true' : 'false');
+      if (node.parentNode === row) { var left = node.offsetLeft; if (left < row.scrollLeft) row.scrollLeft = left; else if (left + node.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = left + node.offsetWidth - row.clientWidth; }
+    }
     el('focusDetail').textContent = currentScreen === 'screenHome' && node.getAttribute('data-app-id') ? node.getAttribute('data-app-title') + '   ·   OK : ouvrir   ·   Maintenir OK : organiser' : '';
   }
   function firstFocus(saved) {
@@ -101,9 +107,11 @@
     if (push !== false && currentScreen !== id) history.push(currentScreen);
     releaseDynamic();
     for (i = 0; i < screens.length; i++) { removeClass(screens[i], 'active'); if (screens[i].id === id) addClass(screens[i], 'active'); }
-    currentScreen = id; renderCurrent(); firstFocus(focusMemory[id]);
+    currentScreen = id; TVConnection.pairingVisible(id === 'screenAccount'); renderCurrent(); firstFocus(focusMemory[id]);
+    if (id !== 'screenAccount') { el('pairQr').innerHTML = ''; lastQr = ''; }
   }
   function goBack() {
+    if (currentScreen === 'screenHome' && el('screenHome').getAttribute('data-lower') === 'true') { setFocus(el('primaryTv')); return; }
     if (history.length) showScreen(history.pop(), false);
     else if (currentScreen === 'screenHome' || currentScreen === 'screenProfiles') showScreen('screenExit');
     else showScreen('screenHome', false);
@@ -111,10 +119,10 @@
   function setProfile(name) {
     if (['Julian', 'Camille', 'Milo', 'Invité'].indexOf(name) < 0) return;
     currentProfile = name; prefs = TVModel.preferences(storage, name);
+    TVConnection.profile(name);
     applyAppearance();
     el('profileInitial').textContent = name === 'Invité' ? '+' : name.charAt(0);
     el('profileName').textContent = name;
-    el('greeting').textContent = (new Date().getHours() >= 18 ? 'Bonsoir' : 'Bonjour') + (name === 'Invité' ? '' : ', ' + name);
     history = []; focusMemory = {}; appsPage = 0; organizing = false;
     showScreen('screenHome', false);
   }
@@ -164,13 +172,17 @@
     if (!list.length) appendText(row, 'p', 'Aucune entrée détectée', 'rail-status');
   }
   function renderHomeApps() {
-    var row = el('appRow'), favorites = profileApps(5), i;
+    var row = el('appRow'), previousLeft = row.scrollLeft, favorites = profileApps(8), i;
     var recent = TVModel.byIds(currentProfile === 'Milo' ? TVModel.byIds(installedApps, prefs.pins()) : installedApps, prefs.recent());
     el('filmsCopy').textContent = recent.length ? recent[0].title : 'Films & séries';
     el('filmsHint').textContent = recent.length ? 'Rouvrir l’app' : 'Vos apps';
     row.innerHTML = '';
     for (i = 0; i < favorites.length; i++) row.appendChild(appButton(favorites[i], false));
+    var add = allAppsButton(); add.setAttribute('data-action', 'manage-apps'); add.setAttribute('aria-label', 'Ajouter une app'); add.querySelector('.app-name').textContent = 'Ajouter'; add.querySelector('.app-logo').textContent = '+'; row.appendChild(add);
     row.appendChild(allAppsButton()); el('appsStatus').textContent = currentProfile === 'Milo' && !favorites.length ? 'Choisissez ses apps' : '';
+    row.scrollLeft = previousLeft;
+    var view = TVConnection.view();
+    if (view.linked && view.items.length) { el('filmsCopy').textContent = view.items[0].title; el('filmsHint').textContent = 'Ma liste SeenIt'; }
   }
   function profileApps(limit) {
     return currentProfile === 'Milo' ? TVModel.byIds(installedApps, prefs.pins()).slice(0, limit) : TVModel.favorites(installedApps, prefs.pins(), limit, prefs.hidden());
@@ -182,6 +194,36 @@
     for (i = 0; i < recent.length; i++) el('recentApps').appendChild(appButton(recent[i], false));
     for (i = 0; i < favorites.length; i++) el('filmApps').appendChild(appButton(favorites[i], false));
     el('filmApps').appendChild(allAppsButton()); el('recentHint').style.display = recent.length ? 'none' : '';
+    var view = TVConnection.view(), row = el('linkedFilms'), image, item, card;
+    row.innerHTML = '';
+    for (i = 0; i < view.items.length; i++) {
+      item = view.items[i]; card = document.createElement('div'); card.className = 'linked-film';
+      if (/^\/[a-zA-Z0-9._/-]+$/.test(item.posterPath || '') && String(item.posterPath).indexOf('..') < 0) { image = document.createElement('img'); image.alt = ''; image.src = 'https://image.tmdb.org/t/p/w185' + item.posterPath; card.appendChild(image); }
+      appendText(card, 'strong', String(item.title || '').slice(0, 180)); row.appendChild(card);
+    }
+  }
+  function renderAccount() {
+    var view = TVConnection.view(), qr = el('pairQr'), blocked = currentProfile === 'Milo' || currentProfile === 'Invité';
+    el('accountTitle').textContent = view.linked ? view.accountName : 'Connecter SeenIt';
+    var statuses = { creating: 'Création du code…', pending: 'Confirmez sur votre téléphone pour ' + currentProfile + '.', expired: 'Le code a expiré. Affichez un nouveau code.', error: 'Connexion indisponible. Réessayez.' };
+    el('accountStatus').textContent = view.linked ? (view.online ? 'Associé à ' + view.profile + ' · à jour' : 'Associé à ' + view.profile + ' · données en cache') : (blocked ? 'Sélectionnez le profil adulte qui utilisera son compte SeenIt.' : (view.linkedProfile ? 'Un compte est déjà associé à ' + view.linkedProfile + '.' : statuses[view.phase] || 'Votre liste SeenIt sur la TV, avec votre accord.'));
+    if (view.error === 'REVOKE_PENDING') el('accountStatus').textContent = 'Données retirées. La dissociation sera confirmée au retour du réseau.';
+    el('pairButton').style.display = view.linked || view.linkedProfile || blocked ? 'none' : '';
+    el('pairButton').disabled = view.phase === 'creating' || view.phase === 'pending';
+    el('syncButton').style.display = view.linked ? '' : 'none';
+    el('unlinkButton').style.display = view.linkedProfile && !blocked ? '' : 'none';
+    el('pairPanel').style.display = view.approvalUrl ? '' : 'none'; el('pairCode').textContent = view.code;
+    if (view.approvalUrl && view.approvalUrl !== lastQr) {
+      var code = qrcode(0, 'M'); code.addData(view.approvalUrl); code.make();
+      qr.innerHTML = code.createSvgTag({ cellSize: 7, margin: 28, scalable: true }); lastQr = view.approvalUrl;
+    } else if (!view.approvalUrl) { qr.innerHTML = ''; lastQr = ''; }
+  }
+  function connectionChanged() {
+    if (hidden()) return;
+    var saved = token(document.activeElement);
+    if (currentScreen === 'screenAccount') { renderAccount(); if (!isVisible(document.activeElement) || document.activeElement.disabled) firstFocus(saved); }
+    else if (currentScreen === 'screenHome') { renderHomeApps(); firstFocus(saved); }
+    else if (currentScreen === 'screenFilms') renderFilms();
   }
   function appendTeam(parent, team) {
     var name = team && team.name ? String(team.name) : 'Équipe', url = TVModel.teamArtwork(team && team.logo);
@@ -250,6 +292,7 @@
     else if (currentScreen === 'screenApps') renderAppsPage();
     else if (currentScreen === 'screenDiagnostics') updateDiagnosticPanel();
     else if (currentScreen === 'screenAppearance') renderAppearance();
+    else if (currentScreen === 'screenAccount') renderAccount();
   }
   function applyAppearance() {
     var hour = new Date().getHours(), theme = prefs.theme(), light = theme === 'mist' || (theme === 'auto' && hour >= 7 && hour < 20);
@@ -271,12 +314,12 @@
     showScreen('screenAppMenu');
   }
   function moveApp(offset) {
-    var list = profileApps(5), pins = prefs.pins(), order = [], i, index, target, moved;
+    var list = profileApps(8), pins = prefs.pins(), order = [], i, index, target, moved;
     for (i = 0; i < list.length; i++) order.push(list[i].id);
     for (i = 0; i < pins.length && order.length < 32; i++) if (order.indexOf(pins[i]) < 0) order.push(pins[i]);
     index = order.indexOf(selectedAppId);
     if (index < 0 && order.length < 32) { order.push(selectedAppId); index = order.length - 1; }
-    if (index < 0) { showToast('32 favoris maximum.'); return; }
+    if (index < 0) { showToast('8 favoris maximum.'); return; }
     target = Math.max(0, Math.min(order.length - 1, index + offset));
     moved = order.splice(index, 1)[0]; order.splice(target, 0, moved); prefs.order(order);
   }
@@ -341,15 +384,21 @@
     else if (action === 'films') showScreen('screenFilms');
     else if (action === 'sport') showScreen('screenSport');
     else if (action === 'sport-event') showToast('La source de ce rendez-vous n’est pas encore connectée.');
-    else if (action === 'settings') showScreen('screenSettings');
+    else if (action === 'settings') { if (currentScreen === 'screenHome') setFocus(el('screenHome').querySelector('.home-setting-card')); else showScreen('screenSettings'); }
     else if (action === 'quick') showScreen('screenQuick');
     else if (action === 'sources') showScreen('screenSources');
     else if (action === 'diagnostics') { showScreen('screenDiagnostics'); refreshMemory(); refreshStorage(); }
     else if (action === 'ambient') showScreen('screenAmbient');
     else if (action === 'appearance') showScreen('screenAppearance');
+    else if (action === 'account') showScreen('screenAccount');
+    else if (action === 'pair') { TVConnection.start('Samsung SeenIt TV'); renderAccount(); firstFocus(); }
+    else if (action === 'sync-account') TVConnection.sync();
+    else if (action === 'unlink-account') showScreen('screenUnlink');
+    else if (action === 'confirm-unlink') { TVConnection.revoke(); goBack(); }
+    else if (action === 'samsung-home') { TVDevice.exitApp(function (ok) { if (!ok) showToast('Utilisez la touche Home pour revenir à Samsung.'); }); }
     else if (action === 'theme') { prefs.setTheme(button.getAttribute('data-theme')); applyAppearance(); renderAppearance(); }
     else if (action === 'motion') { prefs.toggleMotion(); applyAppearance(); renderAppearance(); }
-    else if (action === 'menu-pin') { if (!prefs.toggle(selectedAppId)) showToast('32 favoris maximum.'); else goBack(); }
+    else if (action === 'menu-pin') { if (!prefs.toggle(selectedAppId)) showToast('8 favoris maximum.'); else goBack(); }
     else if (action === 'menu-hide') { prefs.hideApp(selectedAppId); goBack(); }
     else if (action === 'menu-left' || action === 'menu-right') { moveApp(action === 'menu-left' ? -1 : 1); goBack(); }
     else if (action === 'switch-profile') { history = []; showScreen('screenProfiles', false); }
@@ -358,7 +407,7 @@
     else if (action === 'toggle-manage') { organizing = !organizing; if (currentProfile === 'Milo') { appsTab = organizing ? 'user' : 'favorites'; appsPage = 0; } saved = token(button); renderAppsPage(); firstFocus(saved); }
     else if (action === 'pin-app') {
       if (!TVModel.byIds(installedApps, [button.getAttribute('data-app-id')]).length) return;
-      saved = token(button); if (!prefs.toggle(saved.app)) { showToast('32 favoris maximum.'); return; }
+      saved = token(button); if (!prefs.toggle(saved.app)) { showToast('8 favoris maximum.'); return; }
       renderAppsPage(); firstFocus(saved);
     }
     else if (action === 'page-prev' || action === 'page-next') {
@@ -389,8 +438,8 @@
     else if (code === 403 && !TVDevice.isSamsung()) { sportState = sportState === 'normal' ? 'imminent' : sportState === 'imminent' ? 'live' : 'normal'; updateSportTile(); }
   }
   function handleVisibility() {
-    if (hidden()) { suspendedFocus = token(document.activeElement); stopTelemetryTimers(); releaseDynamic(); }
-    else { launchPending = false; startTelemetryTimers(); renderCurrent(); firstFocus(suspendedFocus); discoverDevice(false); }
+    if (hidden()) { suspendedFocus = token(document.activeElement); TVConnection.pause(); stopTelemetryTimers(); releaseDynamic(); el('pairQr').innerHTML = ''; lastQr = ''; }
+    else { launchPending = false; startTelemetryTimers(); renderCurrent(); firstFocus(suspendedFocus); TVConnection.resume(); discoverDevice(false); }
   }
   function handleKeyUp(event) {
     if ((event.keyCode || event.which) !== 13) return;
@@ -401,6 +450,7 @@
     enterTarget = null; longActivated = false;
   }
   function init() {
+    TVConnection.init(storage, connectionChanged);
     resizeStage(); updateConnectivity(); updateSportTile(); startTelemetryTimers();
     window.addEventListener('resize', resizeStage); window.addEventListener('online', updateConnectivity); window.addEventListener('offline', updateConnectivity);
     document.addEventListener('visibilitychange', handleVisibility); document.addEventListener('keydown', handleKey);

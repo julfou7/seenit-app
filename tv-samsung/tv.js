@@ -9,6 +9,15 @@ var TVDevice = (function () {
   var samsung = typeof window.tizen !== 'undefined' && !!window.tizen.application;
   var viewerId = 'org.tizen.tv-viewer';
   var settingsMenuId = 'org.tizen.menu';
+  var nativeSources = {};
+  var operationLog = [];
+
+  function record(kind, target, error) {
+    operationLog.push({ at: new Date().getTime(), kind: kind, target: String(target || '').slice(0, 160), error: error ? String(error.name || 'UnknownError').slice(0, 80) : null });
+    if (operationLog.length > 24) operationLog.shift();
+  }
+
+  function sourceKey(type, number) { return String(type).toUpperCase() + ':' + Number(number); }
 
   var sampleApps = [
     { id: 'sample.plex', name: 'Plex', show: true },
@@ -96,8 +105,9 @@ var TVDevice = (function () {
       return;
     }
     try {
-      window.tizen.application.launch(id, function () { if (done) done(true); }, function () { if (done) done(false); });
+      window.tizen.application.launch(id, function () { record('launch-accepted', id); if (done) done(true); }, function (error) { record('launch-failed', id, error); if (done) done(false); });
     } catch (e) {
+      record('launch-failed', id, e);
       if (done) done(false);
     }
   }
@@ -141,13 +151,16 @@ var TVDevice = (function () {
         var connected = value && value.connected ? value.connected : [];
         var disconnected = value && value.disconnected ? value.disconnected : [];
         var i;
+        nativeSources = {};
         for (i = 0; i < connected.length; i++) {
           if (connected[i] && connected[i].type && connected[i].number !== undefined) {
+            nativeSources[sourceKey(connected[i].type, connected[i].number)] = connected[i];
             out.push({ type: connected[i].type, number: connected[i].number, connected: true });
           }
         }
         for (i = 0; i < disconnected.length; i++) {
           if (disconnected[i] && disconnected[i].type && disconnected[i].number !== undefined) {
+            nativeSources[sourceKey(disconnected[i].type, disconnected[i].number)] = disconnected[i];
             out.push({ type: disconnected[i].type, number: disconnected[i].number, connected: false });
           }
         }
@@ -177,8 +190,13 @@ var TVDevice = (function () {
         return;
       }
       try {
-        window.tizen.tvwindow.setSource(wanted, function () { launchViewer(done); }, function () { if (done) done(false); });
+        var nativeSource = nativeSources[sourceKey(wanted.type, wanted.number)];
+        if (!nativeSource) { if (done) done(false); return; }
+        window.tizen.tvwindow.setSource(nativeSource, function () {
+          record('source-selected', sourceKey(wanted.type, wanted.number)); launchViewer(done);
+        }, function (error) { record('source-failed', sourceKey(wanted.type, wanted.number), error); if (done) done(false); });
       } catch (e) {
+        record('source-failed', sourceKey(wanted.type, wanted.number), e);
         if (done) done(false);
       }
     });
@@ -240,11 +258,9 @@ var TVDevice = (function () {
       return;
     }
     function fallback() {
-      try {
-        var info = window.tizen.application.getAppInfo(settingsMenuId);
-        if (!info || info.id !== settingsMenuId) { if (done) done(false); return; }
-        launchApp(info.id, done);
-      } catch (e) { if (done) done(false); }
+      // The internal menu can capture the remote without showing on older TVs.
+      // Leave SeenIt responsive and explain the physical Settings/Home route.
+      if (done) done(false);
     }
     try {
       var control = new window.tizen.ApplicationControl('http://tizen.org/appcontrol/operation/setting', null, null, null, []);
@@ -290,7 +306,7 @@ var TVDevice = (function () {
           result.memory = memory;
           getStorageInfo(function (storage) {
             result.storage = storage;
-            done(result);
+            result.operations = operationLog.slice(0); done(result);
           });
         });
       });

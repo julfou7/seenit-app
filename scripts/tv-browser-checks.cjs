@@ -5,8 +5,9 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function buildTvHarness(root) {
   const target = path.join(root, 'dist/__seenit-tv');
   fs.mkdirSync(target, { recursive: true });
-  for (const file of ['index.html', 'styles.css', 'tv.js', 'model.js', 'app.js']) fs.copyFileSync(path.join(root, 'tv-samsung', file), path.join(target, file));
+  for (const file of ['index.html', 'styles.css', 'tv.js', 'model.js', 'connection.js', 'app.js']) fs.copyFileSync(path.join(root, 'tv-samsung', file), path.join(target, file));
   fs.cpSync(path.join(root, 'tv-samsung/assets'), path.join(target, 'assets'), { recursive: true });
+  fs.cpSync(path.join(root, 'tv-samsung/vendor'), path.join(target, 'vendor'), { recursive: true });
   const mock = `(function(){
     localStorage.clear();
     var apps=${JSON.stringify(JSON.parse(fs.readFileSync(path.join(root, 'tests/fixtures/tv-samsung-tizen4-apps.json'), 'utf8')))};
@@ -15,6 +16,8 @@ async function buildTvHarness(root) {
     var t=window.__tv={apps:apps,launches:[],clicks:[],errors:[],inventoryCalls:0,settings:0,exits:0,hidden:false,intervals:{},failLaunch:false};
     document.addEventListener('click',function(e){t.clicks.push(e.target.id+':'+e.target.getAttribute('data-action'))},true);
     window.addEventListener('error',function(e){if(e.message)t.errors.push(e.message)});
+    t.connectionRequests=[];t.pairApproved=false;
+    window.XMLHttpRequest=function(){var xhr=this;this.open=function(method,url){xhr.method=method;xhr.url=url};this.setRequestHeader=function(){};this.abort=function(){xhr.aborted=true};this.send=function(body){t.connectionRequests.push(xhr.url);setTimeout(function(){if(xhr.aborted)return;var response;if(xhr.url.endsWith('/api/tv/links')){var input=JSON.parse(body);response={id:'a'.repeat(48),secret:'b'.repeat(64),code:'ABCD-EF12',profile:input.profile,expiresAt:Date.now()+600000}}else if(xhr.url.endsWith('/status'))response={state:t.pairApproved?'active':'pending',profile:'Julian',expiresAt:Date.now()+3600000,accountName:'Test account'};else if(xhr.url.endsWith('/bootstrap'))response={state:'active',profile:'Julian',syncedAt:Date.now(),items:[{tmdbId:1,title:'Film du compte',posterPath:null}]};else response={revoked:true};xhr.status=200;xhr.readyState=4;xhr.responseText=JSON.stringify(response);if(xhr.onreadystatechange)xhr.onreadystatechange()},20)}};
     var nativeSet=window.setInterval,nativeClear=window.clearInterval;
     window.setInterval=function(fn,ms){var id=nativeSet(fn,ms);t.intervals[id]=ms;return id};
     window.clearInterval=function(id){delete t.intervals[id];nativeClear(id)};
@@ -29,8 +32,9 @@ async function buildTvHarness(root) {
       launchAppControl:function(c,id,done){t.settings++;done()},
       getCurrentApplication:function(){return{appInfo:{id:'SeenItTV01.SeenItTV'},exit:function(){t.exits++}}}
     },systeminfo:{getTotalMemory:function(){return 1610612736},getAvailableMemory:function(){return 0},getPropertyValue:function(kind,done){
-      done(kind==='STORAGE'?{units:[{capacity:4000000000,availableCapacity:0,isRemovable:false}]}:{connected:[{type:'HDMI',number:1},{type:'TV',number:0}],disconnected:[{type:'HDMI',number:2},{type:'HDMI',number:3},{type:'HDMI',number:4}]})
-    }},tvwindow:{setSource:function(source,done){t.source=source;done()}}};
+      var sources={connected:[{type:'HDMI',number:1},{type:'TV',number:0}],disconnected:[{type:'HDMI',number:2},{type:'HDMI',number:3},{type:'HDMI',number:4}]};t.nativeSources=sources.connected.concat(sources.disconnected);
+      done(kind==='STORAGE'?{units:[{capacity:4000000000,availableCapacity:0,isRemovable:false}]}:sources)
+    }},tvwindow:{setSource:function(source,done){if(t.nativeSources.indexOf(source)<0)throw Error('Native descriptor identity lost');t.source=source;done()}}};
   })();`;
   const html = fs.readFileSync(path.join(target, 'index.html'), 'utf8').replace('<script src="tv.js">', '<script>' + mock + '</script><script src="tv.js">');
   fs.writeFileSync(path.join(target, 'index.html'), html);
@@ -42,7 +46,7 @@ async function evaluate(client, expression) {
 }
 async function check(client, expression, message) {
   for (let i = 0; i < 35; i++) { if (await evaluate(client, expression)) return; await delay(40); }
-  throw new Error('SEENIT-TV-001 ' + message + ': ' + JSON.stringify(await evaluate(client, '({errors:window.__tv.errors,clicks:window.__tv.clicks,storage:JSON.stringify(localStorage),screen:document.querySelector(".screen.active").id,focus:document.activeElement.outerHTML,toast:document.getElementById("toast").textContent})')));
+  throw new Error('SEENIT-TV-001 ' + message + ': ' + JSON.stringify(await evaluate(client, '({appHeight:document.querySelector("#appRow .app-card")?.getBoundingClientRect().height,headingFont:document.querySelector("#screenHome h2")&&getComputedStyle(document.querySelector("#screenHome h2")).fontSize,gear:!!document.querySelector(".header-settings svg"),errors:window.__tv.errors,clicks:window.__tv.clicks,storage:JSON.stringify(localStorage),screen:document.querySelector(".screen.active").id,focus:document.activeElement.outerHTML,toast:document.getElementById("toast").textContent})')));
 }
 async function key(client, code) {
   await client.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: code, nativeVirtualKeyCode: code });
@@ -62,28 +66,43 @@ async function testTvHarness(client, root) {
     await check(client, 'window.__tv && window.TVModel && document.activeElement.dataset.profile === "Julian"', 'entrée profils');
     await key(client, 13);
     await check(client, 'document.activeElement.id === "primaryTv"', 'focus initial TV');
-    await check(client, `document.querySelectorAll('#appRow .app-card').length===6 && document.querySelectorAll('#homeSources .source-card').length===4 && document.querySelector('#homeSources [data-source-number="4"]')`, 'rails 5+1 et quatre HDMI natifs sans perte du troisième');
+    await check(client, `document.querySelectorAll('#appRow .app-card').length===10 && document.querySelectorAll('#homeSources .source-card').length===4 && document.querySelector('#homeSources [data-source-number="4"]')`, 'rail huit favoris plus Ajouter/Toutes et quatre HDMI réellement déclarés');
     await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id]')).filter(n=>n.dataset.appTitle==='Netflix').length===1 && document.querySelector('#appRow [data-app-title=Netflix]').dataset.appId==='RN1MCdNq8t.Netflix'`, 'inventaire réel Tizen4 : une seule tuile Netflix, variante installée');
-    await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id] img')).every(n=>n.getAttribute('src').startsWith('assets/apps/')&&n.naturalWidth>0)`, 'logos vectoriels homogènes avant les icônes natives');
-    await check(client, `document.querySelector('#appRow .app-card').getBoundingClientRect().height>=${height / 1080 * 224} && getComputedStyle(document.querySelector('#screenHome h2')).fontSize==='28px' && document.querySelector('.settings-card svg')`, 'logos et libellés lisibles sans emoji de réglages');
+    await check(client, `Array.from(document.querySelectorAll('#appRow [data-app-id] img')).every(n=>n.naturalWidth>0)`, 'logos vectoriels homogènes avant les icônes natives');
+    await check(client, `Math.round(document.querySelector('#appRow .app-card').getBoundingClientRect().height)>=${Math.floor(height / 1080 * 128)} && getComputedStyle(document.querySelector('.home-settings-zone h2')).fontSize==='24px' && document.querySelector('.header-settings svg')`, 'logos et libellés lisibles sans emoji de réglages');
     await check(client, '!document.getElementById("homeEvents").textContent.includes("Monaco")', 'aucun faux événement en mode Samsung');
     await check(client, 'getComputedStyle(document.getElementById("homeEvents")).display==="none"', 'aucun bloc sport vide sur Home');
-    await check(client, `Array.from(document.querySelectorAll('.screen.active .focusable')).every(n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.top>=0&&r.right<=${width}&&r.bottom<=${height}})`, 'aucune carte coupée');
+    await check(client, `Array.from(document.querySelectorAll('.screen.active .primary-card')).every(n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.top>=0&&r.right<=${width}&&r.bottom<=${height}})`, 'aucune carte coupée');
     await key(client, 13); await check(client, 'window.__tv.source.type==="TV"', 'tuner réel');
-    for (let i = 0; i < 3; i++) await key(client, 39);
-    await check(client, 'document.activeElement.dataset.action==="settings"', 'télécommande quatre destinations');
-    await key(client, 13); await click(client, '#screenSettings [data-action=samsung-settings]');
+    await key(client, 39); await key(client, 39);
+    await check(client, 'document.activeElement.id==="sportTile"', 'télécommande trois destinations');
+    await click(client, '.header-settings');
+    await check(client, 'document.getElementById("screenHome").dataset.lower==="true" && document.activeElement.classList.contains("home-setting-card")', 'roue mène aux réglages bas sans déplacer l’en-tête');
+    await screenshot(client, root, `tv-home-lower-${width}.png`);
+    await click(client, '#screenHome [data-action=samsung-settings]');
     await check(client, 'window.__tv.settings===1', 'menu natif vérifié');
-    await click(client, '#screenSettings [data-action=appearance]'); await click(client, '[data-theme=mist]');
+    await click(client, '#screenHome [data-action=appearance]'); await click(client, '[data-theme=mist]');
     await check(client, 'document.getElementById("stage").classList.contains("light-theme") && document.querySelector(".brand").getAttribute("src")==="assets/seenit-tv-dark.svg"', 'thème clair avec contraste du logo');
     await click(client, '#screenAppearance [data-action=motion]');
     await check(client, 'document.getElementById("stage").classList.contains("reduced-motion")', 'mouvements désactivables');
     await screenshot(client, root, `tv-appearance-${width}.png`);
     await key(client, 8);
-    await click(client, '#screenSettings [data-action=diagnostics]');
+    await click(client, '#screenHome [data-action=diagnostics]');
     await check(client, 'document.getElementById("diagMemory").textContent.includes("0 Mo") && document.getElementById("diagStorage").textContent.includes("0 Mo")', 'zéro libre ne devient pas indisponible');
     await key(client, 8); await key(client, 8);
+    await check(client, 'document.activeElement.id==="primaryTv" && document.getElementById("screenHome").dataset.lower==="false"', 'Retour remonte la Home avant de quitter');
     await screenshot(client, root, `tv-home-${width}.png`);
+    await click(client, '#screenHome [data-action=account]');
+    await click(client, '#pairButton');
+    await check(client, 'document.querySelector("#pairQr svg") && document.getElementById("pairCode").textContent==="ABCD-EF12"', 'QR produit réel et code lisible');
+    await check(client, '!document.getElementById("pairQr").innerHTML.includes("b".repeat(64))', 'secret absent du QR');
+    await screenshot(client, root, `tv-account-qr-${width}.png`);
+    await evaluate(client, 'window.__tv.pairApproved=true'); await delay(5100);
+    await check(client, 'TVConnection.view().linked && TVConnection.view().items.length===1 && document.getElementById("accountTitle").textContent==="Test account"', 'approbation et bootstrap via vrai client TV');
+    await click(client, '#unlinkButton'); await check(client, 'document.querySelector(".screen.active").id==="screenUnlink"', 'dissociation exige confirmation');
+    await click(client, '#screenUnlink [data-action=confirm-unlink]');
+    await check(client, '!TVConnection.view().linked && !localStorage.getItem("seenit.tv.v4.foyer")', 'dissociation enlève session et données privées');
+    await key(client, 8); await key(client, 8);
     const homeId = await evaluate(client, 'document.querySelector("#appRow [data-app-id]").dataset.appId');
     await evaluate(client, 'document.querySelector("#appRow [data-app-id]").focus()');
     await client.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });

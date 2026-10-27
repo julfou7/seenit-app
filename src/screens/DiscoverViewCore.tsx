@@ -1,3 +1,4 @@
+import { DiscoverSearchDock } from '../components/DiscoverSearchDock';
 import { type DiscoverViewModel } from './discoverViewModel';
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
@@ -506,75 +507,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
         </div>
       </div>
 
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        className={cn(
-          "absolute bottom-0 inset-x-0 px-3 pb-[calc(90px+env(safe-area-inset-bottom,0px))] pt-24 bg-gradient-to-t from-black via-black/95 to-transparent pointer-events-none z-40 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]",
-          isSearchVisible ? "translate-y-0" : "translate-y-full"
-        )}
-      >
-        <div className="flex flex-col gap-3 pointer-events-auto px-4 max-w-md mx-auto w-full">
-          <div className="bg-[#1C1C1E]/95 backdrop-blur-xl border border-white/5 rounded-[1.75rem] p-1.5 flex items-center gap-2 shadow-[0_8px_30px_rgb(0,0,0,0.5)]">
-            <div className={cn("flex items-center gap-1", (hasActiveFilters || activeCategory !== 'Tout') ? "bg-[#E5A93D]/20" : "bg-white/5", "rounded-full transition-colors shrink-0")}>
-              <button
-                onClick={() => setShowGenreMenu(true)}
-                className="flex items-center gap-2 px-3.5 py-2.5 hover:bg-white/10 rounded-full transition-colors"
-              >
-                <SlidersHorizontal size={15} className={cn("text-zinc-400", (hasActiveFilters || activeCategory !== 'Tout') && "text-[#E5A93D]")} />
-                <span className={cn("text-[14px] font-semibold text-zinc-300", (hasActiveFilters || activeCategory !== 'Tout') && "text-[#E5A93D]")}>
-                  {activeCategory !== 'Tout'
-                    ? activeCategory
-                    : activeFilterCount > 0
-                      ? `${activeFilterCount} filtre${activeFilterCount > 1 ? 's' : ''}`
-                      : 'Filtres'}
-                </span>
-              </button>
-            </div>
-
-            <div className="w-px h-6 bg-white/10 shrink-0 mx-0.5" />
-
-            <div className="flex-1 flex items-center gap-2 min-w-0">
-              <Search size={18} className="text-zinc-500 shrink-0 ml-1" />
-              <input
-                type="text"
-                placeholder="Séries, films, acteurs..."
-                data-navigation-search
-                aria-label="Rechercher une série, un film ou un acteur"
-                value={query}
-                onChange={(e) => {
-                  const nextQuery = e.target.value;
-                  setQuery(nextQuery);
-                  if (nextQuery.trim() && !isSearchCompatibleCategory(activeCategory)) {
-                    setActiveCategory('Tout');
-                  }
-                }}
-                onFocus={() => { setIsSearchFocused(true); setIsSearchVisible(true); }}
-                onBlur={() => setIsSearchFocused(false)}
-                className="bg-transparent border-none outline-none text-white text-[15px] font-medium w-full placeholder:text-zinc-500 min-w-0"
-              />
-            </div>
-
-            {(query || hasActiveFilters || activeCategory !== 'Tout') && (
-              <button
-                onClick={() => {
-                  setQuery('');
-                  setSelectedPlatforms([]);
-                  setSelectedGenres([]);
-                  setPegi('Tous');
-                  setMinRating('Toutes');
-                  setActiveCategory('Tout');
-                }}
-                className="p-2 text-[#E5A93D] hover:text-[#f8d28a] shrink-0 transition-colors"
-                title="Effacer"
-              >
-                <X size={18} />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
+      <DiscoverSearchDock {...model} />
 
       {!isSearchVisible && (
         <div

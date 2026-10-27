@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://seenit.ai.studio/tv-samsung" version="0.2.2" viewmodes="maximized">
+<widget xmlns="http://www.w3.org/ns/widgets" xmlns:tizen="http://tizen.org/ns/widgets" id="https://seenit.ai.studio/tv-samsung" version="0.4.0" viewmodes="maximized">
     <tizen:application id="SeenItTV01.SeenItTV" package="SeenItTV01" required_version="3.0"/>
     <name>SeenIt TV</name>
     <author href="https://seenit.ai.studio">SeenIt</author>
-    <description>SeenIt TV launcher V2 for Samsung Tizen 3+; validated target QE55Q6FNA / Tizen 4.</description>
+    <description>SeenIt TV launcher V4 for Samsung Tizen 3+; target QE55Q6FNA / Tizen 4.</description>
     <content src="index.html"/>
     <icon src="icon.png"/>
     <feature name="http://tizen.org/feature/screen.size.all"/>

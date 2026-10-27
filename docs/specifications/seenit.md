@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.228**
+Version applicative : **1.4.231**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -25,8 +25,8 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 ## 2. Règles de plateforme
 
 - **SEENIT-TV-001** — Le launcher Samsung reste séparé du runtime mobile, compatible ES5/Tizen 4.0
-  et fidèle aux planches TV : quatre entrées TV, Films, Sport, Réglages ; cinq apps puis la bibliothèque
-  et les sources détectées. Les marques reconnues utilisent leur SVG local homogène, puis l'icône native
+  et fidèle aux idées V4 : trois destinations TV, Films, Sport ; réglages sous l'accueil et dans l'en-tête,
+  favoris par profil, bibliothèque et sources détectées. Les marques reconnues utilisent leur SVG local homogène, puis l'icône native
   et un monogramme générique en secours. Les variantes portant exactement le même nom ne produisent
   qu'une tuile : épingle explicite prioritaire, sinon installation utilisateur locale avant composant
   intégré, choix stable par ID à égalité. Tous les IDs restent inventoriés et les variantes restent en
@@ -37,12 +37,19 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   sont libérés ; RAM/stockage sont lus sans root ni fermeture des autres apps. Les réglages Samsung
   passent par une cible vérifiée ; Retour à l'accueil demande confirmation avant de quitter SeenIt.
   Appairage du compte, Home natif et terrain sont suivis dans #295 ; aucun historique SeenIt n'est écrit
-  sans profil certain. Détails et arbitrage des maquettes : [launcher TV V2](tv-samsung-launcher-v2.md).
+  sans profil certain. La [décision V4](tv-samsung-launcher-v4.md) remplace la composition
+  [V2 historique](tv-samsung-launcher-v2.md). HDMI conserve le descripteur natif pour setSource.
   L'accueil expose jusqu'à quatre sources détectées, dont tous les HDMI remontés sur la TV terrain,
   avec accès à la liste complète. Les cartes Sport affichent les logos fournis avec les identités
   explicites des deux équipes, puis leurs initiales si l'image manque ; aucun logo n'est résolu par
   rapprochement de noms. L'audit RAM/services reste en lecture seule, sans arrêt ou désactivation
   automatique ni gain chiffré déduit du seul inventaire d'applications.
+
+- **SEENIT-TV-002** — QR d'association HTTPS canonique sans secret dans l'URL, approbation explicite
+  par compte Firebase authentifié, code/secret aléatoires expirables et session TV restreinte à
+  sa lecture/révocation. Les autres profils restent locaux ; aucun visionnage n'est créé par le
+  lancement d'une app. Hash serveur, quotas, expiration/révocation, cache isolé et arrêt des requêtes
+  hors écran sont couverts par les TNR. Contrat : [launcher TV V4](tv-samsung-launcher-v4.md).
 
 - **SEENIT-PLATFORM-001** — La PWA canonique servie depuis `seenit.ai.studio` conserve les routes
   SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence
@@ -254,6 +261,15 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   au comportement attendu.
 
 ### 5.2 Explorer « Au cinéma » — preuve théâtrale France
+
+- **SEENIT-DISCOVER-003** — Pendant la saisie dans Explorer, la recherche se place à 8 px du clavier visible,
+  sans réserver l'espace de la navigation basse ; celle-ci et son fondu sont masqués. Le viewport visuel
+  et le redimensionnement Android sont pris en compte sans double compensation. Fermer le clavier ou
+  quitter le champ restaure la navigation et la position habituelle sans effacer la requête ni les filtres.
+  Dans Explorer, une loupe explicite à gauche de l'îlot de navigation permet de rouvrir et focaliser
+  la recherche repliée sans défilement des résultats ni réinitialisation. Elle possède une cible de
+  44 px minimum et une activation clavier ; elle est masquée avec la navigation pendant la saisie.
+  Un clavier matériel reste utilisable ; aucune recherche réseau n'est provoquée par le déplacement.
 
 - **SEENIT-DISCOVER-001** — La catégorie Explorer **« Au cinéma »** et tout badge portant ce libellé
   exigent une preuve TMDB de sortie théâtrale en France : une entrée `release_dates` de pays `FR` et de
@@ -559,6 +575,8 @@ du runtime est suivie dans [#130](https://github.com/julfou7/seenit-app/issues/1
 n'est rouverte que par une nouvelle décision produit explicite.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
+
+Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique classe les visionnages par période en une passe mémorisée, réutilise ses formateurs de date et ne rescane pas toutes les lignes à chaque rendu ou bascule. Les totaux portent sur la période complète, les lignes restent paginées et les mises à jour Vu/non Vu/date invalident les données concernées. Le panneau masqué conserve son état et suspend ses effets ; une bascule à chaud ne relance ni indexation ni hydratation terminée. Le TNR de terrain utilise le composant réel avec plus de6300visionnages et des bascules répétées.
 
 - **SEENIT-PERF-001** — Les métadonnées publiques TMDB déjà résolues utilisent une couche de cache
   commune, bornée et typée. Les détails média sont indexés par `mediaType + tmdbId`; les requêtes
@@ -1155,10 +1173,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   recherches, filtres ou expansions locales. Aucun suivi, progression, préférence ou téléchargement n'est
   modifié. Chaque reset abouti affiche un toast nommant la page réinitialisée. Un trajet A → B → B ne
   compte jamais le changement d'onglet comme le premier appui du double geste.
-- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 64 px, à 10 px de la safe area,
-  avec fondu inférieur progressif de 96 px, sans repli au défilement. Ordre : À Voir, Explorer, Moi,
+- **SEENIT-UX-017** — La navigation 13j est un îlot verre flottant de 60 px, à 10 px de la safe area,
+  avec fondu inférieur progressif de 92 px, sans repli au défilement. Ordre : À Voir, Explorer, Moi,
   puis séparateur et Télécharger si la fonctionnalité personnelle est activée. Les glyphes SeenIt
-  utilisent le même or, les cibles mesurent au moins 52 × 68 px, le focus et aria-current restent visibles.
+  utilisent le même or, les cibles mesurent au moins 48 × 68 px, le focus et aria-current restent visibles.
   La barre disparaît sur les fiches/dialogues plein écran ; le contenu réserve 84 px plus safe area,
   les toasts se placent à 80 px plus safe area avec la barre, 24 px sans elle. Le point Télécharger
   reflète les données live existantes : actifs or (nombre seulement au-delà de un), attention rouge,

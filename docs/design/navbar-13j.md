@@ -6,7 +6,7 @@ fixent l'îlot 58 px, les boutons 46 × 68 px, le verre, l'or, le fondu inférie
 À Voir · Explorer · Moi │ Télécharger. Les autres variantes, les autres écrans du prototype
 et la sidebar desktop restent hors de cette livraison par composants.
 
-Ajustement demandé le26octobre2026 : îlot64px, boutons52 ×68px et padding vertical4px/6px pour laisser plus d’air autour des libellés, avec largeur et centrage conservés.
+Ajustement demandé le27octobre2026 : îlot60px, boutons48 ×68px et padding vertical4px ; icônes26px, libellés10–11px lisibles, largeur et centrage conservés. Les cibles restent supérieures à44px et la safe area est inchangée.
 
 Le contrat de production est UX-017 et les resets locaux UX-005 : seuil 350 ms, changement
 d'onglet exclu du premier tap, paire consommée après reset, appui long sans clic résiduel.

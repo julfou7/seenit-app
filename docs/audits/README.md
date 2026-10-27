@@ -1,5 +1,10 @@
 # Registre des audits SeenIt
 
+TV V4 : [préparation de livraison du27octobre](./tv-v4-livraison-2026-10-27.md), #295, validations et limites explicites.
+
+TV V4 : [références Flix-Home, Luma et Free My TV](./tv-v4-references-2026-10-27.md),
+27 octobre 2026, #295 : idées retenues, limites Samsung et échecs terrain Netflix.
+
 TV Samsung : [vérifications hors TV du firmware1400.2](./tv-usb-1400.2-2026-10-27/README.md),
 27octobre2026, #295 : bilan, sources figées et empreintes vérifiées ; root non réalisé.
 
@@ -8,6 +13,12 @@ TV Samsung : [RAM et services facultatifs du26octobre2026](./tv-ram-services-202
 
 TV Samsung : [conformité maquettes et cycle mémoire du26octobre2026](./tv-maquettes-2026-10-26.md),
 baselines2f151398/919a109, #295/#738, premier terrain V2 KO ; diagnostic natif et correctif0.2.1 en cours.
+
+Terrain230 : [Non vu historique et recherche au clavier](./terrain230-non-vu-clavier-2026-10-27.md),
+baseline701054d, #729/#774 ; mutation sans fournisseur, scénario tactile et clavier Explorer.
+
+Terrain229 / historique : [cause du gel et scénario6300visionnages](./terrain229-historique-perf-2026-10-27.md),
+baseline0c4bd8a, #729 ; dates, résumés et bascules des trois panneaux, navigation compacte.
 
 Ce dossier conserve les constats historiques. La SPEC reste la source de vérité du comportement
 courant et GitHub Issues la source de vérité des actions à réaliser.

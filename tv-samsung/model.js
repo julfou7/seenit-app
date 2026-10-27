@@ -67,7 +67,8 @@ var TVModel = (function () {
         if (ids([id], 1).length !== 1) return false;
         var index = state.pins.indexOf(id);
         if (index >= 0) state.pins.splice(index, 1);
-        else if (state.pins.length < 32) { state.pins.push(id); index = state.hidden.indexOf(id); if (index >= 0) state.hidden.splice(index, 1); }
+        // Keep legacy saved pins intact, but additions follow the V4 shelf limit.
+        else if (state.pins.length < 8) { state.pins.push(id); index = state.hidden.indexOf(id); if (index >= 0) state.hidden.splice(index, 1); }
         else return false;
         save(); return true;
       },

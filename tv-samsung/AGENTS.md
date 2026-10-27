@@ -2,7 +2,7 @@
 
 Ce sous-dossier cible en priorité la **Samsung QE55Q6FNA, gamme 2018, Tizen 4.0**, suivie par l'issue SeenIt #295.
 Le widget conserve `required_version="3.0"` comme minimum de compatibilité ; cela ne signifie pas que le matériel terrain est Tizen 3.
-La référence UX courante est `docs/specifications/tv-samsung-launcher-v2.md`.
+La référence UX courante est `docs/specifications/tv-samsung-launcher-v4.md` ; V2 reste historique.
 
 - SeenIt TV est destiné à devenir le **Home/launcher principal**, pas une application secondaire.
 - Rester compatible ES5 et vieux moteur Chromium/Tizen : pas de React, Babel, framework, CSS Grid, blur/backdrop-filter temps réel ou dépendance runtime lourde.

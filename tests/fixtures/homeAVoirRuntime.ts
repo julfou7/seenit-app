@@ -17,6 +17,20 @@ base.usePlexAvailabilityStore.setState({ cache: {
   'tv:10': { available: true, serverName: 'Série partielle' },
 } });
 export function useShows() { return { shows: base.useShowsStore(state => state.shows), loading: false, updateShow: base.updateShow, addShow: base.addShow }; }
+export function makeLargeHistory() {
+  const seed = base.initialShows[0];
+  const now = Date.now();
+  const shows = Array.from({ length: 50 }, (_, showIndex) => {
+    const records = Array.from({ length: 126 }, (_, index) => {
+      const number = showIndex * 126 + index;
+      return [`1x${index + 1}`, { watchedAt: now - (number % 1000) * 86_400_000, runtime: 42, episodeTitle: `Épisode ${index + 1}` }] as const;
+    });
+    return { ...seed, id: `perf-history-${showIndex}`, title: `Série historique ${showIndex}`, tmdbId: 70_000 + showIndex,
+      status: 'completed' as const, seenEpisodes: records.map(([key]) => key), episodeRecords: Object.fromEntries(records) };
+  });
+  base.useShowsStore.setState(state => ({ shows: [...state.shows.filter(show => !show.id.startsWith('perf-history-')), ...shows] }));
+  return 6300;
+}
 export const useDownloadConfigStore = create(() => ({ downloadsEnabled: false, userPlatforms: [] }));
 export const useLiveDownloadStore = create(() => ({ downloads: [] }));
 export const useUpdateStore = create(() => ({ hasUpdate: true, latestRelease: { version: '1.4.999' }, requestUpdateModal: () => base.telemetry.opens.push('update') }));
@@ -37,9 +51,14 @@ export const sendNativeNotification = async () => { reminderControl.nativeNotifi
 export const EpisodeDetailModal = () => createElement('div', null, 'Fiche épisode');
 export const PersonDetailModal = () => null;
 const motionSeasons = new Map<number, {season_number:number;episode_count:number;episodes:Array<{season_number:number;episode_number:number;name:string;air_date:string;runtime:number}>}>();
+export const historyUnseenControl = { holdDetails: false, detailCalls: 0 };
 export const tmdb = { ...base.tmdb,
   getSeasonDetails: async (id:number, season:number) => motionSeasons.has(id) ? {ok:true,value:motionSeasons.get(id)!} : base.tmdb.getSeasonDetails(id,season),
-  getEpisodeDetails: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } }),
+  getEpisodeDetails: async (_id: number, season: number, episode: number) => {
+    historyUnseenControl.detailCalls++;
+    if (historyUnseenControl.holdDetails) await new Promise(() => {});
+    return { ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } };
+  },
   getEpisodeHistoryMetadata: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } }),
   getMovieDetails: async (id: number) => id===303 ? {ok:true,value:{belongs_to_collection:{id:555}}} : base.tmdb.getMovieDetails(id),
   getCollectionDetails: async () => ({ ok: true, value: { parts: [{id:301,release_date:'2018-01-01'},{id:302,release_date:'2021-01-01'},{id:303,release_date:date(12)}] } }),

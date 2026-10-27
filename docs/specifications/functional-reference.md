@@ -1,33 +1,29 @@
 # SeenIt — Référence fonctionnelle canonique
 
-## Extension Samsung TV — 26 octobre 2026 (#295)
+## Extension Samsung TV — V4, 27 octobre 2026 (#295)
 
-Le runtime isolé `tv-samsung/` reprend les planches TV : TV/TNT, Films, Sport et Réglages,
-puis cinq apps favorites, Toutes les apps et les entrées réellement détectées. Les icônes viennent
-des SVG locaux pour les marques reconnues, puis de la TV et des initiales pour une nouvelle app.
-Une seule tuile par nom d'app identique : installation utilisateur préférée aux variantes intégrées,
-épingle explicite prioritaire. Tous les IDs sont conservés ; les variantes restent dans Système en
-vue avancée. Aucun lancement n'utilise une table d'IDs supposée universelle. La bibliothèque paginée conserve
-USER/SYSTEM/UNKNOWN ; les favoris sont personnalisables par profil local. Invité reste éphémère.
-Milo n'affiche que les apps sélectionnées, modifiables via Organiser sans code ; Système est masqué.
-Cela ne verrouille pas les apps tierces et ne constitue pas un contrôle parental.
-La référence Luma ajoutée ensuite par le propriétaire modifie la hiérarchie : ces quatre accès sont
-compacts, les apps dominent la Home et SeenIt/Sport restent contextuels. Infos au focus, appui long OK
-pour épingler/déplacer/masquer, apparences Brume/Crépuscule/Auto statiques et mouvements désactivables.
-Une section Sport sans donnée est masquée sur la Home. Les sources restent accessibles directement.
-L'accueil rend jusqu'à quatre entrées détectées au lieu de deux ; Toutes les sources reste disponible.
-Les cartes Sport portent les logos des deux équipes fournis dans l'événement, avec initiales en secours.
-Ce rendu n'invente pas de calendrier : les exemples restent réservés à la preview, le flux réel restant #738.
-Les audits mémoire/services lisent la TV sans désactivation automatique ; un contexte actif ne fournit
-pas sa consommation individuelle ni une estimation fiable du gain après désactivation.
-Films propose de rouvrir les apps lancées avec succès ; cela ne constitue pas un historique de
-visionnage, notamment si Netflix partage son profil. Appairage du compte propriétaire encore suivi
-dans #295, sans faux catalogue ni mutation personnelle. Sport conserve un diffuseur résolu par événement
-(#738), avec exemples seulement en preview. Réglages donne accès au menu Samsung lorsqu'il est
-disponible, aux sources et au diagnostic RAM/stockage. Retour à l'accueil propose Quitter/Revenir.
-Les timers et grilles d'images sont libérés lorsque le launcher est masqué. Le remplacement du Home
-natif et le gain mémoire global restent à vérifier sur la QE55Q6FNA ; aucun root automatique.
-Voir [la règle SEENIT-TV-001](seenit.md) et [la référence TV](tv-samsung-launcher-v2.md).
+Le runtime isolé `tv-samsung/` présente trois grandes destinations TV/TNT, Films et Sport,
+huit favoris maximum sur la rangée, Ajouter/Toutes, puis les sources réellement détectées.
+La roue mène aux réglages de la partie basse, sous un en-tête fixe. Retour remonte d'abord
+l'accueil avant de proposer de quitter. Les apparences Brume/Crépuscule/Auto sont conservées.
+L'inventaire complet garde USER/SYSTEM/UNKNOWN et toutes les variantes, sans table d'IDs
+universelle. Une épingle explicite conserve son ID ; Milo n'affiche que sa sélection locale,
+Invité ne persiste rien. Les anciennes épingles ne sont pas effacées par la limite V4.
+
+Le compte adulte s'associe par QR : consentement explicite du téléphone authentifié, code
+valable dix minutes, session TV limitée à trente jours. La TV ne reçoit aucun jeton Firebase,
+consulte uniquement une liste bornée et n'écrit aucun visionnage. Les autres profils restent
+locaux. Dissociation confirmée, cache privé effacé et révocation rejouée si le réseau manque.
+Les images, timers et requêtes de pairing s'arrêtent hors premier plan. L'absence d'association
+ou de réseau laisse le launcher et ses apps utilisables.
+
+HDMI transmet le descripteur natif Tizen exact, sans reconstruction JS. Les réglages natifs
+utilisent un handler découvert ; sans handler exploitable, expliquer la touche Réglages/Home
+plutôt que lancer aveuglément un menu système. Un callback d'app accepté ne prouve pas
+l'affichage : Netflix noir depuis le launcher reste un écart terrain, malgré son fonctionnement
+via Samsung. Le basculement Home natif, le gain RAM global et le flux sportif réel restent
+suivis séparément ; aucun root ni faux calendrier. Les logos des équipes viennent des données
+explicites avec initiales en secours. Voir [la référence V4](tv-samsung-launcher-v4.md).
 
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
@@ -176,9 +172,9 @@ Son point indique en priorité les transferts actifs (or, nombre au-delà de un)
 aux transferts. Une navigation historique ou directe vers `downloads` alors que la fonctionnalité est
 désactivée revient sur « À Voir ».
 
-La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 64 px, détaché de
-10 px plus safe area, avec fondu progressif inférieur de 96 px. Sans Télécharger, seul le dernier
-onglet et le séparateur disparaissent. Glyphes 24 px, libellés 10 px et cibles minimales 52 × 68 px.
+La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, haut de 60 px, détaché de
+10 px plus safe area, avec fondu progressif inférieur de 92 px. Sans Télécharger, seul le dernier
+onglet et le séparateur disparaissent. Glyphes rendus26px, libellés10–11px et cibles minimales48 ×68px.
 Pas de repli au scroll. Le contenu réserve 84 px plus safe area ; les toasts restent au-dessus à
 80 px plus safe area, ou 24 px sur une fiche/dialogue sans barre. La fiche média occupe tout le viewport.
 
@@ -304,7 +300,9 @@ annulation.
 ### 5.3 Historique et actualités
 
 - L'[historique mixte](../design/history-16d.md) suit la liste compacte de la SPEC accueil v3 : un bloc arrondi, films et épisodes triés depuis leurs `watchedAt`, sans groupes de date ni barres de progression. La date courte apparaît dans chaque ligne (ce soir aujourd’hui) ; une heure inconnue reste inconnue.
-- « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler.
+- « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler. Son enregistrement
+  ne dépend d'aucun appel TMDB ; le prochain épisode conserve les compteurs déjà connus de sa saison.
+  Un échec d'écriture est signalé explicitement, sans annoncer une suppression réussie.
 - Films et épisodes ont la même ligne (minimum 76 px), vignette still/backdrop 92×52, titre or, code/date et titre d’épisode, pastille SeenIt or 26 px. Un film n’affiche ni année ni mention Film. Le tap ouvre
   l'épisode exact ou le film ; l'appui long/menu clavier propose Non vu (confirmation et Annuler),
   Changer la date/heure (heure facultative et Annuler), Revoir et Ouvrir la série.
@@ -359,6 +357,12 @@ utilisent la même URL ; elle rouvre la fiche exacte après démarrage/authentif
 Firestore privé.
 
 ## 7. Explorer
+
+Pendant la saisie dans Explorer, le champ reste à 8 px du clavier et l'îlot de navigation est masqué.
+La fermeture du clavier ou la sortie du champ restaure le placement habituel, la requête et les filtres
+restent conservés (`SEENIT-DISCOVER-003`, #774).
+Dans Explorer, la loupe à gauche de la navigation rouvre et focalise la barre à tout moment,
+y compris après son repli au défilement. La position des résultats, la requête et les filtres sont conservés.
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
@@ -1050,3 +1054,5 @@ Voir [marque v3](../design/marque-2026-10-25.md) : actifs fournis réutilisés s
 Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
 
 Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.
+
+Terrain229 : une réouverture de panneau ne suffit pas à prouver sa fluidité. Les périodes Historique et leurs totaux sont indexés et mémorisés ; aucune création de formateur de date par visionnage ni filtre intégral par période visible pendant le rendu. Le scénario navigateur mesure les composants de production sur6300visionnages, pagination et bascules répétées ; aucun historique utilisateur distant n’est modifié.

@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
+import { Search } from 'lucide-react';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 import { resolveActiveTabTap, type ActiveTabTapState } from '../features/navigation/activeTabTap';
@@ -29,8 +30,13 @@ export function BottomNav({ currentTab, onTabChange, onActiveTabClick, onActiveT
     else if (resolution.action === 'active-double') onActiveTabDoubleClick?.();
     else onActiveTabClick?.();
   };
-  return <div className="bottom-nav-shell">
+  return <div className={rootTab === 'discover' ? 'bottom-nav-shell bottom-nav-shell--search' : 'bottom-nav-shell'}>
     <div className="bottom-nav-fade" aria-hidden="true" />
+    {rootTab === 'discover' && <button type="button" className="bottom-nav-search"
+      data-navigation-search-shortcut aria-label="Rechercher dans Explorer" aria-controls="discover-search"
+      title="Rechercher dans Explorer" onClick={() => { lastActiveTapRef.current = null; onLongPress('discover'); }}>
+      <Search size={22} aria-hidden="true" />
+    </button>}
     <nav className="bottom-nav-island" aria-label="Navigation principale">
       {visibleTabs.map(tab => <span className="navigation-slot" key={tab.id}>
         {tab.id === 'downloads' && <span className="navigation-separator" aria-hidden="true" />}

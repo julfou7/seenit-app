@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.228",
+  "applicationVersion": "1.4.231",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
       "id": "SEENIT-TV-001",
-      "title": "Launcher TV lisible, sources détectées, logos d'apps et équipes, inventaire et mémoire bornés",
+      "title": "Launcher TV V4, sources natives, apps réellement inventoriées et mémoire bornée",
       "targets": [
         "tv"
       ],
@@ -17,6 +17,42 @@
         {
           "file": "tests/tvSamsungModel.test.ts",
           "contains": "SEENIT-TV-001"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-TV-002",
+      "title": "Association QR explicite du compte SeenIt et session TV restreinte",
+      "targets": [
+        "tv",
+        "pwa"
+      ],
+      "tests": [
+        {
+          "file": "tests/tvPairing.test.ts",
+          "contains": "SEENIT-TV-002"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DISCOVER-003",
+      "title": "Recherche Explorer ancrée au clavier, navigation masquée en saisie et loupe de réouverture",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/searchKeyboardDock.test.ts",
+          "contains": "SEENIT-DISCOVER-003 place la recherche au clavier sans double compensation Android"
+        },
+        {
+          "file": "tests/searchKeyboardDock.test.ts",
+          "contains": "SEENIT-DISCOVER-003 câble le dock réel et restaure la nav sans vider la requête"
+        },
+        {
+          "file": "tests/navbar13j.test.ts",
+          "contains": "SEENIT-UX-017 les raccourcis actifs et les réglages évitent les entrées historiques identiques"
         }
       ]
     },
@@ -2723,6 +2759,14 @@
         {
           "file": "tests/mediaDetailPerformance.test.ts",
           "contains": "SEENIT-PERF-001 réserve les skeletons au chargement réellement froid"
+        },
+        {
+          "file": "tests/historyPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 indexe 6300 visionnages sans perdre les totaux complets des périodes"
+        },
+        {
+          "file": "tests/historyPerformance.test.ts",
+          "contains": "SEENIT-PERF-001 réutilise les formateurs de date sur les grands historiques"
         },
         {
           "file": "tests/mediaDetailPerformance.test.ts",

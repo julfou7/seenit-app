@@ -11,6 +11,11 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 
 ## 1. Principes à préserver
 
+Explorer (#774) : pendant la saisie, champ à 8 px au-dessus du clavier, navigation basse masquée.
+Fermeture du clavier/blur : retour à la disposition normale sans vider la recherche ni les filtres.
+Une loupe à gauche de la navigation Explorer rouvre la recherche et le clavier sans déplacer les résultats.
+Cette action explicite reste accessible après repli de la barre, avec cible tactile >=44 px et nom accessible.
+
 ### Bandes-annonces — contrat #447
 
 Un appui ouvre le lecteur partagé ; choisir une vidéo ne change que l'identité YouTube de l'iframe.
@@ -39,7 +44,7 @@ Ce contrat automatisé ne vaut pas preuve de lecture ou de rotation sur un tél�
 | Navigation basse, onglet actif | Appui simple | Émet `app-close-modals`, puis recule l'historique si modal, sinon ferme la fiche | Intention de retour utile ; vérifier qu'un seul niveau se ferme. |
 | Navigation basse | Deux taps espacés de moins de 350 ms | Le premier appui revient d'un niveau ou remonte à la racine, le second réinitialise la page active | Contrat `SEENIT-UX-005`, portée locale et toast propre à l'écran ; A → B → B exclu. |
 | Double appui Explorer | Reset + remontée | Recherche vide, catégorie Tout, plateformes/genres vides, âge Tous, note Toutes, tri populaire descendant, hero première carte | Préserver ce raccourci volontaire, montrer son effet ; jamais effacer les préférences du compte. |
-| Explorer, liste verticale | Swipe / défilement vertical | La descente masque la barre de recherche ; seule une remontée la réaffiche | Le geste tactile et le `scrollTop` réel gardent la même sémantique ; un swipe de descente ne doit jamais rouvrir la recherche. |
+| Explorer, liste verticale | Swipe / défilement vertical | La descente masque la barre de recherche ; une remontée la réaffiche | La loupe à gauche de la navigation permet aussi de la rouvrir sans défilement ; un swipe de descente ne doit jamais rouvrir la recherche. |
 | Double appui Profil | Reset + remontée | Ferme Réglages/personne, revient à Statistiques et nettoie l'état local de Ma Liste | Ne modifie aucun suivi ni statistique. |
 | Double appui À voir | Reset + remontée | Revient à À Regarder, replie les sections et remet les carrousels au début | Ne modifie aucune progression. |
 | Double appui Télécharger | Reset + remontée | Revient à Mes téléchargements, ferme la configuration, vide recherche/filtres/résultats locaux | N'annule ni n'efface aucun transfert. |
@@ -62,8 +67,8 @@ Le reset est local à la racine de l'onglet actif. Il ne scrolle jamais un écra
 La [navigation 13j](../design/navbar-13j.md) remplace la barre pleine largeur :
 
 - sans Téléchargements : **À Voir → Explorer → Moi** ; avec : **À Voir → Explorer → Moi │ Télécharger** ;
-- îlot centré en verre de 64 px, détaché de 10 px plus safe area, boutons 52 × 68 px minimum,
-  glyphes 24 px, libellés 10 px, fondu inférieur progressif de 96 px ; pas de repli au défilement ;
+- îlot centré en verre de 60 px, détaché de 10 px plus safe area, boutons 48 × 68 px minimum,
+  glyphes rendus26px, libellés10–11px, fondu inférieur progressif de92px ; pas de repli au défilement ;
 - le dernier onglet et son séparateur disparaissent selon le réglage personnel existant ;
 - point Télécharger actif or (nombre au-delà de un), attention rouge, puis terminé non consulté vert,
   acquitté à l'ouverture sans modifier les transferts ; aucun polling supplémentaire ;
@@ -317,3 +322,11 @@ Les notifications confirment « ✅ Import terminé », puis
 
 
 Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
+
+
+### SeenIt TV V4 — 27 octobre 2026 (#295)
+
+Trois destinations visuelles, rangée d'apps générique, sources natives et réglages en partie
+basse. En-tête fixe, Retour remonte la Home avant de quitter, focus visible et mouvement réduit.
+Compte/QR réservé à l'association explicite d'un profil adulte ; aucun visionnage attribué
+par un simple lancement d'app. Référence : [TV V4](tv-samsung-launcher-v4.md).

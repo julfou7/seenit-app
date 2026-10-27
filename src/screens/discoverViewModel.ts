@@ -27,6 +27,7 @@ export type DiscoverViewModel = {
   isLoadingMore: boolean;
   isOffline: boolean;
   isSearchVisible: boolean;
+  isSearchFocused: boolean;
   isSortPickerOpen: boolean;
   loading: boolean;
   minRating: string;

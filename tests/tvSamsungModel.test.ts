@@ -20,7 +20,7 @@ test('SEENIT-TV-001 le vrai adapter regroupe les variantes Tizen4 sans perdre le
   const nativeApps = JSON.parse(readFileSync(new URL('./fixtures/tv-samsung-tizen4-apps.json', import.meta.url), 'utf8'));
   const m = model();
   for (const input of [nativeApps, [...nativeApps].reverse()]) {
-    let inventory: any;
+    let inventory: Array<{ id: string; title: string; classification: string; launchable: boolean }> = [];
     const d = device({ getAppsInfo(done: (apps: unknown[]) => void) { done(input); }, getCurrentApplication() { return { appInfo: { id: 'SeenItTV01.SeenItTV' } }; } });
     d.listApps((value: any) => { inventory = value; });
     assert.equal(inventory.length, nativeApps.length);
@@ -65,7 +65,7 @@ test('SEENIT-TV-001 borne les préférences, supporte storage refusé et filtre 
   const m = model(), p = m.preferences({ getItem() { return '{"pins":{},"recent":[null,1,"x","x"]}'; }, setItem() { throw Error('quota'); } }, 'Milo');
   assert.deepEqual(Array.from(p.recent()), ['x']);
   for (let i = 0; i < 50; i++) { p.toggle('id-' + i); p.opened('id-' + i); }
-  assert.equal(p.pins().length, 32); assert.equal(p.recent().length, 8);
+  assert.equal(p.pins().length, 8); assert.equal(p.recent().length, 8);
   assert.equal(p.toggle(''), false);
 });
 test('SEENIT-TV-001 toute nouvelle app est favorite par son ID sans table de lancement', () => {

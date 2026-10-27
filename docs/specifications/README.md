@@ -99,3 +99,5 @@ Un import/sync AI Studio n'est jamais une migration implicite. GitHub reste cano
 Complément prioritaire du25octobre2026 : [marque v3 et terrain223](../design/marque-2026-10-25.md), sources fournies par l’utilisateur, pagination sans scroll et cohérence de saison sans ouvrir la fiche.
 
 La [SPEC-DEV-V4 importée du ZIP10](../design/home-a-voir-v4.md) remplace les états intermédiaires pour la géométrie, les badges, le chargement progressif, la frise historique et la fiche acteur. Les données de maquette ne constituent jamais des données de production.
+
+Référence Samsung TV courante : [launcher V4 et association QR](tv-samsung-launcher-v4.md), #295.

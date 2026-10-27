@@ -81,33 +81,36 @@ button{font:inherit;color:inherit;border:2px solid transparent;background:none;t
 .light-theme .dialog-screen{background:#dbe3e8}.light-theme .text-button{color:#5b482c}.light-theme .tab-button.selected{background:#d1b782;color:#2b3540}
 .light-theme .focusable.focused,.light-theme .focusable:focus{border-color:#8b6528!important;box-shadow:0 0 0 3px rgba(102,73,34,.16)}
 @media(prefers-reduced-motion:reduce){.focusable{transition:none}.focusable.focused,.focusable:focus{transform:none}}
-/* Launcher hierarchy: installed apps first; SeenIt and Sport are contextual additions. */
-.home-main{margin-top:34px}.primary-row{height:78px}
-.primary-card{height:78px;justify-content:center;padding:18px 28px;background:#252a33;border-color:transparent;border-radius:20px}
-.primary-card:before,.primary-card>strong,.primary-card>small,.primary-card .mini-badge{display:none}
-.primary-label{position:static;display:flex;align-items:center;font-size:28px;letter-spacing:0}.tile-icon{width:34px;height:34px;font-size:29px;line-height:32px}.icon-tv{width:34px;height:25px}
-.primary-label svg,.quick-button svg,.all-apps-card svg{fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
-.quick-button svg{width:26px;height:26px}.all-apps-card svg{width:48px;height:48px}
-.home-greeting{font-size:64px;line-height:80px;margin:48px 0 0;font-weight:600;letter-spacing:-1px}
-.home-rails{display:block;margin-top:32px}.apps-rail{width:1728px;margin:0}
-.home-screen h2{font-size:28px}.home-screen .brand{width:268px;height:64px}
-.home-screen #appRow .app-card{width:268px;height:224px;flex-shrink:0;border-radius:24px;border-color:transparent;background:#232830}
-.home-screen #appRow .brand-netflix,.home-screen #appRow .brand-plex,.home-screen #appRow .brand-dazn{background:#191c22}
-.home-screen #appRow .brand-youtube{background:#ecefed}.home-screen #appRow .brand-amazonprime{background:#193044}.home-screen #appRow .brand-spotify{background:#20342c}
-.home-screen .app-logo{width:176px;height:120px}.home-screen .app-logo img{max-width:176px;max-height:120px}
-.home-screen .brand-netflix .app-logo img,.home-screen .brand-plex .app-logo img,.home-screen .brand-amazonprime .app-logo img{width:176px}
-.home-screen .all-apps-card .app-name{font-size:22px;color:inherit;max-width:240px}
-.home-screen .all-apps-card .app-logo{height:60px}
-.home-bottom{display:flex;margin-top:32px}.sources-rail{width:840px;margin-right:48px;flex-shrink:0}.home-sport{width:840px}
-.home-screen .source-card{height:144px;background:#252a33;border-color:transparent}.home-screen .source-card strong{font-size:28px}.home-screen .source-card small{font-size:20px}
-.home-screen .footer-hint{font-size:20px}.home-screen .quick-button,.home-screen .profile-pill{font-size:23px}.home-screen .date{font-size:22px}
-.home-sport .sport-heading{margin-top:0}.home-sport .event-card{width:408px;height:144px;padding:16px;margin-right:24px}.home-sport .event-card:last-child{margin-right:0}
-.home-sport .event-card strong{font-size:23px}.home-sport .event-card span{margin-bottom:8px}
-.focus-detail{height:34px;margin-top:20px}.light-theme .event-card{background:#edf0f1;border-color:#bdc8d1;color:#293d51}.light-theme .event-card span,.light-theme .event-card small{color:#5b6f82}
-.light-theme .home-screen #appRow .app-card,.light-theme .home-screen .source-card{background:#eaf0f2}
-.light-theme .home-screen #appRow .brand-netflix,.light-theme .home-screen #appRow .brand-plex,.light-theme .home-screen #appRow .brand-dazn{background:#191c22}
-.light-theme .home-screen #appRow .brand-amazonprime{background:#193044}.light-theme .home-screen #appRow .brand-spotify{background:#20342c}
-.event-clubs{display:flex;align-items:center;min-height:48px;margin:4px 0}.event-card .event-team{display:flex;align-items:center;flex:1;min-width:0;margin:0;color:inherit;font-size:inherit}
-.event-card .team-badge{display:flex;align-items:center;justify-content:center;width:48px;height:48px;flex-shrink:0;margin:0 10px 0 0;font-size:20px;font-weight:bold;color:inherit}
-.team-badge img{display:block;width:48px;height:48px;object-fit:contain}.event-card .team-name{margin:0;color:inherit;font-size:21px;line-height:24px;font-weight:bold;max-height:48px;overflow:hidden}
-.event-card .event-versus{margin:0 10px;font-size:18px;color:inherit}.calendar-list .event-card{height:200px;width:520px}.home-sport .event-card small{margin-top:4px}
+/* V4: three destinations, bounded app shelf and a lower settings view. */
+#stage{background:#202226;background-image:radial-gradient(ellipse at 78% 5%,rgba(70,83,108,.3),rgba(32,34,38,0) 65%)}
+.home-screen{overflow:hidden}.home-screen .topbar{position:relative;z-index:10;background:inherit}
+.home-screen .brand{width:220px;height:48px}.home-screen .quick-button{width:56px;padding:0;margin-right:20px}.quick-button svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:2}.home-screen .quick-button span{display:none}
+.home-screen .date{font-size:24px}.home-screen .profile-pill{width:60px;height:60px;padding:0;margin-left:24px}.home-screen #profileInitial{width:50px;height:50px;margin:0}.home-screen #profileName{display:none}
+.header-settings{width:56px;height:56px;border-radius:28px;margin-left:24px;display:flex;align-items:center;justify-content:center}.header-settings svg{width:28px;height:28px;fill:none;stroke:currentColor;stroke-width:2}
+.home-main{position:absolute;left:96px;right:96px;top:168px;margin:0;transition:transform .16s ease}.home-screen[data-lower=true] .home-main{transform:translateY(-546px)}
+.primary-row{height:320px}.primary-card{width:554px;height:320px;margin-right:33px;border-radius:32px;padding:32px;background:#242a30;border-color:transparent;flex-shrink:0}
+.primary-label{position:absolute;left:30px;top:auto;bottom:28px;font-size:38px;letter-spacing:-1px}.primary-label svg,.primary-label .icon-tv{display:none}
+.primary-card strong,.primary-card small{display:none}.tv-card{background:linear-gradient(150deg,#487cdd,#172341)}
+.tv-card:before{right:218px;top:80px;width:108px;height:76px;border:7px solid #f7f7fa;border-radius:20px}
+.films-card{background:linear-gradient(150deg,#244a3f,#323528 60%,#15191a)}.films-card:before{right:70px;top:30px;width:180px;height:150px;background:radial-gradient(ellipse,rgba(214,182,99,.4),rgba(214,182,99,0) 70%);border:0;border-radius:0}
+.films-card .primary-label{bottom:62px}.films-card #filmsCopy{display:block;position:absolute;left:30px;right:30px;bottom:26px;font-size:24px;line-height:29px;max-height:29px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;color:#cfceca;max-width:none}
+.sport-card{background:linear-gradient(145deg,#292c31,#141a19)}.sport-card:before{right:100px;top:45px;width:350px;height:180px;border:1px solid #516155;border-radius:0;transform:perspective(300px) rotateX(50deg);background:linear-gradient(90deg,transparent 49.5%,#516155 50%,transparent 50.5%),#1f392c}
+.home-rails{display:block;margin-top:40px}.apps-rail{width:1728px;margin:0;position:relative}.home-screen #appsStatus{position:absolute;top:-30px}
+.home-screen #appRow{width:1728px;height:150px;overflow:hidden;padding:0 0 18px;display:flex}
+.home-screen #appRow .app-card{width:192px;height:128px;flex-shrink:0;margin-right:27px;border-radius:22px;border-color:transparent;background:#303236;overflow:hidden}
+.home-screen #appRow .app-card:last-child{margin-right:0}.home-screen .app-logo{width:148px;height:76px}.home-screen .app-logo img{max-width:140px;max-height:68px}.home-screen #appRow .app-name{display:none}
+.home-screen #appRow .all-apps-card .app-name{display:block;font-size:22px;margin-top:4px;color:inherit}.home-screen #appRow .all-apps-card .app-logo{height:48px;font-size:44px}.all-apps-card svg{width:34px;height:34px;fill:none;stroke:currentColor;stroke-width:2}
+.home-screen #appRow .brand-netflix,.home-screen #appRow .brand-dazn{background:#111214}.home-screen #appRow .brand-plex{background:#21262a}.home-screen #appRow .brand-youtube{background:#f4f4f3}.home-screen #appRow .brand-amazonprime{background:#102b43}.home-screen #appRow .brand-spotify{background:#102e20}
+.home-screen .pin-star{display:none}.focus-detail{height:0;overflow:hidden}.home-bottom{display:block;margin-top:12px;height:104px}.sources-rail{width:1728px;margin:0}.source-row{display:flex}
+.home-screen .source-card{height:104px;width:300px;margin-right:24px;padding:18px 24px;background:#303236;border-color:#45474b;border-radius:22px;flex-shrink:0}.home-screen .source-card strong{font-size:27px}.home-screen .source-card small{font-size:20px;margin-top:4px}.home-sport{display:none}
+.home-settings-zone{margin-top:64px}.home-settings-zone h2{font-size:24px;font-weight:bold;color:#b1b2b5;line-height:32px;margin:0 0 18px}.home-settings-row{display:flex}
+.home-setting-card{display:flex;align-items:center;justify-content:center;flex-direction:column;width:270px;height:200px;margin-right:21px;border-radius:24px;background:#303236;border:1px solid #494b4f;flex-shrink:0}.home-setting-card:last-child{margin:0}.settings-glyph{display:block;width:52px;height:52px;font-size:44px;line-height:52px;margin-bottom:24px}.home-setting-card strong{font-size:27px}
+.home-settings-zone .seenit-settings-heading{margin-top:58px}.seenit-setting-card{width:328px}.network-status{position:absolute;bottom:22px;right:96px;font-size:18px;color:#b6b7bb}
+.home-screen .focusable.focused,.home-screen .focusable:focus{transform:scale(1.025);border-color:#eab13d!important;box-shadow:none}.reduced-motion .home-main{transition:none}.reduced-motion .home-screen .focusable.focused{transform:none}
+.home-screen:before{content:"";position:absolute;left:0;top:0;width:1920px;height:140px;background:#202226;z-index:9;pointer-events:none}.light-theme .home-screen:before{background:#dbe3e8}.home-screen[data-lower=true] #appRow{opacity:.35}
+.light-theme .home-screen .tv-card{background:linear-gradient(150deg,#487cdd,#172341)}.light-theme .home-screen .films-card{background:linear-gradient(150deg,#244a3f,#323528 60%,#15191a)}.light-theme .home-screen .sport-card{background:linear-gradient(145deg,#292c31,#141a19)}
+.light-theme .home-screen #appRow .app-card:not([class*="brand-"]){background:#eaf0f2}.home-screen #appRow .app-card:not([class*="brand-"]) .app-name{display:block;font-size:18px;margin-top:4px}.light-theme .pair-panel p{color:#425b70}
+.light-theme .home-screen .home-setting-card,.light-theme .home-screen .source-card,.light-theme .home-screen #appRow .all-apps-card{background:#eaf0f2;border-color:#c2cbd3}.light-theme .home-settings-zone h2{color:#5b6f82}.light-theme .home-screen .primary-label{color:#fff}
+.account-layout{display:flex;align-items:center;justify-content:space-between;min-height:600px}.account-copy{width:900px}.account-copy h2{font-size:44px;line-height:1.2}.account-copy .cta{margin:12px 16px 12px 0}.pair-panel{width:480px;text-align:center;padding:28px;background:#303236;border-radius:28px}.pair-qr{width:380px;height:380px;background:#fff;padding:12px;margin:auto;border-radius:14px}.pair-qr svg{display:block;width:100%;height:100%}#pairCode{display:block;font-size:42px;letter-spacing:6px;margin-top:24px}.pair-panel p{font-size:21px;color:#d3d3d5;line-height:1.4}
+.linked-films{display:flex;overflow:hidden;max-width:1728px;margin-bottom:24px}.linked-film{width:150px;margin-right:24px;flex-shrink:0}.linked-film img{width:150px;height:225px;object-fit:cover;border-radius:12px}.linked-film strong{display:block;font-size:18px;line-height:22px;max-height:44px;overflow:hidden;margin-top:10px}.linked-films:empty{display:none}.light-theme .pair-panel{background:#cbd6dd;color:#243044}
+.event-clubs{display:flex;align-items:center;min-height:48px;margin:4px 0}.event-card .event-team{display:flex;align-items:center;flex:1;min-width:0;margin:0;color:inherit;font-size:inherit}.event-card .team-badge{display:flex;align-items:center;justify-content:center;width:48px;height:48px;flex-shrink:0;margin:0 10px 0 0;font-size:20px;font-weight:bold;color:inherit}.team-badge img{display:block;width:48px;height:48px;object-fit:contain}.event-card .team-name{margin:0;color:inherit;font-size:21px;line-height:24px;font-weight:bold;max-height:48px;overflow:hidden}.event-card .event-versus{margin:0 10px;font-size:18px;color:inherit}.calendar-list .event-card{height:200px;width:520px}

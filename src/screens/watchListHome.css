@@ -1,4 +1,4 @@
-.home-watchlist { background:#0b0b0f; scrollbar-width:thin; scrollbar-color:#3f3f46 transparent; }
+.home-watchlist { background:#0b0b0f; scrollbar-width:thin; scrollbar-color:#3f3f46 transparent; scroll-padding-bottom:calc(84px + var(--seenit-safe-area-bottom,env(safe-area-inset-bottom,0px))); }
 .home-header { position:sticky; top:0; z-index:40; padding:4px 16px 10px; background:linear-gradient(#08080ceb,#08080cdb); backdrop-filter:blur(18px) saturate(160%); }
 .home-header__top { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:50px; margin-bottom:2px; }
 .home-wordmark { display:inline-flex; align-items:baseline; font-size:26px; line-height:1; font-weight:800; letter-spacing:-1.43px; color:#f4f4f5; }
