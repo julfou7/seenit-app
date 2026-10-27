@@ -42,11 +42,8 @@ function episode(
   };
 }
 
-test('SEENIT-NOTIFICATION-002 et #623 affichent le numéro de saison et le numéro du nouvel épisode', () => {
-  assert.equal(
-    buildTvSeasonReminderSummary(episode(2, 1, 'Reprise')),
-    '📅 Nouvelle saison · Saison 2',
-  );
+test('SEENIT-NOTIFICATION-005 #778 sépare le type du fait compact sans emoji ni répétition', () => {
+  assert.equal(buildTvSeasonReminderSummary(episode(2, 1, 'Reprise')), 'Nouvelle saison');
 
   const released = episode(2, 3, 'Le combat');
   const show = showFixture({
@@ -56,12 +53,14 @@ test('SEENIT-NOTIFICATION-002 et #623 affichent le numéro de saison et le numé
   });
 
   const copy = buildTvEpisodeReminderCopy(show, released, today);
-  assert.equal(copy.summaryText, '🆕 Nouvel épisode · S02 | E03');
-  assert.equal(copy.body, "S02 | E03 · Le combat disponible aujourd'hui.");
-  assert.doesNotMatch(copy.summaryText, /\+ \d+/);
+  assert.equal(copy.summaryText, 'Nouvel épisode');
+  assert.equal(copy.body, 'S02 | E03 · Le combat disponible aujourd’hui.');
+  assert.equal(copy.detailText, undefined);
+  assert.doesNotMatch(`${copy.summaryText} ${copy.body}`, /[📅🆕🎬📺✅🚀]/u);
+  assert.equal((copy.body.match(/S02 \| E03/g) || []).length, 1);
 });
 
-test('SEENIT-NOTIFICATION-002 et #623 signalent un seul épisode supplémentaire à rattraper', () => {
+test('SEENIT-NOTIFICATION-005 #623 exprime le retard en nombre total d’épisodes à voir', () => {
   const released = episode(2, 3, 'La finale');
   const nextToWatch = episode(2, 2, 'Demi-finale');
   const show = showFixture({
@@ -71,17 +70,13 @@ test('SEENIT-NOTIFICATION-002 et #623 signalent un seul épisode supplémentaire
   });
 
   const copy = buildTvEpisodeReminderCopy(show, released, today);
-  assert.equal(
-    copy.summaryText,
-    '🆕 Nouvel épisode · S02 | E03 · À voir S02 | E02 · + 1 épisode',
-  );
-  assert.equal(
-    copy.body,
-    "À voir : S02 | E02 · Demi-finale · + 1 épisode. Nouvel épisode : S02 | E03 · La finale disponible aujourd'hui.",
-  );
+  assert.equal(copy.summaryText, 'Nouvel épisode');
+  assert.equal(copy.body, 'À voir : S02 | E02 · 2 épisodes t’attendent.');
+  assert.equal(copy.detailText, 'Tu as 2 épisodes à reprendre. Un nouvel épisode est disponible aujourd’hui.');
+  assert.equal((`${copy.body} ${copy.detailText}`.match(/S\d{2} \| E\d{2}/g) || []).length, 1);
 });
 
-test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le prochain épisode à voir et le compteur de l’accueil', () => {
+test('SEENIT-NOTIFICATION-005 #623 reste aligné sur la reprise réelle quand plusieurs épisodes attendent', () => {
   const released = episode(2, 5, 'Cinquième manche');
   const nextToWatch = episode(2, 2, 'Deuxième manche');
   const show = showFixture({
@@ -91,24 +86,17 @@ test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le procha
   });
 
   const copy = buildTvEpisodeReminderCopy(show, released, today);
-  assert.equal(
-    copy.summaryText,
-    '🆕 Nouvel épisode · S02 | E05 · À voir S02 | E02 · + 3 épisodes',
-  );
-  assert.equal(
-    copy.body,
-    "À voir : S02 | E02 · Deuxième manche · + 3 épisodes. Nouvel épisode : S02 | E05 · Cinquième manche disponible aujourd'hui.",
-  );
+  assert.equal(copy.summaryText, 'Nouvel épisode');
+  assert.equal(copy.body, 'À voir : S02 | E02 · 4 épisodes t’attendent.');
+  assert.equal(copy.detailText, 'Tu as 4 épisodes à reprendre. Un nouvel épisode est disponible aujourd’hui.');
 
-  // Le nom de ce TNR est conservé pour l'ancrage SEENIT-NOTIFICATION-002 historique.
-  // Depuis #690, la carte 8f réserve cet emplacement aux badges et ne répète plus le compteur.
   const homeSource = readFileSync('src/components/cards/ContinueWatchingCard.tsx', 'utf8');
   assert.doesNotMatch(homeSource, /getExtraAvailableEpisodes/);
   assert.doesNotMatch(homeSource, /restant/);
   assert.match(homeSource, /episodeFreshnessBadge/);
 });
 
-test('SEENIT-NOTIFICATION-002 et #623 restent lisibles lorsque TMDB ne fournit pas de nom d’épisode', () => {
+test('SEENIT-NOTIFICATION-005 reste lisible lorsque TMDB ne fournit pas de nom d’épisode', () => {
   const released = episode(1, 2);
   const show = showFixture({
     seenEpisodes: ['1x1'],
@@ -117,17 +105,17 @@ test('SEENIT-NOTIFICATION-002 et #623 restent lisibles lorsque TMDB ne fournit p
   });
 
   const copy = buildTvEpisodeReminderCopy(show, released, today);
-  assert.equal(copy.summaryText, '🆕 Nouvel épisode · S01 | E02');
-  assert.equal(copy.body, "S01 | E02 disponible aujourd'hui.");
+  assert.equal(copy.summaryText, 'Nouvel épisode');
+  assert.equal(copy.body, 'S01 | E02 disponible aujourd’hui.');
   assert.doesNotMatch(`${copy.summaryText} ${copy.body}`, /undefined|null/);
 });
 
-test('SEENIT-NOTIFICATION-002 et #623 reprogramment une alarme future si le contexte de progression change', () => {
+test('SEENIT-NOTIFICATION-006 migre les alarmes futures vers le payload subText v8', () => {
   const source = readFileSync('src/hooks/useRemindersNotifier.ts', 'utf8');
-  assert.match(source, /REMINDER_SCHEDULE_SCHEMA = 'v7'/);
+  assert.match(source, /REMINDER_SCHEDULE_SCHEMA = 'v8'/);
   assert.match(
     source,
-    /contentRevision = getMediaReminderNotificationId\(\`copy:\$\{summaryText\}:\$\{msgBody\}\`\)/,
+    /contentRevision = getMediaReminderNotificationId\(\`copy:\$\{summaryText\}:\$\{msgBody\}:\$\{detailText \|\| ''\}\`\)/,
   );
   assert.doesNotMatch(source, /_c\$\{contentRevision\}/);
   assert.match(source, /activeContentRevision !== contentRevision/);
