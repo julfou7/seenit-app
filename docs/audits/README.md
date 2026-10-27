@@ -1,5 +1,8 @@
 # Registre des audits SeenIt
 
+Terrain230 : [Non vu historique et recherche au clavier](./terrain230-non-vu-clavier-2026-10-27.md),
+baseline701054d, #729/#774 ; mutation sans fournisseur, scénario tactile et clavier Explorer.
+
 Terrain229 / historique : [cause du gel et scénario6300visionnages](./terrain229-historique-perf-2026-10-27.md),
 baseline0c4bd8a, #729 ; dates, résumés et bascules des trois panneaux, navigation compacte.
 

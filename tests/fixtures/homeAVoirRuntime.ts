@@ -51,9 +51,14 @@ export const sendNativeNotification = async () => { reminderControl.nativeNotifi
 export const EpisodeDetailModal = () => createElement('div', null, 'Fiche épisode');
 export const PersonDetailModal = () => null;
 const motionSeasons = new Map<number, {season_number:number;episode_count:number;episodes:Array<{season_number:number;episode_number:number;name:string;air_date:string;runtime:number}>}>();
+export const historyUnseenControl = { holdDetails: false, detailCalls: 0 };
 export const tmdb = { ...base.tmdb,
   getSeasonDetails: async (id:number, season:number) => motionSeasons.has(id) ? {ok:true,value:motionSeasons.get(id)!} : base.tmdb.getSeasonDetails(id,season),
-  getEpisodeDetails: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } }),
+  getEpisodeDetails: async (_id: number, season: number, episode: number) => {
+    historyUnseenControl.detailCalls++;
+    if (historyUnseenControl.holdDetails) await new Promise(() => {});
+    return { ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } };
+  },
   getEpisodeHistoryMetadata: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: `Épisode ${episode}`, runtime: 42, season_number: season, episode_number: episode } }),
   getMovieDetails: async (id: number) => id===303 ? {ok:true,value:{belongs_to_collection:{id:555}}} : base.tmdb.getMovieDetails(id),
   getCollectionDetails: async () => ({ ok: true, value: { parts: [{id:301,release_date:'2018-01-01'},{id:302,release_date:'2021-01-01'},{id:303,release_date:date(12)}] } }),

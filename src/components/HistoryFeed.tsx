@@ -459,22 +459,12 @@ export const HistoryFeed = memo(function HistoryFeed({
     if (isMovie) {
       if (targetShow.status === 'completed') newStatus = 'plan_to_watch';
     } else {
-      let epDetails: CachedEpisode | undefined;
       const cachedSeason = (targetShow.seasonsCache as CachedSeason[] | undefined)?.find(season => season.season_number === item.season);
-      epDetails = cachedSeason?.episodes?.find(episode => episode.episode_number === item.episode);
-      if (!epDetails && targetShow.tmdbId) {
-        const result = await tmdb.getEpisodeDetails(targetShow.tmdbId, item.season, item.episode);
-        if (result.ok) {
-          const value = asRecord(result.value);
-          epDetails = {
-            episode_number: item.episode,
-            air_date: asString(value?.air_date) || null,
-            name: asString(value?.name) || null,
-            still_path: asString(value?.still_path) || null,
-          };
-        }
-      }
+      // Un dé-vu est un delta utilisateur local, jamais dépendant d'une réponse TMDB.
+      const epDetails = cachedSeason?.episodes?.find(episode => episode.episode_number === item.episode);
       newNextEp = {
+        ...(targetShow.nextEpisodeToWatch?.season_number === item.season ? targetShow.nextEpisodeToWatch : {}),
+        ...targetShow.seasonProgress?.[String(item.season)],
         season_number: item.season,
         episode_number: item.episode,
         air_date: epDetails?.air_date || null,
@@ -485,16 +475,21 @@ export const HistoryFeed = memo(function HistoryFeed({
       newIsArchived = false;
     }
 
-    await updateShow(targetShow.id, {
-      seenEpisodes: newSeenEpisodes,
-      episodeRecords: newRecords,
-      status: newStatus,
-      isArchived: newIsArchived,
-      lastWatchedAt: newLastWatchedAt,
-      nextEpisodeToWatch: newNextEp,
-      updatedAt: Date.now(),
-      isSynced: false,
-    });
+    try {
+      await updateShow(targetShow.id, {
+        seenEpisodes: newSeenEpisodes,
+        episodeRecords: newRecords,
+        status: newStatus,
+        isArchived: newIsArchived,
+        lastWatchedAt: newLastWatchedAt,
+        nextEpisodeToWatch: newNextEp,
+        updatedAt: Date.now(),
+        isSynced: false,
+      });
+    } catch {
+      showToast('Le passage en non vu n’a pas pu être enregistré. Réessaie.', 'error');
+      return;
+    }
     scrollAllCarouselsToStart();
 
     const epLabel = isMovie

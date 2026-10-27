@@ -17,7 +17,9 @@ const { testTerrain220Harness } = require('./home-terrain220-browser-checks.cjs'
 const { testTerrain221Harness } = require('./home-terrain221-browser-checks.cjs');
 const { buildHomeHarness, testHomeHarness } = require('./home-a-voir-browser-checks.cjs');
 const { testHomePerformanceHarness } = require('./home-performance-browser-checks.cjs');
+const { testHomeUnseenHarness } = require('./home-unseen-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
+const { buildSearchKeyboardHarness, testSearchKeyboardHarness } = require('./search-keyboard-browser-checks.cjs');
 
 const root = path.resolve(__dirname, '..');
 const configPath = path.join(root, 'docs', 'specifications', 'quality-gates.json');
@@ -502,6 +504,7 @@ async function main() {
     await buildHistoryHarness(root);
     await buildWatchNextHarness(root);
     await buildNavbarHarness(root);
+    await buildSearchKeyboardHarness(root);
     await buildHomeHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
@@ -562,6 +565,7 @@ async function main() {
       seriesCards: await testSeriesCardHarness(client, root),
       history: await testHistoryHarness(client, root),
       navbar: await testNavbarHarness(client, root),
+      searchKeyboard: await testSearchKeyboardHarness(client, root),
       // L'horloge virtuelle de la minuterie 18c reste la dernière vérification du client CDP.
       watchNext: await testWatchNextHarness(client, root),
       homeV4: await testTerrain220Harness(client, root),
@@ -581,6 +585,7 @@ async function main() {
     };
     const homeReport = await testHomeHarness(client, root);
     report.homePerformance = await testHomePerformanceHarness(root, client);
+    report.homeUnseen = await testHomeUnseenHarness(root, client);
     fs.writeFileSync(path.join(reportDir, 'home-a-voir.json'), JSON.stringify(homeReport, null, 2));
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.md'), [

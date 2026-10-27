@@ -11,6 +11,9 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 
 ## 1. Principes à préserver
 
+Explorer (#774) : pendant la saisie, champ à 8 px au-dessus du clavier, navigation basse masquée.
+Fermeture du clavier/blur : retour à la disposition normale sans vider la recherche ni les filtres.
+
 ### Bandes-annonces — contrat #447
 
 Un appui ouvre le lecteur partagé ; choisir une vidéo ne change que l'identité YouTube de l'iframe.

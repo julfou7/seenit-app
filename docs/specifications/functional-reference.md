@@ -275,7 +275,9 @@ annulation.
 ### 5.3 Historique et actualités
 
 - L'[historique mixte](../design/history-16d.md) suit la liste compacte de la SPEC accueil v3 : un bloc arrondi, films et épisodes triés depuis leurs `watchedAt`, sans groupes de date ni barres de progression. La date courte apparaît dans chaque ligne (ce soir aujourd’hui) ; une heure inconnue reste inconnue.
-- « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler.
+- « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler. Son enregistrement
+  ne dépend d'aucun appel TMDB ; le prochain épisode conserve les compteurs déjà connus de sa saison.
+  Un échec d'écriture est signalé explicitement, sans annoncer une suppression réussie.
 - Films et épisodes ont la même ligne (minimum 76 px), vignette still/backdrop 92×52, titre or, code/date et titre d’épisode, pastille SeenIt or 26 px. Un film n’affiche ni année ni mention Film. Le tap ouvre
   l'épisode exact ou le film ; l'appui long/menu clavier propose Non vu (confirmation et Annuler),
   Changer la date/heure (heure facultative et Annuler), Revoir et Ouvrir la série.
@@ -330,6 +332,10 @@ utilisent la même URL ; elle rouvre la fiche exacte après démarrage/authentif
 Firestore privé.
 
 ## 7. Explorer
+
+Pendant la saisie dans Explorer, le champ reste à 8 px du clavier et l'îlot de navigation est masqué.
+La fermeture du clavier ou la sortie du champ restaure le placement habituel, la requête et les filtres
+restent conservés (`SEENIT-DISCOVER-003`, #774).
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
