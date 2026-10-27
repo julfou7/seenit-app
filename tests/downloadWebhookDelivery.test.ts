@@ -3,7 +3,7 @@ import test from 'node:test';
 import { deliverDownloadWebhookPresentation } from '../src/features/downloads/downloadWebhookDelivery.ts';
 import { buildDownloadWebhookPresentation } from '../src/features/downloads/downloadWebhookNotification.ts';
 
-test('SEENIT-NOTIFICATION-003 #778 garde l’import visible et ajoute la vérification Plex capable', async () => {
+test('SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérification Plex capable', async () => {
   const presentation = buildDownloadWebhookPresentation('radarr', {
     eventType: 'Download',
     downloadId: 'terrain-199',
