@@ -13,6 +13,8 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 
 Explorer (#774) : pendant la saisie, champ à 8 px au-dessus du clavier, navigation basse masquée.
 Fermeture du clavier/blur : retour à la disposition normale sans vider la recherche ni les filtres.
+Une loupe à gauche de la navigation Explorer rouvre la recherche et le clavier sans déplacer les résultats.
+Cette action explicite reste accessible après repli de la barre, avec cible tactile >=44 px et nom accessible.
 
 ### Bandes-annonces — contrat #447
 
@@ -42,7 +44,7 @@ Ce contrat automatisé ne vaut pas preuve de lecture ou de rotation sur un tél�
 | Navigation basse, onglet actif | Appui simple | Émet `app-close-modals`, puis recule l'historique si modal, sinon ferme la fiche | Intention de retour utile ; vérifier qu'un seul niveau se ferme. |
 | Navigation basse | Deux taps espacés de moins de 350 ms | Le premier appui revient d'un niveau ou remonte à la racine, le second réinitialise la page active | Contrat `SEENIT-UX-005`, portée locale et toast propre à l'écran ; A → B → B exclu. |
 | Double appui Explorer | Reset + remontée | Recherche vide, catégorie Tout, plateformes/genres vides, âge Tous, note Toutes, tri populaire descendant, hero première carte | Préserver ce raccourci volontaire, montrer son effet ; jamais effacer les préférences du compte. |
-| Explorer, liste verticale | Swipe / défilement vertical | La descente masque la barre de recherche ; seule une remontée la réaffiche | Le geste tactile et le `scrollTop` réel gardent la même sémantique ; un swipe de descente ne doit jamais rouvrir la recherche. |
+| Explorer, liste verticale | Swipe / défilement vertical | La descente masque la barre de recherche ; une remontée la réaffiche | La loupe à gauche de la navigation permet aussi de la rouvrir sans défilement ; un swipe de descente ne doit jamais rouvrir la recherche. |
 | Double appui Profil | Reset + remontée | Ferme Réglages/personne, revient à Statistiques et nettoie l'état local de Ma Liste | Ne modifie aucun suivi ni statistique. |
 | Double appui À voir | Reset + remontée | Revient à À Regarder, replie les sections et remet les carrousels au début | Ne modifie aucune progression. |
 | Double appui Télécharger | Reset + remontée | Revient à Mes téléchargements, ferme la configuration, vide recherche/filtres/résultats locaux | N'annule ni n'efface aucun transfert. |

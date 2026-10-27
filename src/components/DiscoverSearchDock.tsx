@@ -46,6 +46,7 @@ export function DiscoverSearchDock({ handleTouchStart, handleTouchMove, handleTo
               <Search size={18} className="text-zinc-500 shrink-0 ml-1" />
               <input
                 ref={inputRef}
+                id="discover-search"
                 type="text"
                 enterKeyHint="search"
                 placeholder="Séries, films, acteurs..."

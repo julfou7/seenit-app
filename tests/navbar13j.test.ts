@@ -10,9 +10,11 @@ test('SEENIT-UX-017 les raccourcis actifs et les réglages évitent les entrées
   let quick = 0;
   const actions = { changeTab: (tab: RootNavigationTab) => changes.push(tab), request: (tab: RootNavigationTab) => requests.push(tab), quickAccount: () => { quick++; } };
   activateNavigationShortcut('discover', 'discover', actions);
+  // La loupe peut rouvrir plusieurs fois la recherche, sans navigation ni reset.
+  activateNavigationShortcut('discover', 'discover', actions);
   activateNavigationShortcut('downloads', 'downloads', actions);
   assert.deepEqual(changes, []);
-  assert.deepEqual(requests, ['discover', 'downloads']);
+  assert.deepEqual(requests, ['discover', 'discover', 'downloads']);
   activateNavigationShortcut('discover', 'profile', actions);
   assert.equal(quick, 1);
   assert.deepEqual(changes, []);

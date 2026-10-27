@@ -239,6 +239,9 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   sans réserver l'espace de la navigation basse ; celle-ci et son fondu sont masqués. Le viewport visuel
   et le redimensionnement Android sont pris en compte sans double compensation. Fermer le clavier ou
   quitter le champ restaure la navigation et la position habituelle sans effacer la requête ni les filtres.
+  Dans Explorer, une loupe explicite à gauche de l'îlot de navigation permet de rouvrir et focaliser
+  la recherche repliée sans défilement des résultats ni réinitialisation. Elle possède une cible de
+  44 px minimum et une activation clavier ; elle est masquée avec la navigation pendant la saisie.
   Un clavier matériel reste utilisable ; aucune recherche réseau n'est provoquée par le déplacement.
 
 - **SEENIT-DISCOVER-001** — La catégorie Explorer **« Au cinéma »** et tout badge portant ce libellé

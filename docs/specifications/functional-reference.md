@@ -336,6 +336,8 @@ Firestore privé.
 Pendant la saisie dans Explorer, le champ reste à 8 px du clavier et l'îlot de navigation est masqué.
 La fermeture du clavier ou la sortie du champ restaure le placement habituel, la requête et les filtres
 restent conservés (`SEENIT-DISCOVER-003`, #774).
+Dans Explorer, la loupe à gauche de la navigation rouvre et focalise la barre à tout moment,
+y compris après son repli au défilement. La position des résultats, la requête et les filtres sont conservés.
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
