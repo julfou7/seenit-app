@@ -132,7 +132,7 @@ export function WatchListView({ model }: WatchListViewProps) {
         <div ref={historyRef} id="home-panel-history" role="tabpanel" aria-labelledby="home-tab-history" hidden={activeTab !== 'history'} tabIndex={0} className="home-panel-content">
           {activeTab === 'history' && !mountedHomeTabs.has('history') && <div className="home-skeleton" role="status" aria-label="Chargement de l’historique"><div><span /><div /></div></div>}
           {mountedHomeTabs.has('history') && <Activity mode={activeTab === 'history' ? 'visible' : 'hidden'}>
-            <HistoryFeed onExplore={onExplore} onShowClick={onShowClick} onEpisodeClick={openHistoryEpisode} />
+            <HistoryFeed today={today} onExplore={onExplore} onShowClick={onShowClick} onEpisodeClick={openHistoryEpisode} />
           </Activity>}
         </div>
       </>}

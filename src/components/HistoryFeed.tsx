@@ -206,6 +206,7 @@ function HistoryRowItem({
 
 export const HistoryFeed = memo(function HistoryFeed({
   active = true,
+  today = historyLocalDayKey(Date.now()),
   onExplore,
   onShowClick,
   onEpisodeClick
@@ -214,6 +215,7 @@ export const HistoryFeed = memo(function HistoryFeed({
   onEpisodeClick?: (showId: string, season: number, episode: number) => void;
   onExplore?: () => void;
   active?: boolean;
+  today?: string;
 }) {
   const [page, setPage] = useState(1);
   const itemsPerPage = HISTORY_PAGE_SIZE;
@@ -288,8 +290,7 @@ export const HistoryFeed = memo(function HistoryFeed({
   const rows = useMemo(() => buildHistoryRows(historyItems), [historyItems]);
   const displayedRows = useMemo(() => rows.slice(0, page * itemsPerPage), [rows, page]);
   const displayedItems = useMemo(() => displayedRows.flatMap(row => row.members), [displayedRows]);
-  const day = historyLocalDayKey(Date.now());
-  const periods = useMemo(() => indexHistoryPeriods(rows), [rows, day]);
+  const periods = useMemo(() => indexHistoryPeriods(rows), [rows, today]);
   const summaries = useMemo(() => {
     const movieDurations = new Map<number, number | null>();
     const minutes = (item: HistoryItem): number | null => {

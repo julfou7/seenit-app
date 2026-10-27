@@ -1,7 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { buildHistoryRows, historyPeriod, historyPeriodSummary, indexHistoryPeriods, type TimelineEntry } from '../src/features/history/historyTimeline.ts';
 import { formatHistoryAriaWhen, formatHistoryClock, formatHistoryRowDate } from '../src/features/history/historyPresentation.ts';
+
+test('SEENIT-PERF-001 invalide les périodes conservées au changement de jour', () => {
+  const yesterday = new Date(2026, 9, 27, 23, 59).getTime();
+  const tomorrow = new Date(2026, 9, 28, 0, 1).getTime();
+  const rows = buildHistoryRows([{ key:'one', showId:'one', mediaType:'tv' as const, season:1, episode:1, watchedAt:yesterday }]);
+  assert.equal(indexHistoryPeriods(rows, yesterday).get('today')?.rows.length, 1);
+  assert.equal(indexHistoryPeriods(rows, tomorrow).has('today'), false);
+  assert.equal(indexHistoryPeriods(rows, tomorrow).get('yesterday')?.rows.length, 1);
+  const view = readFileSync('src/screens/WatchListView.tsx', 'utf8');
+  assert.match(view, /<HistoryFeed today=\{today\}/, 'le panneau mémorisé reçoit le jour suivi par son parent');
+});
 
 test('SEENIT-PERF-001 indexe 6300 visionnages sans perdre les totaux complets des périodes', () => {
   const now = new Date(2026, 9, 27, 14).getTime();
