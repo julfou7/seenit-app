@@ -8,11 +8,28 @@ import {
 } from '../../lib/firebase';
 import { resolveMediaReminderSchedule } from './mediaReminderSchedule';
 import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
+import {
+  ensureSeenItNotificationChannels,
+  SEENIT_NOTIFICATION_CHANNELS,
+} from './notificationChannels.ts';
 
 const localConsole = globalThis.console;
 
+type PendingMediaNotification = {
+  id: number;
+  extra?: Record<string, unknown>;
+};
+
+type LocalScheduleNotification = Parameters<typeof LocalNotifications.schedule>[0]['notifications'][number] & {
+  subText?: string;
+};
+
 export interface MediaReminderNotificationOptions extends NativeNotificationOptions {
+  /** Libellé historique conservé côté appelants ; il devient le subText Android. */
   summaryText: string;
+  /** Texte développé distinct du fait compact. */
+  detailText?: string;
+  channelId?: string;
   allowMarkWatched?: boolean;
 }
 
@@ -27,6 +44,13 @@ function resolveNotificationId(options: MediaReminderNotificationOptions): numbe
     return generateNotificationNumericId(`ep_${options.showId}_S${options.season}E${options.episode}`);
   }
   return Math.floor(Math.random() * 1_000_000);
+}
+
+function resolveChannelId(options: MediaReminderNotificationOptions): string {
+  if (options.channelId) return options.channelId;
+  return options.mediaType === 'movie'
+    ? SEENIT_NOTIFICATION_CHANNELS.movies
+    : SEENIT_NOTIFICATION_CHANNELS.episodes;
 }
 
 export async function cancelMediaReminderNotificationByTag(tag: string): Promise<void> {
@@ -56,13 +80,14 @@ export async function prunePendingMediaReminderNotifications(
   try {
     const allowed = new Set(allowedNotificationIds);
     const pending = await LocalNotifications.getPending();
-    const notifications = (pending.notifications || [])
-      .filter((notification: { extra?: Record<string, unknown>; id?: number }) => (
-        String(notification?.extra?.showId ?? '') === String(showId)
-        && String(notification?.extra?.mediaType ?? 'tv') === mediaType
-        && !allowed.has(Number(notification?.id))
+    const pendingNotifications = pending.notifications as PendingMediaNotification[];
+    const notifications = pendingNotifications
+      .filter(notification => (
+        String(notification.extra?.showId ?? '') === String(showId)
+        && String(notification.extra?.mediaType ?? 'tv') === mediaType
+        && !allowed.has(Number(notification.id))
       ))
-      .map((notification: any) => ({ id: Number(notification.id) }))
+      .map(notification => ({ id: Number(notification.id) }))
       .filter(notification => Number.isInteger(notification.id));
 
     if (notifications.length > 0) {
@@ -97,13 +122,15 @@ export async function sendMediaReminderNotification(
       if (requested.display !== 'granted') return false;
     }
 
+    await ensureSeenItNotificationChannels();
+
     if (options.allowMarkWatched) {
       await LocalNotifications.registerActionTypes({
         types: [{
           id: 'EPISODE_NOTIF_ACTIONS',
           actions: [{
             id: 'mark_watched',
-            title: '✓ Marquer comme vu',
+            title: '✓ Vu',
             foreground: true,
           }],
         }],
@@ -125,32 +152,38 @@ export async function sendMediaReminderNotification(
       episode: options.episode,
     };
     const schedule = resolveMediaReminderSchedule(options.scheduleDate);
+    const detailText = options.detailText?.trim();
 
     if (ownerUid && auth.currentUser?.uid !== ownerUid) return false;
-    await LocalNotifications.schedule({
-      notifications: [{
-        title,
-        body: options.body || '',
-        largeBody: options.body || '',
-        summaryText: options.summaryText,
-        id: resolveNotificationId(options),
-        ...(schedule ? { schedule } : {}),
-        smallIcon: 'ic_stat_seenit',
-        iconColor: '#E5A93D',
-        largeIcon: iconUrl || undefined,
-        attachments,
-        actionTypeId: options.allowMarkWatched ? 'EPISODE_NOTIF_ACTIONS' : undefined,
-        extra: {
-          ownerUid,
-          showId: extraData.showId,
-          tmdbId: extraData.tmdbId,
-          mediaType: extraData.mediaType || 'tv',
-          season: extraData.season,
-          episode: extraData.episode,
-          url: extraData.url,
-        },
-      }],
-    });
+
+    const notification: LocalScheduleNotification = {
+      title,
+      body: options.body || '',
+      largeBody: detailText || options.body || '',
+      // BigPicture utilise encore summaryText pour le texte développé ; le type
+      // passe désormais exclusivement par subText.
+      summaryText: attachments && detailText ? detailText : undefined,
+      subText: options.summaryText,
+      id: resolveNotificationId(options),
+      ...(schedule ? { schedule } : {}),
+      channelId: resolveChannelId(options),
+      smallIcon: 'ic_stat_seenit',
+      iconColor: '#E5A93D',
+      largeIcon: iconUrl || undefined,
+      attachments,
+      actionTypeId: options.allowMarkWatched ? 'EPISODE_NOTIF_ACTIONS' : undefined,
+      extra: {
+        ownerUid,
+        showId: extraData.showId,
+        tmdbId: extraData.tmdbId,
+        mediaType: extraData.mediaType || 'tv',
+        season: extraData.season,
+        episode: extraData.episode,
+        url: extraData.url,
+      },
+    };
+
+    await LocalNotifications.schedule({ notifications: [notification] });
     return true;
   } catch (error) {
     recordClientOperationalSignal('NOTIFICATION_CLIENT_FAILED');
