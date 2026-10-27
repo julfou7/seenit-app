@@ -19,6 +19,8 @@ const { buildHomeHarness, testHomeHarness } = require('./home-a-voir-browser-che
 const { testHomePerformanceHarness } = require('./home-performance-browser-checks.cjs');
 const { testHomeUnseenHarness } = require('./home-unseen-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
+const { buildTvHarness, testTvHarness } = require('./tv-browser-checks.cjs');
+
 const { buildSearchKeyboardHarness, testSearchKeyboardHarness } = require('./search-keyboard-browser-checks.cjs');
 
 const root = path.resolve(__dirname, '..');
@@ -504,6 +506,8 @@ async function main() {
     await buildHistoryHarness(root);
     await buildWatchNextHarness(root);
     await buildNavbarHarness(root);
+    await buildTvHarness(root);
+
     await buildSearchKeyboardHarness(root);
     await buildHomeHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
@@ -565,6 +569,8 @@ async function main() {
       seriesCards: await testSeriesCardHarness(client, root),
       history: await testHistoryHarness(client, root),
       navbar: await testNavbarHarness(client, root),
+      tv: await testTvHarness(client, root),
+
       searchKeyboard: await testSearchKeyboardHarness(client, root),
       // L'horloge virtuelle de la minuterie 18c reste la dernière vérification du client CDP.
       watchNext: await testWatchNextHarness(client, root),

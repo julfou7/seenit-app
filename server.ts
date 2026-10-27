@@ -5,6 +5,8 @@ import { createServer as createViteServer } from "vite";
 import cron from "node-cron";
 import { getMessaging } from "firebase-admin/messaging";
 import { adminAuth, adminDb } from "./src/lib/firebase-admin.ts";
+import { registerTvPairingRoutes } from './src/features/tv/tvPairingRoutes.ts';
+import { createFirestoreTvLinkStore, readTvLibrary } from './src/features/tv/tvPairingFirestore.ts';
 import { processReleaseUpdateNotificationRequest } from "./src/features/release/releaseUpdatePushBackend.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
 import dns from "node:dns/promises";
@@ -576,6 +578,10 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  registerTvPairingRoutes(app, {
+    store: createFirestoreTvLinkStore(adminDb), authenticate: requireAuth, rateLimit,
+    library: uid => readTvLibrary(adminDb, uid),
+  });
   registerMediaProviderRoutes(app, {
     authenticate: requireAuth,
     parentalEvidence: {
@@ -1049,9 +1055,9 @@ async function startServer() {
       }
 
       return res.json({ available: false });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[Plex Availability] Error:', err);
-      return res.status(500).json({ error: err?.message || 'Erreur interne' });
+      return res.status(500).json({ error: err instanceof Error ? err.message : 'Erreur interne' });
     }
   });
 

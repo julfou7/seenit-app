@@ -322,3 +322,11 @@ Les notifications confirment « ✅ Import terminé », puis
 
 
 Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
+
+
+### SeenIt TV V4 — 27 octobre 2026 (#295)
+
+Trois destinations visuelles, rangée d'apps générique, sources natives et réglages en partie
+basse. En-tête fixe, Retour remonte la Home avant de quitter, focus visible et mouvement réduit.
+Compte/QR réservé à l'association explicite d'un profil adulte ; aucun visionnage attribué
+par un simple lancement d'app. Référence : [TV V4](tv-samsung-launcher-v4.md).

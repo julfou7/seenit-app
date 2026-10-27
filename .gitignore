@@ -23,6 +23,7 @@ release_patch.cjs
 *.zip
 android/*.zip
 *.apk
+*.wgt
 
 # Généré depuis docs/specifications/android-contract.json ; AI Studio ne le transporte pas.
 android/app/google-services.json

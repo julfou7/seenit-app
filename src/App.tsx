@@ -48,6 +48,7 @@ import { activateCurrentNavigationTab, resetCurrentNavigationTab } from './featu
 import type { RootNavigationTab } from './features/navigation/tabPresentation';
 import { activateNavigationShortcut } from './features/navigation/navigationShortcuts';
 const QuickAccountSheet = lazy(() => import('./components/QuickAccountSheet').then(module => ({ default: module.QuickAccountSheet })));
+const TvPairingPage = lazy(() => import('./screens/TvPairingPage').then(module => ({ default: module.TvPairingPage })));
 
 const loadProfileScreen = createCachedAsyncLoader(() => import('./screens/ProfileScreen').then(module => ({ default: module.ProfileScreen })));
 const loadShowDetailScreen = createCachedAsyncLoader(() => import('./screens/ShowDetailScreen').then(module => ({ default: module.ShowDetailScreen })));
@@ -148,7 +149,7 @@ export default function App() {
   const isReady = currentUser !== undefined;
 
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || window.location.pathname === '/tv/connect') return;
     void preloadInBackground(privateScreenPreloaders);
   }, [currentUser]);
 
@@ -179,7 +180,9 @@ export default function App() {
       )}
 
       {isReady && isSplashClosing ? (
-        currentUser === null ? <LoginScreen /> : <MainApp />
+        currentUser === null ? <LoginScreen /> : window.location.pathname === '/tv/connect'
+          ? <Suspense fallback={<div role="status">Connexion SeenIt TV…</div>}><TvPairingPage user={currentUser} /></Suspense>
+          : <MainApp />
       ) : (
         <div className="w-full min-h-[100dvh] bg-[#040406]" />
       )}

@@ -11,7 +11,7 @@ try {
 }
 
 const cataloguePath = path.join(root, 'docs/specifications/requirements.json');
-const allowedTargets = new Set(['backend', 'pwa', 'apk', 'ci']);
+const allowedTargets = new Set(['backend', 'pwa', 'apk', 'tv', 'ci']);
 const requirementIdPattern = /^SEENIT-(?:[A-Z0-9]+-)+\d{3}$/;
 const documentedRequirementPattern = /\*\*(SEENIT-(?:[A-Z0-9]+-)+\d{3})\*\*/g;
 

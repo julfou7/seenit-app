@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "verification_date": "2026-10-27",
+  "model": "QE55Q6FNA",
+  "platform": "18_KANTM2_QTV",
+  "tizen_version": "4.0",
+  "installed_firmware": "T-KTM2DEUC-1400.2, BT-S",
+  "installed_firmware_evidence": "Photo du propriétaire, pas une déduction depuis la dernière version en ligne.",
+  "status": "Analyse horsTV ; root non réalisé, méthode complète non validée.",
+  "artifacts": [
+    {
+      "name": "T-KTM2DEUC-1400.2.zip",
+      "size": 1375406746,
+      "sha256": "0f30e46098495e88f809b637b977c7f3da55ae1603f3ce71d10bf057ace2ada4",
+      "checks": [
+        "SHA-256 comparé à la référence de compatibilité"
+      ],
+      "included_in_repository": false
+    },
+    {
+      "name": "uImage",
+      "size": 6506176,
+      "sha256": "5a9f1c491e0125836a3c75fec0f56b3064563316b06c0e0ecb6f073a185021f5",
+      "section_crc32": "de0e4f22",
+      "checks": [
+        "SHA-256 comparé à la référence de compatibilité",
+        "CRC32 section MSDU11",
+        "CRC32 en-tête uImage",
+        "CRC32 données uImage"
+      ],
+      "included_in_repository": false
+    },
+    {
+      "name": "kernel.bin",
+      "size": 6505800,
+      "sha256": "1aad059596e65142b61bdd5928a1ec5cd2b8c87e61b1bc03bb984ad7cb60e5c8",
+      "checks": [
+        "Corps du conteneur uImage vérifié"
+      ],
+      "linux_version": "4.1.10",
+      "included_in_repository": false
+    },
+    {
+      "name": "platform.img",
+      "size": 1362239488,
+      "crc32": "1ea1c9f9",
+      "sha256": "a18f0c42543f41cfba7ef7f1799a4de5c8ca4a9f457d25e52f6d76bcac265a1b",
+      "verified": true,
+      "checks": [
+        "Taille et CRC32 comparés à la table MSDU11"
+      ],
+      "included_in_repository": false
+    }
+  ],
+  "sources": [
+    {
+      "repository": "Luminger/samsung-tv-usb-root",
+      "commit": "223f1cd6cca185f93fe7db53ef71eb52963a7086",
+      "purpose": "Matrice de compatibilité, candidat statique2018 uniquement"
+    },
+    {
+      "repository": "theubusu/unixtract",
+      "commit": "3310492cf19c56617acfe84f2f36f14aaab0df5b",
+      "purpose": "Description du conteneur MSDU11 et de la table des sections"
+    },
+    {
+      "repository": "cfloinc/samsung-q70t-tizen-root",
+      "commit": "a160316e70c00b4b83342cfe4bbc8036473533bc",
+      "purpose": "Référence Q70T distincte ; aucune compatibilité Q6FN démontrée"
+    },
+    {
+      "repository": "gtors/vdfs-unpack",
+      "commit": "0bc1e65b74016fbd59d5d68f09ab7920044be1f9",
+      "purpose": "Source consultée ; extracteur non exécuté"
+    }
+  ],
+  "firmware_url": "https://org.downloadcenter.samsung.com/content/FM/202607/20260729103150980/T-KTM2DEUC.zip",
+  "state": {
+    "usb_capacity_gb_reported": 32,
+    "usb_formatted": false,
+    "usb_root_image_created": false,
+    "root_attempted_on_tv": false,
+    "firmware_flashed": false,
+    "persistent_system_change": false,
+    "exfat_driver_independently_extracted": false,
+    "full_chain_validated": false
+  },
+  "ram": {
+    "total_bytes": 1959391232,
+    "reference_available_bytes": 347123712,
+    "last_median_available_bytes": 390901760,
+    "samples_available_bytes": [
+      390901760,
+      395993088,
+      377733120
+    ],
+    "stable_gain_demonstrated": false,
+    "airplay_disabled_confirmed": true,
+    "hbbtv_disabled_confirmed": true,
+    "voice_wakeup_disabled_confirmed": false
+  },
+  "issue": "https://github.com/julfou7/seenit-app/issues/295"
+}

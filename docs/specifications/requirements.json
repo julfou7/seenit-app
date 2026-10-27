@@ -4,6 +4,37 @@
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
+      "id": "SEENIT-TV-001",
+      "title": "Launcher TV V4, sources natives, apps réellement inventoriées et mémoire bornée",
+      "targets": [
+        "tv"
+      ],
+      "tests": [
+        {
+          "file": "tests/tvSamsungPrototype.test.ts",
+          "contains": "SEENIT-TV-001"
+        },
+        {
+          "file": "tests/tvSamsungModel.test.ts",
+          "contains": "SEENIT-TV-001"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-TV-002",
+      "title": "Association QR explicite du compte SeenIt et session TV restreinte",
+      "targets": [
+        "tv",
+        "pwa"
+      ],
+      "tests": [
+        {
+          "file": "tests/tvPairing.test.ts",
+          "contains": "SEENIT-TV-002"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DISCOVER-003",
       "title": "Recherche Explorer ancrée au clavier, navigation masquée en saisie et loupe de réouverture",
       "targets": [

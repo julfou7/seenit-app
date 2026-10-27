@@ -1,5 +1,30 @@
 # SeenIt — Référence fonctionnelle canonique
 
+## Extension Samsung TV — V4, 27 octobre 2026 (#295)
+
+Le runtime isolé `tv-samsung/` présente trois grandes destinations TV/TNT, Films et Sport,
+huit favoris maximum sur la rangée, Ajouter/Toutes, puis les sources réellement détectées.
+La roue mène aux réglages de la partie basse, sous un en-tête fixe. Retour remonte d'abord
+l'accueil avant de proposer de quitter. Les apparences Brume/Crépuscule/Auto sont conservées.
+L'inventaire complet garde USER/SYSTEM/UNKNOWN et toutes les variantes, sans table d'IDs
+universelle. Une épingle explicite conserve son ID ; Milo n'affiche que sa sélection locale,
+Invité ne persiste rien. Les anciennes épingles ne sont pas effacées par la limite V4.
+
+Le compte adulte s'associe par QR : consentement explicite du téléphone authentifié, code
+valable dix minutes, session TV limitée à trente jours. La TV ne reçoit aucun jeton Firebase,
+consulte uniquement une liste bornée et n'écrit aucun visionnage. Les autres profils restent
+locaux. Dissociation confirmée, cache privé effacé et révocation rejouée si le réseau manque.
+Les images, timers et requêtes de pairing s'arrêtent hors premier plan. L'absence d'association
+ou de réseau laisse le launcher et ses apps utilisables.
+
+HDMI transmet le descripteur natif Tizen exact, sans reconstruction JS. Les réglages natifs
+utilisent un handler découvert ; sans handler exploitable, expliquer la touche Réglages/Home
+plutôt que lancer aveuglément un menu système. Un callback d'app accepté ne prouve pas
+l'affichage : Netflix noir depuis le launcher reste un écart terrain, malgré son fonctionnement
+via Samsung. Le basculement Home natif, le gain RAM global et le flux sportif réel restent
+suivis séparément ; aucun root ni faux calendrier. Les logos des équipes viennent des données
+explicites avec initiales en secours. Voir [la référence V4](tv-samsung-launcher-v4.md).
+
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
 Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
