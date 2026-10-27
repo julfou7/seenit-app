@@ -3,23 +3,32 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const root = path.resolve(__dirname, '..');
-const localNotificationPath = path.join(
-  root,
-  'node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotification.java',
+const pluginDir = path.join(
+  __dirname,
+  '..',
+  'node_modules',
+  '@capacitor',
+  'local-notifications',
+  'android',
+  'src',
+  'main',
+  'kotlin',
+  'com',
+  'capacitorjs',
+  'plugins',
+  'localnotifications',
 );
-const managerPath = path.join(
-  root,
-  'node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/LocalNotificationManager.java',
-);
+const localNotificationPath = path.join(pluginDir, 'LocalNotification.kt');
+const managerPath = path.join(pluginDir, 'LocalNotificationManager.kt');
+const MARKER = 'SEENIT_NOTIFICATION_SUBTEXT_PATCH';
 
-const patchOnce = (filePath, marker, replacements) => {
+const patchOnce = (filePath, replacements) => {
   if (!fs.existsSync(filePath)) {
     throw new Error(`[notification-subtext] fichier introuvable: ${filePath}`);
   }
 
   let content = fs.readFileSync(filePath, 'utf8');
-  if (content.includes(marker)) return;
+  if (content.includes(MARKER)) return;
 
   for (const [needle, replacement] of replacements) {
     if (!content.includes(needle)) {
@@ -28,25 +37,25 @@ const patchOnce = (filePath, marker, replacements) => {
     content = content.replace(needle, replacement);
   }
 
-  content += `\n// ${marker}\n`;
+  content += `\n// ${MARKER}\n`;
   fs.writeFileSync(filePath, content, 'utf8');
 };
 
-patchOnce(localNotificationPath, 'SEENIT_NOTIFICATION_SUBTEXT_PATCH', [
+patchOnce(localNotificationPath, [
   [
-    'public String summaryText;\n',
-    'public String summaryText;\n    public String subText;\n',
+    'var summaryText: String? = null\n',
+    'var summaryText: String? = null\n    var subText: String? = null\n',
   ],
   [
-    'n.summaryText = jsonObject.getString("summaryText");\n',
-    'n.summaryText = jsonObject.getString("summaryText");\n        n.subText = jsonObject.getString("subText");\n',
+    'n.summaryText = jsonObject.getString("summaryText")\n',
+    'n.summaryText = jsonObject.getString("summaryText")\n            n.subText = jsonObject.getString("subText")\n',
   ],
 ]);
 
-patchOnce(managerPath, 'SEENIT_NOTIFICATION_SUBTEXT_PATCH', [
+patchOnce(managerPath, [
   [
     '.setGroupSummary(localNotification.groupSummary)\n',
-    '.setGroupSummary(localNotification.groupSummary)\n                .setSubText(localNotification.subText)\n',
+    '.setGroupSummary(localNotification.groupSummary)\n            .setSubText(localNotification.subText)\n',
   ],
 ]);
 
