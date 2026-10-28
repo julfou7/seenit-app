@@ -401,7 +401,6 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const docRef = doc(db, 'users', userUid, 'shows', showId);
 
         if (!hasNextToWatchChanged && !hasNextToAirChanged && !hasTotalChanged && !hasSeasonsCacheToDelete && !hasArchivedChanged && !hasSeriesEndedChanged && !hasTmdbStatusChanged) {
-           console.log(`[SyncWorker] No major changes for ${showToSync.title}, saving sync markers to Firestore.`);
 
            await updateDoc(docRef, {
              isSynced: true,

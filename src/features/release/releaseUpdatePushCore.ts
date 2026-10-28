@@ -370,12 +370,9 @@ function isEligibleAndroidDevice(device: ReleaseNotificationDevice): boolean {
 }
 
 export function sanitizeMessagingErrorCode(error: unknown): string {
-  const raw =
-    typeof (error as any)?.code === 'string'
-      ? (error as any).code
-      : typeof (error as any)?.errorInfo?.code === 'string'
-        ? (error as any).errorInfo.code
-        : 'messaging/unknown';
+  const value = error && typeof error === 'object' ? error as { code?: unknown; errorInfo?: { code?: unknown } } : {};
+  const raw = typeof value.code === 'string' ? value.code
+    : typeof value.errorInfo?.code === 'string' ? value.errorInfo.code : 'messaging/unknown';
   const clean = raw.replace(/[^a-zA-Z0-9_./-]/g, '').slice(0, 120);
   return clean || 'messaging/unknown';
 }

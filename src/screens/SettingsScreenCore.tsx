@@ -294,7 +294,7 @@ export function SettingsScreen() {
           const localNotifs = readUserScopedJson<Record<string, boolean> | null>(currentUser.uid, 'notifications', null);
 
           if (snapNotif.exists()) {
-            const cloudNotifs = { ...DEFAULT_NOTIFICATION_PREFS, ...snapNotif.data() };
+            const cloudNotifs = mergeNotificationPreferences(snapNotif.data());
             setNotificationPrefs(mergeNotificationPreferences(cloudNotifs));
             writeUserScopedJson(currentUser.uid, 'notifications', cloudNotifs);
           } else if (localNotifs) {
@@ -390,7 +390,7 @@ export function SettingsScreen() {
       const notifRef = doc(db, 'users', user.uid, 'settings', 'notifications');
       const snapNotif = await getDoc(notifRef);
       if (snapNotif.exists()) {
-        const cloudNotifs = { ...DEFAULT_NOTIFICATION_PREFS, ...snapNotif.data() };
+        const cloudNotifs = mergeNotificationPreferences(snapNotif.data());
         setNotificationPrefs(mergeNotificationPreferences(cloudNotifs));
         writeUserScopedJson(user.uid, 'notifications', cloudNotifs);
       }
@@ -515,7 +515,7 @@ export function SettingsScreen() {
         renotify: true,
         vibrate: [150, 80, 150, 80, 250],
         data: sample.data,
-      } as any);
+      });
 
       if (!sent) {
         showToast("🧪 Test · Échec d'envoi de la notification.", "error");
