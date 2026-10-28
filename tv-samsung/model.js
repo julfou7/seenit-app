@@ -134,5 +134,19 @@ var TVModel = (function () {
     /* Unknown apps remain in All Apps and may be pinned; never auto-fill with platform utilities. */
     return out.slice(0, limit);
   }
-  return { brand: brand, localIcon: localIcon, teamArtwork: teamArtwork, initials: initials, preferences: preferences, userApps: userApps, advancedApps: advancedApps, byIds: byIds, favorites: favorites };
+  function mediaImage(path, size) {
+    return typeof path === 'string' && /^\/[a-zA-Z0-9._/-]+$/.test(path) && path.indexOf('..') < 0 && path.indexOf('//') !== 0 ? 'https://image.tmdb.org/t/p/' + (size === 'w1280' ? 'w1280' : 'w500') + path : '';
+  }
+  function mediaItems(items, filter) {
+    var watching = [], planned = [], seen = [], i, item, key;
+    for (i = 0; i < items.length && i < 18; i++) {
+      item = items[i];
+      if (!item || !item.title || !Number(item.tmdbId) || ['tv', 'movie'].indexOf(item.mediaType) < 0 || (filter !== 'all' && item.mediaType !== filter)) continue;
+      key = item.mediaType + ':' + item.tmdbId;
+      if (seen.indexOf(key) >= 0) continue; seen.push(key);
+      if (item.status === 'watching') watching.push(item); else planned.push(item);
+    }
+    return watching.concat(planned);
+  }
+  return { brand: brand, localIcon: localIcon, teamArtwork: teamArtwork, initials: initials, preferences: preferences, userApps: userApps, advancedApps: advancedApps, byIds: byIds, favorites: favorites, mediaImage: mediaImage, mediaItems: mediaItems };
 }());

@@ -25,6 +25,20 @@ export function createFirestoreTvLinkStore(db: Firestore): TvLinkStore {
     },
   };
 }
+export function normalizeTvImage(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 1024 || value.includes('..') || /%2e|[\\\x00-\x20]/i.test(value)) return null;
+  let path = value;
+  if (value.startsWith('https://')) {
+    try {
+      const url = new URL(value);
+      if (url.origin !== 'https://image.tmdb.org' || url.username || url.password || url.search || url.hash) return null;
+      const match = /^\/t\/p\/(?:w\d+|original)(\/[^?]+)$/.exec(url.pathname);
+      if (!match) return null;
+      path = match[1];
+    } catch { return null; }
+  }
+  return /^\/[a-zA-Z0-9._/-]+$/.test(path) && !path.includes('..') && !path.startsWith('//') ? path : null;
+}
 export async function readTvLibrary(db: Firestore, uid: string) {
   if (!/^[a-zA-Z0-9:_-]{1,128}$/.test(uid)) throw new Error('Invalid TV owner');
   const snapshot = await db.collection(`users/${uid}/shows`).orderBy('updatedAt', 'desc').limit(60)
@@ -32,11 +46,10 @@ export async function readTvLibrary(db: Firestore, uid: string) {
   return snapshot.docs.map(doc => {
     const item = doc.data();
     const next = item.nextEpisodeToWatch;
-    const image = (value: unknown) => typeof value === 'string' && /^\/[a-zA-Z0-9._/-]+$/.test(value) && !value.includes('..') ? value : null;
     return {
       tmdbId: Number(item.tmdbId), title: typeof item.title === 'string' ? item.title.slice(0, 180) : '',
       mediaType: item.mediaType === 'movie' ? 'movie' : 'tv', status: item.status,
-      isArchived: item.isArchived === true, posterPath: image(item.posterPath), backdropPath: image(item.backdropPath),
+      isArchived: item.isArchived === true, posterPath: normalizeTvImage(item.posterPath), backdropPath: normalizeTvImage(item.backdropPath),
       nextEpisode: next && typeof next === 'object' ? { season: Number(next.season_number) || 1, episode: Number(next.episode_number) || 1,
         name: typeof next.name === 'string' ? next.name.slice(0, 180) : '' } : null,
     };

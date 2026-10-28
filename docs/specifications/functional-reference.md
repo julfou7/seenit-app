@@ -17,6 +17,15 @@ locaux. Dissociation confirmée, cache privé effacé et révocation rejouée si
 Les images, timers et requêtes de pairing s'arrêtent hors premier plan. L'absence d'association
 ou de réseau laisse le launcher et ses apps utilisables.
 
+Films & séries reprend le contenu du compte, sans rangée d'apps : grand visuel du titre
+sélectionné, métadonnées réelles, Pour toi/Séries/Films et rail paysage de quatre contenus
+par page. Le focus change le hero sans reconstruire le rail, OK ouvre une fiche en lecture
+seule et Retour conserve le focus. Les chemins TMDB et URLs TMDB complètes enregistrés par
+le mobile sont normalisés ; un visuel absent conserve sa place. Aucun « Reprendre » ou
+« Épisodes » de maquette n'est promis sans contrat de lecture implémenté. Les apps restent
+sur Home et Toutes les apps. Hors écran : cinq images maximum libérées et aucune requête
+de métadonnées supplémentaire pour réparer les visuels existants.
+
 HDMI transmet le descripteur natif Tizen exact, sans reconstruction JS. Les réglages natifs
 utilisent un handler découvert ; sans handler exploitable, expliquer la touche Réglages/Home
 plutôt que lancer aveuglément un menu système. Un callback d'app accepté ne prouve pas

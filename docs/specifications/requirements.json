@@ -46,6 +46,10 @@
       ],
       "tests": [
         {
+          "file": "tests/tvLibrary.test.ts",
+          "contains": "SEENIT-TV-002"
+        },
+        {
           "file": "tests/tvPairing.test.ts",
           "contains": "SEENIT-TV-002"
         }

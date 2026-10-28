@@ -2,6 +2,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+async function fulfillTvFixtureImage(client, event, root) {
+  const url = new URL(event.request.url);
+  if (url.origin !== 'https://image.tmdb.org' || !/^\/t\/p\/(?:w500|w1280)\/__seenit_fixture_(?:poster|backdrop)\.jpg$/.test(url.pathname)) return false;
+  await client.send('Fetch.fulfillRequest', { requestId: event.requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'image/svg+xml' }], body: fs.readFileSync(path.join(root, 'tests/fixtures/tv-film-scene.svg')).toString('base64') });
+  return true;
+}
+
 async function buildTvHarness(root) {
   const target = path.join(root, 'dist/__seenit-tv');
   fs.mkdirSync(target, { recursive: true });
@@ -17,7 +24,7 @@ async function buildTvHarness(root) {
     document.addEventListener('click',function(e){t.clicks.push(e.target.id+':'+e.target.getAttribute('data-action'))},true);
     window.addEventListener('error',function(e){if(e.message)t.errors.push(e.message)});
     t.connectionRequests=[];t.pairApproved=false;
-    window.XMLHttpRequest=function(){var xhr=this;this.open=function(method,url){xhr.method=method;xhr.url=url};this.setRequestHeader=function(){};this.abort=function(){xhr.aborted=true};this.send=function(body){t.connectionRequests.push(xhr.url);setTimeout(function(){if(xhr.aborted)return;var response;if(xhr.url.endsWith('/api/tv/sport'))response={events:t.sportEvents||[],sources:[],fetchedAt:Date.now()};else if(xhr.url.endsWith('/api/tv/links')){var input=JSON.parse(body);response={id:'a'.repeat(48),secret:'b'.repeat(64),code:'ABCD-EF12',profile:input.profile,expiresAt:Date.now()+600000}}else if(xhr.url.endsWith('/status'))response={state:t.pairApproved?'active':'pending',profile:'Julian',expiresAt:Date.now()+3600000,accountName:'Test account'};else if(xhr.url.endsWith('/bootstrap'))response={state:'active',profile:'Julian',syncedAt:Date.now(),items:[{tmdbId:1,title:'Film du compte',posterPath:null}]};else response={revoked:true};xhr.status=200;xhr.readyState=4;xhr.responseText=JSON.stringify(response);if(xhr.onreadystatechange)xhr.onreadystatechange()},20)}};
+    window.XMLHttpRequest=function(){var xhr=this;this.open=function(method,url){xhr.method=method;xhr.url=url};this.setRequestHeader=function(){};this.abort=function(){xhr.aborted=true};this.send=function(body){t.connectionRequests.push(xhr.url);setTimeout(function(){if(xhr.aborted)return;var response;if(xhr.url.endsWith('/api/tv/sport'))response={events:t.sportEvents||[],sources:[],fetchedAt:Date.now()};else if(xhr.url.endsWith('/api/tv/links')){var input=JSON.parse(body);response={id:'a'.repeat(48),secret:'b'.repeat(64),code:'ABCD-EF12',profile:input.profile,expiresAt:Date.now()+600000}}else if(xhr.url.endsWith('/status'))response={state:t.pairApproved?'active':'pending',profile:'Julian',expiresAt:Date.now()+3600000,accountName:'Test account'};else if(xhr.url.endsWith('/bootstrap'))response={state:'active',profile:'Julian',syncedAt:Date.now(),items:Array.from({length:7},function(_,i){return{tmdbId:i+1,title:i===0?'Une très longue série dont le titre reste lisible dans le grand visuel':'Contenu '+(i+1),mediaType:i%3===0?'movie':'tv',status:i<5?'watching':'plan_to_watch',posterPath:'/__seenit_fixture_poster.jpg',backdropPath:'/__seenit_fixture_backdrop.jpg',nextEpisode:i%3?{season:2,episode:3,name:'Épisode de reprise'}:null}})};else response={revoked:true};xhr.status=200;xhr.readyState=4;xhr.responseText=JSON.stringify(response);if(xhr.onreadystatechange)xhr.onreadystatechange()},20)}};
     var nativeSet=window.setInterval,nativeClear=window.clearInterval;
     window.setInterval=function(fn,ms){var id=nativeSet(fn,ms);t.intervals[id]=ms;return id};
     window.clearInterval=function(id){delete t.intervals[id];nativeClear(id)};
@@ -98,7 +105,21 @@ async function testTvHarness(client, root) {
     await check(client, '!document.getElementById("pairQr").innerHTML.includes("b".repeat(64))', 'secret absent du QR');
     await screenshot(client, root, `tv-account-qr-${width}.png`);
     await evaluate(client, 'window.__tv.pairApproved=true'); await delay(5100);
-    await check(client, 'TVConnection.view().linked && TVConnection.view().items.length===1 && document.getElementById("accountTitle").textContent==="Test account"', 'approbation et bootstrap via vrai client TV');
+    await check(client, 'TVConnection.view().linked && TVConnection.view().items.length===7 && document.getElementById("accountTitle").textContent==="Test account"', 'approbation et bootstrap via vrai client TV');
+    await key(client, 8); await click(client, '#screenHome [data-action=films]');
+    await check(client, 'document.querySelectorAll("#linkedFilms .film-content-card").length===4 && !document.querySelector("#screenFilms .app-card")', 'Films : quatre contenus, aucune rangée apps');
+    await check(client, 'document.getElementById("filmHeroTitle").textContent.length>0 && document.querySelector("#filmBackdrop img").naturalWidth>0 && Array.from(document.querySelectorAll("#linkedFilms img")).every(n=>n.naturalWidth>0)', 'hero et rail chargent les images du bootstrap');
+    await check(client, `Array.from(document.querySelectorAll('#linkedFilms .film-content-card')).every(n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.right<=${width}&&r.bottom<=${height}})`, 'cartes paysage dans viewport');
+    await screenshot(client, root, 'tv-films-'+width+'.png');
+    await key(client, 40); await check(client, 'document.activeElement.dataset.filmIndex!==undefined', 'rail accessible depuis hero');
+    await key(client, 39);
+    await check(client, 'document.getElementById("filmHeroTitle").textContent===document.activeElement.getAttribute("aria-label")', 'focus actualise le contenu du hero');
+    const filmFocus=await evaluate(client,'document.activeElement.id');
+    await key(client, 13); await check(client, 'document.querySelector(".screen.active").id==="screenFilmDetail"', 'détail sans lecture supposée');
+    await key(client, 8); await check(client, `document.activeElement.id===${JSON.stringify(filmFocus)}`, 'retour garde contenu et focus');
+    await click(client, '#filmNext'); await check(client, 'document.querySelectorAll("#linkedFilms .film-content-card").length===3', 'suite de la liste accessible');
+    await click(client, '#filmTabs [data-film-filter=movie]'); await check(client, 'document.querySelectorAll("#linkedFilms .film-content-card").length===3 && document.getElementById("filmNext").disabled', 'filtre films indépendant des séries');
+    await click(client, '#screenFilms [data-action=account]');
     await click(client, '#unlinkButton'); await check(client, 'document.querySelector(".screen.active").id==="screenUnlink"', 'dissociation exige confirmation');
     await click(client, '#screenUnlink [data-action=confirm-unlink]');
     await check(client, '!TVConnection.view().linked && !localStorage.getItem("seenit.tv.v4.foyer")', 'dissociation enlève session et données privées');
@@ -194,4 +215,4 @@ async function testTvHarness(client, root) {
   await check(client, 'document.querySelectorAll("#calendarList img").length===0 && Object.keys(window.__tv.intervals).length===0', 'logos du calendrier libérés en arrière-plan');
   return reports;
 }
-module.exports = { buildTvHarness, testTvHarness };
+module.exports = { buildTvHarness, testTvHarness, fulfillTvFixtureImage };

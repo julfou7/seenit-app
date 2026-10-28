@@ -43,6 +43,30 @@ Préserver type et numéro exacts. « Connecté » signifie détection native du
 présence physique garantie. Alias/masquage configurables ; Box/Console ne sont pas des
 équipements supposés. Aucun root, Home/startup, firmware ou service système modifié.
 
+## Films & séries — correction terrain du28octobre
+
+La destination et son écran s'appellent « Films & séries ». La référence V3-06 fournie
+le28/10 guide la composition : grand visuel de fond du contenu sélectionné, titre lisible,
+métadonnées réelles, onglets Pour toi/Séries/Films et rail de contenus en bas. Retirer les
+rangées d'apps de cet écran : elles restent dans la Home et Toutes les apps. Le HTML/React
+du ZIP est une maquette, pas le runtime Tizen à embarquer.
+
+Les images persistées par le mobile existent en chemins TMDB et URLs HTTPS TMDB complètes.
+Le bootstrap normalise les deux formes vers un chemin sûr ; refuser hôtes arbitraires,
+identifiants dans l'URL, query/fragment et chemins traversants. Aucun nouveau fetch de
+métadonnées nécessaire pour réutiliser les visuels déjà enregistrés. Le rail garde au
+maximum quatre cartes paysage par page ; focus actualise le hero sans reconstruire le rail,
+pagination explicite, filtres locaux et focus restauré au retour. Un seul hero + quatre
+images visibles, tailles réduites, libération hors écran. Si une image manque, conserver
+un visuel neutre de taille stable et le titre ; jamais une carte réduite au texte.
+
+Montrer statut, saison/épisode et nom de reprise seulement lorsqu'ils existent. OK ouvre
+un détail en lecture seule ; aucun « Reprendre »/« Épisodes » promettant une lecture exacte
+non implémentée. Ne copier ni pourcentage fictif ni question « terminé ? » de maquette.
+Sans compte associé à ce profil, inviter à l'association, sans exposer un autre profil.
+TNR : bootstrap de production avec images absolues/relatives, faux hôtes, propriété du compte,
+hero/rail/filtres/pagination/détail, aucune app et limites DOM à1920/1280.
+
 ## SEENIT-TV-002 — association QR explicite
 
 1. Le backend HTTPS canonique crée un identifiant aléatoire, un secret de 256 bits et
