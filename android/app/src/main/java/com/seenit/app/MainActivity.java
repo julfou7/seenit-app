@@ -17,6 +17,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(SeenItAuthPlugin.class);
+        registerPlugin(SeenItNotificationSettingsPlugin.class);
         registerPlugin(SeenItUpdatePlugin.class);
         registerPlugin(SeenItPlexBackgroundPlugin.class);
         registerPlugin(SeenItTrailerPlugin.class);
@@ -29,7 +30,7 @@ public class MainActivity extends BridgeActivity {
         WindowInsetsControllerCompat insetsController =
             WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
         insetsController.setAppearanceLightStatusBars(false);
-        
+
         try {
             WebView webView = this.getBridge().getWebView();
             if (webView != null) {

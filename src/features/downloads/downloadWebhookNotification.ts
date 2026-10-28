@@ -60,6 +60,10 @@ function firstEpisode(payload: DownloadWebhookPayload): { season: number; episod
   return season !== null && episode !== null ? { season, episode } : null;
 }
 
+function formatEpisodeCode(episode: { season: number; episode: number }): string {
+  return `S${String(episode.season).padStart(2, '0')} | E${String(episode.episode).padStart(2, '0')}`;
+}
+
 function buildEventKey(
   source: DownloadWebhookSource,
   payload: DownloadWebhookPayload,
@@ -79,22 +83,31 @@ export function buildDownloadWebhookPresentation(
   const eventType = typeof payload.eventType === 'string'
     ? payload.eventType.trim()
     : (typeof payload.event_type === 'string' ? payload.event_type.trim() : 'Unknown');
+  const mediaType: 'movie' | 'tv' = payload?.movie ? 'movie' : 'tv';
+  const mediaTitle = displayText(payload?.movie?.title || payload?.series?.title, 'Téléchargement');
+  const tmdbId = positiveInteger(payload?.movie?.tmdbId ?? payload?.series?.tmdbId);
+  const episode = mediaType === 'tv' ? firstEpisode(payload) : null;
   const commonData: Record<string, string> = {
     type: 'DOWNLOAD_EVENT',
     source,
-    eventType
+    eventType,
+    mediaType,
+    ...(tmdbId ? { tmdbId: String(tmdbId) } : {}),
+    ...(episode ? { season: String(episode.season), episode: String(episode.episode) } : {}),
+    subText: 'Téléchargement',
+    eventKey: buildEventKey(source, payload, positiveInteger(payload?.movie?.tmdbId ?? payload?.series?.tmdbId), firstEpisode(payload)),
   };
 
   if (eventType === 'Grab') {
     const mediaTitle = displayText(
       payload?.series?.title || payload?.movie?.title || payload?.release?.releaseTitle,
-      'Média'
+      'Téléchargement'
     );
     return {
       eventType,
       notification: {
-        title: 'Téléchargement démarré 🚀',
-        body: `"${mediaTitle}" a été envoyé au client de téléchargement.`
+        title: mediaTitle,
+        body: 'Envoyé au client de téléchargement.'
       },
       data: commonData,
       plexAvailabilityData: null
@@ -105,19 +118,15 @@ export function buildDownloadWebhookPresentation(
     return {
       eventType,
       notification: {
-        title: 'Notification Téléchargement',
-        body: 'Un événement de téléchargement a eu lieu.'
+        title: 'Téléchargement',
+        body: 'Événement de téléchargement reçu.'
       },
       data: commonData,
       plexAvailabilityData: null
     };
   }
 
-  const mediaType: 'movie' | 'tv' = payload?.movie ? 'movie' : 'tv';
-  const mediaTitle = displayText(payload?.movie?.title || payload?.series?.title, 'Média');
-  const tmdbId = positiveInteger(payload?.movie?.tmdbId ?? payload?.series?.tmdbId);
-  const episode = mediaType === 'tv' ? firstEpisode(payload) : null;
-  const suffix = episode ? ` (S${String(episode.season).padStart(2, '0')} | E${String(episode.episode).padStart(2, '0')})` : '';
+  const episodeCode = episode ? formatEpisodeCode(episode) : null;
 
   const data: Record<string, string> = {
     ...commonData,
@@ -138,6 +147,7 @@ export function buildDownloadWebhookPresentation(
     title: mediaTitle,
     tmdbId: String(tmdbId),
     eventKey: buildEventKey(source, payload, tmdbId, episode),
+    subText: 'Téléchargement',
     ...(episode ? {
       season: String(episode.season),
       episode: String(episode.episode)
@@ -147,8 +157,8 @@ export function buildDownloadWebhookPresentation(
   return {
     eventType,
     notification: {
-      title: `${mediaTitle}${suffix}`,
-      body: '✅ Import terminé'
+      title: mediaTitle,
+      body: episodeCode ? `${episodeCode} · Import terminé` : 'Import terminé'
     },
     data,
     plexAvailabilityData

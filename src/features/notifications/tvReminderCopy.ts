@@ -6,11 +6,14 @@ import {
 
 export interface TvReminderEpisode extends WatchEpisodePointer {
   name?: string | null;
+  runtime?: number | null;
+  episode_type?: string | null;
 }
 
 export interface TvEpisodeReminderCopy {
   summaryText: string;
   body: string;
+  detailText?: string;
 }
 
 export function formatTvEpisodeCode(episode: Pick<TvReminderEpisode, 'season_number' | 'episode_number'>): string {
@@ -24,40 +27,45 @@ function episodeLabel(episode: TvReminderEpisode): string {
   return `${formatTvEpisodeCode(episode)}${name ? ` · ${name}` : ''}`;
 }
 
-function backlogSuffix(extraAvailableEpisodes: number): string {
-  if (extraAvailableEpisodes <= 0) return '';
-  return ` · + ${extraAvailableEpisodes} épisode${extraAvailableEpisodes > 1 ? 's' : ''}`;
+function waitingEpisodesLabel(count: number): string {
+  return `${count} épisode${count > 1 ? 's' : ''} t’attend${count > 1 ? 'ent' : ''}`;
 }
 
-export function buildTvSeasonReminderSummary(episode: TvReminderEpisode): string {
-  return `📅 Nouvelle saison · Saison ${episode.season_number}`;
+export function buildTvSeasonReminderSummary(_episode: TvReminderEpisode): string {
+  return 'Bientôt';
 }
 
 export function buildTvEpisodeReminderCopy(
   show: Show,
   releasedEpisode: TvReminderEpisode,
   todayStr: string,
+  providerName?: string,
 ): TvEpisodeReminderCopy {
-  const releasedCode = formatTvEpisodeCode(releasedEpisode);
-  const defaultBody = `${episodeLabel(releasedEpisode)} disponible aujourd'hui.`;
+  const defaultBody = providerName ? `${episodeLabel(releasedEpisode)} — sur ${providerName}` : `${episodeLabel(releasedEpisode)} disponible aujourd’hui.`;
+  if (show.seenEpisodes?.includes(`${releasedEpisode.season_number}x${releasedEpisode.episode_number}`)
+    && (!show.nextEpisodeToWatch || show.nextEpisodeToWatch.air_date > todayStr)) {
+    return { summaryText: 'Nouvel épisode', body: `À jour · ${formatTvEpisodeCode(releasedEpisode)}`,
+      detailText: 'Tu as vu tous les épisodes disponibles.' };
+  }
   const nextToWatch = show.nextEpisodeToWatch as TvReminderEpisode | undefined;
 
   if (!nextToWatch) {
     return {
-      summaryText: `🆕 Nouvel épisode · ${releasedCode}`,
+      summaryText: 'Nouvel épisode',
       body: defaultBody,
+      detailText: 'Retrouve cet épisode dans ta liste À voir.',
     };
   }
 
   const nextIsAvailable = !nextToWatch.air_date || nextToWatch.air_date <= todayStr;
   if (!nextIsAvailable) {
     return {
-      summaryText: `🆕 Nouvel épisode · ${releasedCode}`,
+      summaryText: 'Nouvel épisode',
       body: defaultBody,
+      detailText: 'Retrouve cet épisode dans ta liste À voir.',
     };
   }
 
-  const nextCode = formatTvEpisodeCode(nextToWatch);
   const sameEpisode = (
     nextToWatch.season_number === releasedEpisode.season_number
     && nextToWatch.episode_number === releasedEpisode.episode_number
@@ -66,26 +74,21 @@ export function buildTvEpisodeReminderCopy(
   const extraAvailableEpisodes = sameEpisode
     ? computedExtra
     : Math.max(1, computedExtra);
+  const waitingCount = extraAvailableEpisodes + 1;
 
-  if (sameEpisode && extraAvailableEpisodes === 0) {
+  const header = releasedEpisode.episode_type === 'finale'
+    ? (show.seriesEnded ? 'Final de série' : 'Final de saison') : 'Nouvel épisode';
+  if (sameEpisode && waitingCount === 1) {
     return {
-      summaryText: `🆕 Nouvel épisode · ${releasedCode}`,
+      summaryText: header,
       body: defaultBody,
-    };
-  }
-
-  const suffix = backlogSuffix(extraAvailableEpisodes);
-  const summaryText = `🆕 Nouvel épisode · ${releasedCode} · À voir ${nextCode}${suffix}`;
-
-  if (sameEpisode) {
-    return {
-      summaryText,
-      body: `À voir : ${episodeLabel(nextToWatch)}${suffix}.`,
+      detailText: [providerName, releasedEpisode.runtime && `${releasedEpisode.runtime} min`, 'C’est ton prochain épisode.'].filter(Boolean).join(' · '),
     };
   }
 
   return {
-    summaryText,
-    body: `À voir : ${episodeLabel(nextToWatch)}${suffix}. Nouvel épisode : ${episodeLabel(releasedEpisode)} disponible aujourd'hui.`,
+    summaryText: header,
+    body: `À voir : ${formatTvEpisodeCode(nextToWatch)} · ${waitingEpisodesLabel(waitingCount)}.`,
+    detailText: `Ton prochain : ${episodeLabel(nextToWatch)}\n${waitingCount} épisodes à rattraper · le plus récent est sorti aujourd’hui.`,
   };
 }

@@ -1538,7 +1538,7 @@
       "tests": [
         {
           "file": "tests/notificationMediaPresentation.test.ts",
-          "contains": "SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement"
+          "contains": "SEENIT-NOTIFICATION-002 affiche un visuel média et aucun emoji textuel"
         },
         {
           "file": "tests/notificationMediaPresentation.test.ts",
@@ -2948,6 +2948,66 @@
         {
           "file": "tests/downloadAvailabilityRuntime.test.ts",
           "contains": "SEENIT-DOWNLOAD-012 l’attente survit au vrai stockage et au redémarrage au-delà des anciens TTL"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-NOTIFICATION-005",
+      "title": "Grammaire commune titre œuvre, type distinct et détail utile",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/notificationRefactor.test.ts",
+          "contains": "SEENIT-NOTIFICATION-005 unifie les textes sans emoji ni code répété"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-NOTIFICATION-006",
+      "title": "Canaux Android et préférences non destructives",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/notificationRefactor.test.ts",
+          "contains": "SEENIT-NOTIFICATION-006 fusionne les préférences sans écraser les choix"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-NOTIFICATION-007",
+      "title": "Cycle de vie des alertes et anti-spam isolés par UID",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/notificationRefactor.test.ts",
+          "contains": "SEENIT-NOTIFICATION-007 retire seulement les alertes exactes vues ou archivées"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-NOTIFICATION-008",
+      "title": "Actions et cas existants au format commun",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/notificationRefactor.test.ts",
+          "contains": "SEENIT-NOTIFICATION-008 actualise la reprise sans inventer de disponibilité"
         }
       ]
     }

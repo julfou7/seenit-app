@@ -5,6 +5,8 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { getPlexSyncRetryAt } from '../features/plex/plexSyncRetry';
 import { useEffect, useRef } from 'react';
 import { buildSeasonProgressEvidence, needsSeasonProgressRefresh, hasSeasonReleaseDue } from '../features/shows/seasonProgressEvidence';
+import { mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
+import { readUserScopedJson } from '../lib/userIsolation';
 import { db, auth, sendNativeNotification } from '../lib/firebase';
 import { doc, updateDoc, getDoc, getDocs, collection, addDoc } from 'firebase/firestore';
 import { tmdb } from '../features/shows/tmdb';
@@ -372,20 +374,24 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const hasSeriesEndedChanged = showToSync.seriesEnded !== isEnded;
         const hasTmdbStatusChanged = showToSync.tmdbStatus !== (details.status || null);
 
+        const allowNews = mergeNotificationPreferences(readUserScopedJson(userUid, 'notifications', null)).news
+          && !showToSync.isArchived && showToSync.status !== 'dropped' && showToSync.notificationsEnabled !== false;
         // Notification pour les saisons renouvelées
-        if (showToSync.tmdbStatus && (showToSync.tmdbStatus === 'Ended' || showToSync.tmdbStatus === 'Canceled') && details.status === 'Returning Series') {
+        if (allowNews && showToSync.tmdbStatus && (showToSync.tmdbStatus === 'Ended' || showToSync.tmdbStatus === 'Canceled') && details.status === 'Returning Series') {
            sendNativeNotification(showToSync.title, {
              body: `Bonne nouvelle ! La série a été renouvelée pour une suite.`,
-             tag: `notif_${showId}_renewed_${Date.now()}`,
+             tag: `notif_${showId}_news`,
+             icon: showToSync.posterPath ? (showToSync.posterPath.startsWith('http') ? showToSync.posterPath : `https://image.tmdb.org/t/p/w342${showToSync.posterPath}`) : undefined,
              showId,
              tmdbId: tmdbIdNum,
              mediaType: 'tv'
            });
-        } else if (nextEpisodeToAir && !showToSync.nextEpisodeToAir && nextEpisodeToAir.season_number > 1 && (!showToSync.seasons || showToSync.seasons.length < nextEpisodeToAir.season_number)) {
+        } else if (allowNews && nextEpisodeToAir && !showToSync.nextEpisodeToAir && nextEpisodeToAir.season_number > 1 && (!showToSync.seasons || showToSync.seasons.length < nextEpisodeToAir.season_number)) {
            // Détection d'une nouvelle saison annoncée via un prochain épisode
            sendNativeNotification(showToSync.title, {
              body: `La saison ${nextEpisodeToAir.season_number} a été annoncée et est prévue pour le ${new Date(nextEpisodeToAir.air_date).toLocaleDateString('fr-FR')} !`,
-             tag: `notif_${showId}_new_season_${nextEpisodeToAir.season_number}`,
+             tag: `notif_${showId}_news`,
+             icon: showToSync.posterPath ? (showToSync.posterPath.startsWith('http') ? showToSync.posterPath : `https://image.tmdb.org/t/p/w342${showToSync.posterPath}`) : undefined,
              showId,
              tmdbId: tmdbIdNum,
              mediaType: 'tv'
@@ -395,7 +401,6 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const docRef = doc(db, 'users', userUid, 'shows', showId);
 
         if (!hasNextToWatchChanged && !hasNextToAirChanged && !hasTotalChanged && !hasSeasonsCacheToDelete && !hasArchivedChanged && !hasSeriesEndedChanged && !hasTmdbStatusChanged) {
-           console.log(`[SyncWorker] No major changes for ${showToSync.title}, saving sync markers to Firestore.`);
 
            await updateDoc(docRef, {
              isSynced: true,

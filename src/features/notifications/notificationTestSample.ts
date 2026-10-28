@@ -24,6 +24,7 @@ export interface NotificationTestSample {
   notificationTitle: string;
   summaryText: string;
   body: string;
+  detailText?: string;
   posterUrl?: string;
   richImageUrl?: string;
   allowMarkWatched: boolean;
@@ -142,8 +143,9 @@ function buildSample(
       season,
       episode: episodeNumber,
       notificationTitle: show.title,
-      summaryText: '🆕 Nouvel épisode',
-      body: `S${sNum} | E${eNum}${episodeName} disponible aujourd'hui.`,
+      summaryText: 'Nouvel épisode',
+      body: `S${sNum} | E${eNum}${episodeName} disponible aujourd’hui.`,
+      detailText: 'Un nouvel épisode est prêt dans ta liste À voir.',
       posterUrl,
       richImageUrl: episodeRich,
       allowMarkWatched: true,
@@ -167,7 +169,7 @@ function buildSample(
       season,
       episode: episodeNumber,
       notificationTitle: show.title,
-      summaryText: '📅 Nouvelle saison',
+      summaryText: 'Bientôt',
       body: `Saison ${season || 1} dans 7 jours.`,
       posterUrl,
       richImageUrl: episodeRich,
@@ -190,8 +192,8 @@ function buildSample(
       isUpcoming,
       eventDate,
       notificationTitle: show.title,
-      summaryText: '🎬 Sortie cinéma',
-      body: "Dans les salles aujourd'hui.",
+      summaryText: 'Au cinéma',
+      body: 'Dans les salles aujourd’hui.',
       posterUrl,
       richImageUrl: fallbackRich,
       allowMarkWatched: false,
@@ -210,7 +212,7 @@ function buildSample(
     isUpcoming,
     eventDate,
     notificationTitle: show.title,
-    summaryText: '📺 Sortie DVD / VOD',
+    summaryText: 'Sortie vidéo',
     body: 'Disponible en DVD / VOD.',
     posterUrl,
     richImageUrl: fallbackRich,

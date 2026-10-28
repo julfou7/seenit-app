@@ -23,16 +23,16 @@ test('SEENIT-NOTIFICATION-004 notifie une seule fois le UID de la demande', asyn
 
 test('la notification nomme le média canonique et ouvre le scope exact sans détail torrent', () => {
   const presentation = downloadFailurePresentation(receipt);
-  assert.equal(presentation.notification.title, 'Titre SeenIt · S00 | E01');
-  assert.equal(presentation.notification.body, 'Aucune release compatible trouvée.');
+  assert.equal(presentation.notification.title, 'Titre SeenIt');
+  assert.equal(presentation.notification.body, 'S00 | E01 · Aucune release compatible trouvée.');
   assert.equal(presentation.data.type, 'NAVIGATE_SHOW');
   assert.equal(presentation.data.tmdbId, '11');
   assert.equal(presentation.data.season, '0');
   assert.equal(presentation.data.episode, '1');
   assert.match(presentation.data.url, /season=0&episode=1/);
   assert.equal(presentation.data.notificationKind, 'download_failure');
-  assert.equal(downloadFailurePresentation({ ...receipt, episode: undefined }).notification.title, 'Titre SeenIt · Saison 0');
-  assert.equal(downloadFailurePresentation({ ...receipt, season: undefined, episode: undefined }).notification.title, 'Titre SeenIt · Toute la série');
+  assert.equal(downloadFailurePresentation({ ...receipt, episode: undefined }).notification.body, 'Saison 0 · Aucune release compatible trouvée.');
+  assert.equal(downloadFailurePresentation({ ...receipt, season: undefined, episode: undefined }).notification.body, 'Toute la série · Aucune release compatible trouvée.');
   for (const patch of [{ requestId: '../other' }, { tmdbId: '11' }, { season: null }, { ownerUid: '' }, { mediaType: 'movie' }]) {
     assert.equal(normalizeDownloadFailureReceipt({ ...receipt, ...patch }), null);
   }
