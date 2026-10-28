@@ -68,8 +68,13 @@ export function useRemindersNotifier() {
         await new Promise(r => setTimeout(r, 50));
         if (!active()) return;
 
-        if (s.isArchived || s.status === 'dropped' || s.mediaType === 'movie' && s.seenEpisodes?.includes('movie')) {
+        if (s.isArchived || s.status === 'dropped') {
           await prunePendingMediaReminderNotifications(s.id, s.mediaType, []);
+          continue;
+        }
+
+        if (s.mediaType === 'movie' && s.seenEpisodes?.includes('movie')) {
+          await prunePendingMediaReminderNotifications(s.id, 'movie', []);
           continue;
         }
 
