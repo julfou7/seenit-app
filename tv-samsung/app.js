@@ -7,7 +7,8 @@
   var installedApps = [], detectedSources = [], appsTab = 'favorites', appsPage = 0, organizing = false;
   var memoryInfo = null, storageInfo = null, memoryTimer = null, storageTimer = null, clockTimer = null, toastTimer = null;
   var focusMemory = {}, suspendedFocus = null, inventoryBusy = false, lastDiscovery = 0, lastDirectionalAt = 0;
-  var launchPending = false, sportState = 'normal';
+  var launchPending = false, sportState = 'normal', sportPage = 0, sportMinute = 0;
+  var filmFilter = 'all', filmPage = 0, selectedFilm = '';
   var enterTimer = null, enterTarget = null, longActivated = false, selectedAppId = '';
   var storage;
   try { storage = window.localStorage; } catch (e) { storage = { getItem: function () {}, setItem: function () {}, removeItem: function () {} }; }
@@ -17,7 +18,7 @@
     { when: 'Exemple · 21:00', title: 'Monaco — Benfica', meta: 'Champions League', home: { id: 'preview-monaco', name: 'Monaco', logo: 'assets/sport/monaco.svg' }, away: { id: 'preview-benfica', name: 'Benfica', logo: 'assets/sport/benfica.png' } },
     { when: 'Exemple · 20:45', title: 'France — Italie', meta: 'International', home: { id: 'preview-france', name: 'France', logo: 'assets/sport/france.svg' }, away: { id: 'preview-italy', name: 'Italie', logo: 'assets/sport/italy.svg' } }
   ];
-  var dynamicIds = ['appRow', 'homeSources', 'homeEvents', 'recentApps', 'filmApps', 'calendarList', 'sourceGrid', 'allAppsGrid', 'linkedFilms'];
+  var dynamicIds = ['appRow', 'homeSources', 'homeEvents', 'calendarList', 'sourceGrid', 'allAppsGrid', 'linkedFilms', 'filmBackdrop'];
   var lastQr = '';
   function el(id) { return document.getElementById(id); }
   function hidden() { return document.hidden === true; }
@@ -63,11 +64,13 @@
       if (node.parentNode === row) { var left = node.offsetLeft; if (left < row.scrollLeft) row.scrollLeft = left; else if (left + node.offsetWidth > row.scrollLeft + row.clientWidth) row.scrollLeft = left + node.offsetWidth - row.clientWidth; }
     }
     el('focusDetail').textContent = currentScreen === 'screenHome' && node.getAttribute('data-app-id') ? node.getAttribute('data-app-title') + '   ·   OK : ouvrir   ·   Maintenir OK : organiser' : '';
+    if (currentScreen === 'screenFilms' && node.getAttribute('data-film-index') !== null) renderFilmHero(Number(node.getAttribute('data-film-index')));
   }
   function firstFocus(saved) {
     var list = focusables(), i;
     if (saved) for (i = 0; i < list.length; i++) if (matches(list[i], saved)) { setFocus(list[i]); return; }
     if (currentScreen === 'screenHome') setFocus(el('primaryTv'));
+    else if (currentScreen === 'screenFilms') setFocus(isVisible(el('filmDetailsButton')) ? el('filmDetailsButton') : el('filmEmptyButton'));
     else if (currentScreen === 'screenExit') setFocus(el('stayButton'));
     else if (list.length) setFocus(list[0]);
   }
@@ -108,6 +111,7 @@
     releaseDynamic();
     for (i = 0; i < screens.length; i++) { removeClass(screens[i], 'active'); if (screens[i].id === id) addClass(screens[i], 'active'); }
     currentScreen = id; TVConnection.pairingVisible(id === 'screenAccount'); renderCurrent(); firstFocus(focusMemory[id]);
+    if (id === 'screenHome' || id === 'screenSport') refreshSport(false); else TVSport.pause();
     if (id !== 'screenAccount') { el('pairQr').innerHTML = ''; lastQr = ''; }
   }
   function goBack() {
@@ -123,7 +127,7 @@
     applyAppearance();
     el('profileInitial').textContent = name === 'Invité' ? '+' : name.charAt(0);
     el('profileName').textContent = name;
-    history = []; focusMemory = {}; appsPage = 0; organizing = false;
+    history = []; focusMemory = {}; appsPage = 0; sportPage = 0; filmPage = 0; filmFilter = 'all'; selectedFilm = ''; organizing = false;
     showScreen('screenHome', false);
   }
   function appendText(parent, tag, value, className) {
@@ -173,9 +177,8 @@
   }
   function renderHomeApps() {
     var row = el('appRow'), previousLeft = row.scrollLeft, favorites = profileApps(8), i;
-    var recent = TVModel.byIds(currentProfile === 'Milo' ? TVModel.byIds(installedApps, prefs.pins()) : installedApps, prefs.recent());
-    el('filmsCopy').textContent = recent.length ? recent[0].title : 'Films & séries';
-    el('filmsHint').textContent = recent.length ? 'Rouvrir l’app' : 'Vos apps';
+    el('filmsCopy').textContent = 'Ma sélection SeenIt';
+    el('filmsHint').textContent = 'Films & séries';
     row.innerHTML = '';
     for (i = 0; i < favorites.length; i++) row.appendChild(appButton(favorites[i], false));
     var add = allAppsButton(); add.setAttribute('data-action', 'manage-apps'); add.setAttribute('aria-label', 'Ajouter une app'); add.querySelector('.app-name').textContent = 'Ajouter'; add.querySelector('.app-logo').textContent = '+'; row.appendChild(add);
@@ -188,19 +191,59 @@
     return currentProfile === 'Milo' ? TVModel.byIds(installedApps, prefs.pins()).slice(0, limit) : TVModel.favorites(installedApps, prefs.pins(), limit, prefs.hidden());
   }
   function renderFilms() {
-    var allowed = currentProfile === 'Milo' ? TVModel.byIds(installedApps, prefs.pins()) : installedApps;
-    var recent = TVModel.byIds(allowed, prefs.recent()).slice(0, 5), favorites = profileApps(5), i;
-    el('recentApps').innerHTML = ''; el('filmApps').innerHTML = '';
-    for (i = 0; i < recent.length; i++) el('recentApps').appendChild(appButton(recent[i], false));
-    for (i = 0; i < favorites.length; i++) el('filmApps').appendChild(appButton(favorites[i], false));
-    el('filmApps').appendChild(allAppsButton()); el('recentHint').style.display = recent.length ? 'none' : '';
-    var view = TVConnection.view(), row = el('linkedFilms'), image, item, card;
-    row.innerHTML = '';
-    for (i = 0; i < view.items.length; i++) {
-      item = view.items[i]; card = document.createElement('div'); card.className = 'linked-film';
-      if (/^\/[a-zA-Z0-9._/-]+$/.test(item.posterPath || '') && String(item.posterPath).indexOf('..') < 0) { image = document.createElement('img'); image.alt = ''; image.src = 'https://image.tmdb.org/t/p/w185' + item.posterPath; card.appendChild(image); }
-      appendText(card, 'strong', String(item.title || '').slice(0, 180)); row.appendChild(card);
+    var view = TVConnection.view(), items = TVModel.mediaItems(view.items, filmFilter), row = el('linkedFilms'), image, item, card, i, url, count = Math.max(1, Math.ceil(items.length / 4)), tabs = el('filmTabs').querySelectorAll('[data-film-filter]');
+    filmPage = Math.max(0, Math.min(filmPage, count - 1));
+    clearFilmArtwork(row);
+    for (i = 0; i < tabs.length; i++) { removeClass(tabs[i], 'selected'); if (tabs[i].getAttribute('data-film-filter') === filmFilter) addClass(tabs[i], 'selected'); tabs[i].setAttribute('aria-pressed', String(tabs[i].getAttribute('data-film-filter') === filmFilter)); }
+    el('filmEmpty').style.display = items.length ? 'none' : '';
+    el('filmHeroCopy').style.display = items.length ? '' : 'none'; el('filmShelf').style.display = items.length ? '' : 'none';
+    el('filmEmptyTitle').textContent = !view.linked ? 'Votre sélection, sur la TV.' : 'Aucun titre dans cette sélection.';
+    el('filmEmptyHint').textContent = !view.linked ? 'Associez votre compte SeenIt à ce profil pour retrouver vos films et séries.' : 'Changez de filtre ou actualisez votre liste.';
+    el('filmEmptyButton').setAttribute('data-action', view.linked ? 'sync-account' : 'account'); el('filmEmptyButton').textContent = view.linked ? 'Actualiser' : 'Connecter SeenIt';
+    el('filmPrevious').disabled = filmPage === 0; el('filmNext').disabled = filmPage + 1 >= count;
+    el('filmPageLabel').textContent = (filmPage + 1) + ' / ' + count;
+    for (i = filmPage * 4; i < items.length && i < filmPage * 4 + 4; i++) {
+      item = items[i]; card = document.createElement('button'); card.className = 'film-content-card focusable';
+      card.id = 'film-' + item.mediaType + '-' + item.tmdbId; card.setAttribute('data-action', 'film-detail'); card.setAttribute('data-film-index', String(i)); card.setAttribute('aria-label', item.title);
+      url = TVModel.mediaImage(item.backdropPath || item.posterPath, 'w500');
+      if (url) { image = document.createElement('img'); image.alt = ''; image.width = 400; image.height = 225; image.onerror = function () { this.style.display = 'none'; }; image.src = url; card.appendChild(image); }
+      appendText(card, 'small', item.status === 'watching' ? 'En cours' : 'À voir', 'film-card-state');
+      appendText(card, 'strong', item.title); row.appendChild(card);
     }
+    var selected = -1;
+    for (i = filmPage * 4; i < items.length && i < filmPage * 4 + 4; i++) if (items[i].mediaType + ':' + items[i].tmdbId === selectedFilm) selected = i;
+    renderFilmHero(selected < 0 ? filmPage * 4 : selected);
+  }
+  function filmMeta(item) {
+    var next = item.nextEpisode, meta = item.mediaType === 'movie' ? 'Film' : 'Série';
+    if (next && item.mediaType === 'tv') meta += ' · S' + (next.season < 10 ? '0' : '') + next.season + ' | E' + (next.episode < 10 ? '0' : '') + next.episode;
+    return meta + ' · ' + (item.status === 'watching' ? 'En cours' : 'À voir');
+  }
+  function clearFilmArtwork(container) {
+    var images = container.querySelectorAll('img'), i;
+    for (i = 0; i < images.length; i++) { images[i].onerror = null; images[i].removeAttribute('src'); }
+    container.innerHTML = '';
+  }
+  function renderFilmHero(index) {
+    var items = TVModel.mediaItems(TVConnection.view().items, filmFilter), item = items[index], image, url, fallback;
+    if (!item) { clearFilmArtwork(el('filmBackdrop')); return; }
+    if (selectedFilm === item.mediaType + ':' + item.tmdbId && el('filmHeroTitle').textContent === item.title && el('filmBackdrop').childNodes.length) return;
+    selectedFilm = item.mediaType + ':' + item.tmdbId;
+    el('filmHeroTitle').textContent = item.title; el('filmHeroTitle').className = item.title.length > 48 ? 'long-title' : '';
+    el('filmHeroMeta').textContent = filmMeta(item); el('filmHeroEpisode').textContent = item.nextEpisode && item.nextEpisode.name ? item.nextEpisode.name : '';
+    clearFilmArtwork(el('filmBackdrop')); url = TVModel.mediaImage(item.backdropPath || item.posterPath, 'w1280'); fallback = TVModel.mediaImage(item.posterPath, 'w500');
+    if (url) {
+      image = document.createElement('img'); image.alt = ''; image.className = item.backdropPath ? 'wide-artwork' : 'poster-artwork';
+      image.onerror = function () { if (fallback && this.src !== fallback) { this.className = 'poster-artwork'; this.src = fallback; } else this.style.display = 'none'; };
+      image.src = url; el('filmBackdrop').appendChild(image);
+    }
+  }
+  function renderFilmDetail() {
+    var items = TVModel.mediaItems(TVConnection.view().items, filmFilter), item = null, i;
+    for (i = 0; i < items.length; i++) if (items[i].mediaType + ':' + items[i].tmdbId === selectedFilm) item = items[i];
+    el('filmDetailTitle').textContent = item ? item.title : 'Contenu indisponible';
+    el('filmDetailMeta').textContent = item ? filmMeta(item) : '';
+    el('filmDetailEpisode').textContent = item && item.nextEpisode ? item.nextEpisode.name : '';
   }
   function renderAccount() {
     var view = TVConnection.view(), qr = el('pairQr'), blocked = currentProfile === 'Milo' || currentProfile === 'Invité';
@@ -224,6 +267,7 @@
     if (currentScreen === 'screenAccount') { renderAccount(); if (!isVisible(document.activeElement) || document.activeElement.disabled) firstFocus(saved); }
     else if (currentScreen === 'screenHome') { renderHomeApps(); firstFocus(saved); }
     else if (currentScreen === 'screenFilms') renderFilms();
+    else if (currentScreen === 'screenFilmDetail') renderFilmDetail();
   }
   function appendTeam(parent, team) {
     var name = team && team.name ? String(team.name) : 'Équipe', url = TVModel.teamArtwork(team && team.logo);
@@ -237,27 +281,48 @@
     appendText(group, 'span', name, 'team-name');
   }
   function renderEvents() {
-    var preview = !TVDevice.isSamsung(), events = preview ? demoEvents : [], row = el(currentScreen === 'screenHome' ? 'homeEvents' : 'calendarList'), i, b;
+    var preview = !TVDevice.isSamsung(), state = TVSport.view(prefs.sportSources()), events = preview ? demoEvents : state.events, row = el(currentScreen === 'screenHome' ? 'homeEvents' : 'calendarList'), i, b, event;
+    var start = currentScreen === 'screenHome' ? 0 : sportPage * 6, count = Math.max(1, Math.ceil(events.length / 6)), buttons = el('sportTeams').querySelectorAll('[data-team]');
+    if (sportPage >= count) { sportPage = count - 1; start = sportPage * 6; }
     row.innerHTML = '';
+    if (currentScreen === 'screenHome' && !preview) { row.style.display = 'none'; el('homeSportHeading').style.display = 'none'; return; }
     if (currentScreen === 'screenHome') { row.style.display = events.length ? '' : 'none'; el('homeSportHeading').style.display = events.length ? '' : 'none'; }
     el('sportStatus').textContent = preview ? 'Aperçu' : '';
-    el('calendarHint').textContent = preview ? 'Exemples de maquette. Le diffuseur dépend de chaque événement.' : 'Aucun calendrier connecté pour le moment.';
-    for (i = 0; i < events.length && (currentScreen !== 'screenHome' || i < 2); i++) {
+    for (i = 0; i < buttons.length; i++) { buttons[i].setAttribute('aria-pressed', String(prefs.sportSources().indexOf(buttons[i].getAttribute('data-team')) >= 0)); removeClass(buttons[i], 'selected'); if (buttons[i].getAttribute('aria-pressed') === 'true') addClass(buttons[i], 'selected'); }
+    el('sportPrevious').disabled = sportPage === 0; el('sportNext').disabled = sportPage + 1 >= count;
+    el('sportPage').textContent = events.length ? (sportPage + 1) + ' / ' + count : '';
+    var missing = state.sources.some(function (source) { return source.state === 'unavailable'; });
+    el('calendarHint').textContent = preview ? 'Exemples de maquette. Le diffuseur dépend de chaque événement.' : !prefs.sportSources().length ? 'Choisissez vos équipes. Cette sélection reste dans ce profil.' : state.loading ? 'Chargement des calendriers officiels…' : (state.failed || missing || state.stale ? 'Calendrier partiellement indisponible ou ancien. ' : '') + 'Sources : calendriers officiels AS Monaco / FFF · ' + (state.fetchedAt ? 'actualisé le ' + new Date(state.fetchedAt).toLocaleDateString('fr-FR') : 'actualisation à réessayer') + ' · sans score.';
+    for (i = start; i < events.length && i < start + (currentScreen === 'screenHome' ? 2 : 6); i++) {
+      event = events[i];
       b = document.createElement('button'); b.className = 'event-card focusable'; b.setAttribute('data-action', 'sport-event');
-      b.setAttribute('aria-label', events[i].title + ' · ' + events[i].when);
-      appendText(b, 'span', events[i].when);
-      if (events[i].home && events[i].away) {
+      b.id = 'sportEvent' + (event.id || String(i)).replace(/[^a-z0-9]/gi, '_');
+      b.setAttribute('data-event-detail', (event.venue || 'Stade non précisé') + ' · ' + (event.sourceId === 'monaco' ? 'AS Monaco officiel' : 'FFF officielle') + ' · diffusion non résolue');
+      appendText(b, 'span', event.when || sportWhen(event));
+      if (event.home && event.away) {
         var clubs = appendText(b, 'div', '', 'event-clubs');
-        appendTeam(clubs, events[i].home); appendText(clubs, 'span', '—', 'event-versus'); appendTeam(clubs, events[i].away);
-      } else appendText(b, 'strong', events[i].title);
-      appendText(b, 'small', events[i].meta); row.appendChild(b);
+        appendTeam(clubs, event.home); appendText(clubs, 'span', '—', 'event-versus'); appendTeam(clubs, event.away);
+      } else appendText(b, 'strong', event.title);
+      appendText(b, 'small', event.meta || event.competition);
+      if (!preview) appendText(b, 'small', (event.sourceId === 'monaco' ? 'AS Monaco' : 'France') + (event.home.name.toUpperCase().indexOf(event.sourceId === 'monaco' ? 'MONACO' : 'FRANCE') >= 0 ? ' · domicile' : ' · extérieur') + (event.venue ? ' · ' + event.venue : ''), 'event-venue');
+      row.appendChild(b);
     }
     if (!events.length) appendText(row, 'div', 'Vos rendez-vous sportifs apparaîtront ici.', 'empty-event');
   }
+  function sportWhen(event) {
+    var date = new Date(event.kickoff), day = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+    return day + (event.confirmed ? ' · ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ' · horaire à confirmer');
+  }
+  function sportChanged() {
+    if (hidden() || (currentScreen !== 'screenHome' && currentScreen !== 'screenSport')) return;
+    var saved = token(document.activeElement); updateSportTile(); if (currentScreen === 'screenSport') renderEvents(); firstFocus(saved);
+  }
+  function refreshSport(force) { if (TVDevice.isSamsung() && currentProfile && prefs.sportSources().length) TVSport.refresh(force); }
   function updateSportTile() {
-    var demo = !TVDevice.isSamsung();
-    el('sportBadge').textContent = demo && sportState === 'live' ? 'EN DIRECT' : demo && sportState === 'imminent' ? 'DANS 23 MIN' : '';
-    el('sportCopy').textContent = demo && sportState !== 'normal' ? 'Monaco — Lille' : 'Mes rendez-vous';
+    var demo = !TVDevice.isSamsung(), next = TVSport.view(prefs.sportSources()).events[0], minutes = next ? Math.ceil((new Date(next.kickoff).getTime() - new Date().getTime()) / 60000) : 0;
+    el('sportBadge').textContent = demo && sportState === 'live' ? 'EN DIRECT' : demo && sportState === 'imminent' ? 'DANS 23 MIN' : next && next.confirmed && minutes <= 60 ? 'DANS ' + minutes + ' MIN' : '';
+    el('sportCopy').textContent = demo && sportState !== 'normal' ? 'Monaco — Lille' : next ? next.home.name + ' — ' + next.away.name : 'Mes rendez-vous';
+    el('sportTile').querySelector('small').textContent = next ? sportWhen(next) : 'Calendrier sportif';
     removeClass(el('sportTile'), 'live'); if (demo && sportState !== 'normal') addClass(el('sportTile'), 'live');
   }
   function appsForTab() {
@@ -285,7 +350,7 @@
   function configurePager(button, enabled) { button.disabled = !enabled; button.className = enabled ? 'pager-button focusable' : 'pager-button'; }
   function renderCurrent() {
     if (hidden()) return;
-    if (currentScreen === 'screenHome') { renderHomeApps(); renderSources(); renderEvents(); }
+    if (currentScreen === 'screenHome') { renderHomeApps(); renderSources(); renderEvents(); updateSportTile(); }
     else if (currentScreen === 'screenFilms') renderFilms();
     else if (currentScreen === 'screenSport') renderEvents();
     else if (currentScreen === 'screenSources') renderSources();
@@ -345,6 +410,7 @@
     el('clock').textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
     el('date').textContent = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][now.getDay()] + ' ' + now.getDate() + ' ' + ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][now.getMonth()];
     applyAppearance();
+    if (sportMinute !== Math.floor(now.getTime() / 60000)) { sportMinute = Math.floor(now.getTime() / 60000); sportChanged(); if (currentScreen === 'screenHome' || currentScreen === 'screenSport') refreshSport(false); }
   }
   function stopTelemetryTimers() {
     if (memoryTimer !== null) clearInterval(memoryTimer); if (storageTimer !== null) clearInterval(storageTimer); if (clockTimer !== null) clearInterval(clockTimer);
@@ -382,8 +448,14 @@
     if (profile) { setProfile(profile); return; }
     if (action === 'live-tv') TVDevice.openLiveTv(function (ok) { if (!ok) showToast('Le tuner TV n’est pas accessible.'); });
     else if (action === 'films') showScreen('screenFilms');
+    else if (action === 'film-filter') { filmFilter = button.getAttribute('data-film-filter'); filmPage = 0; selectedFilm = ''; saved = token(button); renderFilms(); firstFocus(saved); }
+    else if (action === 'film-next' || action === 'film-previous') { filmPage += action === 'film-next' ? 1 : -1; selectedFilm = ''; renderFilms(); setFocus(el('linkedFilms').querySelector('button')); }
+    else if (action === 'film-detail') showScreen('screenFilmDetail');
     else if (action === 'sport') showScreen('screenSport');
-    else if (action === 'sport-event') showToast('La source de ce rendez-vous n’est pas encore connectée.');
+    else if (action === 'sport-event') showToast(button.getAttribute('data-event-detail') || 'Aperçu de maquette.');
+    else if (action === 'sport-team') { prefs.toggleSport(button.getAttribute('data-team')); sportPage = 0; renderEvents(); refreshSport(false); }
+    else if (action === 'sport-refresh') { refreshSport(true); renderEvents(); }
+    else if (action === 'sport-next' || action === 'sport-previous') { sportPage += action === 'sport-next' ? 1 : -1; renderEvents(); firstFocus(); }
     else if (action === 'settings') { if (currentScreen === 'screenHome') setFocus(el('screenHome').querySelector('.home-setting-card')); else showScreen('screenSettings'); }
     else if (action === 'quick') showScreen('screenQuick');
     else if (action === 'sources') showScreen('screenSources');
@@ -438,8 +510,8 @@
     else if (code === 403 && !TVDevice.isSamsung()) { sportState = sportState === 'normal' ? 'imminent' : sportState === 'imminent' ? 'live' : 'normal'; updateSportTile(); }
   }
   function handleVisibility() {
-    if (hidden()) { suspendedFocus = token(document.activeElement); TVConnection.pause(); stopTelemetryTimers(); releaseDynamic(); el('pairQr').innerHTML = ''; lastQr = ''; }
-    else { launchPending = false; startTelemetryTimers(); renderCurrent(); firstFocus(suspendedFocus); TVConnection.resume(); discoverDevice(false); }
+    if (hidden()) { suspendedFocus = token(document.activeElement); TVConnection.pause(); TVSport.pause(); stopTelemetryTimers(); releaseDynamic(); el('pairQr').innerHTML = ''; lastQr = ''; }
+    else { launchPending = false; startTelemetryTimers(); renderCurrent(); firstFocus(suspendedFocus); TVConnection.resume(); if (currentScreen === 'screenHome' || currentScreen === 'screenSport') refreshSport(false); discoverDevice(false); }
   }
   function handleKeyUp(event) {
     if ((event.keyCode || event.which) !== 13) return;
@@ -451,6 +523,7 @@
   }
   function init() {
     TVConnection.init(storage, connectionChanged);
+    TVSport.init(storage, sportChanged);
     resizeStage(); updateConnectivity(); updateSportTile(); startTelemetryTimers();
     window.addEventListener('resize', resizeStage); window.addEventListener('online', updateConnectivity); window.addEventListener('offline', updateConnectivity);
     document.addEventListener('visibilitychange', handleVisibility); document.addEventListener('keydown', handleKey);

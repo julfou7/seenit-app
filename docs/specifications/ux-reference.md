@@ -330,3 +330,15 @@ Trois destinations visuelles, rangée d'apps générique, sources natives et ré
 basse. En-tête fixe, Retour remonte la Home avant de quitter, focus visible et mouvement réduit.
 Compte/QR réservé à l'association explicite d'un profil adulte ; aucun visionnage attribué
 par un simple lancement d'app. Référence : [TV V4](tv-samsung-launcher-v4.md).
+
+Films & séries, terrain28/10 : grand fond du contenu actif et rail paysage, sans apps.
+Pour toi/Séries/Films filtrent localement ; quatre cartes/page. Déplacer le focus actualise
+le grand visuel, OK consulte le détail et Retour restaure la carte. Sans image, garder une
+carte stable ; sans association, proposer le QR du profil. Aucun contenu/progrès fictif ni
+CTA de lecture exacte sans implémentation prouvée. Référence : maquette V3-06 fournie.
+
+Sport, MVP gratuit du28/10 (#738) : sélectionner les équipes localement, calendrier six
+cartes/page, heure locale et horaire provisoire explicites, sans résultat. OK sur une carte
+donne stade/source/information de diffusion ; aucune ouverture supposée. Précédents/Suivants
+et Actualiser restent accessibles à la télécommande. Retour retrouve la tuile Sport, sans
+modifier les équipes choisies. La Home anticipe le prochain match sans suivi live.
