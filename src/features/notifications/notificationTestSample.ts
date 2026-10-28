@@ -169,7 +169,7 @@ function buildSample(
       season,
       episode: episodeNumber,
       notificationTitle: show.title,
-      summaryText: 'Nouvelle saison',
+      summaryText: 'Bientôt',
       body: `Saison ${season || 1} dans 7 jours.`,
       posterUrl,
       richImageUrl: episodeRich,

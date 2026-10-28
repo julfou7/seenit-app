@@ -1,3 +1,4 @@
+import { ensureSeenItNotificationChannels } from '../features/notifications/notificationChannels.ts';
 import { rememberNotification } from '../features/notifications/notificationInbox';
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
@@ -103,19 +104,33 @@ async function fetchImageAsDataUrl(url?: string): Promise<string | undefined> {
 // Register native notification click action listener on Capacitor Native platform
 if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
   try {
+    void ensureSeenItNotificationChannels().catch(() => undefined);
     PushNotifications.addListener('pushNotificationReceived', notification => rememberNotification(auth.currentUser?.uid, notification));
     LocalNotifications.addListener('localNotificationReceived', notification => rememberNotification(auth.currentUser?.uid, notification));
     LocalNotifications.addListener('localNotificationActionPerformed', (notificationAction) => {
       rememberNotification(auth.currentUser?.uid, notificationAction.notification);
       const extra = notificationAction.notification?.extra || {};
       const payload = {
-        type: notificationAction.actionId === 'mark_watched' ? 'QUICK_ACTION_MARK_WATCHED' : 'NAVIGATE_SHOW',
+        type: notificationAction.actionId === 'mark_watched' ? 'QUICK_ACTION_MARK_WATCHED'
+          : notificationAction.actionId === 'remind_tonight' ? 'QUICK_ACTION_REMIND_TONIGHT'
+          : notificationAction.actionId === 'open_provider' ? 'QUICK_ACTION_OPEN_PROVIDER' : 'NAVIGATE_SHOW',
         showId: extra.showId,
         tmdbId: extra.tmdbId,
         mediaType: extra.mediaType || 'tv',
         season: extra.season,
         episode: extra.episode,
-        url: extra.url
+        url: extra.url,
+        ownerUid: extra.ownerUid,
+        providerId: extra.providerId,
+        providerName: extra.providerName,
+        notificationId: notificationAction.notification.id,
+        notificationTitle: notificationAction.notification.title,
+        releasedSeason: extra.releasedSeason,
+        releasedEpisode: extra.releasedEpisode,
+        releasedName: extra.releasedName,
+        releasedDate: extra.releasedDate,
+        notificationIcon: notificationAction.notification.largeIcon,
+        notificationImage: notificationAction.notification.attachments?.[0]?.url
       };
       window.dispatchEvent(new CustomEvent('capacitor-notification-action', { detail: payload }));
     });
@@ -189,16 +204,6 @@ export async function cancelScheduledNotification(id: number) {
 
 export async function sendNativeNotification(title: string, options?: NativeNotificationOptions) {
   const ownerUid = auth.currentUser?.uid;
-  const iconUrl = options?.icon || options?.image || 'https://seenit.app/icon-192.png';
-  const imageUrl = options?.image || options?.icon;
-  const extraData: NativeNotificationData = options?.data || {
-    showId: options?.showId,
-    tmdbId: options?.tmdbId,
-    mediaType: options?.mediaType,
-    season: options?.season,
-    episode: options?.episode
-  };
-
   const notificationId = options?.notificationId ?? (
     options?.tag
       ? generateNotificationNumericId(options.tag)
@@ -207,71 +212,18 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
           : Math.floor(Math.random() * 1000000))
   );
 
-  const targetDate = options?.scheduleDate && options.scheduleDate.getTime() > Date.now()
-    ? options.scheduleDate
-    : new Date(Date.now() + 100);
-
-  // On Native Capacitor Android App, use LocalNotifications plugin
   if (Capacitor.isNativePlatform()) {
-    try {
-      const perm = await LocalNotifications.checkPermissions();
-      if (perm.display !== 'granted') {
-        const req = await LocalNotifications.requestPermissions();
-        if (req.display !== 'granted') return;
-      }
-
-      const attachments = imageUrl ? [{ id: 'photo', url: imageUrl }] : undefined;
-
-      // Register action types for notification buttons
-      try {
-        await LocalNotifications.registerActionTypes({
-          types: [
-            {
-              id: 'EPISODE_NOTIF_ACTIONS',
-              actions: [
-                {
-                  id: 'mark_watched',
-                  title: '✓ Marquer comme vu',
-                  foreground: true
-                }
-              ]
-            }
-          ]
-        });
-      } catch (e) {}
-
-      if (ownerUid && auth.currentUser?.uid !== ownerUid) return;
-      await LocalNotifications.schedule({
-        notifications: [{
-          title: title,
-          body: options?.body || '',
-          largeBody: options?.body || '',
-          summaryText: 'Nouvel épisode',
-          id: notificationId,
-          schedule: {
-            at: targetDate,
-            allowWhileIdle: true
-          },
-          smallIcon: 'ic_stat_seenit',
-          iconColor: '#E5A93D',
-          largeIcon: imageUrl || undefined,
-          attachments,
-          actionTypeId: 'EPISODE_NOTIF_ACTIONS',
-          extra: {
-            ownerUid,
-            showId: extraData.showId,
-            tmdbId: extraData.tmdbId,
-            mediaType: extraData.mediaType || 'tv',
-            season: extraData.season,
-            episode: extraData.episode,
-            url: extraData.url
-          }
-        }]
-      });
-      return;
-    } catch (err) {
-      appLogger.warn('system', 'LocalNotifications native schedule failed', err);
-    }
+    const [{ sendMediaReminderNotification }, { resolveNotificationMediaVisual }] = await Promise.all([
+      import('../features/notifications/mediaReminderNotification.ts'),
+      import('../features/notifications/notificationMedia.ts'),
+    ]);
+    const media = await resolveNotificationMediaVisual(options?.icon, options?.image);
+    await sendMediaReminderNotification(title, {
+      ...options, ...media,
+      summaryText: 'Actualité', channelId: 'seenit_news',
+      notificationId,
+    });
+    return;
   }
 
   // If not future schedule on web, trigger web notification

@@ -17,8 +17,8 @@ test('SEENIT-UPDATE-007 notifie seulement après les contrôles de l’APK et av
   assert.ok(installIndex > notificationIndex);
 
   const presentation = getVerifiedUpdateDownloadNotification('1.4.199');
-  assert.equal(presentation.title, 'Mise à jour téléchargée ✅');
-  assert.match(presentation.body, /1\.4\.199/);
+  assert.equal(presentation.title, 'SeenIt 1.4.199');
+  assert.equal(presentation.body, 'Vérifiée · installation en cours');
   assert.equal(
     getVerifiedUpdateDownloadNotification('1.4.199').id,
     getVerifiedUpdateDownloadNotification('1.4.199').id

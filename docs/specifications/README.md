@@ -101,3 +101,5 @@ Complément prioritaire du25octobre2026 : [marque v3 et terrain223](../design/ma
 La [SPEC-DEV-V4 importée du ZIP10](../design/home-a-voir-v4.md) remplace les états intermédiaires pour la géométrie, les badges, le chargement progressif, la frise historique et la fiche acteur. Les données de maquette ne constituent jamais des données de production.
 
 Référence Samsung TV courante : [launcher V4 et association QR](tv-samsung-launcher-v4.md), #295.
+
+La [refonte notifications #778](notification-refactor-2026-10-27.md) précise la grammaire commune, les canaux et les lots encore différés.

@@ -14,7 +14,7 @@ const MAX_PENDING_MEDIA_ACTIONS = 8;
 const REPLAY_MARKER = '__seenitMediaActionReplay';
 
 function isMediaNotificationAction(payload: MediaNotificationActionPayload | null | undefined): boolean {
-  return payload?.type === 'NAVIGATE_SHOW' || payload?.type === 'QUICK_ACTION_MARK_WATCHED';
+  return payload?.type === 'NAVIGATE_SHOW' || payload?.type === 'QUICK_ACTION_MARK_WATCHED' || payload?.type === 'QUICK_ACTION_REMIND_TONIGHT' || payload?.type === 'QUICK_ACTION_OPEN_PROVIDER';
 }
 
 /**

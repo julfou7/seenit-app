@@ -35,7 +35,7 @@ test('SEENIT-NOTIFICATION-005 transporte le type via subText et garde summaryTex
   assert.match(reminder, /summaryText: attachments && detailText \? detailText : undefined/);
   assert.match(reminder, /channelId: resolveChannelId\(options\)/);
   assert.match(reminder, /smallIcon: 'ic_stat_seenit'/);
-  assert.match(reminder, /title: '✓ Vu'/);
+  assert.match(reminder, /'✓ Vu'/);
 });
 
 test('SEENIT-NOTIFICATION-005 patch Capacitor Kotlin est idempotent et branché au postinstall', () => {

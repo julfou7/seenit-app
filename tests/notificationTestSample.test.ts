@@ -108,7 +108,7 @@ test('SEENIT-NOTIFICATION-005 TNR #106 : Tester Nouvelle saison prend une vraie 
   assert.equal(sample.show.title, 'Première réelle');
   assert.equal(sample.season, 5);
   assert.equal(sample.episode, 1);
-  assert.equal(sample.summaryText, 'Nouvelle saison');
+  assert.equal(sample.summaryText, 'Bientôt');
   assert.equal(sample.notificationTitle, 'Première réelle');
   assert.equal(sample.body, 'Saison 5 dans 7 jours.');
   assert.equal(sample.allowMarkWatched, false);

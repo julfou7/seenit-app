@@ -87,7 +87,8 @@ export function buildDownloadWebhookPresentation(
     type: 'DOWNLOAD_EVENT',
     source,
     eventType,
-    subText: 'Téléchargement'
+    subText: 'Téléchargement',
+    eventKey: buildEventKey(source, payload, positiveInteger(payload?.movie?.tmdbId ?? payload?.series?.tmdbId), firstEpisode(payload)),
   };
 
   if (eventType === 'Grab') {

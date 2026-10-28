@@ -10,7 +10,7 @@ const tvReminderCopySource = readSource('src/features/notifications/tvReminderCo
 const nativePatchSource = readSource('scripts/patch-local-notifications.cjs');
 const androidVariablesSource = readSource('android/variables.gradle');
 
-test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par événement', () => {
+test('SEENIT-NOTIFICATION-002 affiche un visuel média et aucun emoji textuel', () => {
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w342/,
     'l’APK doit utiliser un poster TMDB compact pour le largeIcon');
   assert.match(reminderSource, /https:\/\/image\.tmdb\.org\/t\/p\/w500/,
@@ -24,18 +24,9 @@ test('SEENIT-NOTIFICATION-002 affiche un visuel média et un seul emoji par év�
     'le titre média reste séparé du contexte détaillé du nouvel épisode');
   assert.match(reminderSource, /buildTvSeasonReminderSummary\(upcoming\)/,
     'le rappel saison doit construire un contexte qui contient son numéro');
-  assert.match(tvReminderCopySource, /🆕 Nouvel épisode/,
-    'le contexte épisode conserve un seul emoji événementiel');
-  assert.match(tvReminderCopySource, /📅 Nouvelle saison/,
-    'le contexte saison conserve un seul emoji événementiel');
-  assert.match(reminderSource, /title,\n\s+'🎬 Sortie cinéma'/,
-    'le titre média reste sans emoji et le contexte porte l’emoji cinéma');
-  assert.match(reminderSource, /title,\n\s+'📺 Sortie DVD \/ VOD'/,
-    'le titre média reste sans emoji et le contexte porte l’emoji VOD');
-  assert.doesNotMatch(reminderSource, /`(?:🆕|📅|🎬|📺) \$\{title\}`/,
-    'aucun rappel ne doit dupliquer l’emoji de contexte dans le titre média');
-  assert.match(mediaReminderSource, /title: '✓ Marquer comme vu'/,
-    'l’action rapide épisode doit rester disponible');
+  assert.doesNotMatch(tvReminderCopySource, /[🆕📅🎬📺]/u);
+  assert.doesNotMatch(reminderSource, /[🆕📅🎬📺]/u);
+  assert.match(mediaReminderSource, /'✓ Vu'/);
   assert.match(reminderSource, /allowMarkWatched: addActions/,
     'l’action rapide ne doit être attachée qu’au rappel épisode prévu');
 });
@@ -60,7 +51,7 @@ test('SEENIT-NOTIFICATION-002 sépare affiche et image riche sans bloquer le fal
     'tout visuel local disponible, y compris le poster fallback, doit alimenter BigPicture');
   assert.doesNotMatch(mediaReminderSource, /imageUrl !== iconUrl/,
     'un poster partagé avec largeIcon ne doit plus supprimer le BigPicture');
-  assert.match(mediaReminderSource, /summaryText: options\.summaryText/,
+  assert.match(mediaReminderSource, /subText: options\.summaryText/,
     'le libellé secondaire Android doit être spécifique à l’événement');
 });
 
@@ -169,6 +160,6 @@ test('SEENIT-NOTIFICATION-002 hydrate le bitmap seulement à la livraison Androi
     'le patch doit refuser explicitement toute réintroduction du recoverBuilder AndroidX');
   assert.match(hydratedDeliveryBlock, /notificationJson\?\.let \{ LocalNotification\.buildNotificationFromJSObject\(it\) \}/);
   assert.match(hydratedDeliveryBlock, /notificationManager\.notify\(id, deliveredNotification\)/);
-  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v7'/,
+  assert.match(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v8'/,
     'les alarmes existantes doivent être recréées avec la copie détaillée courante');
 });

@@ -40,12 +40,12 @@ export function downloadFailurePresentation(receipt: DownloadFailureReceipt): {
     : receipt.season !== undefined ? ` · Saison ${receipt.season}` : ' · Toute la série';
   const data: Record<string, string> = {
     type: 'NAVIGATE_SHOW', notificationKind: 'download_failure', mediaType: receipt.mediaType, tmdbId: String(receipt.tmdbId),
-    requestId: receipt.requestId, tag: `no-release-${receipt.requestId}`,
+    subText: 'Téléchargement', requestId: receipt.requestId, tag: `no-release-${receipt.requestId}`,
     url: `/?tmdbId=${receipt.tmdbId}&mediaType=${receipt.mediaType}${receipt.season !== undefined ? `&season=${receipt.season}` : ''}${receipt.episode !== undefined ? `&episode=${receipt.episode}` : ''}`
   };
   if (receipt.season !== undefined) data.season = String(receipt.season);
   if (receipt.episode !== undefined) data.episode = String(receipt.episode);
-  return { notification: { title: `${receipt.title}${scope}`, body: 'Aucune release compatible trouvée.' }, data };
+  return { notification: { title: receipt.title, body: `${scope.replace(/^ · /, '')}${scope ? ' · ' : ''}Aucune release compatible trouvée.` }, data };
 }
 
 export interface DownloadFailureDeliveryStore {

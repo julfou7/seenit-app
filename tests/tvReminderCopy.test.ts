@@ -43,7 +43,7 @@ function episode(
 }
 
 test('SEENIT-NOTIFICATION-005 #778 sépare le type du fait compact sans emoji ni répétition', () => {
-  assert.equal(buildTvSeasonReminderSummary(episode(2, 1, 'Reprise')), 'Nouvelle saison');
+  assert.equal(buildTvSeasonReminderSummary(episode(2, 1, 'Reprise')), 'Bientôt');
 
   const released = episode(2, 3, 'Le combat');
   const show = showFixture({
@@ -55,7 +55,7 @@ test('SEENIT-NOTIFICATION-005 #778 sépare le type du fait compact sans emoji ni
   const copy = buildTvEpisodeReminderCopy(show, released, today);
   assert.equal(copy.summaryText, 'Nouvel épisode');
   assert.equal(copy.body, 'S02 | E03 · Le combat disponible aujourd’hui.');
-  assert.equal(copy.detailText, undefined);
+  assert.equal(copy.detailText, 'C’est ton prochain épisode.');
   assert.doesNotMatch(`${copy.summaryText} ${copy.body}`, /[📅🆕🎬📺✅🚀]/u);
   assert.equal((copy.body.match(/S02 \| E03/g) || []).length, 1);
 });
@@ -72,8 +72,8 @@ test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le procha
   const copy = buildTvEpisodeReminderCopy(show, released, today);
   assert.equal(copy.summaryText, 'Nouvel épisode');
   assert.equal(copy.body, 'À voir : S02 | E02 · 2 épisodes t’attendent.');
-  assert.equal(copy.detailText, 'Tu as 2 épisodes à reprendre. Un nouvel épisode est disponible aujourd’hui.');
-  assert.equal((`${copy.body} ${copy.detailText}`.match(/S\d{2} \| E\d{2}/g) || []).length, 1);
+  assert.equal(copy.detailText, 'Ton prochain : S02 | E02 · Demi-finale\n2 épisodes à rattraper · le plus récent est sorti aujourd’hui.');
+  assert.equal((copy.body.match(/S\d{2} \| E\d{2}/g) || []).length, 1);
 });
 
 test('SEENIT-NOTIFICATION-005 #623 reste aligné sur la reprise réelle quand plusieurs épisodes attendent', () => {
@@ -88,7 +88,7 @@ test('SEENIT-NOTIFICATION-005 #623 reste aligné sur la reprise réelle quand pl
   const copy = buildTvEpisodeReminderCopy(show, released, today);
   assert.equal(copy.summaryText, 'Nouvel épisode');
   assert.equal(copy.body, 'À voir : S02 | E02 · 4 épisodes t’attendent.');
-  assert.equal(copy.detailText, 'Tu as 4 épisodes à reprendre. Un nouvel épisode est disponible aujourd’hui.');
+  assert.equal(copy.detailText, 'Ton prochain : S02 | E02 · Deuxième manche\n4 épisodes à rattraper · le plus récent est sorti aujourd’hui.');
 
   const homeSource = readFileSync('src/components/cards/ContinueWatchingCard.tsx', 'utf8');
   assert.doesNotMatch(homeSource, /getExtraAvailableEpisodes/);

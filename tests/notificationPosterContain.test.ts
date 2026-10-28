@@ -38,5 +38,5 @@ test('SEENIT-NOTIFICATION-003 et #443 appliquent le même contain au post-import
   );
   assert.doesNotMatch(plexWorker, /Bitmap\.createScaledBitmap\(/);
   assert.ok(plexWorker.includes('if (poster != null) {'));
-  assert.ok(plexWorker.includes('.setStyle(new NotificationCompat.BigTextStyle().bigText("✅ Disponible dans Plex"))'));
+  assert.ok(plexWorker.includes('.setStyle(new NotificationCompat.BigTextStyle().bigText(compactText))'));
 });

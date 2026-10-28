@@ -6,6 +6,8 @@ import { createPortal } from 'react-dom';
 import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';
 import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
+import { registerPlugin } from '@capacitor/core';
+import { DEFAULT_NOTIFICATION_PREFS, mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
@@ -41,12 +43,7 @@ import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { resolveNotificationMediaVisual } from '../features/notifications/notificationMedia';
 import { sendMediaReminderNotification } from '../features/notifications/mediaReminderNotification';
 import { buildNotificationTestSample, type NotificationTestType } from '../features/notifications/notificationTestSample';
-const DEFAULT_NOTIFICATION_PREFS = {
-  release_today_tv: true,
-  season_d7: true,
-  movie_theater: true,
-  movie_dvd_vod: true
-};
+const NotificationSettings = registerPlugin<{ open(): Promise<void> }>('SeenItNotificationSettings');
 
 const STREAMING_PLATFORMS = [
   { id: 8, name: 'Netflix' },
@@ -93,7 +90,7 @@ export function SettingsScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   const [notificationPrefs, setNotificationPrefs] = useState(() =>
-    readUserScopedJson(auth.currentUser?.uid, 'notifications', DEFAULT_NOTIFICATION_PREFS)
+    mergeNotificationPreferences(readUserScopedJson(auth.currentUser?.uid, 'notifications', null))
   );
 
   const handleToggleNotif = async (key: string, value: boolean) => {
@@ -277,7 +274,7 @@ export function SettingsScreen() {
         // Réinitialiser immédiatement l'UI dans le périmètre du nouveau compte,
         // avant même que les lectures Firestore asynchrones ne se terminent.
         setUserPlatforms(readUserScopedJson<number[]>(currentUser.uid, 'platforms', []));
-        setNotificationPrefs(readUserScopedJson(currentUser.uid, 'notifications', DEFAULT_NOTIFICATION_PREFS));
+        setNotificationPrefs(mergeNotificationPreferences(readUserScopedJson(currentUser.uid, 'notifications', null)));
         try {
           // 1. Plateformes de streaming
           const prefRef = doc(db, 'users', currentUser.uid, 'settings', 'preferences');
@@ -298,7 +295,7 @@ export function SettingsScreen() {
 
           if (snapNotif.exists()) {
             const cloudNotifs = { ...DEFAULT_NOTIFICATION_PREFS, ...snapNotif.data() };
-            setNotificationPrefs(cloudNotifs);
+            setNotificationPrefs(mergeNotificationPreferences(cloudNotifs));
             writeUserScopedJson(currentUser.uid, 'notifications', cloudNotifs);
           } else if (localNotifs) {
             await setDoc(notifRef, localNotifs, { merge: true });
@@ -394,7 +391,7 @@ export function SettingsScreen() {
       const snapNotif = await getDoc(notifRef);
       if (snapNotif.exists()) {
         const cloudNotifs = { ...DEFAULT_NOTIFICATION_PREFS, ...snapNotif.data() };
-        setNotificationPrefs(cloudNotifs);
+        setNotificationPrefs(mergeNotificationPreferences(cloudNotifs));
         writeUserScopedJson(user.uid, 'notifications', cloudNotifs);
       }
 
@@ -507,6 +504,7 @@ export function SettingsScreen() {
         badge: 'https://seenit.app/icon-192.png',
         ...mediaVisual,
         summaryText: sample.summaryText,
+        detailText: sample.detailText,
         allowMarkWatched: sample.allowMarkWatched,
         showId: sample.show.id,
         tmdbId: sample.show.tmdbId,
@@ -789,6 +787,10 @@ export function SettingsScreen() {
                   />
                 </div>
               </div>
+              <label className="flex items-center justify-between gap-4">
+                <span className="text-xs text-zinc-200 font-bold">Actualités des séries<span className="block text-[10px] text-zinc-500 font-normal">Renouvellements et saisons annoncées</span></span>
+                <input type="checkbox" checked={notificationPrefs.news} onChange={event => handleToggleNotif('news', event.target.checked)} className="w-4 h-4 accent-[#E5A93D]" />
+              </label>
             </div>
 
             <button
@@ -805,6 +807,10 @@ export function SettingsScreen() {
               <Bell size={15} />
               Autoriser le système Android/Web
             </button>
+            {Capacitor.getPlatform() === 'android' && <button
+              onClick={() => { void NotificationSettings.open().catch(() => showToast('Réglages Android indisponibles.', 'error')); }}
+              className="mt-3 w-full py-2.5 text-xs text-zinc-300 border border-zinc-700 rounded-xl"
+            >Réglages Android des notifications</button>}
           </div>
 
           {/* SECTION 4: INTÉGRATIONS & SYNCHRO */}

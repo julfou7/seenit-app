@@ -7,6 +7,8 @@ import {
   type NativeNotificationOptions,
 } from '../../lib/firebase';
 import { resolveMediaReminderSchedule } from './mediaReminderSchedule';
+import { isObsoleteMediaAlert } from './notificationLifecycle.ts';
+import type { Show } from '../../types.ts';
 import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
 import {
   ensureSeenItNotificationChannels,
@@ -31,6 +33,11 @@ export interface MediaReminderNotificationOptions extends NativeNotificationOpti
   detailText?: string;
   channelId?: string;
   allowMarkWatched?: boolean;
+  silent?: boolean;
+  actionTitle?: string;
+  allowTonight?: boolean;
+  provider?: { id: number; name: string };
+  reminderPurpose?: 'tonight';
 }
 
 export function getMediaReminderNotificationId(tag: string): number {
@@ -78,12 +85,16 @@ export async function prunePendingMediaReminderNotifications(
   if (!Capacitor.isNativePlatform()) return;
 
   try {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return;
     const allowed = new Set(allowedNotificationIds);
     const pending = await LocalNotifications.getPending();
     const pendingNotifications = pending.notifications as PendingMediaNotification[];
     const notifications = pendingNotifications
       .filter(notification => (
-        String(notification.extra?.showId ?? '') === String(showId)
+        notification.extra?.ownerUid === uid
+        && notification.extra?.reminderPurpose !== 'tonight'
+        && String(notification.extra?.showId ?? '') === String(showId)
         && String(notification.extra?.mediaType ?? 'tv') === mediaType
         && !allowed.has(Number(notification.id))
       ))
@@ -124,15 +135,16 @@ export async function sendMediaReminderNotification(
 
     await ensureSeenItNotificationChannels();
 
-    if (options.allowMarkWatched) {
+    const resolvedId = resolveNotificationId(options);
+    if (options.allowMarkWatched || options.allowTonight || options.provider) {
       await LocalNotifications.registerActionTypes({
         types: [{
-          id: 'EPISODE_NOTIF_ACTIONS',
-          actions: [{
-            id: 'mark_watched',
-            title: '✓ Vu',
-            foreground: true,
-          }],
+          id: `EPISODE_NOTIF_ACTIONS_${resolvedId}`,
+          actions: [
+            ...(options.allowMarkWatched ? [{ id: 'mark_watched', title: options.actionTitle || '✓ Vu', foreground: true }] : []),
+            ...(options.provider ? [{ id: 'open_provider', title: `Ouvrir ${options.provider.name}`, foreground: true }] : []),
+            ...(options.allowTonight ? [{ id: 'remind_tonight', title: 'Ce soir', foreground: true }] : []),
+          ],
         }],
       }).catch(() => undefined);
     }
@@ -164,16 +176,26 @@ export async function sendMediaReminderNotification(
       // passe désormais exclusivement par subText.
       summaryText: attachments && detailText ? detailText : undefined,
       subText: options.summaryText,
-      id: resolveNotificationId(options),
+      id: resolvedId,
       ...(schedule ? { schedule } : {}),
       channelId: resolveChannelId(options),
       smallIcon: 'ic_stat_seenit',
       iconColor: '#E5A93D',
       largeIcon: iconUrl || undefined,
       attachments,
-      actionTypeId: options.allowMarkWatched ? 'EPISODE_NOTIF_ACTIONS' : undefined,
+      actionTypeId: options.allowMarkWatched || options.allowTonight || options.provider ? `EPISODE_NOTIF_ACTIONS_${resolvedId}` : undefined,
+      group: 'seenit',
       extra: {
         ownerUid,
+        notificationScope: 'media',
+        silent: options.silent === true,
+        reminderPurpose: options.reminderPurpose,
+        providerId: options.provider?.id,
+        providerName: options.provider?.name,
+        releasedSeason: extraData.releasedSeason,
+        releasedEpisode: extraData.releasedEpisode,
+        releasedName: extraData.releasedName,
+        releasedDate: extraData.releasedDate,
         showId: extraData.showId,
         tmdbId: extraData.tmdbId,
         mediaType: extraData.mediaType || 'tv',
@@ -190,4 +212,19 @@ export async function sendMediaReminderNotification(
     localConsole.warn('Media reminder native schedule failed; notification skipped safely:', error);
     return false;
   }
+}
+
+/** Retire les alertes vues/archivées sans toucher aux téléchargements ni aux autres UID. */
+export async function reconcileDeliveredMediaAlerts(uid: string, shows: readonly Show[]): Promise<void> {
+  if (!Capacitor.isNativePlatform() || auth.currentUser?.uid !== uid) return;
+  try {
+    const delivered = await LocalNotifications.getDeliveredNotifications();
+    if (auth.currentUser?.uid !== uid) return;
+    const obsolete = delivered.notifications.filter(item => isObsoleteMediaAlert(item, uid, shows));
+    if (obsolete.length) await LocalNotifications.removeDeliveredNotifications({ notifications: obsolete });
+    const pending = await LocalNotifications.getPending();
+    if (auth.currentUser?.uid !== uid) return;
+    const staleReminders = pending.notifications.filter(item => item.extra?.reminderPurpose === 'tonight' && isObsoleteMediaAlert(item, uid, shows));
+    if (staleReminders.length) await LocalNotifications.cancel({ notifications: staleReminders.map(item => ({ id: item.id })) });
+  } catch { /* Un panneau indisponible ne bloque pas le planificateur. */ }
 }

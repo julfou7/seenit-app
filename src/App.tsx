@@ -1,3 +1,4 @@
+import { getTodayStr } from './lib/utils';
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
@@ -449,8 +450,8 @@ function MainApp() {
       handleNativeMediaUrl(sessionStorage.getItem('seenit_pending_media_url'));
     }
 
-    const handleNotificationMessage = (data: { type?: string; showId?: string | number; tmdbId?: string | number; mediaType?: 'tv' | 'movie'; season?: string | number; episode?: string | number }) => {
-      if (!data) return;
+    const handleNotificationMessage = (data: { ownerUid?: string; providerId?: number; providerName?: string; notificationId?: number; notificationTitle?: string; notificationIcon?: string; notificationImage?: string; releasedSeason?: number; releasedEpisode?: number; releasedName?: string; releasedDate?: string; type?: string; showId?: string | number; tmdbId?: string | number; mediaType?: 'tv' | 'movie'; season?: string | number; episode?: string | number }) => {
+      if (!data || data.ownerUid && data.ownerUid !== auth.currentUser?.uid) return;
 
       if (isAppUpdateAvailablePush(data)) {
         consumeAppUpdateAvailablePush();
@@ -479,13 +480,67 @@ function MainApp() {
         }
       }
 
+      if (data.type === 'QUICK_ACTION_OPEN_PROVIDER' && data.ownerUid === auth.currentUser?.uid) {
+        const show = useShowsStore.getState().shows.find(item => item.id === String(data.showId) && item.userId === data.ownerUid);
+        if (!show || !Number.isSafeInteger(data.providerId) || !data.providerName) return;
+        void Promise.all([import('./features/providers/providerLink.ts'), import('@capacitor/browser')]).then(([{ getProviderLinkPresentation }, { Browser }]) => {
+          if (data.ownerUid !== auth.currentUser?.uid) return;
+          const target = getProviderLinkPresentation({ providerId: Number(data.providerId), providerName: data.providerName || '', title: show.title, fallbackLink: '' });
+          if (target.url && target.url !== '#') return Browser.open({ url: target.url });
+        }).catch(() => undefined);
+        return;
+      }
+
+      if (data.type === 'QUICK_ACTION_REMIND_TONIGHT' && data.ownerUid === auth.currentUser?.uid) {
+        void Promise.all([import('./features/notifications/tonightReminder.ts'), import('./features/notifications/mediaReminderNotification.ts')]).then(async ([{ nextTonightReminder }, { sendMediaReminderNotification }]) => {
+          const show = useShowsStore.getState().shows.find(item => item.id === String(data.showId) && item.userId === data.ownerUid);
+          if (!show || show.isArchived || show.status === 'dropped' || data.ownerUid !== auth.currentUser?.uid) return;
+          const season = Number(data.season), episode = Number(data.episode);
+          if (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode <= 0 || show.seenEpisodes.includes(`${season}x${episode}`)) return;
+          await sendMediaReminderNotification(show.title, { notificationId: data.notificationId,
+            summaryText: 'Rappel', body: `S${String(season).padStart(2, '0')} | E${String(episode).padStart(2, '0')} t’attend`,
+            detailText: 'Le rappel que tu as demandé pour ce soir.', channelId: 'seenit_reminders',
+            scheduleDate: nextTonightReminder(), reminderPurpose: 'tonight', allowMarkWatched: true,
+            icon: data.notificationIcon, image: data.notificationImage, showId: show.id, tmdbId: show.tmdbId, mediaType: 'tv', season, episode });
+        }).catch(() => undefined);
+        return;
+      }
+
       if (data.type === 'QUICK_ACTION_MARK_WATCHED') {
+        if (data.mediaType === 'movie') {
+          const show = useShowsStore.getState().shows.find(item => item.id === String(data.showId) && item.userId === auth.currentUser?.uid);
+          if (show) void import('./features/watchlist/watchProgressActions.ts').then(({ markMovieWatched }) => markMovieWatched(show, updateShow)).catch(() => undefined);
+          return;
+        }
         const idToWatch = data.showId || data.tmdbId;
         const season = data.season;
         const episode = data.episode;
 
-        if (idToWatch && season && episode) {
-          markEpisodeWatched(idToWatch, Number(season), Number(episode), updateShow);
+        if (idToWatch && season !== undefined && episode !== undefined) {
+          void markEpisodeWatched(idToWatch, Number(season), Number(episode), updateShow).then(async success => {
+            if (!success || !data.notificationId || data.ownerUid !== auth.currentUser?.uid) return;
+            const show = useShowsStore.getState().shows.find(item => String(item.id) === String(idToWatch) && item.userId === data.ownerUid);
+            if (!show || show.isArchived || show.status === 'dropped') return;
+            const [{ buildTvEpisodeReminderCopy }, { sendMediaReminderNotification }] = await Promise.all([
+              import('./features/notifications/tvReminderCopy.ts'), import('./features/notifications/mediaReminderNotification.ts'),
+            ]);
+            if (data.ownerUid !== auth.currentUser?.uid) return;
+            const released = { season_number: Number(data.releasedSeason ?? season), episode_number: Number(data.releasedEpisode ?? episode),
+              name: data.releasedName, air_date: data.releasedDate };
+            const next = show.nextEpisodeToWatch;
+            const available = next && (!next.air_date || next.air_date <= getTodayStr());
+            const copy = buildTvEpisodeReminderCopy(show, released, getTodayStr());
+            await sendMediaReminderNotification(show.title, { ...copy, notificationId: data.notificationId,
+              icon: data.notificationIcon, image: data.notificationImage, silent: true,
+              showId: show.id, tmdbId: show.tmdbId, mediaType: 'tv',
+              season: available ? next.season_number : undefined, episode: available ? next.episode_number : undefined,
+              allowMarkWatched: !!available, allowTonight: !!available,
+              data: { showId: show.id, tmdbId: show.tmdbId, mediaType: 'tv',
+                season: available ? next.season_number : undefined, episode: available ? next.episode_number : undefined,
+                releasedSeason: released.season_number, releasedEpisode: released.episode_number,
+                releasedName: released.name, releasedDate: released.air_date },
+            });
+          }).catch(() => undefined);
         }
 
         if (idToWatch) {

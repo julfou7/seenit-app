@@ -311,6 +311,7 @@ export interface ReleasePushMessage {
     priority: 'high';
     collapseKey: string;
     notification: {
+      channelId: 'seenit_app';
       icon: 'ic_stat_seenit';
       color: '#E5A93D';
       tag: string;
@@ -336,8 +337,8 @@ export function buildReleaseUpdatePushMessage(version: string): ReleasePushMessa
   const stableKey = version.replace(/\./g, '_');
   return {
     notification: {
-      title: `SeenIt ${version} est disponible ✨`,
-      body: 'Une nouvelle version de SeenIt est prête à installer.'
+      title: `SeenIt ${version}`,
+      body: 'Nouvelle version disponible'
     },
     data: {
       type: APP_UPDATE_AVAILABLE_PUSH_TYPE,
@@ -347,6 +348,7 @@ export function buildReleaseUpdatePushMessage(version: string): ReleasePushMessa
       priority: 'high',
       collapseKey: `seenit-update-${version}`,
       notification: {
+        channelId: 'seenit_app',
         icon: 'ic_stat_seenit',
         color: '#E5A93D',
         tag: `seenit_update_${stableKey}`

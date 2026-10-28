@@ -1,13 +1,16 @@
+import { getNotificationProvider } from '../features/notifications/notificationProvider.ts';
 import { useEffect } from 'react';
 import { useShowsStore } from '../store/showsStore';
 import { useToastStore } from '../store/toastStore';
 import { getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
 import { auth } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
+import { mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { tmdb } from '../features/shows/tmdb';
 import { resolveNotificationMediaVisual } from '../features/notifications/notificationMedia';
 import {
+  reconcileDeliveredMediaAlerts,
   cancelMediaReminderNotificationByTag,
   getMediaReminderNotificationId,
   prunePendingMediaReminderNotifications,
@@ -50,21 +53,22 @@ export function useRemindersNotifier() {
 
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const userPrefs = readUserScopedJson(uid, 'notifications', {
-      release_today_tv: true,
-      season_d7: true,
-      movie_theater: true,
-      movie_dvd_vod: true
-    });
+    const userPrefs = mergeNotificationPreferences(readUserScopedJson(uid, 'notifications', null));
+    let cancelled = false;
+    const active = () => !cancelled && auth.currentUser?.uid === uid;
+    void reconcileDeliveredMediaAlerts(uid, shows);
+
 
     const processReminders = async () => {
       await new Promise(r => setTimeout(r, 5000));
+      if (!active()) return;
       const dueToastCandidates: ReminderToastCandidate[] = [];
 
       for (const s of shows) {
         await new Promise(r => setTimeout(r, 50));
+        if (!active()) return;
 
-        if (s.isArchived || s.status === 'dropped') {
+        if (s.isArchived || s.status === 'dropped' || s.mediaType === 'movie' && s.seenEpisodes?.includes('movie')) {
           await prunePendingMediaReminderNotifications(s.id, s.mediaType, []);
           continue;
         }
@@ -76,6 +80,7 @@ export function useRemindersNotifier() {
         }
 
         const title = s.title;
+        const provider = getNotificationProvider(s, readUserScopedJson<number[]>(uid, 'platforms', []));
         const iconUrl = s.posterPath
           ? (s.posterPath.startsWith('http') ? s.posterPath : `https://image.tmdb.org/t/p/w342${s.posterPath}`)
           : undefined;
@@ -155,10 +160,13 @@ export function useRemindersNotifier() {
 
             const send = async (scheduleDate?: Date) => {
               const mediaVisual = await resolveNotificationMediaVisual(iconUrl, imageUrl);
+              if (!active()) return { delivered: false, visualReady: false };
               const delivered = await sendMediaReminderNotification(notificationTitle, {
                 ...notificationPayload,
                 ...mediaVisual,
                 summaryText,
+                detailText: provider ? `Inclus dans ${provider.name}.` : undefined,
+                provider, allowMarkWatched: true, actionTitle: tag === 'theater' ? 'Vu au cinéma' : '✓ Vu',
                 scheduleDate
               } as MediaReminderNotificationOptions);
               return {
@@ -234,22 +242,26 @@ export function useRemindersNotifier() {
           ? (episodeStill.startsWith('http') ? episodeStill : `https://image.tmdb.org/t/p/w500${episodeStill}`)
           : imageUrl;
 
+        const targetEpisode = s.nextEpisodeToWatch && (!s.nextEpisodeToWatch.air_date || s.nextEpisodeToWatch.air_date <= upcoming.air_date)
+          ? s.nextEpisodeToWatch : upcoming;
         const tvPayload = {
           badge: 'https://seenit.app/icon-192.png',
           showId: s.id,
           tmdbId: s.tmdbId,
           mediaType: 'tv',
-          season: upcoming.season_number,
-          episode: upcoming.episode_number,
+          season: targetEpisode.season_number,
+          episode: targetEpisode.episode_number,
           renotify: true,
           vibrate: [150, 80, 150, 80, 250],
           data: {
-            url: `/?showId=${s.id}&tmdbId=${s.tmdbId}&mediaType=tv&season=${upcoming.season_number}&episode=${upcoming.episode_number}&tab=watchlist`,
+            releasedSeason: upcoming.season_number, releasedEpisode: upcoming.episode_number,
+            releasedName: upcoming.name, releasedDate: upcoming.air_date,
+            url: `/?showId=${s.id}&tmdbId=${s.tmdbId}&mediaType=tv&season=${targetEpisode.season_number}&episode=${targetEpisode.episode_number}&tab=watchlist`,
             showId: s.id,
             tmdbId: s.tmdbId,
             mediaType: 'tv',
-            season: upcoming.season_number,
-            episode: upcoming.episode_number
+            season: targetEpisode.season_number,
+            episode: targetEpisode.episode_number
           }
         };
 
@@ -295,12 +307,17 @@ export function useRemindersNotifier() {
 
           const send = async (scheduleDate?: Date) => {
             const mediaVisual = await resolveNotificationMediaVisual(iconUrl, tvImageUrl);
+            if (!active()) return { delivered: false, visualReady: false };
             const delivered = await sendMediaReminderNotification(notificationTitle, {
               ...fullPayload,
               ...mediaVisual,
               summaryText,
               detailText,
+              provider,
               allowMarkWatched: addActions,
+              allowTonight: addActions,
+              actionTitle: targetEpisode.episode_number !== upcoming.episode_number ? `✓ Vu E${String(targetEpisode.episode_number).padStart(2, '0')}` : '✓ Vu',
+              channelId: isSpecificReminder ? 'seenit_reminders' : 'seenit_episodes',
               scheduleDate
             } as MediaReminderNotificationOptions);
             return {
@@ -348,7 +365,7 @@ export function useRemindersNotifier() {
         }
 
         if (userPrefs.release_today_tv || isSpecificReminder) {
-          const episodeCopy = buildTvEpisodeReminderCopy(s, upcoming, todayStr);
+          const episodeCopy = buildTvEpisodeReminderCopy(s, upcoming, todayStr, provider?.name);
           await scheduleTvAlert(
             airDate9Am,
             'today',
@@ -373,5 +390,6 @@ export function useRemindersNotifier() {
       }
     };
     processReminders().catch(err => localConsole.warn('Reminder scheduling error:', err));
+    return () => { cancelled = true; };
   }, [shows, showToast]);
 }

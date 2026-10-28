@@ -60,3 +60,61 @@ patchOnce(managerPath, [
 ]);
 
 console.log('[notification-subtext] patch appliqué');
+
+const publisherPath = path.join(pluginDir, 'TimedNotificationPublisher.kt');
+const LIFE_MARKER = 'SEENIT_NOTIFICATION_LIFECYCLE_V1';
+const extrasCode = `
+        // ${LIFE_MARKER}: short identity only; never media bytes or credentials.
+        val seenItExtra = com.getcapacitor.JSObject(localNotification.source ?: "{}").optJSONObject("extra")
+        if (seenItExtra?.optString("notificationScope") == "media") {
+            mBuilder.addExtras(android.os.Bundle().apply {
+                putString("seenitScope", "media")
+                putString("seenitOwner", seenItExtra.optString("ownerUid"))
+                putString("seenitShow", seenItExtra.optString("showId"))
+                putString("seenitMediaType", seenItExtra.optString("mediaType"))
+            })
+            if (seenItExtra.optBoolean("silent", false)) mBuilder.setSilent(true)
+        }
+`;
+const dedupCode = (item, id) => `
+        // ${LIFE_MARKER}: remove delivered alerts only, not pending future alarms.
+        try {
+            val candidate = ${item}
+            val extra = candidate.extras
+            if (extra.getString("seenitScope") == "media" && !extra.getString("seenitOwner").isNullOrEmpty()) {
+                val manager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                for (active in manager.activeNotifications.take(100)) {
+                    val previous = active.notification.extras
+                    if (active.id != ${id} && previous.getString("seenitScope") == "media"
+                        && previous.getString("seenitOwner") == extra.getString("seenitOwner")
+                        && previous.getString("seenitShow") == extra.getString("seenitShow")
+                        && previous.getString("seenitMediaType") == extra.getString("seenitMediaType")) {
+                        manager.cancel(active.tag, active.id)
+                    }
+                }
+            }
+        } catch (_: Exception) { /* Text delivery remains available. */ }
+`;
+let lifetimeManager = fs.readFileSync(managerPath, 'utf8');
+if (!lifetimeManager.includes(LIFE_MARKER)) {
+  const extraAnchor = '        createActionIntents(localNotification, mBuilder)';
+  const deliverAnchor = '            localNotification.id?.let { notificationManager.notify(it, buildNotification) }';
+  const cancelAnchor = '            dismissVisibleNotification(id)';
+  for (const anchor of [extraAnchor, deliverAnchor, cancelAnchor]) {
+    if (!lifetimeManager.includes(anchor)) throw new Error('[notification-lifecycle] incompatible manager anchor');
+  }
+  lifetimeManager = lifetimeManager
+    .replace(extraAnchor, extrasCode + extraAnchor)
+    .replace(deliverAnchor, dedupCode('buildNotification', 'localNotification.id') + deliverAnchor)
+    .replace(cancelAnchor, `            if (com.getcapacitor.JSObject(localNotification.source ?: "{}").optJSONObject("extra")?.optString("notificationScope") != "media") {
+                dismissVisibleNotification(id)
+            }`);
+  fs.writeFileSync(managerPath, lifetimeManager, 'utf8');
+}
+let publisher = fs.readFileSync(publisherPath, 'utf8');
+if (!publisher.includes(LIFE_MARKER)) {
+  const anchor = '        notificationManager.notify(id, deliveredNotification)';
+  if (!publisher.includes(anchor)) throw new Error('[notification-lifecycle] incompatible publisher anchor');
+  publisher = publisher.replace(anchor, dedupCode('deliveredNotification', 'id') + anchor);
+  fs.writeFileSync(publisherPath, publisher, 'utf8');
+}
