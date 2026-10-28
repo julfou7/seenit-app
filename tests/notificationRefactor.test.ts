@@ -99,3 +99,11 @@ test('#778 Grab porte le média et le scope exacts sans prétendre à un transfe
   assert.equal(event.notification.body, 'Envoyé au client de téléchargement.');
   assert.equal(event.plexAvailabilityData, null);
 });
+
+test('#778 le fallback texte garde le type dans l’en-tête si le fichier image a disparu', () => {
+  const patch = readFileSync('scripts/patch-notification-subtext.cjs', 'utf8');
+  assert.match(patch, /SEENIT_NOTIFICATION_TEXT_FALLBACK_V1/);
+  assert.match(patch, /subText.isNullOrEmpty\(\)/);
+  assert.match(patch, /summaryText else null/);
+  assert.match(patch, /\[managerPath, 'localNotification'\], \[publisherPath, 'storedRequest'\]/);
+});

@@ -118,3 +118,19 @@ if (!publisher.includes(LIFE_MARKER)) {
   publisher = publisher.replace(anchor, dedupCode('deliveredNotification', 'id') + anchor);
   fs.writeFileSync(publisherPath, publisher, 'utf8');
 }
+
+// If a cached picture disappeared, BigText must not reuse its caption as header.
+for (const [file, owner] of [[managerPath, 'localNotification'], [publisherPath, 'storedRequest']]) {
+  let content = fs.readFileSync(file, 'utf8');
+  const marker = 'SEENIT_NOTIFICATION_TEXT_FALLBACK_V1';
+  if (content.includes(marker)) continue;
+  const pattern = new RegExp('\\.bigText\\(' + owner + '\\.largeBody\\)(\\s*)\\.setSummaryText\\(' + owner + '\\.summaryText\\)', 'g');
+  let replacements = 0;
+  content = content.replace(pattern, (_, whitespace) => {
+    replacements += 1;
+    return '.bigText(' + owner + '.largeBody)' + whitespace
+      + '.setSummaryText(if (' + owner + '.subText.isNullOrEmpty()) ' + owner + '.summaryText else null)';
+  });
+  if (replacements !== 1) throw new Error('[notification-subtext] incompatible text fallback');
+  fs.writeFileSync(file, content + '\n// ' + marker + '\n', 'utf8');
+}
