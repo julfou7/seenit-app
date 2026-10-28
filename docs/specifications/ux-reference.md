@@ -330,3 +330,9 @@ Trois destinations visuelles, rangée d'apps générique, sources natives et ré
 basse. En-tête fixe, Retour remonte la Home avant de quitter, focus visible et mouvement réduit.
 Compte/QR réservé à l'association explicite d'un profil adulte ; aucun visionnage attribué
 par un simple lancement d'app. Référence : [TV V4](tv-samsung-launcher-v4.md).
+
+Sport, MVP gratuit du28/10 (#738) : sélectionner les équipes localement, calendrier six
+cartes/page, heure locale et horaire provisoire explicites, sans résultat. OK sur une carte
+donne stade/source/information de diffusion ; aucune ouverture supposée. Précédents/Suivants
+et Actualiser restent accessibles à la télécommande. Retour retrouve la tuile Sport, sans
+modifier les équipes choisies. La Home anticipe le prochain match sans suivi live.

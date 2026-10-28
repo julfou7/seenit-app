@@ -7,7 +7,7 @@
   var installedApps = [], detectedSources = [], appsTab = 'favorites', appsPage = 0, organizing = false;
   var memoryInfo = null, storageInfo = null, memoryTimer = null, storageTimer = null, clockTimer = null, toastTimer = null;
   var focusMemory = {}, suspendedFocus = null, inventoryBusy = false, lastDiscovery = 0, lastDirectionalAt = 0;
-  var launchPending = false, sportState = 'normal';
+  var launchPending = false, sportState = 'normal', sportPage = 0, sportMinute = 0;
   var enterTimer = null, enterTarget = null, longActivated = false, selectedAppId = '';
   var storage;
   try { storage = window.localStorage; } catch (e) { storage = { getItem: function () {}, setItem: function () {}, removeItem: function () {} }; }
@@ -108,6 +108,7 @@
     releaseDynamic();
     for (i = 0; i < screens.length; i++) { removeClass(screens[i], 'active'); if (screens[i].id === id) addClass(screens[i], 'active'); }
     currentScreen = id; TVConnection.pairingVisible(id === 'screenAccount'); renderCurrent(); firstFocus(focusMemory[id]);
+    if (id === 'screenHome' || id === 'screenSport') refreshSport(false); else TVSport.pause();
     if (id !== 'screenAccount') { el('pairQr').innerHTML = ''; lastQr = ''; }
   }
   function goBack() {
@@ -123,7 +124,7 @@
     applyAppearance();
     el('profileInitial').textContent = name === 'Invité' ? '+' : name.charAt(0);
     el('profileName').textContent = name;
-    history = []; focusMemory = {}; appsPage = 0; organizing = false;
+    history = []; focusMemory = {}; appsPage = 0; sportPage = 0; organizing = false;
     showScreen('screenHome', false);
   }
   function appendText(parent, tag, value, className) {
@@ -237,27 +238,47 @@
     appendText(group, 'span', name, 'team-name');
   }
   function renderEvents() {
-    var preview = !TVDevice.isSamsung(), events = preview ? demoEvents : [], row = el(currentScreen === 'screenHome' ? 'homeEvents' : 'calendarList'), i, b;
+    var preview = !TVDevice.isSamsung(), state = TVSport.view(prefs.sportSources()), events = preview ? demoEvents : state.events, row = el(currentScreen === 'screenHome' ? 'homeEvents' : 'calendarList'), i, b, event;
+    var start = currentScreen === 'screenHome' ? 0 : sportPage * 6, count = Math.max(1, Math.ceil(events.length / 6)), buttons = el('sportTeams').querySelectorAll('[data-team]');
+    if (sportPage >= count) { sportPage = count - 1; start = sportPage * 6; }
     row.innerHTML = '';
     if (currentScreen === 'screenHome') { row.style.display = events.length ? '' : 'none'; el('homeSportHeading').style.display = events.length ? '' : 'none'; }
     el('sportStatus').textContent = preview ? 'Aperçu' : '';
-    el('calendarHint').textContent = preview ? 'Exemples de maquette. Le diffuseur dépend de chaque événement.' : 'Aucun calendrier connecté pour le moment.';
-    for (i = 0; i < events.length && (currentScreen !== 'screenHome' || i < 2); i++) {
+    for (i = 0; i < buttons.length; i++) { buttons[i].setAttribute('aria-pressed', String(prefs.sportSources().indexOf(buttons[i].getAttribute('data-team')) >= 0)); removeClass(buttons[i], 'selected'); if (buttons[i].getAttribute('aria-pressed') === 'true') addClass(buttons[i], 'selected'); }
+    el('sportPrevious').disabled = sportPage === 0; el('sportNext').disabled = sportPage + 1 >= count;
+    el('sportPage').textContent = events.length ? (sportPage + 1) + ' / ' + count : '';
+    var missing = state.sources.some(function (source) { return source.state === 'unavailable'; });
+    el('calendarHint').textContent = preview ? 'Exemples de maquette. Le diffuseur dépend de chaque événement.' : !prefs.sportSources().length ? 'Choisissez vos équipes. Cette sélection reste dans ce profil.' : state.loading ? 'Chargement des calendriers officiels…' : (state.failed || missing || state.stale ? 'Calendrier partiellement indisponible ou ancien. ' : '') + 'Sources : calendriers officiels AS Monaco / FFF · ' + (state.fetchedAt ? 'actualisé le ' + new Date(state.fetchedAt).toLocaleDateString('fr-FR') : 'actualisation à réessayer') + ' · sans score.';
+    for (i = start; i < events.length && i < start + (currentScreen === 'screenHome' ? 2 : 6); i++) {
+      event = events[i];
       b = document.createElement('button'); b.className = 'event-card focusable'; b.setAttribute('data-action', 'sport-event');
-      b.setAttribute('aria-label', events[i].title + ' · ' + events[i].when);
-      appendText(b, 'span', events[i].when);
-      if (events[i].home && events[i].away) {
+      b.id = 'sportEvent' + (event.id || String(i)).replace(/[^a-z0-9]/gi, '_');
+      b.setAttribute('data-event-detail', (event.venue || 'Stade non précisé') + ' · ' + (event.sourceId === 'monaco' ? 'AS Monaco officiel' : 'FFF officielle') + ' · diffusion non résolue');
+      appendText(b, 'span', event.when || sportWhen(event));
+      if (event.home && event.away) {
         var clubs = appendText(b, 'div', '', 'event-clubs');
-        appendTeam(clubs, events[i].home); appendText(clubs, 'span', '—', 'event-versus'); appendTeam(clubs, events[i].away);
-      } else appendText(b, 'strong', events[i].title);
-      appendText(b, 'small', events[i].meta); row.appendChild(b);
+        appendTeam(clubs, event.home); appendText(clubs, 'span', '—', 'event-versus'); appendTeam(clubs, event.away);
+      } else appendText(b, 'strong', event.title);
+      appendText(b, 'small', event.meta || event.competition);
+      if (!preview) appendText(b, 'small', (event.sourceId === 'monaco' ? 'AS Monaco' : 'France') + (event.home.name.toUpperCase().indexOf(event.sourceId === 'monaco' ? 'MONACO' : 'FRANCE') >= 0 ? ' · domicile' : ' · extérieur') + (event.venue ? ' · ' + event.venue : ''), 'event-venue');
+      row.appendChild(b);
     }
     if (!events.length) appendText(row, 'div', 'Vos rendez-vous sportifs apparaîtront ici.', 'empty-event');
   }
+  function sportWhen(event) {
+    var date = new Date(event.kickoff), day = date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+    return day + (event.confirmed ? ' · ' + date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : ' · horaire à confirmer');
+  }
+  function sportChanged() {
+    if (hidden() || (currentScreen !== 'screenHome' && currentScreen !== 'screenSport')) return;
+    var saved = token(document.activeElement); updateSportTile(); if (currentScreen === 'screenSport') renderEvents(); firstFocus(saved);
+  }
+  function refreshSport(force) { if (TVDevice.isSamsung() && currentProfile && prefs.sportSources().length) TVSport.refresh(force); }
   function updateSportTile() {
-    var demo = !TVDevice.isSamsung();
-    el('sportBadge').textContent = demo && sportState === 'live' ? 'EN DIRECT' : demo && sportState === 'imminent' ? 'DANS 23 MIN' : '';
-    el('sportCopy').textContent = demo && sportState !== 'normal' ? 'Monaco — Lille' : 'Mes rendez-vous';
+    var demo = !TVDevice.isSamsung(), next = TVSport.view(prefs.sportSources()).events[0], minutes = next ? Math.ceil((new Date(next.kickoff).getTime() - new Date().getTime()) / 60000) : 0;
+    el('sportBadge').textContent = demo && sportState === 'live' ? 'EN DIRECT' : demo && sportState === 'imminent' ? 'DANS 23 MIN' : next && next.confirmed && minutes <= 60 ? 'DANS ' + minutes + ' MIN' : '';
+    el('sportCopy').textContent = demo && sportState !== 'normal' ? 'Monaco — Lille' : next ? next.home.name + ' — ' + next.away.name : 'Mes rendez-vous';
+    el('sportTile').querySelector('small').textContent = next ? sportWhen(next) : 'Calendrier sportif';
     removeClass(el('sportTile'), 'live'); if (demo && sportState !== 'normal') addClass(el('sportTile'), 'live');
   }
   function appsForTab() {
@@ -285,7 +306,7 @@
   function configurePager(button, enabled) { button.disabled = !enabled; button.className = enabled ? 'pager-button focusable' : 'pager-button'; }
   function renderCurrent() {
     if (hidden()) return;
-    if (currentScreen === 'screenHome') { renderHomeApps(); renderSources(); renderEvents(); }
+    if (currentScreen === 'screenHome') { renderHomeApps(); renderSources(); renderEvents(); updateSportTile(); }
     else if (currentScreen === 'screenFilms') renderFilms();
     else if (currentScreen === 'screenSport') renderEvents();
     else if (currentScreen === 'screenSources') renderSources();
@@ -345,6 +366,7 @@
     el('clock').textContent = (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
     el('date').textContent = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'][now.getDay()] + ' ' + now.getDate() + ' ' + ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'][now.getMonth()];
     applyAppearance();
+    if (sportMinute !== Math.floor(now.getTime() / 60000)) { sportMinute = Math.floor(now.getTime() / 60000); sportChanged(); if (currentScreen === 'screenHome' || currentScreen === 'screenSport') refreshSport(false); }
   }
   function stopTelemetryTimers() {
     if (memoryTimer !== null) clearInterval(memoryTimer); if (storageTimer !== null) clearInterval(storageTimer); if (clockTimer !== null) clearInterval(clockTimer);
@@ -383,7 +405,10 @@
     if (action === 'live-tv') TVDevice.openLiveTv(function (ok) { if (!ok) showToast('Le tuner TV n’est pas accessible.'); });
     else if (action === 'films') showScreen('screenFilms');
     else if (action === 'sport') showScreen('screenSport');
-    else if (action === 'sport-event') showToast('La source de ce rendez-vous n’est pas encore connectée.');
+    else if (action === 'sport-event') showToast(button.getAttribute('data-event-detail') || 'Aperçu de maquette.');
+    else if (action === 'sport-team') { prefs.toggleSport(button.getAttribute('data-team')); sportPage = 0; renderEvents(); refreshSport(false); }
+    else if (action === 'sport-refresh') { refreshSport(true); renderEvents(); }
+    else if (action === 'sport-next' || action === 'sport-previous') { sportPage += action === 'sport-next' ? 1 : -1; renderEvents(); firstFocus(); }
     else if (action === 'settings') { if (currentScreen === 'screenHome') setFocus(el('screenHome').querySelector('.home-setting-card')); else showScreen('screenSettings'); }
     else if (action === 'quick') showScreen('screenQuick');
     else if (action === 'sources') showScreen('screenSources');
@@ -438,8 +463,8 @@
     else if (code === 403 && !TVDevice.isSamsung()) { sportState = sportState === 'normal' ? 'imminent' : sportState === 'imminent' ? 'live' : 'normal'; updateSportTile(); }
   }
   function handleVisibility() {
-    if (hidden()) { suspendedFocus = token(document.activeElement); TVConnection.pause(); stopTelemetryTimers(); releaseDynamic(); el('pairQr').innerHTML = ''; lastQr = ''; }
-    else { launchPending = false; startTelemetryTimers(); renderCurrent(); firstFocus(suspendedFocus); TVConnection.resume(); discoverDevice(false); }
+    if (hidden()) { suspendedFocus = token(document.activeElement); TVConnection.pause(); TVSport.pause(); stopTelemetryTimers(); releaseDynamic(); el('pairQr').innerHTML = ''; lastQr = ''; }
+    else { launchPending = false; startTelemetryTimers(); renderCurrent(); firstFocus(suspendedFocus); TVConnection.resume(); if (currentScreen === 'screenHome' || currentScreen === 'screenSport') refreshSport(false); discoverDevice(false); }
   }
   function handleKeyUp(event) {
     if ((event.keyCode || event.which) !== 13) return;
@@ -451,6 +476,7 @@
   }
   function init() {
     TVConnection.init(storage, connectionChanged);
+    TVSport.init(storage, sportChanged);
     resizeStage(); updateConnectivity(); updateSportTile(); startTelemetryTimers();
     window.addEventListener('resize', resizeStage); window.addEventListener('online', updateConnectivity); window.addEventListener('offline', updateConnectivity);
     document.addEventListener('visibilitychange', handleVisibility); document.addEventListener('keydown', handleKey);

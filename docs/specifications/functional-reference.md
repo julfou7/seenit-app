@@ -21,9 +21,17 @@ HDMI transmet le descripteur natif Tizen exact, sans reconstruction JS. Les rég
 utilisent un handler découvert ; sans handler exploitable, expliquer la touche Réglages/Home
 plutôt que lancer aveuglément un menu système. Un callback d'app accepté ne prouve pas
 l'affichage : Netflix noir depuis le launcher reste un écart terrain, malgré son fonctionnement
-via Samsung. Le basculement Home natif, le gain RAM global et le flux sportif réel restent
+via Samsung. Le basculement Home natif et le gain RAM global restent
 suivis séparément ; aucun root ni faux calendrier. Les logos des équipes viennent des données
 explicites avec initiales en secours. Voir [la référence V4](tv-samsung-launcher-v4.md).
+
+Le calendrier Sport gratuit (#738) consomme `/api/tv/sport` : le backend existant normalise
+les calendriers officiels Monaco/FFF, cache six heures, sans clé dans le WGT, sans nouveau
+service payant ni résultat obligatoire. Sélection locale indépendante par profil, six cartes
+par page, heure locale et programmation provisoire explicites, logos de source et initiales
+si absents. La tuile Sport anticipe le prochain match. Les événements passés disparaissent
+sans récupérer de score. Les concepts live/score restent optionnels hors MVP ; aucune app ou
+chaîne n'est suggérée comme diffuseur sans preuve gratuite fiable et lancement réel testé.
 
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).

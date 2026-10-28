@@ -76,10 +76,52 @@ Pour Netflix, ne préférer une variante qu'après preuve terrain ou choix expli
 un callback de lancement accepté n'est pas une confirmation d'image affichée.
 
 Conserver événement → diffuseur vérifié → app/entrée réellement disponible. Source
-football-data configurable derrière le backend, aucune clé dans le WGT ni souscription
-payante implicite. Sans source : information courte et préférences, pas de faux matchs.
+gratuite configurable derrière le backend, aucune clé dans le WGT ni souscription
+payante. Sans source : information courte et préférences, pas de faux matchs.
 Hub, match, équipes et sans-spoiler partagent les données normalisées et le cache daté.
 Pas de requête en arrière-plan ; rafraîchissement visible regroupé et borné.
+
+### Calendrier réel — SEENIT-TV-003, 28 octobre (#738)
+
+Le premier connecteur public lit les calendriers officiels AS Monaco et France A masculine
+(FFF), sans clé ni compte payant. Ce sont des sources de calendrier, pas des preuves de
+diffusion : ne déduire aucune app/diffuseur d'une compétition. Les deux sources sont fixes
+côté serveur ; aucune URL fournie par la TV n'est téléchargée. Réponse normalisée bornée
+à 24 matchs futurs, sans score. Conserver lien officiel, date de collecte et disponibilité
+de chaque source ; une panne partielle ne masque pas la source saine.
+
+Contrainte ferme : aucun abonnement, aucune API payante ni nouveau service payant récurrent.
+Privilégier un fournisseur structuré dans les limites vérifiées de son offre gratuite,
+notamment football-data.org si couverture/clé disponibles. La première source exploitable
+sans clé est le repli officiel Monaco/FFF. Les adaptateurs restent indépendants du diffuseur.
+Le backend SeenIt existant normalise les réponses : pas de parseur fournisseur dans le WGT,
+pas de nouveau service provisionné, pas de clé secrète ni compte fournisseur requis sur TV.
+
+Cache serveur partagé par source : six heures, requêtes concurrentes regroupées, retry
+après trente minutes en erreur, dernier calendrier conservé au maximum 48 heures et signalé
+comme ancien. Deux téléchargements simultanés maximum, timeout huit secondes et HTML
+limité à un Mio ; aucune écriture Firestore. Horaires FFF interprétés en Europe/Paris
+avec changements été/hiver ; Monaco fournit son décalage explicite. Une programmation
+« non définitive » garde uniquement sa date indicative et « Horaire à confirmer ».
+
+Sur la TV : sélection Monaco/France indépendante par profil, Julian initialisé avec les
+deux, les autres sans sélection héritée. Milo reste configurable sans code. La Home
+montre le prochain rendez-vous dans sa tuile Sport ; le calendrier affiche six cartes
+par page, logos de la source (initiales ou drapeau fourni en secours), heure locale,
+compétition et source. Le détail ne propose pas de lecture non prouvée. Les sélections
+et le cache public sont locaux, sans association implicite avec un compte SeenIt.
+
+Client ES5 : chargement sur Home/Sport visibles seulement, cache six heures, annulation
+au masquage, aucune boucle de polling ni travail en arrière-plan ; un retour utilise
+le cache et les matchs expirés sont filtrés sans attendre un nouveau téléchargement.
+Les erreurs gardent la navigation utilisable et offrent Actualiser. TNR : fixtures
+officielles expurgées, identité de source, provisoire, fuseau, pagination, panne partielle,
+concurrence/cache, absence de score, changement de profil et réponse tardive annulée.
+Après le coup d'envoi, retirer le match des prochains rendez-vous sans récupérer de résultat.
+Score et statut live peuvent rester optionnels dans le modèle pour une évolution ; ils ne
+conditionnent ni le calendrier ni son utilité. « Monaco joue dans 20 min » est une anticipation
+temporelle, pas une preuve de live. Un futur CTA exige diffuseur français sourcé gratuitement,
+app/source réellement disponible et lancement testé ; sinon rester informatif.
 
 Valider à 1920×1080 et 1280×720, télécommande, inventaire réel, QR/approbation, erreurs
 et cycle mémoire. Chromium ne prouve pas le matériel : distinguer callback, premier plan

@@ -51,6 +51,14 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   lancement d'une app. Hash serveur, quotas, expiration/révocation, cache isolé et arrêt des requêtes
   hors écran sont couverts par les TNR. Contrat : [launcher TV V4](tv-samsung-launcher-v4.md).
 
+- **SEENIT-TV-003** — Le calendrier Sport doit être utile sans dépenser un euro : fixtures gratuites
+  normalisées par le backend existant, cache six heures sans polling live, Monaco/France et sélection
+  locale par profil. Sources structurées gratuites en priorité lorsque disponibles, repli officiel
+  Monaco/FFF sans clé ; aucun fournisseur payant ni secret dans le WGT. Date/heure locale, équipes,
+  compétition, stade et programmation provisoire sont conservés. Score/live optionnels hors MVP,
+  sans spoiler ; retirer les matchs passés sans chercher de résultat. Pas de diffuseur/action supposés.
+  Voir [le contrat V4](tv-samsung-launcher-v4.md), #738.
+
 - **SEENIT-PLATFORM-001** — La PWA canonique servie depuis `seenit.ai.studio` conserve les routes
   SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence
   par `ais-dev-*` ciblent explicitement `https://seenit.ai.studio` pour les routes `/api/*` afin de

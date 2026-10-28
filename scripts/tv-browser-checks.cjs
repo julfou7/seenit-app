@@ -5,7 +5,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function buildTvHarness(root) {
   const target = path.join(root, 'dist/__seenit-tv');
   fs.mkdirSync(target, { recursive: true });
-  for (const file of ['index.html', 'styles.css', 'tv.js', 'model.js', 'connection.js', 'app.js']) fs.copyFileSync(path.join(root, 'tv-samsung', file), path.join(target, file));
+  for (const file of ['index.html', 'styles.css', 'tv.js', 'model.js', 'connection.js', 'sport.js', 'app.js']) fs.copyFileSync(path.join(root, 'tv-samsung', file), path.join(target, file));
   fs.cpSync(path.join(root, 'tv-samsung/assets'), path.join(target, 'assets'), { recursive: true });
   fs.cpSync(path.join(root, 'tv-samsung/vendor'), path.join(target, 'vendor'), { recursive: true });
   const mock = `(function(){
@@ -17,7 +17,7 @@ async function buildTvHarness(root) {
     document.addEventListener('click',function(e){t.clicks.push(e.target.id+':'+e.target.getAttribute('data-action'))},true);
     window.addEventListener('error',function(e){if(e.message)t.errors.push(e.message)});
     t.connectionRequests=[];t.pairApproved=false;
-    window.XMLHttpRequest=function(){var xhr=this;this.open=function(method,url){xhr.method=method;xhr.url=url};this.setRequestHeader=function(){};this.abort=function(){xhr.aborted=true};this.send=function(body){t.connectionRequests.push(xhr.url);setTimeout(function(){if(xhr.aborted)return;var response;if(xhr.url.endsWith('/api/tv/links')){var input=JSON.parse(body);response={id:'a'.repeat(48),secret:'b'.repeat(64),code:'ABCD-EF12',profile:input.profile,expiresAt:Date.now()+600000}}else if(xhr.url.endsWith('/status'))response={state:t.pairApproved?'active':'pending',profile:'Julian',expiresAt:Date.now()+3600000,accountName:'Test account'};else if(xhr.url.endsWith('/bootstrap'))response={state:'active',profile:'Julian',syncedAt:Date.now(),items:[{tmdbId:1,title:'Film du compte',posterPath:null}]};else response={revoked:true};xhr.status=200;xhr.readyState=4;xhr.responseText=JSON.stringify(response);if(xhr.onreadystatechange)xhr.onreadystatechange()},20)}};
+    window.XMLHttpRequest=function(){var xhr=this;this.open=function(method,url){xhr.method=method;xhr.url=url};this.setRequestHeader=function(){};this.abort=function(){xhr.aborted=true};this.send=function(body){t.connectionRequests.push(xhr.url);setTimeout(function(){if(xhr.aborted)return;var response;if(xhr.url.endsWith('/api/tv/sport'))response={events:t.sportEvents||[],sources:[],fetchedAt:Date.now()};else if(xhr.url.endsWith('/api/tv/links')){var input=JSON.parse(body);response={id:'a'.repeat(48),secret:'b'.repeat(64),code:'ABCD-EF12',profile:input.profile,expiresAt:Date.now()+600000}}else if(xhr.url.endsWith('/status'))response={state:t.pairApproved?'active':'pending',profile:'Julian',expiresAt:Date.now()+3600000,accountName:'Test account'};else if(xhr.url.endsWith('/bootstrap'))response={state:'active',profile:'Julian',syncedAt:Date.now(),items:[{tmdbId:1,title:'Film du compte',posterPath:null}]};else response={revoked:true};xhr.status=200;xhr.readyState=4;xhr.responseText=JSON.stringify(response);if(xhr.onreadystatechange)xhr.onreadystatechange()},20)}};
     var nativeSet=window.setInterval,nativeClear=window.clearInterval;
     window.setInterval=function(fn,ms){var id=nativeSet(fn,ms);t.intervals[id]=ms;return id};
     window.clearInterval=function(id){delete t.intervals[id];nativeClear(id)};
@@ -147,6 +147,21 @@ async function testTvHarness(client, root) {
     await evaluate(client, 'window.__tv.apps.push({id:"new.installed",name:"New App",show:true})');
     await click(client, '#screenApps [data-action=refresh]');
     await check(client, 'document.getElementById("appsCount").textContent==="131 apps"', 'nouvelle installation détectée');
+    await key(client, 8);
+    await evaluate(client, `window.__tv.sportEvents=Array.from({length:7},(_,i)=>({id:'fixture-'+i,sourceId:'monaco',kickoff:new Date(Date.now()+(i+1)*86400000).toISOString(),confirmed:i!==2,home:{name:'Monaco',logo:'assets/sport/monaco.svg'},away:{name:'Italie',logo:'assets/sport/italy.svg'},competition:'Calendrier de test',venue:'Stade de test'}));TVSport.refresh(true)`);
+    await check(client, 'document.getElementById("sportCopy").textContent==="Monaco — Italie"', 'prochain rendez-vous normalisé dans la tuile Home');
+    await click(client, '#sportTile');
+    await check(client, 'document.querySelectorAll("#calendarList .event-card").length===6 && document.getElementById("sportPage").textContent==="1 / 2"', 'calendrier réel borné à six cartes');
+    await check(client, 'document.querySelectorAll("#calendarList .event-card")[2].textContent.includes("horaire à confirmer")', 'horaire provisoire distinct');
+    await check(client, `Array.from(document.querySelectorAll('#calendarList .event-card')).every(n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.top>=0&&r.right<=${width}&&r.bottom<=${height}})`, 'six matchs sans carte coupée');
+    await screenshot(client, root, 'tv-sport-fixtures-'+width+'.png');
+    await click(client, '#sportNext');
+    await check(client, 'document.querySelectorAll("#calendarList .event-card").length===1 && document.getElementById("sportPage").textContent==="2 / 2"', 'septième match accessible');
+    await click(client, '#sportTeams [data-team=monaco]');
+    await check(client, 'document.querySelectorAll("#calendarList .event-card").length===0', 'désélection sans score ni héritage');
+    await click(client, '#sportTeams [data-team=monaco]');
+    await key(client, 8);
+    await click(client, '#appRow [data-action=all-apps]');
     await screenshot(client, root, `tv-apps-${width}.png`);
     await key(client, 8); await click(client, '#screenHome [data-action=switch-profile]');
     await click(client, '[data-profile=Camille]');

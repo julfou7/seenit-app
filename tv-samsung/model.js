@@ -37,13 +37,14 @@ var TVModel = (function () {
   }
   function preferences(storage, profile) {
     var key = 'seenit.tv.preferences.v1.' + encodeURIComponent(profile || '');
-    var state = { pins: [], recent: [], hidden: [], theme: 'dusk', motion: true }, parsed;
+    var state = { pins: [], recent: [], hidden: [], theme: 'dusk', motion: true, sportSources: profile === 'Julian' ? ['monaco', 'france-men'] : [] }, parsed;
     var persistent = !!profile && profile !== 'Invité';
     if (persistent) try {
       parsed = JSON.parse(storage.getItem(key) || '{}');
       state.pins = ids(parsed && parsed.pins, 32);
       state.recent = ids(parsed && parsed.recent, 8);
       state.hidden = ids(parsed && parsed.hidden, 64);
+      if (parsed && Object.prototype.toString.call(parsed.sportSources) === '[object Array]') state.sportSources = ids(parsed.sportSources, 16);
       if (parsed && ['dusk', 'mist', 'auto'].indexOf(parsed.theme) >= 0) state.theme = parsed.theme;
       if (parsed && parsed.motion === false) state.motion = false;
     } catch (e) {}
@@ -54,6 +55,13 @@ var TVModel = (function () {
       hidden: function () { return state.hidden.slice(0); },
       theme: function () { return state.theme; },
       motion: function () { return state.motion; },
+      sportSources: function () { return state.sportSources.slice(0); },
+      toggleSport: function (id) {
+        if (!/^[a-z0-9-]{1,64}$/.test(id)) return;
+        var index = state.sportSources.indexOf(id);
+        if (index >= 0) state.sportSources.splice(index, 1); else if (state.sportSources.length < 16) state.sportSources.push(id);
+        save();
+      },
       setTheme: function (theme) { if (['dusk', 'mist', 'auto'].indexOf(theme) >= 0) { state.theme = theme; save(); } },
       toggleMotion: function () { state.motion = !state.motion; save(); },
       order: function (ordered) { state.pins = ids(ordered, 32); save(); },

@@ -18,7 +18,7 @@ import zipfile
 ROOT = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(ROOT)
 WGT = os.path.join(REPO, 'SeenItTV-tizen.wgt')
-FILES = ['config.xml', 'index.html', 'styles.css', 'tv.js', 'model.js', 'connection.js', 'app.js', 'icon.png', 'NOTICE-FreeMyTV.md',
+FILES = ['config.xml', 'index.html', 'styles.css', 'tv.js', 'model.js', 'connection.js', 'sport.js', 'app.js', 'icon.png', 'NOTICE-FreeMyTV.md',
          'vendor/qrcode.min.js', 'vendor/qrcode.LICENSE', 'vendor/NOTICE.md']
 # Only shipped local artwork, never sources, tests, certificates or personal exports.
 for asset_root, _, asset_names in os.walk(os.path.join(ROOT, 'assets')):
