@@ -4,6 +4,23 @@
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
+      "id": "SEENIT-TV-003",
+      "title": "Calendrier Sport gratuit sans score obligatoire, normalisé et mis en cache",
+      "targets": [
+        "tv"
+      ],
+      "tests": [
+        {
+          "file": "tests/tvSport.test.ts",
+          "contains": "SEENIT-TV-003"
+        },
+        {
+          "file": "tests/tvSportClient.test.ts",
+          "contains": "SEENIT-TV-003"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-TV-001",
       "title": "Launcher TV V4, sources natives, apps réellement inventoriées et mémoire bornée",
       "targets": [
@@ -28,6 +45,10 @@
         "pwa"
       ],
       "tests": [
+        {
+          "file": "tests/tvLibrary.test.ts",
+          "contains": "SEENIT-TV-002"
+        },
         {
           "file": "tests/tvPairing.test.ts",
           "contains": "SEENIT-TV-002"

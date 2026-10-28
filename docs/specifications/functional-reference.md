@@ -17,13 +17,30 @@ locaux. Dissociation confirmée, cache privé effacé et révocation rejouée si
 Les images, timers et requêtes de pairing s'arrêtent hors premier plan. L'absence d'association
 ou de réseau laisse le launcher et ses apps utilisables.
 
+Films & séries reprend le contenu du compte, sans rangée d'apps : grand visuel du titre
+sélectionné, métadonnées réelles, Pour toi/Séries/Films et rail paysage de quatre contenus
+par page. Le focus change le hero sans reconstruire le rail, OK ouvre une fiche en lecture
+seule et Retour conserve le focus. Les chemins TMDB et URLs TMDB complètes enregistrés par
+le mobile sont normalisés ; un visuel absent conserve sa place. Aucun « Reprendre » ou
+« Épisodes » de maquette n'est promis sans contrat de lecture implémenté. Les apps restent
+sur Home et Toutes les apps. Hors écran : cinq images maximum libérées et aucune requête
+de métadonnées supplémentaire pour réparer les visuels existants.
+
 HDMI transmet le descripteur natif Tizen exact, sans reconstruction JS. Les réglages natifs
 utilisent un handler découvert ; sans handler exploitable, expliquer la touche Réglages/Home
 plutôt que lancer aveuglément un menu système. Un callback d'app accepté ne prouve pas
 l'affichage : Netflix noir depuis le launcher reste un écart terrain, malgré son fonctionnement
-via Samsung. Le basculement Home natif, le gain RAM global et le flux sportif réel restent
+via Samsung. Le basculement Home natif et le gain RAM global restent
 suivis séparément ; aucun root ni faux calendrier. Les logos des équipes viennent des données
 explicites avec initiales en secours. Voir [la référence V4](tv-samsung-launcher-v4.md).
+
+Le calendrier Sport gratuit (#738) consomme `/api/tv/sport` : le backend existant normalise
+les calendriers officiels Monaco/FFF, cache six heures, sans clé dans le WGT, sans nouveau
+service payant ni résultat obligatoire. Sélection locale indépendante par profil, six cartes
+par page, heure locale et programmation provisoire explicites, logos de source et initiales
+si absents. La tuile Sport anticipe le prochain match. Les événements passés disparaissent
+sans récupérer de score. Les concepts live/score restent optionnels hors MVP ; aucune app ou
+chaîne n'est suggérée comme diffuseur sans preuve gratuite fiable et lancement réel testé.
 
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).

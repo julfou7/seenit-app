@@ -77,6 +77,30 @@ test('SEENIT-TV-001 toute nouvelle app est favorite par son ID sans table de lan
   assert.equal(m.byIds(apps, ['sys']).length, 0);
   assert.equal(m.initials('Nouvelle Application'), 'NA');
 });
+
+test('SEENIT-TV-003 les équipes restent locales par profil et une sélection vide est conservée', () => {
+  const m = model(), saved = new Map<string, string>();
+  const store = { getItem: (key: string) => saved.get(key), setItem: (key: string, value: string) => saved.set(key, value) };
+  const julian = m.preferences(store, 'Julian');
+  assert.deepEqual(Array.from(julian.sportSources()), ['monaco', 'france-men']);
+  assert.deepEqual(Array.from(m.preferences(store, 'Milo').sportSources()), []);
+  julian.toggleSport('monaco'); julian.toggleSport('france-men');
+  assert.deepEqual(Array.from(m.preferences(store, 'Julian').sportSources()), []);
+  const guest = m.preferences(store, 'Invité'); guest.toggleSport('monaco');
+  assert.deepEqual(Array.from(m.preferences(store, 'Invité').sportSources()), []);
+});
+
+test('SEENIT-TV-001 filtres Films et séries gardent les identités et les images sûres', () => {
+  const m = model(), items = [
+    { tmdbId: 1, mediaType: 'movie', title: 'Film', status: 'plan_to_watch' },
+    { tmdbId: 1, mediaType: 'tv', title: 'Série', status: 'watching' },
+    { tmdbId: 1, mediaType: 'movie', title: 'Doublon', status: 'plan_to_watch' },
+  ];
+  assert.deepEqual(Array.from(m.mediaItems(items, 'all'), (v: { title: string }) => v.title), ['Série', 'Film']);
+  assert.equal(m.mediaItems(items, 'tv').length, 1); assert.equal(m.mediaItems(items, 'movie').length, 1);
+  assert.equal(m.mediaImage('/backdrop.jpg', 'w1280'), 'https://image.tmdb.org/t/p/w1280/backdrop.jpg');
+  assert.equal(m.mediaImage('//evil.invalid/x', 'w500'), ''); assert.equal(m.mediaImage('/../x', 'w500'), '');
+});
 test('SEENIT-TV-001 les logos refusent le réseau et gardent un secours générique', () => {
   const m = model();
   for (const path of ['https://remote/icon.png', '//remote/icon', 'javascript:x', 'data:image/svg+xml,x', 'file://remote/x']) assert.equal(m.localIcon(path), '');

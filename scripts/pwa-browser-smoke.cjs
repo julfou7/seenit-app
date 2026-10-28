@@ -19,7 +19,7 @@ const { buildHomeHarness, testHomeHarness } = require('./home-a-voir-browser-che
 const { testHomePerformanceHarness } = require('./home-performance-browser-checks.cjs');
 const { testHomeUnseenHarness } = require('./home-unseen-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
-const { buildTvHarness, testTvHarness } = require('./tv-browser-checks.cjs');
+const { buildTvHarness, testTvHarness, fulfillTvFixtureImage } = require('./tv-browser-checks.cjs');
 
 const { buildSearchKeyboardHarness, testSearchKeyboardHarness } = require('./search-keyboard-browser-checks.cjs');
 
@@ -542,6 +542,7 @@ async function main() {
       client.send('Fetch.enable', { patterns: [{ urlPattern: '*' }] }),
     ]);
     client.on('Fetch.requestPaused', async event => {
+      if (await fulfillTvFixtureImage(client, event, root)) return;
       const url = new URL(event.request.url);
       const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && url.port === '4173';
       if (local || url.protocol === 'data:' || url.protocol === 'blob:') {

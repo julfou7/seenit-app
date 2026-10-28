@@ -6,6 +6,7 @@ import cron from "node-cron";
 import { getMessaging } from "firebase-admin/messaging";
 import { adminAuth, adminDb } from "./src/lib/firebase-admin.ts";
 import { registerTvPairingRoutes } from './src/features/tv/tvPairingRoutes.ts';
+import { registerTvSportRoutes } from './src/features/tv/tvSport.ts';
 import { createFirestoreTvLinkStore, readTvLibrary } from './src/features/tv/tvPairingFirestore.ts';
 import { processReleaseUpdateNotificationRequest } from "./src/features/release/releaseUpdatePushBackend.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
@@ -582,6 +583,7 @@ async function startServer() {
     store: createFirestoreTvLinkStore(adminDb), authenticate: requireAuth, rateLimit,
     library: uid => readTvLibrary(adminDb, uid),
   });
+  registerTvSportRoutes(app, rateLimit);
   registerMediaProviderRoutes(app, {
     authenticate: requireAuth,
     parentalEvidence: {
@@ -1270,7 +1272,8 @@ async function startServer() {
           console.log(`[Plex Sync] Watch History GraphQL rich query unavailable, fallback minimal: ${richError?.message || richError}`);
           try {
             return await runQuery(PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY, 'minimal');
-          } catch (minimalError: any) {
+          } catch (minimalCaught: unknown) {
+            const minimalError = minimalCaught as { message?: unknown } | null;
             console.log(`[Plex Sync] Watch History Plex Account unavailable: ${minimalError?.message || minimalError}`);
             return { available: false, items: [], queryMode: 'none' };
           }

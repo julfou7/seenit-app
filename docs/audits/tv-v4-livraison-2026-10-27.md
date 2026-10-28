@@ -26,3 +26,22 @@ jamais le menu interne connu pour prendre la télécommande sans affichage.
 La validation navigateur n’est pas une preuve matérielle. Signature, digest,
 installation, contrôle visuel et API canonique restent à consigner dans le checkpoint
 stable avant de déclarer la livraison. Aucun root ni changement Home/startup/services.
+
+## Terrain du28octobre — compte et Films & séries
+
+Le service d'association779 est déployé. QR réellement créé sur la TV puis approbation
+confirmée par le propriétaire ; phase linked/online,18contenus reçus, code masqué.
+Le terrain révèle une seule affiche et des apps sans rapport dans Films. Cause code
+confirmée : certains chemins stockés par le mobile sont des URLs TMDB complètes, rejetées
+par le bootstrap qui n'acceptait que les chemins relatifs. Normalisation des deux formes,
+refus des hôtes/secrets/query/chemins traversants et TNR sur readTvLibrary de production,
+sans fetch externe supplémentaire ni modification de compte.
+
+Composition V3-06 reprise en ES5 : fond/hero, filtres locaux, rail paysage quatre cartes,
+fiche en lecture seule. Les apps restent sur Home ; pas de faux Reprendre ni progression
+de maquette. Images cinq maximum, sources retirées au changement de hero/écran ; navigation,
+chargement réel des images simulées et restauration de focus vérifiés dans le harnais
+1920/1280. Le réseau du harnais ne laisse passer aucune image extérieure : seules deux
+URLs de fixtures explicites sont satisfaites par un SVG local de test. Cette illustration
+est hors WGT et ne remplace aucune affiche de production. Prochaine preuve : API/visuels
+réels après déploiement et installation0.4.2. Suivi #295 / PR780.
