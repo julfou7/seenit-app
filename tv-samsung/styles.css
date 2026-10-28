@@ -1,5 +1,5 @@
 *{box-sizing:border-box}
-html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#11141b;color:#f6f3ef;font-family:Arial,Helvetica,sans-serif}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#11141b;color:#f6f3ef;font-family:"Plus Jakarta Sans",Arial,Helvetica,sans-serif}
 button{font:inherit;color:inherit;border:2px solid transparent;background:none;text-align:left;outline:0;cursor:pointer}button:disabled{cursor:default;opacity:.4}
 #viewport{position:absolute;left:0;top:0;width:100%;height:100%;overflow:hidden}
 #stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;background:#11141b;background-image:radial-gradient(ellipse at 18% 10%,rgba(42,65,83,.48),rgba(17,20,27,0) 65%),radial-gradient(ellipse at 85% 85%,rgba(74,45,47,.3),rgba(17,20,27,0) 65%)}
@@ -123,11 +123,48 @@ button{font:inherit;color:inherit;border:2px solid transparent;background:none;t
 .light-theme .sports-toolbar>span,.light-theme #calendarHint{color:#555d6b}.light-theme .calendar-list .event-card{background:#e1e5eb;border-color:#c2c7d0;color:#202630}.light-theme .calendar-list .event-card span,.light-theme .calendar-list .event-card small{color:#374151}
 
 /* Films & séries: cinematic content focus, static art, bounded rail. */
-#screenFilms{background:#16191c;color:#fff;padding:0}.film-backdrop{position:absolute;inset:0;background:linear-gradient(125deg,#203c35,#2d3434 55%,#464137)}.film-backdrop img{display:block;position:absolute;right:0;top:0;height:1080px;width:1920px;object-fit:cover}.film-backdrop img.poster-artwork{width:900px;object-fit:contain;object-position:right center}
-.film-scrim{position:absolute;inset:0;background:linear-gradient(90deg,rgba(17,20,23,.96),rgba(17,20,23,.65) 48%,rgba(17,20,23,.12) 85%),linear-gradient(0deg,#111419 0%,rgba(17,20,23,.9) 25%,transparent 70%);pointer-events:none}
+#screenFilms{background:#16191c;color:#fff;padding:0}.film-backdrop{position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(125deg,#203c35,#2d3434 55%,#464137)}.film-backdrop img{display:block;position:absolute;right:0;top:0;height:1080px;width:1920px;object-fit:cover}.film-backdrop img.poster-artwork{width:900px;object-fit:contain;object-position:right center}
+.film-scrim{position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(90deg,rgba(17,20,23,.96),rgba(17,20,23,.65) 48%,rgba(17,20,23,.12) 85%),linear-gradient(0deg,#111419 0%,rgba(17,20,23,.9) 25%,transparent 70%);pointer-events:none}
 .film-header{position:absolute;top:54px;left:96px;right:96px;display:flex;align-items:center;height:72px}.film-header h1{font-size:32px;line-height:40px;margin:0 32px 0 22px;white-space:nowrap}.film-header .back-button{background:rgba(255,255,255,.1);color:white}.film-tabs{display:flex;border-radius:32px;background:rgba(20,22,26,.65);padding:6px}.film-tab{padding:14px 26px;font-size:22px;line-height:28px;border-radius:28px;border:2px solid transparent;font-weight:bold}.film-tab.selected{background:#fff;color:#17191d}.film-account{margin-left:auto;font-size:21px;border-radius:28px;padding:16px 22px;background:rgba(255,255,255,.12)}
 .film-hero-copy{position:absolute;left:96px;top:238px;width:1140px;max-height:420px}.film-hero-copy h2{font-size:84px;line-height:94px;max-height:188px;overflow:hidden;color:#fff;letter-spacing:-2px}.film-hero-copy h2.long-title{font-size:64px;line-height:74px;max-height:222px}.film-hero-copy p{font-size:27px;line-height:36px;color:#e0e1e4;margin:18px 0 0;max-height:72px;overflow:hidden}.film-hero-copy #filmHeroEpisode{margin-top:8px}.film-hero-copy .cta{margin-top:24px;background:white;color:#17191d;border-radius:32px;padding:18px 30px;font-size:25px}
 .film-empty{position:absolute;left:96px;top:300px;width:1100px}.film-empty h2{font-size:62px;line-height:74px;color:white}.film-empty p{font-size:27px;line-height:40px;color:#d8dadd;margin:28px 0}.film-empty .cta{margin-top:16px}
 .film-shelf{position:absolute;left:96px;right:96px;top:692px}.film-shelf-head{display:flex;align-items:center;height:48px;margin-bottom:22px}.film-shelf-head h2{font-size:30px;color:#fff}.film-pagination{margin-left:auto;display:flex;align-items:center;font-size:20px}.film-pagination .text-button{font-size:36px;line-height:32px;color:white;width:60px;text-align:center}.film-pagination span{margin:0 16px}.film-content-row{display:flex;overflow:visible}
-.film-content-card{position:relative;flex-shrink:0;width:400px;height:225px;margin-right:32px;border-radius:22px;overflow:hidden;border:3px solid transparent;background:linear-gradient(135deg,#28433b,#39444a);color:white}.film-content-card:last-child{margin-right:0}.film-content-card:after{content:"";position:absolute;inset:0;background:linear-gradient(0deg,rgba(8,10,13,.94),rgba(8,10,13,0) 90%)}.film-content-card img{display:block;width:100%;height:100%;object-fit:cover}.film-content-card strong{position:absolute;z-index:1;left:22px;right:22px;bottom:20px;font-size:26px;line-height:31px;max-height:62px;overflow:hidden}.film-card-state{position:absolute;z-index:1;top:16px;left:20px;background:rgba(14,17,20,.72);padding:6px 12px;border-radius:16px;font-size:18px}
+.film-content-card{position:relative;flex-shrink:0;width:400px;height:225px;margin-right:32px;border-radius:22px;overflow:hidden;border:3px solid transparent;background:linear-gradient(135deg,#28433b,#39444a);color:white}.film-content-card:last-child{margin-right:0}.film-content-card:after{content:"";position:absolute;top:0;right:0;bottom:0;left:0;background:linear-gradient(0deg,rgba(8,10,13,.94),rgba(8,10,13,0) 90%)}.film-content-card img{display:block;width:100%;height:100%;object-fit:cover}.film-content-card strong{position:absolute;z-index:1;left:22px;right:22px;bottom:20px;font-size:26px;line-height:31px;max-height:62px;overflow:hidden}.film-card-state{position:absolute;z-index:1;top:16px;left:20px;background:rgba(14,17,20,.72);padding:6px 12px;border-radius:16px;font-size:18px}
 .light-theme #screenFilms h2,.light-theme #screenFilms .text-button{color:white}.light-theme #screenFilms .focusable:focus,.light-theme #screenFilms .focusable.focused{border-color:#e5b765!important;box-shadow:0 0 0 3px rgba(229,183,101,.18)}
+
+/* Terrain QE55Q6FNA: one palette per screen, static assets, legacy positions. */
+@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:400;src:url("assets/fonts/jakarta-400.woff2") format("woff2")}
+@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:600;src:url("assets/fonts/jakarta-600.woff2") format("woff2")}
+@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:700;src:url("assets/fonts/jakarta-700.woff2") format("woff2")}
+.toast{color:#fff;line-height:1.5}.light-theme .toast{background:#edf0f1;color:#243044;border-color:#a7b5c3}
+.home-screen .quick-button,.home-screen .date{display:none}
+.home-screen .profile-pill{width:auto;padding:0 16px 0 6px}.home-screen #profileName{display:block;margin-left:12px;font-size:21px}
+.header-settings{background:#303236}.light-theme .header-settings{background:#e9edef}
+.profile-screen>.brand{position:absolute;left:690px;top:132px;width:540px;height:134px;object-position:center}
+.profiles-wrap{left:280px;right:280px;top:350px;text-align:center}.profiles-wrap h1{font-size:54px;line-height:70px;font-weight:600;letter-spacing:-1.5px}
+.profile-row{justify-content:center;margin-top:60px}.profile-card{width:280px;height:320px;margin:0 24px;border-radius:30px;background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.1)}
+.profile-card strong{font-size:30px}.avatar{width:130px;height:130px;font-size:48px}.profile-card small{font-size:18px}
+.light-theme .profile-card{background:rgba(255,255,255,.6);border-color:#becbd4;color:#243044}.light-theme .profile-card small{color:#536579}.avatar-c,.avatar-m,.avatar-g{color:#fff}
+.native-settings-row .home-setting-card{width:562px}.native-settings-row .home-setting-card:last-child{margin:0}
+.home-screen #appRow .brand-youtube .app-logo{height:46px}.home-screen #appRow .brand-youtube .app-logo img{max-height:42px}
+.home-screen #appRow .brand-youtube .app-name,.home-screen #appRow .brand-canalplus .app-name,.home-screen #appRow .brand-plex .app-name{display:block;font-size:20px;line-height:25px;color:inherit;margin-top:5px}
+.home-screen #appRow .brand-youtube{color:#182029}.home-screen #appRow .brand-canalplus,.home-screen #appRow .brand-appletv{background:#151719;color:#fff}.home-screen #appRow .brand-plex{color:#eee}
+.light-theme .home-screen #appRow .brand-canalplus,.light-theme .home-screen #appRow .brand-plex{color:#fff}
+.sport-card .primary-label{bottom:118px}.sport-card:before{top:18px;height:130px;opacity:.5}
+.sport-card #sportCopy{display:block;position:absolute;left:30px;right:30px;bottom:62px;max-width:none;font-size:26px;line-height:33px;max-height:66px;color:#fff}
+.sport-card small{display:block;position:absolute;left:30px;right:30px;bottom:26px;font-size:21px;color:#d8e3df;line-height:28px;margin:0}
+.light-theme .home-screen .sport-card #sportCopy{color:#fff}.light-theme .home-screen .sport-card small{color:#d8e3df}
+.calendar-list{padding:12px;margin-left:-12px;max-height:524px;overflow:visible}.calendar-list .event-card.focused,.calendar-list .event-card:focus{transform:scale(1.015)}
+.light-theme .film-backdrop{background:linear-gradient(125deg,#cbd7d8,#dce2df 55%,#d7c8b5)}
+.light-theme #screenFilms{background:#dbe3e8;color:#243044}
+.light-theme .film-scrim{background:linear-gradient(90deg,rgba(237,241,239,.98),rgba(237,241,239,.76) 44%,rgba(237,241,239,.08) 86%),linear-gradient(0deg,#dbe3e8 0%,rgba(219,227,232,.95) 22%,rgba(219,227,232,0) 70%)}
+.light-theme #screenFilms .film-hero-copy h2,.light-theme #screenFilms .film-shelf-head h2,.light-theme #screenFilms .film-empty h2{color:#243044}
+.light-theme #screenFilms .film-hero-copy p,.light-theme #screenFilms .film-empty p{color:#3c5365}
+.light-theme .film-header .back-button,.light-theme .film-account,.light-theme .film-tabs{background:rgba(245,247,247,.8);color:#243044}
+.light-theme .film-tab.selected,.light-theme .film-hero-copy .cta{background:#243044;color:#fff}.light-theme #screenFilms .film-pagination .text-button{color:#243044}
+.light-theme .film-card-state{background:rgba(14,17,20,.8);color:white}.light-theme .film-content-card strong{color:white}
+.dialog-panel h1{line-height:1.25}.dialog-panel .sub-intro{margin-bottom:30px}
+
+
+.profile-card{position:relative}.profile-card .avatar{position:absolute;left:73px;top:58px}.profile-card strong{position:absolute;top:220px;left:0;right:0;margin:0}.profile-card small{position:absolute;top:265px;left:0;right:0;margin:0}
+.sport-card .primary-label{top:28px;bottom:auto}.sport-card:before{right:20px;top:30px;width:240px;height:125px;opacity:.4}

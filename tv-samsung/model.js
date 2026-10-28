@@ -5,7 +5,9 @@ var TVModel = (function () {
     { match: /^netflix$/i, file: 'netflix' }, { match: /^plex(?:\s*[-–].*)?$/i, file: 'plex' },
     { match: /^youtube$/i, file: 'youtube' }, { match: /^prime\s*video$/i, file: 'amazonprime' },
     { match: /^spotify(?:\s*[-–].*)?$/i, file: 'spotify' }, { match: /^dazn$/i, file: 'dazn' },
-    { match: /^(?:my)?canal\s*(?:\+|plus)?$/i, file: 'canalplus' }
+    { match: /^(?:my)?canal\s*(?:\+|plus)?$/i, file: 'canalplus' },
+    { match: /^apple\s*tv$/i, file: 'appletv', native: true },
+    { match: /^paramount\s*\+$/i, file: 'paramount', native: true }
   ];
   function brand(title) {
     var i;

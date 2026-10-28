@@ -10,7 +10,7 @@ test('SEENIT-TV-001 garde ES5, identité Samsung et absence de runtime lourd', (
     assert.doesNotMatch(source, /\b(?:const|let|async|await)\b|=>|\?\.|\?\?|\bclass\s+\w+|\x60/, name);
     new vm.Script(source, { filename: name });
   }
-  assert.match(config, /version="0\.4\.2"/);
+  assert.match(config, /version="0\.4\.3"/);
   assert.match(config, /id="SeenItTV01.SeenItTV" package="SeenItTV01" required_version="3\.0"/);
   assert.doesNotMatch(html, /react|babel|iframe/i);
   assert.doesNotMatch(css, /display\s*:\s*grid|backdrop-filter|filter\s*:\s*blur|animation\s*:/i);
@@ -27,6 +27,14 @@ test('SEENIT-TV-001 suit les trois destinations V4, huit favoris et les sources 
   assert.doesNotMatch(html, /id="greeting"/);
   assert.match(app, /setFocus\(el\('primaryTv'\)\)/);
   assert.match(css, /scale\(1\.025\)/);
+});
+
+test('SEENIT-TV-001 les calques cinéma restent compatibles avec le moteur Tizen 4', () => {
+  assert.doesNotMatch(css, /\binset\s*:/);
+  for (const selector of ['.film-backdrop', '.film-scrim', '.film-content-card:after']) {
+    const rule = css.slice(css.indexOf(selector + '{')).split('}')[0];
+    for (const edge of ['top', 'right', 'bottom', 'left']) assert.match(rule, new RegExp(edge + ':0'));
+  }
 });
 test('SEENIT-TV-001 borne la bibliothèque et ne simule pas des données personnelles', () => {
   assert.match(app, /var APPS_PER_PAGE = 18/);

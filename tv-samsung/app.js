@@ -140,7 +140,7 @@
     button.setAttribute('data-action', system && app.classification !== 'USER' ? 'inspect-app' : (organizing && currentScreen === 'screenApps' ? 'pin-app' : 'launch-app'));
     button.setAttribute('data-app-id', app.id); button.setAttribute('data-app-title', app.title); button.setAttribute('aria-label', app.title);
     logo = appendText(button, 'span', '', 'app-logo');
-    if (brand) paths.push('assets/apps/' + brand.file + '.svg');
+    if (brand && !brand.native) paths.push('assets/apps/' + brand.file + '.svg');
     if (nativePath) paths.push(nativePath);
     function fallback() {
       if (hidden() || (next > 0 && !document.documentElement.contains(logo))) return;
@@ -148,7 +148,7 @@
       image = document.createElement('img'); image.alt = ''; image.onerror = fallback; image.src = paths[next++]; logo.innerHTML = ''; logo.appendChild(image);
     }
     fallback();
-    appendText(button, 'span', app.title, 'app-name');
+    appendText(button, 'span', brand && brand.file === 'plex' ? 'Plex' : app.title, 'app-name');
     if (prefs.pins().indexOf(app.id) >= 0) appendText(button, 'span', '★', 'pin-star');
     if (system) appendText(button, 'span', app.classification === 'USER' ? 'VARIANTE' : app.classification, 'app-class');
     return button;
@@ -227,7 +227,7 @@
   function renderFilmHero(index) {
     var items = TVModel.mediaItems(TVConnection.view().items, filmFilter), item = items[index], image, url, fallback;
     if (!item) { clearFilmArtwork(el('filmBackdrop')); return; }
-    if (selectedFilm === item.mediaType + ':' + item.tmdbId && el('filmHeroTitle').textContent === item.title && el('filmBackdrop').childNodes.length) return;
+    if (selectedFilm === item.mediaType + ':' + item.tmdbId && el('filmHeroTitle').textContent === item.title && el('filmBackdrop').firstChild && el('filmBackdrop').firstChild.style.display !== 'none') return;
     selectedFilm = item.mediaType + ':' + item.tmdbId;
     el('filmHeroTitle').textContent = item.title; el('filmHeroTitle').className = item.title.length > 48 ? 'long-title' : '';
     el('filmHeroMeta').textContent = filmMeta(item); el('filmHeroEpisode').textContent = item.nextEpisode && item.nextEpisode.name ? item.nextEpisode.name : '';
@@ -352,6 +352,7 @@
     if (hidden()) return;
     if (currentScreen === 'screenHome') { renderHomeApps(); renderSources(); renderEvents(); updateSportTile(); }
     else if (currentScreen === 'screenFilms') renderFilms();
+    else if (currentScreen === 'screenFilmDetail') renderFilmDetail();
     else if (currentScreen === 'screenSport') renderEvents();
     else if (currentScreen === 'screenSources') renderSources();
     else if (currentScreen === 'screenApps') renderAppsPage();
@@ -360,7 +361,12 @@
     else if (currentScreen === 'screenAccount') renderAccount();
   }
   function applyAppearance() {
-    var hour = new Date().getHours(), theme = prefs.theme(), light = theme === 'mist' || (theme === 'auto' && hour >= 7 && hour < 20);
+    var hour = new Date().getHours(), theme = prefs.theme();
+    try {
+      if (!currentProfile) theme = storage.getItem('seenit.tv.appearance.v1') || theme;
+      else if (currentProfile !== 'Invité') storage.setItem('seenit.tv.appearance.v1', theme);
+    } catch (e) {}
+    var light = theme === 'mist' || (theme === 'auto' && hour >= 7 && hour < 20);
     var reduced = !prefs.motion(), logos = document.querySelectorAll('.brand'), i, source = light ? 'assets/seenit-tv-dark.svg' : 'assets/seenit-tv.svg';
     try { if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) reduced = true; } catch (e) {}
     el('stage').className = (light ? 'light-theme' : '') + (reduced ? ' reduced-motion' : '');
@@ -489,7 +495,7 @@
     else if (action === 'launch-app') launchAppFromButton(button);
     else if (action === 'inspect-app') showToast('Composant système · lancement désactivé.');
     else if (action === 'source') TVDevice.openSource(button.getAttribute('data-source-type'), Number(button.getAttribute('data-source-number')), function (ok) { if (!ok) showToast('Cette entrée n’est pas accessible.'); });
-    else if (action === 'samsung-settings') TVDevice.openSamsungSettings(function (ok) { if (!ok) showToast('Menu Samsung indisponible ici. Utilisez la touche Réglages de la TV.'); });
+    else if (action === 'samsung-settings') TVDevice.openSamsungSettings(function (ok) { if (!ok) showScreen('screenSamsungSettings'); });
     else if (action === 'exit') TVDevice.exitApp(function (ok) { if (!ok) showToast('Impossible de quitter depuis cet aperçu.'); });
     else if (action === 'back') goBack();
   }
@@ -524,7 +530,7 @@
   function init() {
     TVConnection.init(storage, connectionChanged);
     TVSport.init(storage, sportChanged);
-    resizeStage(); updateConnectivity(); updateSportTile(); startTelemetryTimers();
+    resizeStage(); applyAppearance(); updateConnectivity(); updateSportTile(); startTelemetryTimers();
     window.addEventListener('resize', resizeStage); window.addEventListener('online', updateConnectivity); window.addEventListener('offline', updateConnectivity);
     document.addEventListener('visibilitychange', handleVisibility); document.addEventListener('keydown', handleKey);
     document.addEventListener('keyup', handleKeyUp);

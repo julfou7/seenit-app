@@ -50,6 +50,23 @@ test('SEENIT-TV-001 le regroupement de tuiles est générique, stable et ne chan
   assert.equal(m.favorites(apps, [], 5, ['built-in']).some((a: any) => a.id === 'installed'), false);
   assert.equal(m.favorites(apps, ['installed'], 5, ['built-in'])[0].id, 'installed');
 });
+
+test('SEENIT-TV-001 garde les composants terrain dans Système et Apple TV/Paramount dans Apps', () => {
+  const components = ['AmbientSupport', 'CSAccount', 'CSAccountOOBE', 'Apps', 'csfs', 'com.samsung.tv.search'];
+  const input = components.map((name, i) => ({ id: 'component.' + i, name, show: true }));
+  input.push({ id: 'com.samsung.tv.aria-dummy', name: 'Apple TV', show: true });
+  input.push({ id: 'com.samsung.tv.aria-video', name: 'Apple TV', show: true });
+  input.push({ id: 'installed.paramount', name: 'Paramount+', show: true });
+  let inventory: any[] = [];
+  device({ getAppsInfo(done: (apps: unknown[]) => void) { done(input); } }).listApps((apps: any[]) => { inventory = apps; });
+  const m = model(), users = m.userApps(inventory);
+  assert.equal(inventory.length, input.length);
+  assert.deepEqual(Array.from(users, (a: any) => a.id).sort(), ['com.samsung.tv.aria-video', 'installed.paramount']);
+  assert.equal(m.advancedApps(inventory).length, components.length + 1);
+  assert.equal(m.byIds(inventory, ['com.samsung.tv.aria-video', 'installed.paramount']).length, 2);
+  assert.equal(m.brand('Apple TV').native, true);
+  assert.equal(m.brand('Paramount+').native, true);
+});
 test('SEENIT-TV-001 isole les favoris et réouvertures par profil sans persister Invité', () => {
   const m = model(), saved: Record<string, string> = {};
   const store = { getItem: (key: string) => saved[key], setItem: (key: string, value: string) => { saved[key] = value; } };

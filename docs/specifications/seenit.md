@@ -31,6 +31,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   qu'une tuile : épingle explicite prioritaire, sinon installation utilisateur locale avant composant
   intégré, choix stable par ID à égalité. Tous les IDs restent inventoriés et les variantes restent en
   vue avancée ; le regroupement d'affichage ne devient jamais une table d'IDs de lancement universels.
+  Les composants techniques restent dans Système ; Apple TV et Paramount+ découverts
+  sont ajoutables comme toute autre app. Les profils sont centrés et le thème choisi
+  couvre fiches, dialogues et messages. OK rend la fiche sans attendre une synchronisation ;
+  les calques cinéma utilisent des positions compatibles Tizen 4. Le prochain match
+  reste visible sur la tuile Sport ; les accès réglages n'annoncent aucune destination
+  native non prise en charge.
   Toute app utilisateur découverte peut devenir favorite par profil local. « Rouvrir » mémorise seulement
   les ouvertures réussies, jamais un visionnage Netflix partagé. Invité ne persiste rien. La bibliothèque
   conserve l'inventaire système mais borne son DOM à 18 apps. Au masquage, images hors écran et timers

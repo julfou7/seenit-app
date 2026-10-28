@@ -6,6 +6,11 @@ Le runtime isolé `tv-samsung/` présente trois grandes destinations TV/TNT, Fil
 huit favoris maximum sur la rangée, Ajouter/Toutes, puis les sources réellement détectées.
 La roue mène aux réglages de la partie basse, sous un en-tête fixe. Retour remonte d'abord
 l'accueil avant de proposer de quitter. Les apparences Brume/Crépuscule/Auto sont conservées.
+Les profils sont centrés, avec marque et police locales ; l'en-tête montre heure, profil
+et réglages. Brume et Crépuscule couvrent aussi fiches et messages. La tuile Sport montre
+le prochain événement sans clic. Les composants techniques reconnus restent dans Système,
+Apple TV/Paramount+ détectés sont ajoutables. Les réglages indisponibles proposent le chemin
+Samsung sans promettre un faux accès direct.
 L'inventaire complet garde USER/SYSTEM/UNKNOWN et toutes les variantes, sans table d'IDs
 universelle. Une épingle explicite conserve son ID ; Milo n'affiche que sa sélection locale,
 Invité ne persiste rien. Les anciennes épingles ne sont pas effacées par la limite V4.

@@ -37,6 +37,9 @@ var TVDevice = (function () {
     var id = String((app && app.id) || '');
     if (!id) return true;
     if (id === viewerId || id === settingsMenuId) return true;
+    if (/^com\.samsung\./.test(id) && /(?:ambient|account|commonsearch|voice|mybixby|preview|notification|aria-dummy|csfs)/i.test(id)) return true;
+    if (/^(?:AmbientSupport|AmbientApp|CSAccount(?:OOBE)?|Apps|csfs|VoiceDiscoveryMenu|Samsung TV Plus Privacy Settings)$/i.test(safeTitle(app))) return true;
+    if (/^(?:com\.samsung\.|org\.tizen\.)/.test(safeTitle(app))) return true;
     if (/^org\.tizen\./.test(id) && !/^(?:Netflix|Prime Video|Internet|Browser|Samsung TV Plus)$/i.test(safeTitle(app))) return true;
     if (/^(ise-|ug-|org\.volt\.)/.test(id)) return true;
     if (/Service$|Daemon|Keyboard|syspopup|Helper$/i.test(id)) return true;
