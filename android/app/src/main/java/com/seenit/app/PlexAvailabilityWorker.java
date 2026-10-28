@@ -112,13 +112,10 @@ public class PlexAvailabilityWorker extends Worker {
         boolean canRetry = attempt < MAX_ATTEMPTS;
         Credentials credentials = PlexBackgroundCredentialStore.read(getApplicationContext());
         if (credentials == null) {
-            // L'enregistrement FCM et la copie privée Plex sont asynchrones.
-            // Une absence momentanée n'est pas un succès terminal.
             recordDiagnostic("credentials", canRetry ? "missing_retry" : "missing_exhausted", attempt);
             return canRetry ? Result.retry() : Result.success();
         }
         if (!expectedUidHash.equals(credentials.uidHash)) {
-            // Fail closed : un signal ancien ou d'un autre UID ne révèle aucun titre.
             recordDiagnostic("identity", "uid_mismatch", attempt);
             return Result.success();
         }
@@ -145,13 +142,10 @@ public class PlexAvailabilityWorker extends Worker {
                 attempt
             );
         } catch (Exception ignored) {
-            // Une panne réseau/Plex ne devient jamais une preuve d'indisponibilité.
             recordDiagnostic("plex_check", canRetry ? "error_retry" : "error_exhausted", attempt);
         }
 
         if (canRetry) return Result.retry();
-
-        // « Import terminé » a déjà été livré par le webhook : pas de doublon.
         return Result.success();
     }
 
@@ -355,7 +349,6 @@ public class PlexAvailabilityWorker extends Worker {
         }
     }
 
-    // Identity consumed by Capacitor getDeliveredNotifications, scoped to the owner.
     private static Bundle inboxExtras(String ownerUidHash, int tmdbId, String mediaType, int season, int episode) {
         Bundle extras = new Bundle();
         extras.putString("ownerUidHash", ownerUidHash);
@@ -376,9 +369,10 @@ public class PlexAvailabilityWorker extends Worker {
         int season = nonNegativeInt(message.get("season"));
         int episode = positiveInt(message.get("episode"));
         String title = clean(message.get("title"), 180);
-        if (title.isEmpty()) title = "Votre média";
+        if (title.isEmpty()) title = "Téléchargement";
         String eventKey = clean(message.get("eventKey"), 128);
         int notificationId = notificationId(eventKey, mediaType, tmdbId, season, episode);
+        String compactText = episodeFact("Import terminé", season, episode);
 
         PendingIntent seenItIntent = buildSeenItPendingIntent(
             context, notificationId, tmdbId, mediaType, season, episode
@@ -387,9 +381,10 @@ public class PlexAvailabilityWorker extends Worker {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .addExtras(inboxExtras(message.get("ownerUidHash"), tmdbId, mediaType, season, episode))
             .setSmallIcon(R.drawable.ic_stat_seenit)
-            .setContentTitle(displayTitle(title, season, episode))
-            .setContentText("✅ Import terminé")
-            .setStyle(new NotificationCompat.BigTextStyle().bigText("✅ Import terminé"))
+            .setSubText("Téléchargement")
+            .setContentTitle(title)
+            .setContentText(compactText)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(compactText))
             .setContentIntent(seenItIntent)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
@@ -412,9 +407,10 @@ public class PlexAvailabilityWorker extends Worker {
         int season = getInputData().getInt("season", -1);
         int episode = getInputData().getInt("episode", 0);
         String title = clean(getInputData().getString("title"), 180);
-        if (title.isEmpty()) title = "Votre média";
+        if (title.isEmpty()) title = "Téléchargement";
         String eventKey = clean(getInputData().getString("eventKey"), 128);
         int notificationId = notificationId(eventKey, mediaType, tmdbId, season, episode);
+        String compactText = episodeFact("Disponible dans Plex", season, episode);
 
         PendingIntent seenItIntent = buildSeenItPendingIntent(
             context, notificationId, tmdbId, mediaType, season, episode
@@ -423,9 +419,10 @@ public class PlexAvailabilityWorker extends Worker {
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
             .addExtras(inboxExtras(getInputData().getString("ownerUidHash"), tmdbId, mediaType, season, episode))
             .setSmallIcon(R.drawable.ic_stat_seenit)
-            .setContentTitle(displayTitle(title, season, episode))
-            .setContentText("✅ Disponible dans Plex")
-            .setStyle(new NotificationCompat.BigTextStyle().bigText("✅ Disponible dans Plex"))
+            .setSubText("Plex")
+            .setContentTitle(title)
+            .setContentText(compactText)
+            .setStyle(new NotificationCompat.BigTextStyle().bigText(compactText))
             .setContentIntent(seenItIntent)
             .setAutoCancel(true)
             .setOnlyAlertOnce(true)
@@ -440,7 +437,7 @@ public class PlexAvailabilityWorker extends Worker {
                 new NotificationCompat.BigPictureStyle()
                     .bigPicture(bigPicture)
                     .bigLargeIcon((Bitmap) null)
-                    .setSummaryText("✅ Disponible dans Plex")
+                    .setSummaryText("La copie exacte est maintenant indexée par Plex.")
             );
             poster.recycle();
         }
@@ -455,7 +452,7 @@ public class PlexAvailabilityWorker extends Worker {
                 plexIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
-            builder.addAction(0, "Ouvrir dans Plex", plexPendingIntent);
+            builder.addAction(0, "Lire sur Plex", plexPendingIntent);
         }
 
         try {
@@ -496,8 +493,11 @@ public class PlexAvailabilityWorker extends Worker {
         return 1_300_000_000 + Math.abs(key.hashCode() % 300_000_000);
     }
 
-    private static String displayTitle(String title, int season, int episode) {
-        return season >= 0 && episode > 0 ? title + " · S" + season + "E" + episode : title;
+    private static String episodeFact(String fact, int season, int episode) {
+        if (season < 0 || episode <= 0) return fact;
+        return "S" + String.format(java.util.Locale.ROOT, "%02d", season)
+            + " | E" + String.format(java.util.Locale.ROOT, "%02d", episode)
+            + " · " + fact;
     }
 
     private static String resolvePlexDiscoverUrl(String token, int tmdbId, String mediaType) {

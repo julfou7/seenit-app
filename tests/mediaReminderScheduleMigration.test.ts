@@ -8,8 +8,8 @@ const nativeSource = readFileSync('src/features/notifications/mediaReminderNotif
 const patchSource = readFileSync('scripts/patch-local-notifications.cjs', 'utf8');
 
 test('issues #106, #623 et #625 gardent une seule révision active de chaque alarme future', () => {
-  assert.match(reminderSource, /const REMINDER_SCHEDULE_SCHEMA = 'v7';/,
-    'le payload v7 doit invalider les clés v6 afin de reprogrammer les rappels avec leur contexte détaillé');
+  assert.match(reminderSource, /const REMINDER_SCHEDULE_SCHEMA = 'v8';/,
+    'le payload v8 doit invalider les clés v6 afin de reprogrammer les rappels avec leur contexte détaillé');
   assert.doesNotMatch(reminderSource, /REMINDER_SCHEDULE_SCHEMA = 'v6'/,
     'l’ancien schéma ne doit plus figer une alarme future avec une copie générique');
   assert.match(
@@ -84,7 +84,7 @@ test('issues #106 et #621 migrent chaque révision Android déjà patchée de ma
 test('issue #106 purge les anciens rappels film dont la date n’est plus autoritative', () => {
   assert.match(reminderSource, /prunePendingMediaReminderNotifications\(s\.id, 'movie', allowedPendingMovieIds\)/);
   assert.match(nativeSource, /LocalNotifications\.getPending\(\)/);
-  assert.match(nativeSource, /String\(notification\?\.extra\?\.showId/);
-  assert.match(nativeSource, /String\(notification\?\.extra\?\.mediaType/);
-  assert.match(nativeSource, /!allowed\.has\(Number\(notification\?\.id\)\)/);
+  assert.match(nativeSource, /String\(notification\.extra\?\.showId/);
+  assert.match(nativeSource, /String\(notification\.extra\?\.mediaType/);
+  assert.match(nativeSource, /!allowed\.has\(Number\(notification\.id\)\)/);
 });

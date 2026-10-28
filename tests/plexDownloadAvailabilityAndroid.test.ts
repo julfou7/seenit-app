@@ -24,7 +24,7 @@ test('SEENIT-UX-018 les deux notifications natives Plex exposent leur identité 
   const payload = worker.slice(start, worker.indexOf('static void showImportNotification', start));
   for (const key of ['ownerUidHash', 'tmdbId', 'mediaType', 'season', 'episode']) assert.ok(payload.includes(`"${key}"`));
   assert.doesNotMatch(payload, /plexToken|accessToken|authToken|serverUri/);
-  assert.equal((worker.match(/\.addExtras\(inboxExtras\(/g) || []).length, 2, 'import et disponibilité branchés au contrat Android lu par Capacitor');
+  assert.equal((worker.match(/\.addExtras\(inboxExtras\(/g) || []).length, 2);
 });
 
 test('SEENIT-NOTIFICATION-003 vérifie Plex en arrière-plan sans exposer le token', () => {
@@ -81,17 +81,23 @@ test('SEENIT-NOTIFICATION-003 reste compatible minSdk 24 et distingue la saison 
 });
 
 test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et une action Discover exacte', () => {
-  assert.ok(server.includes("icon: 'ic_stat_seenit'"));
-  assert.ok(server.includes("color: '#E5A93D'"));
+  assert.ok(server.includes('androidPushPresentation(uid, data)'));
+  const pushPresentation = readFileSync('src/features/notifications/androidPushPresentation.ts', 'utf8');
+  assert.ok(pushPresentation.includes("icon: 'ic_stat_seenit'"));
+  assert.ok(pushPresentation.includes("color: '#E5A93D'"));
   assert.ok(worker.includes('.setSmallIcon(R.drawable.ic_stat_seenit)'));
-  assert.ok(worker.includes('"✅ Import terminé"'));
-  assert.ok(worker.includes('"✅ Disponible dans Plex"'));
+  assert.ok(worker.includes('.setSubText("Téléchargement")'));
+  assert.ok(worker.includes('.setSubText("Plex")'));
+  assert.ok(worker.includes('episodeFact("Import terminé", season, episode)'));
+  assert.ok(worker.includes('episodeFact("Disponible dans Plex", season, episode)'));
+  assert.doesNotMatch(worker, /✅|🚀/u);
   assert.ok(worker.includes('notificationId(eventKey, mediaType, tmdbId, season, episode)'));
+  assert.equal((worker.match(/notificationId\(eventKey, mediaType, tmdbId, season, episode\)/g) || []).length >= 2, true);
   assert.ok(worker.includes('builder.setLargeIcon(largeIcon)'));
   assert.ok(worker.includes('fitPosterInside(poster, 160, 160)'));
   assert.ok(worker.includes('fitPosterInside(poster, 512, 288)'));
   assert.ok(worker.includes('.bigLargeIcon((Bitmap) null)'));
-  assert.ok(worker.includes('builder.addAction(0, "Ouvrir dans Plex", plexPendingIntent)'));
+  assert.ok(worker.includes('builder.addAction(0, "Lire sur Plex", plexPendingIntent)'));
   assert.ok(worker.includes('"https://metadata.provider.plex.tv/library/metadata/matches?guid="'));
   assert.ok(worker.includes('"https://watch.plex.tv/" + ("movie".equals(mediaType) ? "movie" : "show") + "/" + slug'));
   assert.ok(worker.includes('hasExactTmdbGuid(item, tmdbId)'));
@@ -118,9 +124,8 @@ test('SEENIT-NOTIFICATION-003 préserve S0E1 du deep-link jusqu’à la fiche é
   assert.doesNotMatch(showDetail, /if \(initialSeason && initialEpisode/);
 });
 
-
 test('SEENIT-NOTIFICATION-003 trace le pipeline natif sans média ni secret', () => {
-  assert.ok(server.includes("normalizePlexAvailabilityTraceBatch"));
+  assert.ok(server.includes('normalizePlexAvailabilityTraceBatch'));
   assert.ok(server.includes("'/api/diagnostics/plex-availability'"));
   assert.ok(delivery.includes('traceId'));
   assert.ok(service.includes('"fcm_received"'));

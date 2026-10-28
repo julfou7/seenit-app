@@ -844,10 +844,10 @@ explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est u
 - Un téléphone et une PWA du même compte peuvent recevoir l'événement sans partager un token unique.
 - Déconnecter un appareil révoque son installation sans désactiver les autres.
 - Les webhooks Sonarr/Radarr ciblent seulement les installations du propriétaire de l'endpoint. Un
-  événement `Download` garde un reçu visible « ✅ Import terminé » sur PWA/APK legacy. Sur un Android dont
+  événement `Download` garde un reçu visible « Import terminé » sur PWA/APK legacy. Sur un Android dont
   la copie privée Plex est confirmée, le signal data-only affiche localement le média avec
-  « ✅ Import terminé » puis réutilise le même identifiant pour passer à
-  « ✅ Disponible dans Plex » après preuve TMDB exacte (et saison/épisode exacts pour la TV). Le tap ouvre
+  « Import terminé » puis réutilise le même identifiant pour passer à
+  « Disponible dans Plex » après preuve TMDB exacte (et saison/épisode exacts pour la TV). Le tap ouvre
   la fiche SeenIt exacte ; lorsque le poster PMS exact est disponible, l'état replié le conserve à
   droite en contain sans crop et l'état développé l'affiche une seule fois, entier et centré dans le
   BigPicture. « Ouvrir dans Plex » n'est exposé que lorsqu'un slug Discover strictement résolu par TMDB
@@ -1073,3 +1073,7 @@ Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antéri
 Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.
 
 Terrain229 : une réouverture de panneau ne suffit pas à prouver sa fluidité. Les périodes Historique et leurs totaux sont indexés et mémorisés ; aucune création de formateur de date par visionnage ni filtre intégral par période visible pendant le rendu. Le scénario navigateur mesure les composants de production sur6300visionnages, pagination et bascules répétées ; aucun historique utilisateur distant n’est modifié.
+
+### Notifications unifiées #778
+
+Le titre nomme l’œuvre ; le type est dans l’en-tête Android (`subText`), le compact donne un fait et le développé ajoute du contexte. Les téléchargements distinguent envoi au client, import et preuve Plex exacte. Les sept canaux dédiés sont créés au démarrage sans recréer Téléchargements ni écraser les choix Android. Les réglages exposent Actualités et l’accès au panneau système ; la migration v8 reprogramme les rappels. Les images gardent le cache privé borné, contain et l’hydratation à la livraison. Les alertes vues/archivées sont retirées ; une notification Vu peut afficher la reprise suivante avec la même identité sans son. Voir SEENIT-NOTIFICATION-005 à 008 et [contrat](notification-refactor-2026-10-27.md).

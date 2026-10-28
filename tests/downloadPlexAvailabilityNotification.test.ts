@@ -12,7 +12,7 @@ test('SEENIT-NOTIFICATION-003 réserve la vérification Plex au signal Android c
     movie: { title: 'Dune', tmdbId: 438631 }
   });
   assert.equal(radarr.notification.title, 'Dune');
-  assert.equal(radarr.notification.body, '✅ Import terminé');
+  assert.equal(radarr.notification.body, 'Import terminé');
   assert.doesNotMatch(radarr.notification.body, /disponible dans Plex|prêt et disponible/i);
   assert.equal(radarr.plexAvailabilityData?.type, PLEX_AVAILABILITY_CHECK_PUSH_TYPE);
   assert.equal(radarr.plexAvailabilityData?.tmdbId, '438631');
@@ -34,7 +34,7 @@ test('SEENIT-NOTIFICATION-003 réserve la vérification Plex au signal Android c
   });
   assert.equal(unresolved.plexAvailabilityData, null);
   assert.equal(unresolved.notification.title, 'Titre sans identité');
-  assert.equal(unresolved.notification.body, '✅ Import terminé');
+  assert.equal(unresolved.notification.body, 'Import terminé');
 });
 
 test('SEENIT-NOTIFICATION-003 ne transforme jamais le titre en identité Plex', () => {

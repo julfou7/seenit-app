@@ -29,3 +29,8 @@ export const usePlexAvailabilityStore = create<PlexCache>((_, get) => ({
   cache: {}, getMediaAvailability: key => get().cache[key],
 }));
 export const getPlexMediaKey = (id: number | string | null, type: string) => `v3:${auth.currentUser?.uid || 'anonymous'}:${type}:${id}`;
+
+// Le harness providers ne déclenche aucune notification ; son contrat Firebase
+// expose néanmoins les exports désormais importés par les actions média paresseuses.
+export const generateNotificationNumericId = (value: string) => Array.from(value).reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) | 0, 0) >>> 1;
+export const sendNativeNotification = async () => {};

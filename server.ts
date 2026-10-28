@@ -1,3 +1,4 @@
+import { androidPushPresentation } from './src/features/notifications/androidPushPresentation';
 import express, { Request, type Response, NextFunction } from "express";
 import path from "path";
 import fs from "fs";
@@ -232,8 +233,7 @@ async function sendPushToUserDevices(
           ...(options.androidHighPriority ? { priority: 'high' as const } : {}),
           ...(notification ? {
             notification: {
-              icon: 'ic_stat_seenit',
-              color: '#E5A93D'
+              ...androidPushPresentation(uid, data)
             }
           } : {})
         }
@@ -442,7 +442,6 @@ function startCronJobs() {
   return;
   // Exécution tous les jours à 9h05 (Heure du serveur)
   cron.schedule("5 9 * * *", async () => {
-    console.log("[CRON] Démarrage de la vérification des rappels d'épisodes...");
     const db = adminDb;
     const messaging = getMessaging();
 
@@ -679,7 +678,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.231',
+        'X-Plex-Version': '1.4.232',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };

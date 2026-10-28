@@ -1,7 +1,7 @@
 {
   "name": "seenit-app",
   "private": true,
-  "version": "1.4.231",
+  "version": "1.4.232",
   "packageManager": "npm@10.9.3",
   "engines": {
     "node": ">=22 <25",
@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "postinstall": "node scripts/patch-local-notifications.cjs && node scripts/materialize-android-config.cjs",
+    "postinstall": "node scripts/patch-local-notifications.cjs && node scripts/patch-notification-subtext.cjs && node scripts/materialize-android-config.cjs",
     "build": "vite build && node scripts/scan-provider-client-bundle.cjs && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --alias:vite=./scripts/vite-production-stub.ts --sourcemap --outfile=build/server.cjs && node scripts/smoke-built-server.cjs",
     "start": "node build/server.cjs",
     "preview": "vite preview",

@@ -311,6 +311,7 @@ export interface ReleasePushMessage {
     priority: 'high';
     collapseKey: string;
     notification: {
+      channelId: 'seenit_app';
       icon: 'ic_stat_seenit';
       color: '#E5A93D';
       tag: string;
@@ -336,8 +337,8 @@ export function buildReleaseUpdatePushMessage(version: string): ReleasePushMessa
   const stableKey = version.replace(/\./g, '_');
   return {
     notification: {
-      title: `SeenIt ${version} est disponible ✨`,
-      body: 'Une nouvelle version de SeenIt est prête à installer.'
+      title: `SeenIt ${version}`,
+      body: 'Nouvelle version disponible'
     },
     data: {
       type: APP_UPDATE_AVAILABLE_PUSH_TYPE,
@@ -347,6 +348,7 @@ export function buildReleaseUpdatePushMessage(version: string): ReleasePushMessa
       priority: 'high',
       collapseKey: `seenit-update-${version}`,
       notification: {
+        channelId: 'seenit_app',
         icon: 'ic_stat_seenit',
         color: '#E5A93D',
         tag: `seenit_update_${stableKey}`
@@ -368,12 +370,9 @@ function isEligibleAndroidDevice(device: ReleaseNotificationDevice): boolean {
 }
 
 export function sanitizeMessagingErrorCode(error: unknown): string {
-  const raw =
-    typeof (error as any)?.code === 'string'
-      ? (error as any).code
-      : typeof (error as any)?.errorInfo?.code === 'string'
-        ? (error as any).errorInfo.code
-        : 'messaging/unknown';
+  const value = error && typeof error === 'object' ? error as { code?: unknown; errorInfo?: { code?: unknown } } : {};
+  const raw = typeof value.code === 'string' ? value.code
+    : typeof value.errorInfo?.code === 'string' ? value.errorInfo.code : 'messaging/unknown';
   const clean = raw.replace(/[^a-zA-Z0-9_./-]/g, '').slice(0, 120);
   return clean || 'messaging/unknown';
 }

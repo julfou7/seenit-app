@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.231**
+Version applicative : **1.4.232**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -993,6 +993,12 @@ pour le cache des sagas et univers.
 
 ## 8. Webhooks et notifications
 
+- **SEENIT-NOTIFICATION-005** — [Refonte #778](notification-refactor-2026-10-27.md) : titre œuvre, type `subText`, compact sans emoji et code épisode unique, détail distinct et actions réelles. L’affiche entière reste en contain, sans bitmap dans AlarmManager.
+- **SEENIT-NOTIFICATION-006** — Sept canaux dédiés et `seenit_downloads` conservé ; création idempotente au démarrage, accès aux réglages système, préférences fusionnées sans écraser les choix et reprogrammation v8.
+- **SEENIT-NOTIFICATION-007** — Identité stable par œuvre pour les alertes visibles, alarmes futures distinctes ; mises à jour silencieuses, retrait des alertes vues/archivées et isolation UID. Les téléchargements restent distincts par demande/épisode.
+- **SEENIT-NOTIFICATION-008** — Rappels existants, actualités, versions et téléchargements adoptent la même grammaire. Un Vu de notification ouvre SeenIt sur l’épisode exact et actualise son état. Aucune plateforme, disponibilité, progression ou durée inconnue n’est inventée. Les nouveaux déclencheurs backend restent un lot séparé tant que non opérationnels.
+
+
 - **SEENIT-NOTIFICATION-004** — Une demande explicite Sonarr/Radarr ne conclut « aucune release
   compatible » qu'après une réponse interactive valide pour son scope exact et tous les fallbacks
   autorisés (épisode puis pack saison ; série puis toutes ses saisons concernées). Un résultat absent,
@@ -1018,13 +1024,13 @@ pour le cache des sagas et univers.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
 - **SEENIT-NOTIFICATION-003** — Un événement Sonarr/Radarr `Download` prouve uniquement que l'import
   Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. La PWA et les APK legacy
-  reçoivent un reçu FCM visible dont le statut reste strictement « ✅ Import terminé », sans annoncer une
+  reçoivent un reçu FCM visible dont le statut reste strictement « Import terminé », sans annoncer une
   vérification Plex qu'ils ne lanceront pas. Sur un Android ayant confirmé la capability
   `plexAvailabilityBackgroundV1`, le backend envoie à la place un message data-only haute priorité :
   le service natif affiche immédiatement une notification média locale dont le titre est le nom du média
-  et le statut « ✅ Import terminé », puis lance la vérification Plex bornée. Le même
+  et le statut « Import terminé », puis lance la vérification Plex bornée. Le même
   identifiant de notification est réutilisé ; une preuve Plex exacte met donc cet élément à jour vers
-  « ✅ Disponible dans Plex » au lieu d'empiler une seconde alerte. Si la preuve n'arrive jamais, le reçu
+  « Disponible dans Plex » au lieu d'empiler une seconde alerte. Si la preuve n'arrive jamais, le reçu
   d'import reste visible. Le téléphone compare l'empreinte du UID actif, conserve le jeton Plex uniquement
   dans son stockage privé exclu des sauvegardes et vérifie par TMDB ID exact et, pour un épisode, par
   saison + épisode exacts. Le titre n'est jamais une preuve d'identité. Une copie native momentanément
@@ -1067,7 +1073,7 @@ pour le cache des sagas et univers.
   série nomme toujours la saison ou l'épisode concerné : « Nouvelle saison » précise « Saison N » et
   « Nouvel épisode » précise « Sxx | Eyy ». Quand la série possède déjà un prochain épisode non vu antérieur
   à l'épisode nouvellement diffusé, la notification reprend ce prochain épisode réellement à voir et le
-  compteur de reprise « + X épisode(s) », calculé indépendamment de la présentation de la carte
+  nombre d’épisodes à voir, prochain inclus (`getExtraAvailableEpisodes + 1`), calculé depuis la même source que la carte
   À Regarder qui n'affiche plus ce compteur ; le corps conserve aussi les noms
   d'épisode disponibles afin de distinguer ce qui vient de sortir de ce qui doit être repris. Les autres
   catégories de rappel conservent leur feedback interne existant.

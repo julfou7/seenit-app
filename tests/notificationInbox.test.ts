@@ -6,7 +6,7 @@ import { webcrypto } from 'node:crypto';
 test('SEENIT-UX-018 reprend les notifications SeenIt livrées sans croiser les comptes et compte des IDs stables', async () => {
  const bundle=await build({entryPoints:['src/features/notifications/notificationInbox.ts'],bundle:true,write:false,platform:'node',format:'cjs',plugins:[{name:'inbox-native-ports',setup(b){
  b.onResolve({filter:/^@capacitor\/(?:core|push-notifications|local-notifications)$/},a=>({path:a.path,namespace:'native'}));
- b.onLoad({filter:/.*/,namespace:'native'},()=>({contents:`export const Capacitor={isNativePlatform:()=>true};export const PushNotifications={getDeliveredNotifications:async()=>({notifications:globalThis.__notifications})};export const LocalNotifications={getDeliveredNotifications:async()=>({notifications:[]})};`}));
+ b.onLoad({filter:/.*/,namespace:'native'},()=>({contents:`export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>'android'};export const PushNotifications={getDeliveredNotifications:async()=>({notifications:globalThis.__notifications})};export const LocalNotifications={getDeliveredNotifications:async()=>({notifications:[]})};`}));
  }}]});
  const module={exports:{} as {rememberNotification:Function;collectDeliveredNotifications:Function;formatNotificationEpisodeCodes:(value:string)=>string}};
  const values=new Map<string,string>();
@@ -29,8 +29,8 @@ test('SEENIT-NOTIFICATION-003 le producteur natif marque le propriétaire et ref
   b.onResolve({filter:/^@capacitor\/(?:core|local-notifications)$|\/(?:firebase|clientOperationalDiagnostics)(?:\.ts)?$/},a=>({path:a.path,namespace:'ports'}));
   b.onLoad({filter:/.*/,namespace:'ports'},()=>({contents:`
     export const auth=globalThis.__auth;
-    export const Capacitor={isNativePlatform:()=>true};
-    export const LocalNotifications={checkPermissions:async()=>{if(globalThis.__hold)await new Promise(resolve=>globalThis.__release=resolve);return{display:'granted'};},registerActionTypes:async()=>{},schedule:async(value)=>globalThis.__scheduled.push(value)};
+    export const Capacitor={isNativePlatform:()=>true,getPlatform:()=>'android'};
+    export const LocalNotifications={listChannels:async()=>({channels:[]}),createChannel:async()=>{},checkPermissions:async()=>{if(globalThis.__hold)await new Promise(resolve=>globalThis.__release=resolve);return{display:'granted'};},registerActionTypes:async()=>{},schedule:async(value)=>globalThis.__scheduled.push(value)};
     export const generateNotificationNumericId=()=>42;export const sendNativeNotification=async()=>{};export const recordClientOperationalSignal=()=>{};
   `}));
  }}]});

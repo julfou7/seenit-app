@@ -1,4 +1,6 @@
 import { Capacitor } from '@capacitor/core';
+import { ensureSeenItNotificationChannels } from '../notifications/notificationChannels.ts';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 function stableNotificationId(version: string): number {
@@ -12,8 +14,8 @@ function stableNotificationId(version: string): number {
 export function getVerifiedUpdateDownloadNotification(version: string) {
   return {
     id: stableNotificationId(version),
-    title: 'Mise à jour téléchargée ✅',
-    body: `SeenIt ${version} est vérifiée. Ouverture de l’installeur Android…`
+    title: `SeenIt ${version}`,
+    body: 'Vérifiée · installation en cours'
   };
 }
 
@@ -27,13 +29,20 @@ export async function notifyVerifiedUpdateDownload(version: string): Promise<voi
     }
     if (permission.display !== 'granted') return;
 
+    await ensureSeenItNotificationChannels();
+    try {
+      const delivered = await PushNotifications.getDeliveredNotifications();
+      const sameVersion = delivered.notifications.filter(item => item.data?.type === 'APP_UPDATE_AVAILABLE' && item.data?.version === version);
+      if (sameVersion.length) await PushNotifications.removeDeliveredNotifications({ notifications: sameVersion });
+    } catch { /* Le reçu vérifié reste indépendant du nettoyage des anciennes alertes. */ }
     const presentation = getVerifiedUpdateDownloadNotification(version);
     await LocalNotifications.schedule({
       notifications: [{
         ...presentation,
         smallIcon: 'ic_stat_seenit',
         iconColor: '#E5A93D',
-        summaryText: 'Mise à jour SeenIt',
+        channelId: 'seenit_app',
+        subText: 'Mise à jour',
         extra: {
           type: 'APP_UPDATE_DOWNLOADED',
           version

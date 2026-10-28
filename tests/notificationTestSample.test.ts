@@ -21,7 +21,7 @@ function makeShow(overrides: Partial<Show> & Pick<Show, 'id' | 'title' | 'tmdbId
 
 const NOW = new Date(2026, 8, 6, 12, 0, 0);
 
-test('TNR #106 : Tester choisit le prochain épisode réel plutôt que le premier média du store', () => {
+test('SEENIT-NOTIFICATION-005 TNR #106 : Tester choisit le prochain épisode réel sans emoji', () => {
   const toTheLake = makeShow({
     id: 'to-the-lake',
     title: 'To the Lake',
@@ -67,16 +67,17 @@ test('TNR #106 : Tester choisit le prochain épisode réel plutôt que le premie
   assert.equal(sample.show.title, 'Série la plus proche');
   assert.equal(sample.isUpcoming, true);
   assert.equal(sample.eventDate, '2026-09-07');
-  assert.equal(sample.summaryText, '🆕 Nouvel épisode');
+  assert.equal(sample.summaryText, 'Nouvel épisode');
   assert.equal(sample.notificationTitle, 'Série la plus proche');
   assert.match(sample.body, /S03 \| E04/);
   assert.match(sample.body, /· Demain/);
   assert.doesNotMatch(sample.body, /Série la plus proche/);
+  assert.doesNotMatch(`${sample.summaryText} ${sample.body}`, /[📅🆕🎬📺✅🚀]/u);
   assert.equal(sample.richImageUrl, 'https://image.tmdb.org/t/p/w500/nearest-still.jpg');
   assert.equal(sample.allowMarkWatched, true);
 });
 
-test('TNR #106 : Tester Nouvelle saison prend une vraie première de saison et retire l’action épisode', () => {
+test('SEENIT-NOTIFICATION-005 TNR #106 : Tester Nouvelle saison prend une vraie première de saison', () => {
   const normalEpisode = makeShow({
     id: 'normal',
     title: 'Épisode normal',
@@ -107,13 +108,13 @@ test('TNR #106 : Tester Nouvelle saison prend une vraie première de saison et r
   assert.equal(sample.show.title, 'Première réelle');
   assert.equal(sample.season, 5);
   assert.equal(sample.episode, 1);
-  assert.equal(sample.summaryText, '📅 Nouvelle saison');
+  assert.equal(sample.summaryText, 'Bientôt');
   assert.equal(sample.notificationTitle, 'Première réelle');
   assert.equal(sample.body, 'Saison 5 dans 7 jours.');
   assert.equal(sample.allowMarkWatched, false);
 });
 
-test('TNR #106 : cinéma garde une date réelle mais le test VOD reste un aperçu sans date inventée', () => {
+test('SEENIT-NOTIFICATION-005 TNR #106 : cinéma garde une date réelle et VOD reste un aperçu', () => {
   const oldMovie = makeShow({
     id: 'old',
     title: 'Film déjà sorti',
@@ -133,20 +134,21 @@ test('TNR #106 : cinéma garde une date réelle mais le test VOD reste un aperç
   assert.ok(theaterSample);
   assert.equal(theaterSample.show.title, 'Film cinéma proche');
   assert.equal(theaterSample.eventDate, '2026-09-08');
-  assert.equal(theaterSample.summaryText, '🎬 Sortie cinéma');
+  assert.equal(theaterSample.summaryText, 'Au cinéma');
   assert.equal(theaterSample.notificationTitle, 'Film cinéma proche');
+  assert.equal(theaterSample.body, 'Dans les salles aujourd’hui.');
   assert.equal(theaterSample.allowMarkWatched, false);
 
   const vodSample = buildNotificationTestSample([oldMovie, nextTheater], 'movie_dvd_vod', NOW);
   assert.ok(vodSample);
   assert.equal(vodSample.isUpcoming, false);
   assert.equal(vodSample.eventDate, undefined);
-  assert.equal(vodSample.summaryText, '📺 Sortie DVD / VOD');
+  assert.equal(vodSample.summaryText, 'Sortie vidéo');
   assert.equal(vodSample.notificationTitle, vodSample.show.title);
   assert.equal(vodSample.allowMarkWatched, false);
 });
 
-test('TNR #106 : sans événement futur, Tester garde un fallback média explicite et déterministe', () => {
+test('SEENIT-NOTIFICATION-005 TNR #106 : fallback média explicite et déterministe', () => {
   const stale = makeShow({
     id: 'stale',
     title: 'Ancienne série',
@@ -172,10 +174,10 @@ test('TNR #106 : sans événement futur, Tester garde un fallback média explici
   assert.ok(sample);
   assert.equal(sample.isUpcoming, false);
   assert.equal(sample.show.title, 'Série récente');
-  assert.equal(sample.summaryText, '🆕 Nouvel épisode');
+  assert.equal(sample.summaryText, 'Nouvel épisode');
 });
 
-test('TNR #106 : une affiche absente reste absente et n’est pas remplacée par le logo SeenIt', () => {
+test('SEENIT-NOTIFICATION-002 TNR #106 : une affiche absente reste absente', () => {
   const noVisual = makeShow({
     id: 'no-visual',
     title: 'Sans visuel',
@@ -191,20 +193,15 @@ test('TNR #106 : une affiche absente reste absente et n’est pas remplacée par
   assert.equal(sample.richImageUrl, undefined);
 });
 
-test('TNR #106 : Settings réutilise le pipeline natif et distingue succès visuel/fallback/échec', () => {
+test('SEENIT-NOTIFICATION-005 TNR #106 : Settings réutilise le pipeline natif', () => {
   const source = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
 
-  assert.match(source, /buildNotificationTestSample\(shows, type\)/,
-    'le bouton de test doit choisir un exemple via le sélecteur dédié');
-  assert.match(source, /resolveNotificationMediaVisual\(sample\.posterUrl, sample\.richImageUrl\)/,
-    'le test doit préparer les mêmes références privées que les vrais rappels');
-  assert.match(source, /const sent = await sendMediaReminderNotification\(sample\.notificationTitle/,
-    'le test doit vérifier le résultat de l’ordonnanceur média');
+  assert.match(source, /buildNotificationTestSample\(shows, type\)/);
+  assert.match(source, /resolveNotificationMediaVisual\(sample\.posterUrl, sample\.richImageUrl\)/);
+  assert.match(source, /const sent = await sendMediaReminderNotification\(sample\.notificationTitle/);
   assert.match(source, /const hasVisual = Boolean\(mediaVisual\.icon \|\| mediaVisual\.image\)/);
   assert.match(source, /🧪 Test ·/);
   assert.match(source, /fallback texte/);
-  assert.match(source, /allowMarkWatched: sample\.allowMarkWatched/,
-    'seul le test nouvel épisode doit recevoir l’action Marquer comme vu');
-  assert.doesNotMatch(source, /\bsendNativeNotification\b/,
-    'Settings ne doit plus conserver le vieux chemin natif générique non ISO');
+  assert.match(source, /allowMarkWatched: sample\.allowMarkWatched/);
+  assert.doesNotMatch(source, /\bsendNativeNotification\b/);
 });

@@ -19,9 +19,9 @@ export async function rememberNotification(uid: string | null | undefined, raw: 
       if (owner.ownerUidHash !== hash) return;
     } catch { return; }
   }
-  const item = { id: String(raw.id || `${raw.title}:${raw.body || ''}`), title: String(raw.title), body: String(raw.body || ''), data: Object.fromEntries(Object.entries(owner).filter(([key]) => ['showId','tmdbId','mediaType','season','episode','type'].includes(key))), receivedAt: Date.now() };
+  const item = { id: String(raw.id || `${raw.title}:${raw.body || ''}`), title: String(raw.title), body: String(raw.body || ''), data: Object.fromEntries(Object.entries(owner).filter(([key]) => ['showId','tmdbId','mediaType','season','episode','type','notificationScope'].includes(key))), receivedAt: Date.now() };
   const previous = readUserScopedJson<InboxNotification[]>(uid, NOTIFICATION_INBOX_FIELD, []);
-  writeUserScopedJson(uid, NOTIFICATION_INBOX_FIELD, [item, ...previous.filter(entry => entry.id !== item.id)].slice(0, 100));
+  writeUserScopedJson(uid, NOTIFICATION_INBOX_FIELD, [item, ...previous.filter(entry => entry.id !== item.id && !(item.data.notificationScope === 'media' && entry.data.notificationScope === 'media' && item.data.showId && String(entry.data.showId) === String(item.data.showId) && entry.data.mediaType === item.data.mediaType))].slice(0, 100));
 }
 export async function collectDeliveredNotifications(uid: string, currentUid: () => string | undefined, shows: readonly Show[]) {
   if (!Capacitor.isNativePlatform()) return;
