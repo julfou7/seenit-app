@@ -285,6 +285,7 @@
     var start = currentScreen === 'screenHome' ? 0 : sportPage * 6, count = Math.max(1, Math.ceil(events.length / 6)), buttons = el('sportTeams').querySelectorAll('[data-team]');
     if (sportPage >= count) { sportPage = count - 1; start = sportPage * 6; }
     row.innerHTML = '';
+    if (currentScreen === 'screenHome' && !preview) { row.style.display = 'none'; el('homeSportHeading').style.display = 'none'; return; }
     if (currentScreen === 'screenHome') { row.style.display = events.length ? '' : 'none'; el('homeSportHeading').style.display = events.length ? '' : 'none'; }
     el('sportStatus').textContent = preview ? 'Aperçu' : '';
     for (i = 0; i < buttons.length; i++) { buttons[i].setAttribute('aria-pressed', String(prefs.sportSources().indexOf(buttons[i].getAttribute('data-team')) >= 0)); removeClass(buttons[i], 'selected'); if (buttons[i].getAttribute('aria-pressed') === 'true') addClass(buttons[i], 'selected'); }

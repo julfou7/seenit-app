@@ -171,6 +171,7 @@ async function testTvHarness(client, root) {
     await key(client, 8);
     await evaluate(client, `window.__tv.sportEvents=Array.from({length:7},(_,i)=>({id:'fixture-'+i,sourceId:'monaco',kickoff:new Date(Date.now()+(i+1)*86400000).toISOString(),confirmed:i!==2,home:{name:'Monaco',logo:'assets/sport/monaco.svg'},away:{name:'Italie',logo:'assets/sport/italy.svg'},competition:'Calendrier de test',venue:'Stade de test'}));TVSport.refresh(true)`);
     await check(client, 'document.getElementById("sportCopy").textContent==="Monaco — Italie"', 'prochain rendez-vous normalisé dans la tuile Home');
+    await check(client, 'document.querySelectorAll("#homeEvents .event-card").length===0', 'Home V4 utilise la tuile Sport sans créer de cartes/images cachées');
     await click(client, '#sportTile');
     await check(client, 'document.querySelectorAll("#calendarList .event-card").length===6 && document.getElementById("sportPage").textContent==="1 / 2"', 'calendrier réel borné à six cartes');
     await check(client, 'document.querySelectorAll("#calendarList .event-card")[2].textContent.includes("horaire à confirmer")', 'horaire provisoire distinct');

@@ -134,6 +134,7 @@ montre le prochain rendez-vous dans sa tuile Sport ; le calendrier affiche six c
 par page, logos de la source (initiales ou drapeau fourni en secours), heure locale,
 compétition et source. Le détail ne propose pas de lecture non prouvée. Les sélections
 et le cache public sont locaux, sans association implicite avec un compte SeenIt.
+La Home Samsung V4 ne crée aucun rail Sport caché ni ses images ; seul le hub monte les cartes.
 
 Client ES5 : chargement sur Home/Sport visibles seulement, cache six heures, annulation
 au masquage, aucune boucle de polling ni travail en arrière-plan ; un retour utilise
