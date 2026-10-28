@@ -14,6 +14,10 @@ Samsung sans promettre un faux accès direct.
 L'inventaire complet garde USER/SYSTEM/UNKNOWN et toutes les variantes, sans table d'IDs
 universelle. Une épingle explicite conserve son ID ; Milo n'affiche que sa sélection locale,
 Invité ne persiste rien. Les anciennes épingles ne sont pas effacées par la limite V4.
+Le menu d'une variante utilisateur peut retenir sa version pour cette TV : choix
+explicite entre IDs inventoriés de même nom, partagé entre profils, favoris conservés.
+Une cible supprimée ou système n'est jamais utilisée. Netflix a été confirmé à l'écran
+le28octobre avec sa variante native ; aucun ID matériel n'est ajouté au code de lancement.
 
 Le compte adulte s'associe par QR : consentement explicite du téléphone authentifié, code
 valable dix minutes, session TV limitée à trente jours. La TV ne reçoit aucun jeton Firebase,

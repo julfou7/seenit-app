@@ -33,6 +33,19 @@ lancement réussi et aucune tentative DIAL/SmartView n'est ajoutée au runtime. 
 table universelle d'IDs, désinstallation de variantes, root ou changement Home natif.
 Le retour physique du dernier essai avec restitution de surface est demandé séparément.
 
+Mise à jour terrain : le propriétaire est revenu devant la TV et a ouvert Netflix
+depuis Samsung. Le contexte actif révèle la variante native réellement installée.
+Un nouveau lancement de cette cible depuis SeenIt est ensuite confirmé explicitement
+par le propriétaire (« Oui, Netflix s’affiche »), et DIAL passe de stopped à running.
+Les essais précédents ne constituent pas une preuve du contraire : l'écran était entre
+temps revenu sur Arte et les évaluations asynchrones du widget masqué expiraient.
+La 0.4.4 ajoute donc un choix de version générique, local au téléviseur, entre IDs USER
+de même nom inventoriés ; il est partagé entre profils sans changer leurs épingles.
+Milo/Invité ne peuvent pas modifier ce choix global. Le test du clic sur la tuile utilise
+la cible choisie, et les TNR refusent cible système, autre nom, retrait et cache invalide.
+La variante Netflix terrain reste une configuration locale, jamais une table d'IDs du WGT.
+Cette confirmation porte sur la TV en cours d'utilisation, pas sur un redémarrage à froid.
+
 ## Validation
 
 22 TNR ciblés adapter/modèle/compatibilité et harnais navigateur 1920×1080 / 1280×720 :

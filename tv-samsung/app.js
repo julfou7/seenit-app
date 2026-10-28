@@ -382,6 +382,7 @@
     if (!app) return;
     selectedAppId = app.id; el('appMenuTitle').textContent = app.title;
     el('menuPin').textContent = prefs.pins().indexOf(app.id) < 0 ? 'Ajouter aux favoris' : 'Retirer des favoris';
+    el('menuTarget').style.display = currentProfile === 'Milo' || currentProfile === 'Invité' || !TVModel.hasLaunchVariants(installedApps, app.id) ? 'none' : '';
     showScreen('screenAppMenu');
   }
   function moveApp(offset) {
@@ -444,7 +445,8 @@
     var id = button.getAttribute('data-app-id'), app = TVModel.byIds(installedApps, [id])[0], ownerPrefs = prefs;
     if (!app || launchPending) return;
     launchPending = true;
-    TVDevice.launchApp(app.id, function (ok) {
+    var target = TVModel.launchTarget(installedApps, app.id, storage);
+    TVDevice.launchApp(target.id, function (ok) {
       launchPending = false;
       if (ok) ownerPrefs.opened(app.id); else showToast('Impossible d’ouvrir ' + app.title + '.');
     });
@@ -477,6 +479,11 @@
     else if (action === 'theme') { prefs.setTheme(button.getAttribute('data-theme')); applyAppearance(); renderAppearance(); }
     else if (action === 'motion') { prefs.toggleMotion(); applyAppearance(); renderAppearance(); }
     else if (action === 'menu-pin') { if (!prefs.toggle(selectedAppId)) showToast('8 favoris maximum.'); else goBack(); }
+    else if (action === 'menu-target') {
+      if (currentProfile === 'Milo' || currentProfile === 'Invité') return;
+      if (TVModel.selectLaunchTarget(installedApps, selectedAppId, storage)) { goBack(); showToast('Cette version sera utilisée sur cette TV.'); }
+      else showToast('Impossible de conserver cette version.');
+    }
     else if (action === 'menu-hide') { prefs.hideApp(selectedAppId); goBack(); }
     else if (action === 'menu-left' || action === 'menu-right') { moveApp(action === 'menu-left' ? -1 : 1); goBack(); }
     else if (action === 'switch-profile') { history = []; showScreen('screenProfiles', false); }

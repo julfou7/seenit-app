@@ -51,6 +51,32 @@ test('SEENIT-TV-001 le regroupement de tuiles est générique, stable et ne chan
   assert.equal(m.favorites(apps, ['installed'], 5, ['built-in'])[0].id, 'installed');
 });
 
+test('SEENIT-TV-001 une version choisie localement ouvre la cible inventoriée sans changer les favoris', () => {
+  const m = model(), saved = new Map<string, string>();
+  const store = { getItem: (key: string) => saved.get(key), setItem: (key: string, value: string) => saved.set(key, value) };
+  const apps = [
+    { id: 'store.app', title: 'Streaming', classification: 'USER', launchable: true },
+    { id: 'native.app', title: 'Streaming', classification: 'USER', launchable: true },
+    { id: 'other', title: 'Other', classification: 'USER', launchable: true },
+    { id: 'system', title: 'Streaming', classification: 'SYSTEM', launchable: false },
+  ];
+  m.preferences(store, 'Julian').toggle('store.app');
+  assert.equal(m.hasLaunchVariants(apps, 'native.app'), true);
+  assert.equal(m.hasLaunchVariants(apps, 'other'), false);
+  const pins = saved.get('seenit.tv.preferences.v1.Julian');
+  assert.equal(m.selectLaunchTarget(apps, 'native.app', store), true);
+  assert.equal(m.launchTarget(apps, 'store.app', store).id, 'native.app');
+  assert.equal(m.launchTarget(apps, 'native.app', store).id, 'native.app');
+  assert.equal(saved.get('seenit.tv.preferences.v1.Julian'), pins);
+  assert.equal(m.launchTarget(apps.filter(a => a.id !== 'native.app'), 'store.app', store).id, 'store.app');
+  assert.equal(m.selectLaunchTarget(apps, 'system', store), false);
+  saved.set('seenit.tv.launchTargets.v1', JSON.stringify([{ source: 'store.app', target: 'system' }, { source: 'store.app', target: 'other' }]));
+  assert.equal(m.launchTarget(apps, 'store.app', store).id, 'store.app');
+  saved.set('seenit.tv.launchTargets.v1', '{invalid');
+  assert.equal(m.launchTarget(apps, 'store.app', store).id, 'store.app');
+  assert.equal(m.selectLaunchTarget(apps, 'native.app', { getItem() { return ''; }, setItem() { throw Error('quota'); } }), false);
+});
+
 test('SEENIT-TV-001 garde les composants terrain dans Système et Apple TV/Paramount dans Apps', () => {
   const components = ['AmbientSupport', 'CSAccount', 'CSAccountOOBE', 'Apps', 'csfs', 'com.samsung.tv.search'];
   const input = components.map((name, i) => ({ id: 'component.' + i, name, show: true }));

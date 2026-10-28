@@ -182,6 +182,12 @@ perdre aucun ID de l'inventaire. Apple TV et Paramount+ découverts restent ajou
 comme toute autre app ; reconnaissance de marque uniquement pour l'illustration.
 Les noms YouTube et CANAL+ restent lisibles même si leur image est indisponible.
 Une ouverture native n'est jamais déclarée testée par le seul callback d'acceptation.
+Lorsqu'une variante native est confirmée visuellement sur cette TV, « Utiliser cette
+version » dans son menu peut la retenir pour les variantes de même nom exact. Ce choix
+est local au téléviseur, partagé entre ses profils et ne change pas leurs favoris.
+Les deux IDs doivent rester réellement inventoriés, USER et lançables ; une cible
+retirée ou système est refusée et l'ouverture reprend l'ID d'origine. Aucun identifiant
+Netflix/CANAL+ spécifique à un appareil n'est inscrit dans le dispatcher du WGT.
 Les accès réglages ne prétendent pas ouvrir des sous-menus non pris en charge :
 une destination non disponible offre une explication courte et une sortie Samsung.
 Association, épingles explicites (dont CANAL+ validé), apparence et profils conservés

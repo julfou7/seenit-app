@@ -37,6 +37,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   les calques cinéma utilisent des positions compatibles Tizen 4. Le prochain match
   reste visible sur la tuile Sport ; les accès réglages n'annoncent aucune destination
   native non prise en charge.
+  Une variante d'app confirmée peut être choisie explicitement pour cette TV, entre
+  IDs utilisateur réellement inventoriés de même nom ; ce choix local est partagé entre
+  profils, sans table universelle et sans modifier leurs favoris.
   Toute app utilisateur découverte peut devenir favorite par profil local. « Rouvrir » mémorise seulement
   les ouvertures réussies, jamais un visionnage Netflix partagé. Invité ne persiste rien. La bibliothèque
   conserve l'inventaire système mais borne son DOM à 18 apps. Au masquage, images hors écran et timers

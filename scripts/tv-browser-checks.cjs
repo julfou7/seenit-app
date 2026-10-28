@@ -211,6 +211,19 @@ async function testTvHarness(client, root) {
     await key(client, 13); await check(client, 'document.querySelector(".screen.active").id==="screenHome"', 'annulation de sortie');
     await key(client, 8); await key(client, 39); await key(client, 13);
     await check(client, 'window.__tv.exits===1', 'sortie seulement après choix explicite');
+    await click(client, '#screenExit [data-action=back]');
+    await click(client, '#screenHome [data-action=switch-profile]');
+    await evaluate(client, '(function(){var p=TVModel.preferences(localStorage,"Julian");if(p.pins().indexOf("RN1MCdNq8t.Netflix")<0)p.toggle("RN1MCdNq8t.Netflix")})()');
+    await click(client, '[data-profile=Julian]');
+    const pinsBeforeVariant = await evaluate(client, 'JSON.stringify(TVModel.preferences(localStorage,"Julian").pins())');
+    await click(client, '#appRow [data-action=all-apps]'); await click(client, '#tabSystem');
+    await evaluate(client, 'document.querySelector("#allAppsGrid [data-app-id=\\"org.tizen.netflix-app\\"]").focus()');
+    await client.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+    await delay(620); await client.send('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+    await check(client, 'document.querySelector(".screen.active").id==="screenAppMenu" && document.getElementById("menuTarget").offsetWidth>0', 'choix explicite de variante réellement inventoriée');
+    await click(client, '#menuTarget'); await key(client, 8);
+    await click(client, '#appRow [data-app-title=Netflix]');
+    await check(client, `window.__tv.launches[window.__tv.launches.length-1]==='org.tizen.netflix-app' && JSON.stringify(TVModel.preferences(localStorage,'Julian').pins())===${JSON.stringify(pinsBeforeVariant)}`, 'la tuile ouvre la version choisie sans changer ses favoris');
     await check(client, 'window.__tv.errors.length===0', 'aucune erreur JavaScript');
     reports.push({ width, height, apps: 137, distinctUserApps: 131, advancedApps: 6, libraryDomMax: 18, backgroundIntervals: 0, resumeCycles: 4, remote: 'passed', native: 'mocked-from-tizen4-fixture' });
   }

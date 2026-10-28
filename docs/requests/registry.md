@@ -160,3 +160,4 @@ Complément USR-2026-10-23-005 : ZIP(10) SPEC-DEV-V4.md reçue24/10, complète (
 | USR-2026-10-28-002 | 2026-10-28 | Terrain Films après association : une seule affiche visible, rangées apps indésirables. Reprendre la composition V3-06 en Films & séries : hero visuel, contenus, filtres et visuels fiables depuis le compte, sans données de maquette ni lecture supposée. | SEENIT-TV-001/002, #295 | active |
 
 - 2026-10-28 · #295 / #738 · Retours TV réels : fiches/hero Tizen 4, thèmes cohérents et toasts, profils centrés, apps utiles et logos, réglages honnêtes, aperçu Sport ; conserver association et CANAL+ validé, sans toucher au mobile.
+- 2026-10-28 · #295 · Netflix natif confirmé visuellement par le propriétaire : mémoriser une variante réellement installée pour cette TV, avec choix générique « Utiliser cette version », partagé entre profils sans modifier leurs favoris.
