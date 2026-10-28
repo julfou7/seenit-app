@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import express from 'express';
-import { createTvSportService, parseFrance, parseMonaco, parisKickoff, registerTvSportRoutes, SPORT_SOURCES } from '../src/features/tv/tvSport.ts';
+import { createTvSportService, parseFrance, parseFranceTickets, parseMonaco, parisKickoff, registerTvSportRoutes, SPORT_SOURCES, FRANCE_TICKETS } from '../src/features/tv/tvSport.ts';
 
 const monaco = readFileSync(new URL('fixtures/tv-sport-monaco.html', import.meta.url), 'utf8');
 const france = readFileSync(new URL('fixtures/tv-sport-france.html', import.meta.url), 'utf8');
+const franceTickets = readFileSync(new URL('fixtures/tv-sport-fff-ticket.html', import.meta.url), 'utf8');
 const fixture = (url: string) => Promise.resolve(url === SPORT_SOURCES[0].url ? monaco : france);
 const today = Date.parse('2026-10-28T09:00:00Z');
 test('SEENIT-TV-003 lit les vraies lignes officielles, sans exiger URL de match ni résultat', () => {
@@ -53,15 +54,36 @@ test('SEENIT-TV-003 panne partielle, backoff et expiration du cache restent expl
   await service.schedule(); broken = true; now += 7 * 3600000;
   const stale = await service.schedule();
   assert.equal(stale.sources[0].state, 'stale'); assert.equal(stale.events.length, 5);
-  await service.schedule(); assert.equal(calls, 4);
+  await service.schedule(); assert.equal(calls, 5);
   now += 49 * 3600000;
   const expired = await service.schedule(); assert.equal(expired.events.length, 0); assert.equal(expired.sources[0].state, 'unavailable');
   const partial = createTvSportService(async url => { if (url.includes('fff.fr')) throw Error('not available'); return monaco; }, () => today);
   const result = await partial.schedule(); assert.equal(result.events.length, 3); assert.equal(result.sources[1].state, 'unavailable');
 });
+test('SEENIT-TV-003 repli officiel FFF en production : seniors seuls, deux matchs malgré même catégorie', async () => {
+  const parsed = parseFranceTickets(franceTickets + franceTickets);
+  assert.equal(parsed.length, 2);
+  assert.deepEqual(parsed.map(e => [e.home.name, e.away.name]), [['ITALIE', 'FRANCE'], ['FRANCE', 'TURQUIE']]);
+  assert.ok(parsed.every(e => e.home.logo && e.away.logo && !e.score));
+  assert.equal(parsed[0].kickoff, '2026-11-12T19:45:00.000Z');
+  const calls: string[] = [];
+  const service = createTvSportService(async url => {
+    calls.push(url);
+    if (url === SPORT_SOURCES[1].url) throw new Error('SPORT_SOURCE_HTTP_403');
+    return url === FRANCE_TICKETS ? franceTickets : monaco;
+  }, () => today);
+  const result = await service.schedule();
+  assert.equal(result.events.length, 5); assert.equal(result.sources[1].state, 'ready');
+  assert.equal(result.sources[1].url, FRANCE_TICKETS); assert.equal(result.sources[1].failure, null);
+  assert.equal(calls.filter(u => u === FRANCE_TICKETS).length, 1);
+});
 test('SEENIT-TV-003 route réelle : seules les sources fixes sont lues, sans clé ni Firestore', async () => {
   const calls: string[] = [], app = express();
-  registerTvSportRoutes(app, () => (_req, _res, next) => next(), createTvSportService(url => { calls.push(url); return fixture(url); }, () => today));
+  registerTvSportRoutes(app, () => (_req, _res, next) => next(), createTvSportService(async url => {
+    calls.push(url);
+    if (url === SPORT_SOURCES[1].url) throw new Error('SPORT_SOURCE_HTTP_403');
+    return url === FRANCE_TICKETS ? franceTickets : monaco;
+  }, () => today));
   const server = app.listen(0, '127.0.0.1');
   await new Promise<void>(r => server.once('listening', r));
   try {
@@ -69,7 +91,8 @@ test('SEENIT-TV-003 route réelle : seules les sources fixes sont lues, sans cl�
     const response = await fetch('http://127.0.0.1:' + address.port + '/api/tv/sport?url=https://untrusted.invalid');
     assert.equal(response.status, 200); assert.match(response.headers.get('cache-control') || '', /public/);
     const data = await response.json(); assert.equal(data.events.length, 5);
-    assert.deepEqual(calls.sort(), SPORT_SOURCES.map(s => s.url).sort());
+    assert.equal(data.events.filter((e: { sourceId: string }) => e.sourceId === 'france-men').length, 2);
+    assert.deepEqual(calls.sort(), [...SPORT_SOURCES.map(s => s.url), FRANCE_TICKETS].sort());
     assert.ok(JSON.stringify(data).length < 65536);
   } finally { server.closeAllConnections(); await new Promise<void>(r => server.close(() => r())); }
 });

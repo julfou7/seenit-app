@@ -113,6 +113,16 @@ diffusion : ne déduire aucune app/diffuseur d'une compétition. Les deux source
 côté serveur ; aucune URL fournie par la TV n'est téléchargée. Réponse normalisée bornée
 à 24 matchs futurs, sans score. Conserver lien officiel, date de collecte et disponibilité
 de chaque source ; une panne partielle ne masque pas la source saine.
+Terrain28/10 : la page principale FFF est indisponible depuis le runtime de production.
+Ajouter le repli officiel public `https://billetterie.fff.fr/fr`, sans compte ni achat.
+Seules les cartes explicitement classées « ÉQUIPE DE FRANCE » sont admissibles : exclure
+Espoirs/Féminines/Futsal. Les identifiants de catégorie de cette page se répètent entre
+matchs ; conserver une clé de ligne datée et les participants exacts, puis dédupliquer
+les présentations multiples du même rendez-vous. Les logos sont ceux des participants.
+Au plus trois URLs fixes : Monaco + FFF principal/repli ; deux récupérations simultanées,
+France séquentielle limitée à deux tentatives de huit secondes, sans polling supplémentaire.
+La réponse indique l'URL réellement retenue et un code d'échec technique borné si aucune
+source n'est exploitable ; jamais le contenu fournisseur ni un secret.
 
 Contrainte ferme : aucun abonnement, aucune API payante ni nouveau service payant récurrent.
 Privilégier un fournisseur structuré dans les limites vérifiées de son offre gratuite,

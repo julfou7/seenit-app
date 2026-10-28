@@ -16,6 +16,7 @@ export const SPORT_SOURCES = [
 ];
 const TTL = 6 * 60 * 60_000, RETRY = 30 * 60_000, MAX_AGE = 48 * 60 * 60_000;
 const MAX_HTML = 1024 * 1024;
+export const FRANCE_TICKETS = 'https://billetterie.fff.fr/fr';
 function text(html: string) {
   return html.replace(/<[^>]*>/g, ' ').replace(/&#(\d+);/g, (_s, n: string) => Number(n) < 65536 ? String.fromCharCode(Number(n)) : '')
     .replace(/&#x([a-f\d]+);/gi, (_s, n: string) => Number.parseInt(n, 16) < 65536 ? String.fromCharCode(Number.parseInt(n, 16)) : '')
@@ -85,9 +86,31 @@ export function parseFrance(html: string): SportEvent[] {
   }
   return events;
 }
+export function parseFranceTickets(html: string): SportEvent[] {
+  const starts = Array.from(html.matchAll(/<div\b[^>]*data-direction="(?:row|column)"[^>]*data-event="\d+"[^>]*>/g));
+  const events = new Map<string, SportEvent>();
+  for (let i = 0; i < starts.length && i < 80; i++) {
+    const block = html.slice(starts[i].index, starts[i + 1]?.index);
+    if (text(contents(block, 'span', 'badge-event')[0] || '') !== 'ÉQUIPE DE FRANCE') continue;
+    const participants = block.split(/<div class="participant (?:first|second)">/).slice(1, 3);
+    const names = participants.map(p => text(contents(p, 'span', 'name')[0] || ''));
+    const date = /(\d{1,2})\s+(\S+)\s+(\d{4})\s+(?:à|•)\s+(\d{2}):(\d{2})/i.exec(text(contents(block, 'span', 'date')[0] || ''));
+    if (names.length !== 2 || names.some(n => !n) || !date) continue;
+    const kickoff = parisKickoff(Number(date[3]), months.indexOf(date[2].toLowerCase()), Number(date[1]), Number(date[4]), Number(date[5]));
+    if (!Number.isFinite(kickoff)) continue;
+    const id = 'fff-ticket:' + createHash('sha256').update(date.slice(1).join('|') + '|' + names.join('|')).digest('hex').slice(0, 24);
+    events.set(id, { id, sourceId: 'france-men', sourceUrl: FRANCE_TICKETS, kickoff: new Date(kickoff).toISOString(), confirmed: true,
+      home: { name: names[0], logo: logo(participants[0], 'https://billetterie.fff.fr') },
+      away: { name: names[1], logo: logo(participants[1], 'https://billetterie.fff.fr') },
+      competition: text(contents(block, 'span', 'event-title')[0] || ''), venue: text(contents(block, 'span', 'venue')[0] || ''),
+    });
+  }
+  return Array.from(events.values());
+}
 async function readOfficial(url: string) {
   const response = await fetch(url, { signal: AbortSignal.timeout(8000), redirect: 'error', headers: { Accept: 'text/html' } });
-  if (!response.ok || !response.headers.get('content-type')?.includes('text/html') || !response.body) throw new Error('SPORT_SOURCE_UNAVAILABLE');
+  if (!response.ok) { await response.body?.cancel(); throw new Error('SPORT_SOURCE_HTTP_' + response.status); }
+  if (!response.headers.get('content-type')?.includes('text/html') || !response.body) { await response.body?.cancel(); throw new Error('SPORT_SOURCE_CHANGED'); }
   const reader = response.body.getReader(), chunks: Uint8Array[] = [];
   let bytes = 0;
   try {
@@ -96,7 +119,7 @@ async function readOfficial(url: string) {
   return Buffer.concat(chunks).toString('utf8');
 }
 export function createTvSportService(read: (url: string) => Promise<string> = readOfficial, now: () => number = Date.now) {
-  const entries = new Map<SportSourceId, { events: SportEvent[]; fetchedAt: number; nextTry: number; failed: boolean; pending?: Promise<void> }>();
+  const entries = new Map<SportSourceId, { events: SportEvent[]; fetchedAt: number; nextTry: number; failed: boolean; usedUrl?: string; failure?: string; pending?: Promise<void> }>();
   async function load(source: typeof SPORT_SOURCES[number]) {
     let entry = entries.get(source.id);
     if (!entry) { entry = { events: [], fetchedAt: 0, nextTry: 0, failed: false }; entries.set(source.id, entry); }
@@ -105,9 +128,18 @@ export function createTvSportService(read: (url: string) => Promise<string> = re
     const target = entry;
     target.pending = (async () => {
       try {
-        const html = await read(source.url);
-        if (Buffer.byteLength(html, 'utf8') > MAX_HTML) throw new Error('SPORT_SOURCE_TOO_LARGE');
-        const events = source.id === 'monaco' ? parseMonaco(html) : parseFrance(html);
+        let events: SportEvent[] = [];
+        for (const url of source.id === 'france-men' ? [source.url, FRANCE_TICKETS] : [source.url]) {
+          try {
+            const html = await read(url);
+            if (Buffer.byteLength(html, 'utf8') > MAX_HTML) throw new Error('SPORT_SOURCE_TOO_LARGE');
+            events = source.id === 'monaco' ? parseMonaco(html) : url === FRANCE_TICKETS ? parseFranceTickets(html) : parseFrance(html);
+            if (!events.length) throw new Error('SPORT_SOURCE_CHANGED');
+            target.usedUrl = url; break;
+          } catch (error) {
+            target.failure = error instanceof Error && /^SPORT_SOURCE_(?:HTTP_\d{3}|TOO_LARGE|CHANGED)$/.test(error.message) ? error.message : 'SPORT_SOURCE_FETCH_FAILED';
+          }
+        }
         if (!events.length) throw new Error('SPORT_SOURCE_CHANGED');
         target.events = events.slice(0, 120); target.fetchedAt = now(); target.nextTry = now() + TTL; target.failed = false;
       } catch { target.nextTry = now() + RETRY; target.failed = true; }
@@ -117,7 +149,7 @@ export function createTvSportService(read: (url: string) => Promise<string> = re
   return {
     async schedule() {
       await Promise.all(SPORT_SOURCES.map(load));
-      const sources = SPORT_SOURCES.map(source => { const e = entries.get(source.id)!; return { ...source, fetchedAt: e.fetchedAt || null, state: e.fetchedAt && now() - e.fetchedAt <= MAX_AGE ? e.failed ? 'stale' : 'ready' : 'unavailable' }; });
+      const sources = SPORT_SOURCES.map(source => { const e = entries.get(source.id)!; return { ...source, url: e.usedUrl || source.url, fetchedAt: e.fetchedAt || null, failure: e.failed ? e.failure || 'SPORT_SOURCE_CHANGED' : null, state: e.fetchedAt && now() - e.fetchedAt <= MAX_AGE ? e.failed ? 'stale' : 'ready' : 'unavailable' }; });
       const seen = new Set<string>();
       const events = Array.from(entries.values()).filter(e => e.fetchedAt && now() - e.fetchedAt <= MAX_AGE).flatMap(e => e.events)
         .filter(e => Date.parse(e.kickoff) > now() && Date.parse(e.kickoff) < now() + 120 * 86400_000 && !seen.has(e.id) && !!seen.add(e.id))
