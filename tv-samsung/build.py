@@ -23,7 +23,7 @@ FILES = ['config.xml', 'index.html', 'styles.css', 'tv.js', 'model.js', 'connect
 # Only shipped local artwork, never sources, tests, certificates or personal exports.
 for asset_root, _, asset_names in os.walk(os.path.join(ROOT, 'assets')):
     for asset_name in sorted(asset_names):
-        if os.path.splitext(asset_name)[1].lower() in ('.svg', '.png', '.md'):
+        if os.path.splitext(asset_name)[1].lower() in ('.svg', '.png', '.md', '.woff2', '.txt'):
             FILES.append(os.path.relpath(os.path.join(asset_root, asset_name), ROOT).replace(os.sep, '/'))
 
 

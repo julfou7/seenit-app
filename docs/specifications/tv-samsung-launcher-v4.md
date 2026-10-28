@@ -113,6 +113,16 @@ diffusion : ne déduire aucune app/diffuseur d'une compétition. Les deux source
 côté serveur ; aucune URL fournie par la TV n'est téléchargée. Réponse normalisée bornée
 à 24 matchs futurs, sans score. Conserver lien officiel, date de collecte et disponibilité
 de chaque source ; une panne partielle ne masque pas la source saine.
+Terrain28/10 : la page principale FFF est indisponible depuis le runtime de production.
+Ajouter le repli officiel public `https://billetterie.fff.fr/fr`, sans compte ni achat.
+Seules les cartes explicitement classées « ÉQUIPE DE FRANCE » sont admissibles : exclure
+Espoirs/Féminines/Futsal. Les identifiants de catégorie de cette page se répètent entre
+matchs ; conserver une clé de ligne datée et les participants exacts, puis dédupliquer
+les présentations multiples du même rendez-vous. Les logos sont ceux des participants.
+Au plus trois URLs fixes : Monaco + FFF principal/repli ; deux récupérations simultanées,
+France séquentielle limitée à deux tentatives de huit secondes, sans polling supplémentaire.
+La réponse indique l'URL réellement retenue et un code d'échec technique borné si aucune
+source n'est exploitable ; jamais le contenu fournisseur ni un secret.
 
 Contrainte ferme : aucun abonnement, aucune API payante ni nouveau service payant récurrent.
 Privilégier un fournisseur structuré dans les limites vérifiées de son offre gratuite,
@@ -151,3 +161,34 @@ app/source réellement disponible et lancement testé ; sinon rester informatif.
 Valider à 1920×1080 et 1280×720, télécommande, inventaire réel, QR/approbation, erreurs
 et cycle mémoire. Chromium ne prouve pas le matériel : distinguer callback, premier plan
 et retour physique. WGT avec identité auteur/distributeur existante, sans désinstallation.
+
+### Corrections terrain du 28 octobre — SEENIT-TV-001
+
+Le thème choisi s'applique aux profils, aux fiches, au Sport, aux dialogues et aux
+messages. Brume conserve une composition cinéma avec un voile clair lisible ;
+Crépuscule utilise un voile sombre. Aucun texte sombre sur toast sombre. Profils
+centrés, marque réutilisée et police locale légère ; en-tête limité à heure, profil
+et réglages. Le prochain événement est lisible directement dans la tuile Sport.
+Au démarrage, seul le dernier thème adulte est repris pour le choix des profils ;
+aucun compte, historique ou profil n'est sélectionné implicitement. Invité ne le modifie pas.
+
+OK sur un contenu rend immédiatement la fiche existante en lecture seule, sans
+attendre de synchronisation. Les calques du grand visuel ont des positions et tailles
+explicites compatibles Tizen 4 ; une image échouée ne bloque pas sa récupération.
+Le focus du calendrier garde une marge dans son conteneur, y compris en haut/gauche.
+
+La bibliothèque Apps exclut les composants techniques reconnus vers Système, sans
+perdre aucun ID de l'inventaire. Apple TV et Paramount+ découverts restent ajoutables
+comme toute autre app ; reconnaissance de marque uniquement pour l'illustration.
+Les noms YouTube et CANAL+ restent lisibles même si leur image est indisponible.
+Une ouverture native n'est jamais déclarée testée par le seul callback d'acceptation.
+Lorsqu'une variante native est confirmée visuellement sur cette TV, « Utiliser cette
+version » dans son menu peut la retenir pour les variantes de même nom exact. Ce choix
+est local au téléviseur, partagé entre ses profils et ne change pas leurs favoris.
+Les deux IDs doivent rester réellement inventoriés, USER et lançables ; une cible
+retirée ou système est refusée et l'ouverture reprend l'ID d'origine. Aucun identifiant
+Netflix/CANAL+ spécifique à un appareil n'est inscrit dans le dispatcher du WGT.
+Les accès réglages ne prétendent pas ouvrir des sous-menus non pris en charge :
+une destination non disponible offre une explication courte et une sortie Samsung.
+Association, épingles explicites (dont CANAL+ validé), apparence et profils conservés
+lors de la mise à jour WGT ; aucun changement du launcher système ni APK mobile.

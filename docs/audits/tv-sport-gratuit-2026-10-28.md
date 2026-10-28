@@ -43,3 +43,21 @@ ce scénario sont explicitement des données de harnais, jamais servis en produc
 Tests parseurs/routeHTTP/cache/concurrence et client réels. Validation canonique, CI,
 déploiement et terrain restent consignés dans le checkpoint stable #738, sans confondre
 le navigateur avec la TV physique. Pas d'APKmobile ni nouvelle tentativeNetflix.
+
+## Production0.4.2 — repli France
+
+PR780 déployée : GET réel répond200 avec17matchs Monaco, mais la source principale FFF
+est `unavailable` depuis le runtime serveur, malgré sa réponse saine en local. La première
+prétention de calendrier complet est donc invalidée ; aucune donnée France n'est inventée.
+Le chemin TV→route→service→source est reconstitué, puis un repli officiel indépendant est
+ajouté : billetterie.fff.fr/fr. Sa page publique fournit les deux prochains matchs France A,
+dates et drapeaux. Filtrage exact de la sélection senior, exclusion Espoirs/Féminines/Futsal,
+déduplication des cartes répétées ; son data-event149 est une catégorie répétée, pas un
+identifiant unique de match. Les tests passent par la vraie route HTTP avec panne403 du
+premier fournisseur. Cache et coûts inchangés, aucune clé, aucune nouvelle image WGT.
+Le runtime publie l'URL retenue et un code de panne borné pour éviter un diagnostic opaque.
+
+Terrain Films0.4.2 validé pendant ce correctif : compte/pinsCANAL/Brume conservés ; bootstrap
+18affiches/18fonds, hero et quatre images réellement chargés, aucune carte app dans Films.
+La capture native Page.captureScreenshot ne répond pas sur ce moteur ; helper de test
+interrompu proprement, pas de capture physique revendiquée. #295/#738 gardent ces preuves.

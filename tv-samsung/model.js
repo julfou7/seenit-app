@@ -5,7 +5,9 @@ var TVModel = (function () {
     { match: /^netflix$/i, file: 'netflix' }, { match: /^plex(?:\s*[-–].*)?$/i, file: 'plex' },
     { match: /^youtube$/i, file: 'youtube' }, { match: /^prime\s*video$/i, file: 'amazonprime' },
     { match: /^spotify(?:\s*[-–].*)?$/i, file: 'spotify' }, { match: /^dazn$/i, file: 'dazn' },
-    { match: /^(?:my)?canal\s*(?:\+|plus)?$/i, file: 'canalplus' }
+    { match: /^(?:my)?canal\s*(?:\+|plus)?$/i, file: 'canalplus' },
+    { match: /^apple\s*tv$/i, file: 'appletv', native: true },
+    { match: /^paramount\s*\+$/i, file: 'paramount', native: true }
   ];
   function brand(title) {
     var i;
@@ -137,6 +139,43 @@ var TVModel = (function () {
   function mediaImage(path, size) {
     return typeof path === 'string' && /^\/[a-zA-Z0-9._/-]+$/.test(path) && path.indexOf('..') < 0 && path.indexOf('//') !== 0 ? 'https://image.tmdb.org/t/p/' + (size === 'w1280' ? 'w1280' : 'w500') + path : '';
   }
+  function launchRoutes(storage) {
+    try {
+      var raw = storage.getItem('seenit.tv.launchTargets.v1') || '[]', routes;
+      if (raw.length > 65536) return [];
+      routes = JSON.parse(raw);
+      return Object.prototype.toString.call(routes) === '[object Array]' ? routes.slice(0, 64) : [];
+    } catch (e) { return []; }
+  }
+  function launchTarget(apps, id, storage) {
+    var source = byIds(apps, [id])[0], routes = launchRoutes(storage), i, target;
+    if (!source) return null;
+    for (i = 0; i < routes.length; i++) if (routes[i] && routes[i].source === source.id) {
+      target = byIds(apps, [routes[i].target])[0];
+      if (target && titleKey(target) === titleKey(source)) return target;
+    }
+    return source;
+  }
+  function selectLaunchTarget(apps, id, storage) {
+    var chosen = byIds(apps, [id])[0], old = launchRoutes(storage), routes = [], i, source, target;
+    if (!chosen) return false;
+    for (i = 0; i < apps.length && routes.length < 64; i++) {
+      source = byIds(apps, [apps[i].id])[0];
+      if (source && source.id !== chosen.id && titleKey(source) === titleKey(chosen)) routes.push({ source: source.id, target: chosen.id });
+    }
+    for (i = 0; i < old.length && routes.length < 64; i++) if (old[i]) {
+      source = byIds(apps, [old[i].source])[0];
+      target = byIds(apps, [old[i].target])[0];
+      if (source && target && titleKey(source) !== titleKey(chosen) && titleKey(source) === titleKey(target) && source.id !== target.id) routes.push({ source: source.id, target: target.id });
+    }
+    try { storage.setItem('seenit.tv.launchTargets.v1', JSON.stringify(routes)); return true; } catch (e) { return false; }
+  }
+  function hasLaunchVariants(apps, id) {
+    var chosen = byIds(apps, [id])[0], i;
+    if (!chosen) return false;
+    for (i = 0; i < apps.length; i++) if (apps[i].id !== id && apps[i].classification === 'USER' && apps[i].launchable && titleKey(apps[i]) === titleKey(chosen)) return true;
+    return false;
+  }
   function mediaItems(items, filter) {
     var watching = [], planned = [], seen = [], i, item, key;
     for (i = 0; i < items.length && i < 18; i++) {
@@ -148,5 +187,5 @@ var TVModel = (function () {
     }
     return watching.concat(planned);
   }
-  return { brand: brand, localIcon: localIcon, teamArtwork: teamArtwork, initials: initials, preferences: preferences, userApps: userApps, advancedApps: advancedApps, byIds: byIds, favorites: favorites, mediaImage: mediaImage, mediaItems: mediaItems };
+  return { brand: brand, localIcon: localIcon, teamArtwork: teamArtwork, initials: initials, preferences: preferences, userApps: userApps, advancedApps: advancedApps, byIds: byIds, favorites: favorites, mediaImage: mediaImage, mediaItems: mediaItems, launchTarget: launchTarget, selectLaunchTarget: selectLaunchTarget, hasLaunchVariants: hasLaunchVariants };
 }());

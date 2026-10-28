@@ -1,5 +1,8 @@
 # Registre des audits SeenIt
 
+TV V4 : [correctifs et limites des retours du28octobre](./tv-retours-2026-10-28.md), #295 / #738,
+fiches, calques Tizen4, thèmes, bibliothèque, installation0.4.3 et Netflix non validé.
+
 TV Sport : [calendrier gratuit sans score obligatoire](./tv-sport-gratuit-2026-10-28.md), #738, sources officielles, cache et limites.
 
 TV V4 : [préparation de livraison du27octobre](./tv-v4-livraison-2026-10-27.md), #295, validations et limites explicites.

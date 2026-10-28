@@ -35,7 +35,7 @@ async function buildTvHarness(root) {
       getAppsInfo:function(done){t.inventoryCalls++;setTimeout(function(){done(t.apps)},0)},
       launch:function(id,done,fail){t.launches.push(id);if(t.failLaunch)fail();else done()},
       getAppInfo:function(id){if(id==='org.tizen.menu')return{id:id};throw Error('missing')},
-      findAppControl:function(c,done){done([{id:'verified.settings'}])},
+      findAppControl:function(c,done){done(t.noSettings?[]:[{id:'verified.settings'}])},
       launchAppControl:function(c,id,done){t.settings++;done()},
       getCurrentApplication:function(){return{appInfo:{id:'SeenItTV01.SeenItTV'},exit:function(){t.exits++}}}
     },systeminfo:{getTotalMemory:function(){return 1610612736},getAvailableMemory:function(){return 0},getPropertyValue:function(kind,done){
@@ -71,6 +71,8 @@ async function testTvHarness(client, root) {
     await client.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
     await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-tv/index.html' });
     await check(client, 'window.__tv && window.TVModel && document.activeElement.dataset.profile === "Julian"', 'entrée profils');
+    await check(client, `Math.abs(document.querySelector('.profiles-wrap').getBoundingClientRect().left+document.querySelector('.profiles-wrap').getBoundingClientRect().width/2-${width}/2)<2`, 'choix des profils centré');
+    await screenshot(client, root, 'tv-profiles-'+width+'.png');
     await key(client, 13);
     await check(client, 'document.activeElement.id === "primaryTv"', 'focus initial TV');
     await check(client, `document.querySelectorAll('#appRow .app-card').length===8 && document.querySelectorAll('#homeSources .source-card').length===4 && document.querySelector('#homeSources [data-source-number="4"]')`, 'rail favoris utiles plus Ajouter/Toutes et quatre HDMI réellement déclarés');
@@ -88,8 +90,13 @@ async function testTvHarness(client, root) {
     await screenshot(client, root, `tv-home-lower-${width}.png`);
     await click(client, '#screenHome [data-action=samsung-settings]');
     await check(client, 'window.__tv.settings===1', 'menu natif vérifié');
+    await evaluate(client, 'window.__tv.noSettings=true');
+    await click(client, '#screenHome [data-action=samsung-settings]');
+    await check(client, 'document.querySelector(".screen.active").id==="screenSamsungSettings" && document.querySelector("#screenSamsungSettings p").textContent.includes("télécommande")', 'sans handler natif, alternative visible et utilisable');
+    await key(client, 8);
     await click(client, '#screenHome [data-action=appearance]'); await click(client, '[data-theme=mist]');
     await check(client, 'document.getElementById("stage").classList.contains("light-theme") && document.querySelector(".brand").getAttribute("src")==="assets/seenit-tv-dark.svg"', 'thème clair avec contraste du logo');
+    await check(client, 'localStorage.getItem("seenit.tv.appearance.v1")==="mist" && document.fonts.check("600 24px \\"Plus Jakarta Sans\\"")', 'apparence de démarrage et police locale disponibles');
     await click(client, '#screenAppearance [data-action=motion]');
     await check(client, 'document.getElementById("stage").classList.contains("reduced-motion")', 'mouvements désactivables');
     await screenshot(client, root, `tv-appearance-${width}.png`);
@@ -115,7 +122,9 @@ async function testTvHarness(client, root) {
     await key(client, 39);
     await check(client, 'document.getElementById("filmHeroTitle").textContent===document.activeElement.getAttribute("aria-label")', 'focus actualise le contenu du hero');
     const filmFocus=await evaluate(client,'document.activeElement.id');
-    await key(client, 13); await check(client, 'document.querySelector(".screen.active").id==="screenFilmDetail"', 'détail sans lecture supposée');
+    const filmTitle=await evaluate(client,'document.getElementById("filmHeroTitle").textContent');
+    await key(client, 13); await check(client, `document.querySelector('.screen.active').id==='screenFilmDetail' && document.getElementById('filmDetailTitle').textContent===${JSON.stringify(filmTitle)} && document.getElementById('filmDetailMeta').textContent.length>0`, 'OK rend la vraie fiche immédiatement, sans nouveau bootstrap');
+    await check(client, 'getComputedStyle(document.querySelector("#screenFilmDetail .dialog-panel")).color==="rgb(41, 61, 81)"', 'fiche conserve le contraste Brume');
     await key(client, 8); await check(client, `document.activeElement.id===${JSON.stringify(filmFocus)}`, 'retour garde contenu et focus');
     await click(client, '#filmNext'); await check(client, 'document.querySelectorAll("#linkedFilms .film-content-card").length===3', 'suite de la liste accessible');
     await click(client, '#filmTabs [data-film-filter=movie]'); await check(client, 'document.querySelectorAll("#linkedFilms .film-content-card").length===3 && document.getElementById("filmNext").disabled', 'filtre films indépendant des séries');
@@ -171,11 +180,14 @@ async function testTvHarness(client, root) {
     await key(client, 8);
     await evaluate(client, `window.__tv.sportEvents=Array.from({length:7},(_,i)=>({id:'fixture-'+i,sourceId:'monaco',kickoff:new Date(Date.now()+(i+1)*86400000).toISOString(),confirmed:i!==2,home:{name:'Monaco',logo:'assets/sport/monaco.svg'},away:{name:'Italie',logo:'assets/sport/italy.svg'},competition:'Calendrier de test',venue:'Stade de test'}));TVSport.refresh(true)`);
     await check(client, 'document.getElementById("sportCopy").textContent==="Monaco — Italie"', 'prochain rendez-vous normalisé dans la tuile Home');
+    await check(client, 'getComputedStyle(document.getElementById("sportCopy")).display!=="none" && getComputedStyle(document.querySelector("#sportTile small")).display!=="none"', 'prochain match et heure réellement visibles sans entrer dans Sport');
     await check(client, 'document.querySelectorAll("#homeEvents .event-card").length===0', 'Home V4 utilise la tuile Sport sans créer de cartes/images cachées');
     await click(client, '#sportTile');
     await check(client, 'document.querySelectorAll("#calendarList .event-card").length===6 && document.getElementById("sportPage").textContent==="1 / 2"', 'calendrier réel borné à six cartes');
     await check(client, 'document.querySelectorAll("#calendarList .event-card")[2].textContent.includes("horaire à confirmer")', 'horaire provisoire distinct');
     await check(client, `Array.from(document.querySelectorAll('#calendarList .event-card')).every(n=>{const r=n.getBoundingClientRect();return r.left>=0&&r.top>=0&&r.right<=${width}&&r.bottom<=${height}})`, 'six matchs sans carte coupée');
+    await click(client, '#calendarList .event-card');
+    await check(client, 'getComputedStyle(document.getElementById("toast")).color!==getComputedStyle(document.getElementById("toast")).backgroundColor && getComputedStyle(document.getElementById("toast")).color==="rgb(36, 48, 68)"', 'message Brume lisible');
     await screenshot(client, root, 'tv-sport-fixtures-'+width+'.png');
     await click(client, '#sportNext');
     await check(client, 'document.querySelectorAll("#calendarList .event-card").length===1 && document.getElementById("sportPage").textContent==="2 / 2"', 'septième match accessible');
@@ -199,6 +211,19 @@ async function testTvHarness(client, root) {
     await key(client, 13); await check(client, 'document.querySelector(".screen.active").id==="screenHome"', 'annulation de sortie');
     await key(client, 8); await key(client, 39); await key(client, 13);
     await check(client, 'window.__tv.exits===1', 'sortie seulement après choix explicite');
+    await click(client, '#screenExit [data-action=back]');
+    await click(client, '#screenHome [data-action=switch-profile]');
+    await evaluate(client, '(function(){var p=TVModel.preferences(localStorage,"Julian");if(p.pins().indexOf("RN1MCdNq8t.Netflix")<0)p.toggle("RN1MCdNq8t.Netflix")})()');
+    await click(client, '[data-profile=Julian]');
+    const pinsBeforeVariant = await evaluate(client, 'JSON.stringify(TVModel.preferences(localStorage,"Julian").pins())');
+    await click(client, '#appRow [data-action=all-apps]'); await click(client, '#tabSystem');
+    await evaluate(client, 'document.querySelector("#allAppsGrid [data-app-id=\\"org.tizen.netflix-app\\"]").focus()');
+    await client.send('Input.dispatchKeyEvent', { type: 'rawKeyDown', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+    await delay(620); await client.send('Input.dispatchKeyEvent', { type: 'keyUp', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 });
+    await check(client, 'document.querySelector(".screen.active").id==="screenAppMenu" && document.getElementById("menuTarget").offsetWidth>0', 'choix explicite de variante réellement inventoriée');
+    await click(client, '#menuTarget'); await key(client, 8);
+    await click(client, '#appRow [data-app-title=Netflix]');
+    await check(client, `window.__tv.launches[window.__tv.launches.length-1]==='org.tizen.netflix-app' && JSON.stringify(TVModel.preferences(localStorage,'Julian').pins())===${JSON.stringify(pinsBeforeVariant)}`, 'la tuile ouvre la version choisie sans changer ses favoris');
     await check(client, 'window.__tv.errors.length===0', 'aucune erreur JavaScript');
     reports.push({ width, height, apps: 137, distinctUserApps: 131, advancedApps: 6, libraryDomMax: 18, backgroundIntervals: 0, resumeCycles: 4, remote: 'passed', native: 'mocked-from-tizen4-fixture' });
   }
