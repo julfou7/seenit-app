@@ -166,5 +166,5 @@ button{font:inherit;color:inherit;border:2px solid transparent;background:none;t
 .dialog-panel h1{line-height:1.25}.dialog-panel .sub-intro{margin-bottom:30px}
 
 
-.profile-card{position:relative}.profile-card .avatar{position:absolute;left:73px;top:58px}.profile-card strong{position:absolute;top:220px;left:0;right:0;margin:0}.profile-card small{position:absolute;top:265px;left:0;right:0;margin:0}
+.profile-card{position:relative;text-align:center}.profile-card .avatar{position:absolute;left:73px;top:58px}.profile-card strong{position:absolute;top:220px;left:0;right:0;margin:0}.profile-card small{position:absolute;top:265px;left:0;right:0;margin:0}
 .sport-card .primary-label{top:28px;bottom:auto}.sport-card:before{right:20px;top:30px;width:240px;height:125px;opacity:.4}

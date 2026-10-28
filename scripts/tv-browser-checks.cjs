@@ -72,6 +72,7 @@ async function testTvHarness(client, root) {
     await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-tv/index.html' });
     await check(client, 'window.__tv && window.TVModel && document.activeElement.dataset.profile === "Julian"', 'entrée profils');
     await check(client, `Math.abs(document.querySelector('.profiles-wrap').getBoundingClientRect().left+document.querySelector('.profiles-wrap').getBoundingClientRect().width/2-${width}/2)<2`, 'choix des profils centré');
+    await check(client, 'Array.from(document.querySelectorAll(".profile-card strong,.profile-card small")).every(n=>{const range=document.createRange();range.selectNodeContents(n);const text=range.getBoundingClientRect(),card=n.closest("button").getBoundingClientRect();return Math.abs(text.left+text.width/2-card.left-card.width/2)<2})', 'noms et sous-titre Invité centrés sous chaque avatar');
     await screenshot(client, root, 'tv-profiles-'+width+'.png');
     await key(client, 13);
     await check(client, 'document.activeElement.id === "primaryTv"', 'focus initial TV');
