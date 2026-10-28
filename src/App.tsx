@@ -466,7 +466,7 @@ function MainApp() {
         return;
       }
 
-      if (data.type === 'NAVIGATE_SHOW') {
+      if (data.type === 'NAVIGATE_SHOW' || data.type === 'DOWNLOAD_EVENT' || data.type === 'PLEX_AVAILABLE') {
         const idToOpen = data.showId || data.tmdbId;
         if (idToOpen) {
           openShowSmooth(

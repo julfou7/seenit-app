@@ -91,3 +91,11 @@ test('#778 les reçus de demandes distinctes gardent leur canal et des identité
   assert.notEqual(a.tag, androidPushPresentation('alice', { type: 'DOWNLOAD_EVENT', eventKey: 'sonarr:transfer-a:s0e2' }).tag);
   assert.notEqual(a.tag, androidPushPresentation('bob', { type: 'DOWNLOAD_EVENT', eventKey: 'sonarr:transfer-a:s0e1' }).tag);
 });
+
+test('#778 Grab porte le média et le scope exacts sans prétendre à un transfert démarré', () => {
+  const event = buildDownloadWebhookPresentation('sonarr', { eventType: 'Grab', series: { title: 'Une série', tmdbId: 42 },
+    downloadId: 'download-a', episodes: [{ seasonNumber: 0, episodeNumber: 2 }] });
+  assert.equal(event.data.tmdbId, '42'); assert.equal(event.data.season, '0'); assert.equal(event.data.episode, '2');
+  assert.equal(event.notification.body, 'Envoyé au client de téléchargement.');
+  assert.equal(event.plexAvailabilityData, null);
+});

@@ -180,6 +180,8 @@ export interface NativeNotificationOptions extends NotificationOptions {
   episode?: number;
   scheduleDate?: Date;
   notificationId?: number;
+  renotify?: boolean;
+  vibrate?: number[];
 }
 
 export function generateNotificationNumericId(str: string): number {

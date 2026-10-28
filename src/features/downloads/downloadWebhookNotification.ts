@@ -83,10 +83,17 @@ export function buildDownloadWebhookPresentation(
   const eventType = typeof payload.eventType === 'string'
     ? payload.eventType.trim()
     : (typeof payload.event_type === 'string' ? payload.event_type.trim() : 'Unknown');
+  const mediaType: 'movie' | 'tv' = payload?.movie ? 'movie' : 'tv';
+  const mediaTitle = displayText(payload?.movie?.title || payload?.series?.title, 'Téléchargement');
+  const tmdbId = positiveInteger(payload?.movie?.tmdbId ?? payload?.series?.tmdbId);
+  const episode = mediaType === 'tv' ? firstEpisode(payload) : null;
   const commonData: Record<string, string> = {
     type: 'DOWNLOAD_EVENT',
     source,
     eventType,
+    mediaType,
+    ...(tmdbId ? { tmdbId: String(tmdbId) } : {}),
+    ...(episode ? { season: String(episode.season), episode: String(episode.episode) } : {}),
     subText: 'Téléchargement',
     eventKey: buildEventKey(source, payload, positiveInteger(payload?.movie?.tmdbId ?? payload?.series?.tmdbId), firstEpisode(payload)),
   };
@@ -119,10 +126,6 @@ export function buildDownloadWebhookPresentation(
     };
   }
 
-  const mediaType: 'movie' | 'tv' = payload?.movie ? 'movie' : 'tv';
-  const mediaTitle = displayText(payload?.movie?.title || payload?.series?.title, 'Téléchargement');
-  const tmdbId = positiveInteger(payload?.movie?.tmdbId ?? payload?.series?.tmdbId);
-  const episode = mediaType === 'tv' ? firstEpisode(payload) : null;
   const episodeCode = episode ? formatEpisodeCode(episode) : null;
 
   const data: Record<string, string> = {

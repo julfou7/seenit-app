@@ -43,6 +43,9 @@ export async function deliverDownloadWebhookPresentation({
   plexCheckDelivered: number;
   plexCheckFailed: number;
 }> {
+  if (presentation.eventType !== 'Download' && presentation.eventType !== 'Grab') {
+    return { delivered: 0, invalidTokensRemoved: 0, plexCheckAttempted: 0, plexCheckDelivered: 0, plexCheckFailed: 0 };
+  }
   if (presentation.eventType !== 'Download' || !presentation.plexAvailabilityData) {
     const result = await sendPush(uid, presentation.notification, presentation.data);
     return {
