@@ -220,6 +220,7 @@ export async function sendNativeNotification(title: string, options?: NativeNoti
       import('../features/notifications/notificationMedia.ts'),
     ]);
     const media = await resolveNotificationMediaVisual(options?.icon, options?.image);
+    if (!ownerUid || auth.currentUser?.uid !== ownerUid) return;
     await sendMediaReminderNotification(title, {
       ...options, ...media,
       summaryText: 'Actualité', channelId: 'seenit_news',

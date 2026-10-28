@@ -483,10 +483,10 @@ function MainApp() {
       if (data.type === 'QUICK_ACTION_OPEN_PROVIDER' && data.ownerUid === auth.currentUser?.uid) {
         const show = useShowsStore.getState().shows.find(item => item.id === String(data.showId) && item.userId === data.ownerUid);
         if (!show || !Number.isSafeInteger(data.providerId) || !data.providerName) return;
-        void Promise.all([import('./features/providers/providerLink.ts'), import('@capacitor/browser')]).then(([{ getProviderLinkPresentation }, { Browser }]) => {
+        void Promise.all([import('./features/providers/providerLink.ts'), import('./lib/utils')]).then(([{ getProviderLinkPresentation }, { openExternalUrl }]) => {
           if (data.ownerUid !== auth.currentUser?.uid) return;
           const target = getProviderLinkPresentation({ providerId: Number(data.providerId), providerName: data.providerName || '', title: show.title, fallbackLink: '' });
-          if (target.url && target.url !== '#') return Browser.open({ url: target.url });
+          if (target.url && target.url !== '#') return openExternalUrl(target.url, { title: show.title, originalTitle: show.originalTitle, tmdbId: show.tmdbId, mediaType: show.mediaType });
         }).catch(() => undefined);
         return;
       }
