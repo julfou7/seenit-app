@@ -41,3 +41,18 @@ sources réelles simulées, cycles de masquage/reprise sans accumulation. Les pr
 matérielles et le digest signé final sont consignés dans le checkpoint stable #295
 après installation. Le repli officiel France déjà préparé est conservé dans PR783.
 L'association QR et l'inventaire sont lus sans écrire d'historique personnel.
+
+## Mise à jour matérielle 0.4.3
+
+`install completed`, `cmd_ret:0` et version0.4.3 relue via l'API Tizen. Compte Julian
+toujours associé,18contenus, thème `mist`, épingles Netflix/CANAL+ inchangées. Les huit
+logos Home chargent réellement, dont Apple TV/Paramount+ détectés ; quatre HDMI remontés.
+La police locale est reconnue et l'en-tête ne garde que trois éléments visibles.
+Films : calques désormais1920×1080, image hero1280px et cartes500px chargées ; OK remplit
+la fiche Vaiana immédiatement. Ce sont des lectures DOM/API, pas une validation visuelle
+Netflix ni un contrôle de tous les réglages natifs.
+
+WGT138935octets, SHA256 `5af5e7cdc8e6921e6527a6bb1fc641c7c403fe4b6220502e596f26a327f54e63`.
+Auteur et distributeur legacy vérifiés identiques à la baseline installée. Aucun
+effacement de compte/préférences et aucune publication APK mobile. La CI du runtime
+ed6900f est verte (40702379838) ;1 117tests sans échec en validation canonique locale.
