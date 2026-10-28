@@ -81,8 +81,10 @@ test('SEENIT-NOTIFICATION-003 reste compatible minSdk 24 et distingue la saison 
 });
 
 test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et une action Discover exacte', () => {
-  assert.ok(server.includes("icon: 'ic_stat_seenit'"));
-  assert.ok(server.includes("color: '#E5A93D'"));
+  assert.ok(server.includes('androidPushPresentation(uid, data)'));
+  const pushPresentation = readFileSync('src/features/notifications/androidPushPresentation.ts', 'utf8');
+  assert.ok(pushPresentation.includes("icon: 'ic_stat_seenit'"));
+  assert.ok(pushPresentation.includes("color: '#E5A93D'"));
   assert.ok(worker.includes('.setSmallIcon(R.drawable.ic_stat_seenit)'));
   assert.ok(worker.includes('.setSubText("Téléchargement")'));
   assert.ok(worker.includes('.setSubText("Plex")'));
