@@ -42,7 +42,7 @@ export function useDebounce<T>(value: T, delay: number): [T] {
 
 export interface Props {
   navigationShortcut?: number;
-  onShowClick: (id: string | number, mediaType?: 'tv' | 'movie') => void;
+  onShowClick: (id: string | number, mediaType?: 'tv' | 'movie', season?: number, episode?: number) => void;
 }
 
 export const DISCOVER_GRID_INITIAL_ITEMS = 30;
@@ -152,11 +152,11 @@ export const GENRE_OPTIONS: GenreOption[] = [
   { id: 'guerre', label: 'Guerre & Histoire', tmdbIds: [10752, 36, 10768] }
 ];
 
-export function checkIsUpToDate(show: any): boolean {
+export function checkIsUpToDate(show: (Pick<Show, 'mediaType' | 'isArchived' | 'seenEpisodes' | 'totalEpisodes'> & { status: string; nextEpisodeToWatch?: { air_date?: string | null } | null }) | null | undefined): boolean {
   if (!show || show.status === 'dropped') return false;
   if (show.isArchived) return true;
   if (show.mediaType === 'movie') {
-    return show.status === 'completed' || show.seenEpisodes?.includes('movie');
+    return show.status === 'completed' || Boolean(show.seenEpisodes?.includes('movie'));
   }
   if (show.status === 'up_to_date' || show.status === 'completed') return true;
 

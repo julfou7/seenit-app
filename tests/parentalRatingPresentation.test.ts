@@ -8,10 +8,10 @@ const app = readFileSync('src/App.tsx', 'utf8');
 
 test('SEENIT-PARENTAL-001 supprime PEGI et les heuristiques parentales de genre', () => {
   assert.doesNotMatch(filterModal, /Classification PEGI/i);
-  assert.match(filterModal, /Âge conseillé maximum/);
+  assert.match(filterModal, /aria-label="Âge conseillé"/);
   assert.match(filterModal, /id: 'age:0'/);
-  assert.match(filterModal, /id: 'age:10'/);
-  assert.match(filterModal, /id: 'age:18'/);
+  assert.match(filterModal, /\[7, 10, 13, 14, 17, 18\]/);
+  assert.match(filterModal, /id: `age:\$\{age\}`/);
   assert.doesNotMatch(filterModal, /id: '10'/, 'l’UI ne doit plus émettre les anciens tokens qui déclenchaient les heuristiques de genre');
   assert.match(tmdbFacade, /originalDiscoverWithFilters\(\{[\s\S]*pegi:\s*'Tous'/, 'la façade neutralise systématiquement le filtre parental historique du client TMDB');
   assert.match(tmdbFacade, /resolveParentalRating\(/);

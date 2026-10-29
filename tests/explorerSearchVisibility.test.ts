@@ -1,38 +1,15 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { readFeatureSource } from './featureSource.ts';
-
-const discoverSource = readFeatureSource('discover');
-
-test('Explorer garde la recherche masquée pendant une descente tactile', () => {
-  const touchHandler = discoverSource.match(/const handleTouchMove = \(e: React\.TouchEvent\) => \{([\s\S]*?)\n  \};/);
-  assert.ok(touchHandler, 'le gestionnaire tactile Explorer doit rester déclaré');
-  assert.match(
-    touchHandler[1],
-    /diff < -25 && isSearchVisible[\s\S]*?setIsSearchVisible\(false\)/,
-    'un doigt qui remonte (contenu qui descend) doit masquer ou garder masquée la recherche',
-  );
-  assert.doesNotMatch(
-    touchHandler[1],
-    /diff < -25 && !isSearchVisible[\s\S]*?setIsSearchVisible\(true\)/,
-    'une descente dans le contenu ne doit jamais réafficher la recherche',
-  );
+const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
+test('SEENIT-DISCOVER-003 E-03 recherche collante à toute profondeur, sans geste invisible', () => {
+  const view = read('src/screens/DiscoverViewCore.tsx'), css = read('src/screens/explorer.css');
+  assert.match(view, /aria-label="Rechercher" onClick=\{enterSearch\}/);
+  assert.match(css, /\.explorer-controls\{position:sticky;top:0/);
+  assert.doesNotMatch(view, /onTouchMove|Remonter tout en haut|data-navigation-search-shortcut/);
 });
-
-test('Explorer ne réaffiche la recherche tactile que lors de la remontée', () => {
-  const touchHandler = discoverSource.match(/const handleTouchMove = \(e: React\.TouchEvent\) => \{([\s\S]*?)\n  \};/);
-  assert.ok(touchHandler, 'le gestionnaire tactile Explorer doit rester déclaré');
-  assert.match(
-    touchHandler[1],
-    /diff > 25 && !isSearchVisible[\s\S]*?setIsSearchVisible\(true\)/,
-    'un doigt qui redescend (contenu qui remonte) doit réafficher la recherche',
-  );
-});
-
-test('le scroll réel conserve la même sémantique de direction', () => {
-  const scrollHandler = discoverSource.match(/const handleScroll = useCallback\(\(event: React\.UIEvent<HTMLDivElement>\) => \{([\s\S]*?)\n  \}, \[\]\);/);
-  assert.ok(scrollHandler, 'le gestionnaire de scroll Explorer doit rester déclaré');
-  assert.match(scrollHandler[1], /currentScrollY > lastScrollY\.current \+ 10[\s\S]*?setIsSearchVisible\(current => current \? false : current\)/);
-  assert.match(scrollHandler[1], /currentScrollY < lastScrollY\.current - 10[\s\S]*?setIsSearchVisible\(current => current \? current : true\)/);
+test('SEENIT-DISCOVER-003 E-07 navigation commune et mode recherche explicite', () => {
+  assert.doesNotMatch(read('src/components/BottomNav.tsx'), /bottom-nav-search|shell--search/);
+  assert.match(read('src/components/bottomNav.css'), /data-app-tab=discover.*data-discover-search-mode=true/);
+  assert.match(read('src/screens/DiscoverScreen.tsx'), /explorerScroll\.current = containerRef\.current\?\.scrollTop/);
 });

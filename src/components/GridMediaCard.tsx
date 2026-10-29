@@ -375,7 +375,7 @@ export interface PreviewModalProps {
   onClose: () => void;
   onAddClick: (m: TMDBMedia) => void;
   onToggleWatched?: (m: TMDBMedia) => void;
-  onShowClick: (id: any, mediaType: 'tv' | 'movie') => void;
+  onShowClick: (id: number, mediaType: 'tv' | 'movie') => void;
 }
 
 export function PreviewModal({
@@ -396,7 +396,7 @@ export function PreviewModal({
 
   const [trailerKey, setTrailerKey] = useState<string | null>(null);
   const [loadingTrailer, setLoadingTrailer] = useState<boolean>(true);
-  const [fullMedia, setFullMedia] = useState<TMDBMedia | null>(null);
+  const [fullMedia, setFullMedia] = useState<(TMDBMedia & { genres?: Array<{ id: number; name: string }> }) | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -441,125 +441,10 @@ export function PreviewModal({
   const overview = activeMedia.overview || media.overview;
 
   const shows = useShowsStore((state) => state.shows);
-  const show = shows.find((s) => s.tmdbId === Number(media.id));
-
-  let buttonLabel = isTv ? "Suivre la série" : "Ajouter aux films à voir";
-  let ButtonIcon: React.ElementType = Plus;
-  let buttonStyle = "bg-[#E5A93D] text-black hover:bg-[#F5B94D] shadow-lg";
-  let handleAction = () => {
-    onAddClick(media);
-    onClose();
-  };
-
-  if (!show) {
-    buttonLabel = isTv ? "Suivre la série" : "Ajouter aux films à voir";
-    ButtonIcon = Plus;
-    buttonStyle = "bg-[#E5A93D] text-black hover:bg-[#F5B94D] shadow-lg";
-    handleAction = () => {
-      onAddClick(media);
-      onClose();
-    };
-  } else if (show.status === 'dropped') {
-    buttonLabel = isTv ? "Reprendre la série" : "Ajouter à ma liste";
-    ButtonIcon = RotateCcw;
-    buttonStyle = "bg-[#E5A93D] text-black hover:bg-[#F5B94D] shadow-lg";
-    handleAction = () => {
-      onShowClick(media.id, isTv ? 'tv' : 'movie');
-      onClose();
-    };
-  } else if (
-    show.isArchived ||
-    show.status === 'completed' ||
-    computeAutoArchiveStatus(show) ||
-    (isTv && checkIsUpToDate(show) && !show.nextEpisodeToAir) ||
-    (isTv && Boolean(show.seenEpisodes && show.seenEpisodes.length > 0 && !show.nextEpisodeToWatch && !show.nextEpisodeToAir))
-  ) {
-    buttonLabel = isTv ? "Revoir la série" : "Revoir le film";
-    ButtonIcon = RotateCcw;
-    buttonStyle = "bg-[#E5A93D]/20 text-[#E5A93D] border border-[#E5A93D]/30 hover:bg-[#E5A93D]/30 shadow-sm";
-    handleAction = () => {
-      onShowClick(media.id, isTv ? 'tv' : 'movie');
-      onClose();
-    };
-  } else if (isTv) {
-    const hasSeenMedia = Boolean(show.seenEpisodes && show.seenEpisodes.length > 0);
-    const fallbackNextEp = !hasSeenMedia ? { season_number: 1, episode_number: 1 } : null;
-    const nextEp = show.nextEpisodeToWatch || fallbackNextEp || show.nextEpisodeToAir;
-
-    const getEpStatus = () => {
-      if (!nextEp) return null;
-      const sCode = String(nextEp.season_number || 1).padStart(2, '0');
-      const eCode = String(nextEp.episode_number || 1).padStart(2, '0');
-      const fullEpCode = `S${sCode} | E${eCode}`;
-
-      let airDate = nextEp.air_date;
-
-      if (airDate) {
-        const diffDays = getCalendarDaysDiff(airDate);
-        if (diffDays > 0) {
-          if (diffDays === 1) return { isUpcoming: true, label: `${fullEpCode} demain` };
-          if (diffDays <= 7) return { isUpcoming: true, label: `${fullEpCode} dans ${diffDays} jours` };
-          return { isUpcoming: true, label: `${fullEpCode} le ${formatAirDateSafe(airDate, 'short')}` };
-        }
-      }
-
-      const prefix = hasSeenMedia ? "Reprendre" : "Commencer";
-      return { isUpcoming: false, label: `${prefix} • ${fullEpCode}` };
-    };
-
-    const epStatus = getEpStatus();
-
-    if (epStatus) {
-      if (epStatus.isUpcoming) {
-        buttonLabel = epStatus.label;
-        ButtonIcon = Calendar;
-        buttonStyle = "bg-zinc-800 text-zinc-300 border border-zinc-700 hover:bg-zinc-700";
-      } else {
-        buttonLabel = epStatus.label;
-        ButtonIcon = CheckCircle2;
-        buttonStyle = "bg-[#E5A93D] text-black hover:bg-[#F5B94D] shadow-lg";
-      }
-      handleAction = () => {
-        onShowClick(media.id, 'tv');
-        onClose();
-      };
-    } else if (checkIsUpToDate(show)) {
-      buttonLabel = "À jour sur la diffusion";
-      ButtonIcon = CheckCircle2;
-      buttonStyle = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30";
-      handleAction = () => {
-        onShowClick(media.id, 'tv');
-        onClose();
-      };
-    } else {
-      buttonLabel = "Voir les épisodes";
-      ButtonIcon = CheckCircle2;
-      buttonStyle = "bg-[#E5A93D] text-black hover:bg-[#F5B94D]";
-      handleAction = () => {
-        onShowClick(media.id, 'tv');
-        onClose();
-      };
-    }
-  } else {
-    const isSeenMovie = show.seenEpisodes?.includes('movie') || (show.status as string) === 'completed' || isWatched;
-    if (isSeenMovie) {
-      buttonLabel = "Revoir le film";
-      ButtonIcon = RotateCcw;
-      buttonStyle = "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/30 shadow-sm";
-      handleAction = () => {
-        onShowClick(media.id, 'movie');
-        onClose();
-      };
-    } else {
-      buttonLabel = "Marquer comme vu";
-      ButtonIcon = Check;
-      buttonStyle = "bg-[#E5A93D] text-black hover:bg-[#F5B94D] shadow-lg";
-      handleAction = () => {
-        if (onToggleWatched) onToggleWatched(media);
-        onClose();
-      };
-    }
-  }
+  const show = shows.find(s => Number(s.tmdbId) === Number(media.id) && s.mediaType === (isTv ? 'tv' : 'movie'));
+  const alreadySeen = Boolean(isWatched || show?.status === 'completed' || show?.seenEpisodes?.includes('movie'));
+  const added = Boolean(show || isAdded);
+  const openDetails = () => { onShowClick(media.id, isTv ? 'tv' : 'movie'); onClose(); };
 
   return (
     <DialogLayer onDismiss={onClose} label="Aperçu du média" historyMode="local" role="dialog" className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -597,9 +482,10 @@ export function PreviewModal({
               )}
             </>
           )}
+          {trailerKey && <span className="absolute top-3 left-3 pointer-events-none rounded-md bg-black/70 px-2 py-1 text-[10px] font-extrabold text-white">BANDE-ANNONCE</span>}
           <button
-            onClick={onClose}
-            className="absolute top-3 right-3 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-md hover:bg-black/80 transition-colors cursor-pointer"
+            aria-label="Fermer l’aperçu" onClick={onClose}
+            className="absolute top-3 right-3 z-10 w-11 h-11 flex items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-md hover:bg-black/80 transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
@@ -607,6 +493,17 @@ export function PreviewModal({
 
         <div className="p-6 bg-[#1a1a1a] rounded-b-[24px] flex flex-col gap-4 overflow-y-auto min-h-0">
           <div>
+
+            <h2
+              onClick={() => {
+                onShowClick(media.id, isTv ? 'tv' : 'movie');
+                onClose();
+              }}
+              className="text-[22px] font-extrabold text-white hover:text-[#E5A93D] tracking-tight leading-tight mb-2 cursor-pointer transition-colors"
+            >
+              {displayTitle}
+            </h2>
+
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className={cn(
                 "text-[10px] font-bold px-2.5 py-1 rounded-md flex items-center gap-1.5 uppercase tracking-wider shadow-sm",
@@ -625,15 +522,7 @@ export function PreviewModal({
               )}
             </div>
 
-            <h2
-              onClick={() => {
-                onShowClick(media.id, isTv ? 'tv' : 'movie');
-                onClose();
-              }}
-              className="text-2xl font-black text-white hover:text-[#E5A93D] tracking-tight leading-tight mb-2 cursor-pointer transition-colors"
-            >
-              {displayTitle}
-            </h2>
+            {fullMedia?.genres?.length > 0 && <p className="text-xs text-zinc-400 mb-3">{fullMedia?.genres.slice(0, 2).map(genre => genre.name).join(" · ")}</p>}
 
             <div className="max-h-36 overflow-y-auto pr-1 text-sm text-zinc-300 leading-relaxed scrollbar-thin scrollbar-thumb-zinc-700">
               <p>
@@ -642,28 +531,16 @@ export function PreviewModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mt-2 pt-2 shrink-0">
-            <button
-              onClick={handleAction}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl font-bold text-xs uppercase tracking-wider transition-transform active:scale-95 cursor-pointer",
-                buttonStyle
-              )}
-            >
-              <ButtonIcon size={16} />
-              <span className="truncate">{buttonLabel}</span>
+          <div className="flex flex-col gap-2 mt-2 shrink-0">
+            <button type="button" disabled={alreadySeen} onClick={() => { onAddClick(media); onClose(); }}
+              className="min-h-[50px] rounded-xl bg-[#E5A93D] text-black font-extrabold text-sm disabled:opacity-70">
+              {alreadySeen ? 'Déjà vu' : added ? 'Retirer d’À voir' : 'Ajouter à À voir'}
             </button>
-
-            <button
-              onClick={() => {
-                onShowClick(media.id, isTv ? 'tv' : 'movie');
-                onClose();
-              }}
-              className="w-11 h-11 flex items-center justify-center rounded-xl font-bold text-white bg-white/10 hover:bg-white/20 transition-transform active:scale-95 shrink-0 cursor-pointer"
-              title="Détails"
-            >
-              <Info size={18} />
+            <button type="button" onClick={() => { if (isTv) openDetails(); else { onToggleWatched?.(media); onClose(); } }}
+              className="min-h-[50px] rounded-xl bg-white/5 text-zinc-200 font-semibold text-sm">
+              {isTv ? 'Voir les épisodes' : alreadySeen ? 'Marquer comme non vu' : 'Marquer comme vu'}
             </button>
+            <button type="button" onClick={openDetails} className="min-h-[50px] rounded-xl bg-white/5 text-zinc-300 font-semibold text-sm">Ouvrir la fiche</button>
           </div>
         </div>
       </div>

@@ -32,24 +32,16 @@ test('SEENIT-PERF-001 ne remet pas les enrichissements secondaires sur le chemin
   assert.match(providerPolicySource, /addEventListener\('scroll'/);
 });
 
-test('SEENIT-PERF-001 rend les libellés stables pendant le chargement froid', () => {
-  assert.match(discoverSource, /<span>Explorer<\/span>/);
-  assert.match(discoverSource, /showHeroSurface && loading && top10\.length === 0 && <HeroSkeleton \/>/);
-  assert.doesNotMatch(discoverSource, /ExplorerSkeleton|CategorySkeleton|SortSkeleton/);
+test('SEENIT-PERF-001 E-03 les commandes restent montées pendant le chargement froid', () => {
+ assert.match(discoverSource, /aria-label="Rechercher"/);
+ assert.match(discoverSource, /showHeroSurface && loading && !visibleHeroItems.length && <HeroSkeleton/);
+ assert.doesNotMatch(discoverSource, /ExplorerSkeleton|CategorySkeleton|SortSkeleton/);
 });
 
-test('#279 réserve la progression du HERO du skeleton au carrousel complet', () => {
-  assert.match(discoverSource, /const HERO_PROGRESS_LAYOUT_CLASS = "flex h-1\.5 items-center justify-center gap-1\.5 mt-3 mb-2"/);
-  assert.match(discoverSource, /function HeroProgressSkeleton\(\)/);
-  assert.match(
-    discoverSource,
-    /function HeroSkeleton\(\)[\s\S]*?<HeroProgressSkeleton \/>[\s\S]*?function HeroProgressSkeleton\(\)/,
-  );
-  assert.match(
-    discoverSource,
-    /visibleHeroItems\.length > 1 \? \([\s\S]*?className=\{HERO_PROGRESS_LAYOUT_CLASS\}[\s\S]*?: \([\s\S]*?<HeroProgressSkeleton \/>/,
-  );
-  assert.doesNotMatch(discoverSource, /\{visibleHeroItems\.length > 1 && \(/);
+test('SEENIT-DISCOVER-003 E-01 progression incluse dans le hero de hauteur stable', () => {
+ assert.match(discoverSource, /h-\[368px\]/);
+ assert.match(discoverSource, /className="explorer-hero-dots"/);
+ assert.match(discoverSource, /aria-label=\{`Voir la suggestion/);
 });
 
 test('#279 garde le placeholder de progression neutre et non interactif', () => {

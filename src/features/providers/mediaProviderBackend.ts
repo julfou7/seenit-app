@@ -2,6 +2,7 @@ import type { Application } from 'express';
 import {
   registerMediaProviderRoutes as registerCoreMediaProviderRoutes,
 } from './mediaProviderBackendCore.ts';
+import { registerCharacterRoutes } from './characterBackend.ts';
 import { registerParentalRatingBatchRoute } from './parentalRatingBatchBackend.ts';
 
 export {
@@ -29,7 +30,7 @@ const MAX_DISCOVER_RESPONSE_BYTES = 4 * 1024 * 1024;
 type MediaType = 'movie' | 'tv';
 type CoreDependencies = Parameters<typeof registerCoreMediaProviderRoutes>[1];
 export interface ParentalEvidencePersistence {
-  read: (keys: string[]) => Promise<Map<string, any>>;
+  read: (keys: string[]) => Promise<Map<string, unknown>>;
   write: (entries: Array<{ key: string; details: any }>) => Promise<void>;
 }
 type MediaProviderDependencies = CoreDependencies & {
@@ -265,6 +266,7 @@ export function createParentalRatingPrefetchFetch(
 
 export function registerMediaProviderRoutes(app: Application, dependencies: MediaProviderDependencies): void {
   const upstream = dependencies.fetch || fetch;
+  registerCharacterRoutes(app, dependencies);
   const acceleratedFetch = createParentalRatingPrefetchFetch(upstream);
   registerParentalRatingBatchRoute(app, {
     ...dependencies,
