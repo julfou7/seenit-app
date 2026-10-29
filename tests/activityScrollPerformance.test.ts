@@ -9,15 +9,9 @@ const watchListSource = readFeatureSource('watchList');
 const virtualWindowSource = readFileSync(new URL('../src/hooks/useBoundedVirtualWindow.ts', import.meta.url), 'utf8');
 
 test('#229 réarme le scroll infini Explorer après Activity hidden → visible', () => {
-  assert.match(discoverSource, /const observerTargetNodeRef = useRef<HTMLDivElement \| null>\(null\)/);
   assert.match(
     discoverSource,
-    /const observerTargetRef = useCallback\(\(node: HTMLDivElement \| null\) => \{\s*observerTargetNodeRef\.current = node;\s*\}, \[\]\);/,
-    'la callback-ref doit seulement conserver le sentinel DOM afin que React Activity puisse le réutiliser au réveil',
-  );
-  assert.match(
-    discoverSource,
-    /useEffect\(\(\) => \{\s*const node = observerTargetNodeRef\.current;[\s\S]*new IntersectionObserver[\s\S]*observer\.observe\(node\);[\s\S]*return \(\) => observer\.disconnect\(\);/,
+    /useEffect\(\(\) => \{\s*const node = observerTargetNode;[\s\S]*new IntersectionObserver[\s\S]*observer\.observe\(node\);[\s\S]*return \(\) => observer\.disconnect\(\);/,
     'le cycle de vie de l’IntersectionObserver doit appartenir à un Effect reconnectable par Activity',
   );
   assert.doesNotMatch(

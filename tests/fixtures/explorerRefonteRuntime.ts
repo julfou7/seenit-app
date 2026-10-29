@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { useRef } from 'react';
 import type { Show } from '../../src/types';
 import type { TMDBMedia } from '../../src/features/shows/tmdbClient';
-export const telemetry = { calls: 0, opened: [] as Array<string | number>, statuses: [] as string[], documentWrites: [] as string[], deleted: [] as string[] };
+export const telemetry = { calls: 0, homePages: [] as number[], opened: [] as Array<string | number>, statuses: [] as string[], documentWrites: [] as string[], deleted: [] as string[] };
 const media: TMDBMedia[] = Array.from({ length: 60 }, (_, i) => ({ id: 1000 + i, media_type: i % 2 ? 'tv' : 'movie', title: 'Les mondes de demain ' + i, name: 'Les mondes de demain ' + i, release_date: i % 2 ? undefined : '2026-01-01', first_air_date: i % 2 ? '2026-01-01' : undefined, vote_average: 8, vote_count: 800, popularity: 50, poster_path: '/fixture.svg', backdrop_path: '/fixture.svg', genre_ids: [28, 10759] }));
 const seed: Show[] = [{ id: 'local42', userId: 'explorer-test', tmdbId: 42, title: 'Breaking Bad', mediaType: 'tv', firstAirDate: '2008-01-20', seenEpisodes: ['1-1'], totalEpisodes: 62, status: 'watching', isArchived: false, posterPath: '/fixture.svg', backdropPath: null, updatedAt: 1, createdAt: 1, episodeRecords: {} }];
 seed.push({...seed[0],id:'local-got',tmdbId:7778,title:'Le Trône de fer',seenEpisodes:['1x1'],episodeRecords:{'1x1':{watchedAt:123}},nextEpisodeToWatch:{season_number:1,episode_number:2,air_date:'2020-01-01'}});
@@ -28,7 +28,7 @@ export const enrichCinemaEvidenceForExplorerLists = async (popular: TMDBMedia[],
 export const isMovieAtCinema = () => false;
 export const isMovieUpcoming = () => false;
 const details = (id: number) => Promise.resolve({ ok: true, value: { ...media.find(item => item.id === id), id, overview: 'Un récit à découvrir.', genres: [{ id: 28, name: 'Action' }], videos: { results: [] } } });
-const list = async () => ({ ok: true, value: { results: media, total_pages: 1 } });
+const list = async (_type: unknown = 'all', page = 1) => { telemetry.homePages.push(page); return { ok: true, value: { results: media.map(item=>({...item,id:item.id+(page-1)*100,title:'Page '+page+' | '+item.title,name:'Page '+page+' | '+item.name})), total_pages: 3 } }; };
 export const tmdb = {
   getPersonDetails: async (id: number) => ({ ok: true, value: { id, name: 'Bob Odenkirk', biography: 'Bob est un acteur.', profile_path: '/bob.svg', known_for_department: 'Acting' } }),
   getPersonCredits: async () => ({ ok: true, value: { cast: [{...media[1],id:7778,title:undefined,name:'Game of Thrones',media_type:'tv',character:'Personnage',episode_count:10}], crew: [] } }),

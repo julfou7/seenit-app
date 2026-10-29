@@ -54,7 +54,9 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [popularPersons, setPopularPersons] = useState<TMDBMedia[]>([]);
   const [recommendations, setRecommendations] = useState<TMDBMedia[]>([]);
   const [heroDetails, setHeroDetails] = useState<Record<number, any>>({});
-  const [loading, setLoading] = useState(true);
+  const [homeLoading, setHomeLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const loading = debouncedQuery.trim() ? searchLoading : homeLoading;
   const [homeEnrichmentReady, setHomeEnrichmentReady] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
 
@@ -421,7 +423,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
 
   const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [homeHasMore, setHomeHasMore] = useState(true);
+  const hasMore = !debouncedQuery.trim() && homeHasMore;
   const homeRequestGenerationRef = useRef(0);
   const searchRequestGenerationRef = useRef(0);
 
@@ -449,13 +452,13 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
 
   useEffect(() => {
     setPage(1);
-    setHasMore(true);
+    setHomeHasMore(true);
     setPopular([]);
     setTrending([]);
-    if (!debouncedQuery.trim() && activeCategory === 'Tout') {
+    if (activeCategory === 'Tout') {
       setHomeEnrichmentReady(false);
     }
-  }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder]);
+  }, [activeCategory, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -471,14 +474,14 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   useEffect(() => {
     const requestGeneration = ++homeRequestGenerationRef.current;
     const isCurrentRequest = () => homeRequestGenerationRef.current === requestGeneration;
-    if (isOffline || debouncedQuery.trim()) {
+    if (isOffline) {
       return () => {
         if (isCurrentRequest()) homeRequestGenerationRef.current += 1;
       };
     }
 
     async function fetchHome() {
-      if (page === 1) setLoading(true);
+      if (page === 1) setHomeLoading(true);
 
       let nextPopular: TMDBMedia[] | null = null;
       let nextTrending: TMDBMedia[] | null = null;
@@ -579,7 +582,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
         if (trendingList.length > 0) {
           setTrending(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
           setPopular(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
-          if (page === 1) setLoading(false);
+          if (page === 1) setHomeLoading(false);
         }
 
         const [popTvRes, popMovRes, personRes] = await Promise.all([
@@ -633,8 +636,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       if (nextPersons !== null) {
         setPopularPersons(prev => page === 1 ? nextPersons! : mergeMedia(prev, nextPersons!));
       }
-      setHasMore(nextHasMore);
-      setLoading(false);
+      setHomeHasMore(nextHasMore);
+      setHomeLoading(false);
       setIsLoadingMore(false);
       if (page === 1) {
         void getRecommendations(20)
@@ -649,7 +652,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     return () => {
       if (isCurrentRequest()) homeRequestGenerationRef.current += 1;
     };
-  }, [debouncedQuery, isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder, hasActiveFilters]);
+  }, [isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder, hasActiveFilters]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -657,8 +660,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     const isCurrentRequest = () => searchRequestGenerationRef.current === requestGeneration;
     if (isOffline || !debouncedQuery.trim()) {
       setSearchResults([]);
-      setHasMore(!debouncedQuery.trim());
-      if (isOffline) setLoading(false);
+      setSearchLoading(false);
       return () => {
         controller.abort();
       if (isCurrentRequest()) searchRequestGenerationRef.current += 1;
@@ -666,7 +668,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     }
 
     async function search() {
-      setLoading(true);
+      setSearchLoading(true);
       const searchStarted = performance.now();
       setSearchElapsedMs(null);
       setTotalTvCount(null);
@@ -703,14 +705,13 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
         setSearchResults([]);
       }
       setSearchElapsedMs(performance.now() - searchStarted);
-      setHasMore(false);
-      setLoading(false);
-      setIsLoadingMore(false);
+
+      setSearchLoading(false);
     }
 
     void search().catch(() => {
       if (!isCurrentRequest()) return;
-      setSearchResults([]); setLoading(false); setIsLoadingMore(false); setHasMore(false);
+      setSearchResults([]); setSearchLoading(false);
     });
     return () => {
       controller.abort();
@@ -928,24 +929,24 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     : uniqueProcessedResults;
 
   const handleLoadMore = useCallback(() => {
-    if (isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
+    if (isSearchMode || isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
     setIsLoadingMore(true);
     setPage(p => p + 1);
-  }, [criticalHomeSliceActive, debouncedQuery, hasMore, isLoadingMore, loading]);
+  }, [criticalHomeSliceActive, debouncedQuery, hasMore, isLoadingMore, loading, isSearchMode]);
 
-  const observerTargetNodeRef = useRef<HTMLDivElement | null>(null);
+  const [observerTargetNode, setObserverTargetNode] = useState<HTMLDivElement | null>(null);
 
   const observerTargetRef = useCallback((node: HTMLDivElement | null) => {
-    observerTargetNodeRef.current = node;
+    setObserverTargetNode(node);
   }, []);
 
   useEffect(() => {
-    const node = observerTargetNodeRef.current;
-    if (!node || isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
+    const node = observerTargetNode;
+    if (!node || isSearchMode || isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
+        if (entries.at(-1)?.isIntersecting) {
           handleLoadMore();
         }
       },
@@ -954,7 +955,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     observer.observe(node);
 
     return () => observer.disconnect();
-  }, [criticalHomeSliceActive, debouncedQuery, handleLoadMore, hasMore, isLoadingMore, loading]);
+  }, [criticalHomeSliceActive, debouncedQuery, handleLoadMore, hasMore, isLoadingMore, loading, isSearchMode, observerTargetNode]);
 
   const showHeroSurface = !isSearchMode && !debouncedQuery.trim()
     && !hasActiveFilters

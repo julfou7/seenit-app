@@ -20,7 +20,7 @@ async function check(client, expression, label) {
   if(await evaluate(client, expression))return;
   await new Promise(resolve=>setTimeout(resolve,40));
  }
- throw Error('#787 '+label+' '+JSON.stringify(await evaluate(client,'({text:document.body.innerText.slice(0,1000),input:document.querySelector("input")?.getBoundingClientRect().toJSON(),scroll:document.querySelector(".explorer-scroll")?.scrollTop,editing:document.querySelector("[data-discover-search-editing]")?.getAttribute("data-discover-search-editing"),viewport:visualViewport.height,dock:document.querySelector(".explorer-search-dock")?.getAttribute("style"),active:document.activeElement?.id,buttons:[...document.querySelectorAll("button")].map(b=>b.getAttribute("aria-label")).filter(Boolean),geometry:[...document.querySelectorAll("main,[data-app-tab],.explorer-root,.explorer-scroll,.explorer-content")].map(n=>({class:n.className,rect:n.getBoundingClientRect().toJSON(),height:n.scrollHeight}))})')));
+ throw Error('#787 '+label+' '+JSON.stringify(await evaluate(client,'({text:document.body.innerText.slice(0,1000),input:document.querySelector("input")?.getBoundingClientRect().toJSON(),scroll:document.querySelector(".explorer-scroll")?.scrollTop,editing:document.querySelector("[data-discover-search-editing]")?.getAttribute("data-discover-search-editing"),viewport:visualViewport.height,dock:document.querySelector(".explorer-search-dock")?.getAttribute("style"),active:document.activeElement?.id,homePages:window.__explorer?.telemetry.homePages,mode:document.querySelector("[data-discover-search-mode]")?.getAttribute("data-discover-search-mode"),sentinel:{text:document.querySelector(".explorer-page-sentinel")?.textContent,rect:document.querySelector(".explorer-page-sentinel")?.getBoundingClientRect().toJSON()},buttons:[...document.querySelectorAll("button")].map(b=>b.getAttribute("aria-label")).filter(Boolean),geometry:[...document.querySelectorAll("main,[data-app-tab],.explorer-root,.explorer-scroll,.explorer-content")].map(n=>({class:n.className,rect:n.getBoundingClientRect().toJSON(),height:n.scrollHeight}))})')));
 }
 async function testSearchKeyboardHarness(client, root) {
  await client.send('Emulation.setFocusEmulationEnabled',{enabled:true});
@@ -47,6 +47,20 @@ async function testSearchKeyboardHarness(client, root) {
   }
   await evaluate(client,'window.__explorer.tab("discover")');
   await check(client,'document.querySelector("[data-app-tab=discover]").getAttribute("aria-hidden")==="false"','retour Explorer');
+  await click(find('Films'));
+  await check(client,'document.querySelector(".media-grid-card")?.textContent.includes("Page 1")','catalogue première page');
+  await check(client,'(()=>{const scroll=document.querySelector(".explorer-scroll");scroll.scrollTop=scroll.scrollHeight;return [...document.querySelectorAll(".media-grid-card")].some(n=>n.textContent.includes("Page 3 |"))})()','catalogue trois pages via défilement');
+  await evaluate(client,'document.querySelector(".explorer-scroll").scrollTop=Math.floor(document.querySelector(".explorer-scroll").scrollHeight*.72)');
+  await new Promise(resolve=>setTimeout(resolve,100));
+  const pagedScroll=await evaluate(client,'document.querySelector(".explorer-scroll").scrollTop');
+  const homeCalls=await evaluate(client,'window.__explorer.telemetry.homePages.length');
+  await click('document.querySelector("[aria-label=Rechercher]")');
+  await client.send('Input.insertText',{text:'game'});
+  await check(client,'document.querySelector("[aria-label=\\\"Films et séries TMDB\\\"]")?.textContent.includes("Game of Thrones")','recherche après trois pages');
+  await click('document.querySelector("[aria-label=\\\"Quitter la recherche\\\"]")');
+  await check(client,'Math.abs(document.querySelector(".explorer-scroll").scrollTop-'+pagedScroll+')<1 && window.__explorer.telemetry.homePages.length==='+homeCalls,'retour conserve trois pages et défilement exact sans requête catalogue');
+  await click(find('Tout'));
+  await check(client,'Boolean(document.querySelector(".explorer-hero"))','retour catalogue Tout');
   await evaluate(client,'document.querySelector(".explorer-scroll").scrollTop=530');
   await check(client,'Math.abs(document.querySelector(".explorer-controls").getBoundingClientRect().top)<1','commandes collantes');
   const originalScroll=await evaluate(client,'document.querySelector(".explorer-scroll").scrollTop');
