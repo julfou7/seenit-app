@@ -3,10 +3,13 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { Show } from '../src/types.ts';
 import type { CharacterRecord } from '../src/features/discover/characters.ts';
+import type { ActorIndex } from '../src/features/people/movieActors.ts';
 import {
   CHARACTER_SEARCH_CONCURRENCY,
+  buildCachedTrackedCharacterResults,
   buildCharacterSearchBatchesFromKeys,
   orderedCharacterSearchKeys,
+  preferredCharacterSearchKeysFromActorIndex,
   runCharacterSearchBatches,
   sortCharacterSearchResults,
 } from '../src/features/discover/characterSearch.ts';
@@ -58,6 +61,42 @@ test('SEENIT-DISCOVER-004 priorise les séries suivies actives avant le tri tech
   assert.ok(batches.slice(1).every(batch => batch.length <= 16));
 });
 
+test('terrain v1.4.234 : un rôle connu localement sort Vikings du fond de bibliothèque avant le réseau', () => {
+  const shows = Array.from({ length: 80 }, (_, index) => show(1000 + index, { status: 'completed', updatedAt: 80_000 - index }));
+  shows.push(show(44217, { title: 'Vikings', status: 'completed', updatedAt: 1, lastWatchedAt: 1 }));
+  const actorIndex: ActorIndex = {
+    43943: {
+      name: 'Travis Fimmel',
+      profile_path: '/travis.jpg',
+      seen: [{ mediaType: 'tv', tmdbId: 44217, title: 'Vikings', posterPath: null, backdropPath: null, character: 'Ragnar Lothbrok', episodes: 49, minutes: 2205 }],
+    },
+  };
+
+  const preferred = preferredCharacterSearchKeysFromActorIndex(actorIndex, 'Ragnar');
+  assert.deepEqual(preferred, ['tv:44217']);
+  const keys = orderedCharacterSearchKeys(shows, preferred);
+  assert.equal(keys[0], 'tv:44217');
+  const batches = buildCharacterSearchBatchesFromKeys(keys, preferred.length);
+  assert.deepEqual(batches[0], ['tv:44217'], 'le média prouvé localement ne doit plus attendre un lot de 8/16 titres');
+});
+
+test('terrain v1.4.234 : le cache TMDB suivi produit Ragnar Lothbrok sans attendre le scan réseau', () => {
+  const vikings = show(44217, { title: 'Vikings', status: 'completed', firstAirDate: '2013-03-03', updatedAt: 1 });
+  const metadata = new Map<string, unknown>([['tv:44217', {
+    aggregate_credits: { cast: [
+      { id: 43943, name: 'Travis Fimmel', profile_path: '/travis.jpg', roles: [{ character: 'Ragnar Lothbrok', episode_count: 49 }] },
+      { id: 12572, name: 'Katheryn Winnick', profile_path: '/katheryn.jpg', roles: [{ character: 'Lagertha', episode_count: 71 }] },
+    ] },
+  }]]);
+
+  const results = buildCachedTrackedCharacterResults([vikings], metadata, 'Ragnar');
+  assert.equal(results.length, 1);
+  assert.equal(results[0].name, 'Ragnar Lothbrok');
+  assert.equal(results[0].seed, 'tv:44217');
+  assert.equal(results[0].actors[0].name, 'Travis Fimmel');
+  assert.equal(results[0].works[0].title, 'Vikings');
+});
+
 test('SEENIT-DISCOVER-004 classe Ragnar Lothbrok avant une correspondance interne moins pertinente', () => {
   const orderedKeys = ['tv:44217', 'tv:71912'];
   const results = sortCharacterSearchResults([
@@ -89,10 +128,13 @@ test('SEENIT-DISCOVER-004 borne les lots concurrents sans sérialiser toute la b
   assert.deepEqual(completed.sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6]);
 });
 
-test('le hook Personnages ne rajoute plus un second debounce après celui d’Explorer', () => {
+test('le hook Personnages utilise le cache persistant réel avant de retomber sur les lots réseau', () => {
   const source = readFileSync(new URL('../src/hooks/useCharacterSearch.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /setTimeout\s*\(/);
-  assert.match(source, /orderedCharacterSearchKeys/);
+  assert.match(source, /readUserScopedJson<ActorIndex>\(uid, 'home_actor_index'/);
+  assert.match(source, /primeMediaRenderSnapshotFromPersistentCache/);
+  assert.match(source, /peekRenderableMediaDetails/);
+  assert.match(source, /buildCachedTrackedCharacterResults/);
   assert.match(source, /runCharacterSearchBatches/);
-  assert.match(source, /firstBatchSettled/);
+  assert.match(source, /Promise\.allSettled\(\[networkSearch, cachePrime\]\)/);
 });
