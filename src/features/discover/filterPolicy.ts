@@ -31,7 +31,10 @@ export const DISCOVER_PLATFORM_ID_MAP: Record<string, string> = {
   apple: '350',
   prime: '119',
   canal: '381',
-  max: '1825',
+  max: '1899',
+  paramount: '531',
+  france: '234',
+  arte: '239',
 };
 
 export const SEARCH_COMPATIBLE_CATEGORIES = new Set(['Tout', 'Séries', 'Films', 'Personnes']);

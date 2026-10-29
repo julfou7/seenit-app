@@ -7,6 +7,7 @@ import { cn, checkIsUpToDate } from '../lib/utils';
 import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { GridMediaCard, QuickPreviewModal } from '../components/GridMediaCard';
 import { useShows } from '../hooks/useShows';
+import { removeTrackedMedia } from '../features/shows/removeTrackedMedia';
 import { useToastStore } from '../store/toastStore';
 import { type Show } from '../types';
 import { isShowWatched } from '../hooks/useProAnalytics';
@@ -1038,6 +1039,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             isWatched={isShowWatched(showsByMediaIdentity.get(mediaIdentity(previewMedia)))}
             onClose={() => setPreviewMedia(null)}
             onAddClick={handleAddClick}
+            onRemoveClick={media => { const show = showsByMediaIdentity.get(mediaIdentity(media)); if (show) return removeTrackedMedia(show, deleteShow); }}
             onToggleWatched={handleToggleWatched}
             onShowClick={(id, type) => {
               setPreviewMedia(null);

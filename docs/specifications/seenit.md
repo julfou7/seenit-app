@@ -279,14 +279,9 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 
 ### 5.2 Explorer « Au cinéma » — preuve théâtrale France
 
-- **SEENIT-DISCOVER-003** — Pendant la saisie dans Explorer, la recherche se place à 8 px du clavier visible,
-  sans réserver l'espace de la navigation basse ; celle-ci et son fondu sont masqués. Le viewport visuel
-  et le redimensionnement Android sont pris en compte sans double compensation. Fermer le clavier ou
-  quitter le champ restaure la navigation et la position habituelle sans effacer la requête ni les filtres.
-  Dans Explorer, une loupe explicite à gauche de l'îlot de navigation permet de rouvrir et focaliser
-  la recherche repliée sans défilement des résultats ni réinitialisation. Elle possède une cible de
-  44 px minimum et une activation clavier ; elle est masquée avec la navigation pendant la saisie.
-  Un clavier matériel reste utilisable ; aucune recherche réseau n'est provoquée par le déplacement.
+- **SEENIT-DISCOVER-003** — Refonte mobile Explorer E-01 à E-33 ([handoff](../design/explorer-refonte-2026-10-28.md), #787). Hero 368 px uniquement sur Tout sans filtre ; commandes et catégories collantes. Recherche dédiée en liste : bibliothèque locale instantanée sans filtres, puis TMDB et personnes ; identités type+ID, surlignage insensible aux accents et ajout plan_to_watch. Clavier à 8 px ; après fermeture avec texte, champ à 30 px + safe area et nav cachée ; sans texte, sortie et restauration exacte du scroll. Navigation identique sur les onglets, sans loupe annexe. Filtres directs par onglets et pastilles, préférences plateformes isolées par UID. Aperçu vidéo muet, trois actions verticales. Les personnages sans source restent masqués ; commandes YouTube natives conservées, aucune progression fictive. Choix ouverts validés par le propriétaire le29/10 : bouton +, hero masqué avec filtres, retrait du synopsis et du bouton Remonter. E-18 : toasts au-dessus du dock réel ; E-19 : ouverture clavier fermé et retour à la requête. Aucun APK demandé pour ce lot.
+
+- **SEENIT-DISCOVER-004** — Recherche et fiche de personnages de fiction E-40..49 / P-01..12 : [complément4c](../design/explorer-personnage-2026-10-29.md), #398/#787. Source validée : bibliothèque et univers reliés prouvés, index public borné côté backend, cache et quotas ; personnages distincts des acteurs. Progression privée et favoris locaux par UID. Les ratios vus et co-crédits exigent les identités exactes des épisodes ; les calculs incomplets sont signalés, jamais fabriqués depuis aggregate_credits seul.
 
 - **SEENIT-DISCOVER-001** — La catégorie Explorer **« Au cinéma »** et tout badge portant ce libellé
   exigent une preuve TMDB de sortie théâtrale en France : une entrée `release_dates` de pays `FR` et de

@@ -57,7 +57,7 @@
     },
     {
       "id": "SEENIT-DISCOVER-003",
-      "title": "Recherche Explorer ancrée au clavier, navigation masquée en saisie et loupe de réouverture",
+      "title": "Explorer E-01..33 : hero compact, recherche en liste, filtres directs et aperçu",
       "targets": [
         "pwa",
         "apk"
@@ -74,6 +74,10 @@
         {
           "file": "tests/navbar13j.test.ts",
           "contains": "SEENIT-UX-017 les raccourcis actifs et les réglages évitent les entrées historiques identiques"
+        },
+        {
+          "file": "tests/explorerRefonte.test.ts",
+          "contains": "SEENIT-DISCOVER-003"
         }
       ]
     },
@@ -3008,6 +3012,20 @@
         {
           "file": "tests/notificationRefactor.test.ts",
           "contains": "SEENIT-NOTIFICATION-008 actualise la reprise sans inventer de disponibilité"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DISCOVER-004",
+      "title": "Personnages P-01..12 : bibliothèque, univers prouvés, crédits et progression exacts",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/characters.test.ts",
+          "contains": "SEENIT-DISCOVER-004"
         }
       ]
     }

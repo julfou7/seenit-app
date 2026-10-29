@@ -1,334 +1,118 @@
+import { useCallback, useState, useSyncExternalStore } from 'react';
+import { Check, X } from 'lucide-react';
 import { DialogLayer } from './ui/DialogLayer';
-import React, { useRef, useState } from 'react';
-import { cn } from '../lib/utils';
-import { Tv, Film, X, Sparkles, FileText, User, Ticket, Trophy } from 'lucide-react';
-import { isSearchCompatibleCategory, MOVIE_RELEASE_YEAR_MIN } from '../features/discover/filterPolicy';
+import { auth } from '../lib/firebase';
+import { readUserScopedJson, subscribeUserScopedStorageField } from '../lib/userIsolation';
+import { DISCOVER_PLATFORM_ID_MAP, MOVIE_RELEASE_YEAR_MIN } from '../features/discover/filterPolicy';
+import { getFormattedProviderLogo } from '../utils/providerLogos';
 
+export type FilterTab = 'Trier' | 'Plateformes' | 'Genres' | 'Note' | 'Âge' | 'Année';
+const TABS: FilterTab[] = ['Trier', 'Plateformes', 'Genres', 'Note', 'Âge', 'Année'];
+const GENRE_OPTIONS = ['Action', 'Aventure', 'Animation', 'Biopic', 'Comédie', 'Drame', 'Fantastique', 'Horreur', 'Romance', 'Sci-Fi', 'Thriller'];
+const EXTRA_PLATFORM_LABELS: Record<string, string> = { paramount: 'Paramount+', france: 'France TV', arte: 'Arte' };
+const PLATFORMS = [
+  { id: 'netflix', label: 'Netflix', logo: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
+  { id: 'hbo', label: 'HBO', logo: getFormattedProviderLogo(null, 'HBO')! },
+  { id: 'disney', label: 'Disney+', logo: '/97yvRBw1GzX7fXprcF80er19ot.jpg' },
+  { id: 'apple', label: 'Apple TV+', logo: '/2E03IAZsX4ZaUqM7tXlctEPMGWS.jpg' },
+  { id: 'prime', label: 'Prime', logo: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg' },
+  { id: 'canal', label: 'Canal+', logo: '/brand/providers/canalplus.svg' },
+  { id: 'max', label: 'Max', logo: '/fksCUZ9QDWZMUwL2LgMtLckROUN.jpg' },
+];
+const AGE_OPTIONS = [
+  { id: 'Tous', label: 'Tous les âges' }, { id: 'age:0', label: 'Tous publics' },
+  ...[7, 10, 13, 14, 17, 18].map(age => ({ id: `age:${age}`, label: `Jusqu’à ${age} ans` })),
+];
+const RATING_OPTIONS = ['Toutes', '6+', '7+', '7.5+', '8+', '8.5+', '9+'];
+const SORT_OPTIONS = [{ id: 'popular', label: 'Populaires' }, { id: 'rating', label: 'Mieux notés' }, { id: 'date', label: 'Plus récents' }, { id: 'title', label: 'A → Z' }] as const;
+type Sort = typeof SORT_OPTIONS[number]['id'];
 interface FilterModalProps {
   onClose: () => void;
   activeCategory: string;
-  setActiveCategory: (cat: string) => void;
+  setActiveCategory: (category: string) => void;
   initialSelectedPlatforms: string[];
   initialSelectedGenres: string[];
   initialPegi: string;
   initialRating: string;
   initialMovieReleaseAfterYear: string;
   query: string;
-  onApply: (platforms: string[], genres: string[], pegi: string, rating: string, movieReleaseAfterYear: string) => void;
+  onApply: (platforms: string[], genres: string[], age: string, rating: string, year: string) => void;
+  sortBy?: Sort;
+  onSort?: (sort: Sort) => void;
+  initialTab?: FilterTab;
+  onTabChange?: (tab: FilterTab) => void;
+  resultCount?: number | null;
 }
-
-const GENRE_OPTIONS = [
-  'Action', 'Aventure', 'Animation', 'Biopic', 'Comédie', 'Drame',
-  'Fantastique', 'Horreur', 'Romance', 'Sci-Fi', 'Thriller'
-];
-
-const PLATFORMS = [
-  { id: 'netflix', label: 'Netflix', color: 'text-red-500' },
-  { id: 'hbo', label: 'HBO', color: 'text-purple-500' },
-  { id: 'disney', label: 'Disney+', color: 'text-blue-500' },
-  { id: 'apple', label: 'Apple TV+', color: 'text-gray-300' },
-  { id: 'prime', label: 'Prime', color: 'text-cyan-500' },
-  { id: 'canal', label: 'Canal+', color: 'text-white' },
-  { id: 'max', label: 'Max', color: 'text-blue-400' },
-];
-
-// Tokens volontairement distincts des anciennes valeurs PEGI : la façade TMDB
-// les interprète comme une borne d'âge maximale cumulative.
-const AGE_OPTIONS = [
-  { id: 'Tous', label: 'Tous' },
-  { id: 'age:0', label: 'TP' },
-  { id: 'age:7', label: '≤ 7' },
-  { id: 'age:10', label: '≤ 10' },
-  { id: 'age:13', label: '≤ 13' },
-  { id: 'age:14', label: '≤ 14' },
-  { id: 'age:17', label: '≤ 17' },
-  { id: 'age:18', label: '≤ 18' },
-];
-const RATING_OPTIONS = ['Toutes', '6+', '7+', '7.5+', '8+', '8.5+', '9+'];
-const CURRENT_YEAR = new Date().getFullYear();
-const MOVIE_RELEASE_YEAR_OPTIONS = Array.from(
-  { length: CURRENT_YEAR - MOVIE_RELEASE_YEAR_MIN + 1 },
-  (_, index) => String(CURRENT_YEAR - index),
-);
-
-export function FilterModal({
-  onClose,
-  activeCategory,
-  setActiveCategory,
-  initialSelectedPlatforms,
-  initialSelectedGenres,
-  initialPegi,
-  initialRating,
-  initialMovieReleaseAfterYear,
-  query,
-  onApply
-}: FilterModalProps) {
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const isSearchActive = query.trim().length > 0;
-
-  const [draftCategory, setDraftCategory] = useState(activeCategory);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(initialSelectedPlatforms);
-  const [selectedGenres, setSelectedGenres] = useState<string[]>(initialSelectedGenres);
-  const [pegi, setPegi] = useState(initialPegi);
-  const [rating, setRating] = useState(initialRating);
-  const [movieReleaseAfterYear, setMovieReleaseAfterYear] = useState(initialMovieReleaseAfterYear);
-
-  const togglePlatform = (id: string) => {
-    setSelectedPlatforms(prev => prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]);
+export function FilterModal({ onClose, setActiveCategory, initialSelectedPlatforms: platforms, initialSelectedGenres: genres, initialPegi: age, initialRating: rating, initialMovieReleaseAfterYear: year, onApply, sortBy = 'popular', onSort, initialTab = 'Plateformes', onTabChange, resultCount }: FilterModalProps) {
+  const [tab, setTab] = useState<FilterTab>(initialTab);
+  const uid = auth.currentUser?.uid ?? null;
+  const subscribe = useCallback((listener: () => void) => subscribeUserScopedStorageField(uid, 'platforms', listener), [uid]);
+  const snapshot = useCallback(() => JSON.stringify(readUserScopedJson<number[]>(uid, 'platforms', [])), [uid]);
+  const saved: number[] = JSON.parse(useSyncExternalStore(subscribe, snapshot, () => '[]'));
+  const available = [...PLATFORMS, ...Object.entries(EXTRA_PLATFORM_LABELS).filter(([id]) => saved.includes(Number(DISCOVER_PLATFORM_ID_MAP[id])) || platforms.includes(id)).map(([id, label]) => ({ id, label, logo: '' }))];
+  const preferred = Object.keys(DISCOVER_PLATFORM_ID_MAP).filter(id => saved.includes(Number(DISCOVER_PLATFORM_ID_MAP[id])) || (id === 'max' && saved.includes(1899)));
+  const mine = preferred.length > 0 && preferred.length === platforms.length && preferred.every(id => platforms.includes(id));
+  const toggle = (list: string[], id: string) => list.includes(id) ? list.filter(value => value !== id) : [...list, id];
+  const counts = { Trier: sortBy !== 'popular' ? 1 : 0, Plateformes: platforms.length, Genres: genres.length, Note: rating !== 'Toutes' ? 1 : 0, Âge: age !== 'Tous' ? 1 : 0, Année: year !== 'Toutes' ? 1 : 0 };
+  const active = Object.values(counts).some(Boolean);
+  const reset = () => { onApply([], [], 'Tous', 'Toutes', 'Toutes'); onSort?.('popular'); };
+  const changeYear = (value: string) => {
+    if (value !== 'Toutes') setActiveCategory('Films');
+    onApply(platforms, genres, age, rating, value);
   };
-
-  const toggleGenre = (genre: string) => {
-    setSelectedGenres(prev => prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]);
-  };
-
-  const handleCategoryChange = (category: string) => {
-    setDraftCategory(category);
-    if (category !== 'Films') setMovieReleaseAfterYear('Toutes');
-  };
-
-  const handleMovieReleaseAfterYearChange = (value: string) => {
-    setMovieReleaseAfterYear(value);
-    if (value !== 'Toutes') setDraftCategory('Films');
-  };
-
-  const handleOverlayClick = (e: React.MouseEvent) => {
-    if (e.target === overlayRef.current) {
-      onClose();
-    }
-  };
-
-
-  const handleReset = () => {
-    setDraftCategory('Tout');
-    setSelectedPlatforms([]);
-    setSelectedGenres([]);
-    setPegi('Tous');
-    setRating('Toutes');
-    setMovieReleaseAfterYear('Toutes');
-  };
-
-  const handleValidate = () => {
-    const discoverRoot = document.querySelector<HTMLElement>('[data-app-tab="discover"] .max-w-2xl');
-    const scrollContainer = discoverRoot?.querySelector<HTMLElement>(':scope > .flex-1.overflow-y-auto');
-    if (scrollContainer) {
-      try {
-        scrollContainer.scrollTo({ top: 0, behavior: 'auto' });
-      } catch {
-        scrollContainer.scrollTop = 0;
-      }
-    }
-    setActiveCategory(draftCategory);
-    onApply(selectedPlatforms, selectedGenres, pegi, rating, movieReleaseAfterYear);
-  };
-
-  const typeButtonClass = (category: string, disabled = false) => cn(
-    'px-4 py-2 rounded-full text-[13px] font-semibold flex items-center gap-1.5 transition-all border',
-    draftCategory === category
-      ? 'bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50'
-      : 'bg-white/5 border-white/5 text-zinc-300 hover:bg-white/10',
-    disabled && 'opacity-30 pointer-events-none grayscale'
-  );
-
-  const searchDisabled = (category: string) => isSearchActive && !isSearchCompatibleCategory(category);
-
-  return (
-    <DialogLayer onDismiss={onClose} label="Filtres" historyMode="local" role="dialog"
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      className="fixed inset-0 z-[200] flex flex-col justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
-    >
-      <div className="w-full max-w-xl mx-auto bg-[#1C1C1E] rounded-t-[2rem] pt-3 px-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] shadow-2xl animate-in slide-in-from-bottom-full duration-300 max-h-[90vh] flex flex-col">
-        <div className="w-12 h-1.5 bg-white/10 rounded-full mx-auto mb-4 shrink-0" />
-
-        <div className="flex justify-between items-center mb-4 shrink-0">
-          <button onClick={handleReset} className="text-[13px] font-semibold text-zinc-400 hover:text-white transition-colors">
-            Réinitialiser
-          </button>
-          <button type="button" aria-label="Fermer les filtres" data-dialog-initial-focus onClick={onClose} className="w-11 h-11 rounded-full bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto hide-scrollbar pb-6 space-y-6">
-          <div>
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Type de contenu</h3>
-              {isSearchActive && (
-                <span className="text-[10px] text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded">
-                  Recherche : types simples uniquement
-                </span>
-              )}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button onClick={() => handleCategoryChange('Tout')} className={typeButtonClass('Tout')}>
-                Tout
-              </button>
-              <button onClick={() => handleCategoryChange('Séries')} className={typeButtonClass('Séries')}>
-                <Tv size={14}/> Séries
-              </button>
-              <button onClick={() => handleCategoryChange('Films')} className={typeButtonClass('Films')}>
-                <Film size={14}/> Films
-              </button>
-              <button
-                disabled={searchDisabled('Top 100')}
-                onClick={() => handleCategoryChange('Top 100')}
-                className={typeButtonClass('Top 100', searchDisabled('Top 100'))}
-              >
-                <Trophy size={14}/> Top 100
-              </button>
-              <button
-                disabled={searchDisabled('Pépites')}
-                onClick={() => handleCategoryChange('Pépites')}
-                className={typeButtonClass('Pépites', searchDisabled('Pépites'))}
-              >
-                <Sparkles size={14}/> Pépites
-              </button>
-              <button
-                disabled={searchDisabled('Au cinéma')}
-                onClick={() => handleCategoryChange('Au cinéma')}
-                className={typeButtonClass('Au cinéma', searchDisabled('Au cinéma'))}
-              >
-                <Ticket size={14}/> Au cinéma
-              </button>
-              <button
-                disabled={searchDisabled('Documentaires')}
-                onClick={() => handleCategoryChange('Documentaires')}
-                className={typeButtonClass('Documentaires', searchDisabled('Documentaires'))}
-              >
-                <FileText size={14}/> Documentaires
-              </button>
-              <button onClick={() => handleCategoryChange('Personnes')} className={typeButtonClass('Personnes')}>
-                <User size={14}/> Personnes
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Plateforme</h3>
-              {isSearchActive && (
-                <span className="text-[10px] text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded">
-                  Indisponible en recherche texte
-                </span>
-              )}
-            </div>
-            <div className={cn('flex flex-wrap gap-2', isSearchActive && 'opacity-30 pointer-events-none grayscale')}>
-              {PLATFORMS.map(platform => (
-                <button
-                  key={platform.id}
-                  disabled={isSearchActive}
-                  onClick={() => togglePlatform(platform.id)}
-                  className={cn(
-                    'px-4 py-2 rounded-full text-[13px] font-semibold transition-all border',
-                    selectedPlatforms.includes(platform.id)
-                      ? 'bg-white/15 border-white/20'
-                      : 'bg-transparent border-white/10 hover:border-white/20',
-                    platform.color
-                  )}
-                >
-                  {platform.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Genre</h3>
-            <div className="flex flex-wrap gap-2">
-              {GENRE_OPTIONS.map(genre => (
-                <button
-                  key={genre}
-                  onClick={() => toggleGenre(genre)}
-                  className={cn(
-                    'px-4 py-2 rounded-full text-[13px] font-medium transition-all border',
-                    selectedGenres.includes(genre)
-                      ? 'bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]'
-                      : 'bg-transparent border-white/10 text-zinc-300 hover:border-white/20'
-                  )}
-                >
-                  {genre}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-1">Films · date de sortie</h3>
-            <p className="text-[10px] text-zinc-600 mb-3">Sortis après l’année choisie · le type Films est activé automatiquement</p>
-            <select
-              aria-label="Films sortis après l’année"
-              value={movieReleaseAfterYear}
-              onChange={(event) => handleMovieReleaseAfterYearChange(event.target.value)}
-              className="w-full h-11 rounded-xl bg-black/20 border border-white/10 px-3 text-[13px] font-semibold text-zinc-200 outline-none focus:border-[#E5A93D]/60"
-            >
-              <option value="Toutes">Toutes les années</option>
-              {MOVIE_RELEASE_YEAR_OPTIONS.map(year => (
-                <option key={year} value={year}>{`Après ${year}`}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-3 mb-3">
-              <div>
-                <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Âge conseillé maximum</h3>
-                <p className="text-[10px] text-zinc-600 mt-1">Classification US TMDB · inconnues exclues</p>
-              </div>
-              {isSearchActive && (
-                <span className="text-[10px] text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded shrink-0">
-                  Indisponible en recherche texte
-                </span>
-              )}
-            </div>
-            <div className={cn('flex flex-wrap gap-2', isSearchActive && 'opacity-30 pointer-events-none grayscale')}>
-              {AGE_OPTIONS.map(opt => (
-                <button
-                  key={opt.id}
-                  disabled={isSearchActive}
-                  onClick={() => setPegi(opt.id)}
-                  className={cn(
-                    'min-w-12 h-11 px-3 flex items-center justify-center rounded-xl text-[13px] font-bold transition-all border',
-                    pegi === opt.id
-                      ? opt.id === 'Tous' ? 'bg-green-500/20 text-green-400 border-green-500/50' : 'bg-[#E5A93D]/20 border-[#E5A93D]/50 text-[#E5A93D]'
-                      : 'bg-transparent border-white/10 text-zinc-400 hover:border-white/20'
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider mb-3">Note minimum</h3>
-            <div className="flex flex-wrap gap-2">
-              {RATING_OPTIONS.map(opt => (
-                <button
-                  key={opt}
-                  onClick={() => setRating(opt)}
-                  className={cn(
-                    'px-4 py-2.5 rounded-full text-[13px] font-bold transition-all border',
-                    rating === opt
-                      ? 'bg-[#E5A93D]/20 text-[#E5A93D] border-[#E5A93D]/50'
-                      : 'bg-transparent border-white/10 text-zinc-400 hover:border-white/20'
-                  )}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-white/5 shrink-0">
-          <button
-            onClick={handleValidate}
-            className="w-full bg-[#E5A93D] text-black font-bold text-[15px] py-4 rounded-2xl shadow-[0_4px_14px_0_rgba(229,169,61,0.3)] hover:bg-[#F6BA4E] transition-colors"
-          >
-            Afficher les résultats
-          </button>
-        </div>
+  const currentYear = new Date().getFullYear();
+  return <DialogLayer label="Filtres" onDismiss={onClose} historyMode="local" role="dialog"
+    className="explorer-filter-overlay" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className="explorer-filter-sheet">
+      <div className="explorer-sheet-handle" aria-hidden="true" />
+      <header><h2>Filtres</h2>{active && <button type="button" onClick={reset}>Réinitialiser</button>}
+        <button type="button" aria-label="Fermer les filtres" onClick={onClose}><X size={20} /></button></header>
+      <div className="explorer-filter-tabs" role="tablist" aria-label="Type de filtre">
+        {TABS.map(value => <button type="button" role="tab" key={value} id={`filter-tab-${value}`} aria-controls="explorer-filter-content"
+          aria-selected={value === tab} onClick={() => { setTab(value); onTabChange?.(value); }}>
+          {value}{counts[value] > 0 && <span>{counts[value]}</span>}
+        </button>)}
       </div>
-    </DialogLayer>
-  );
+      <div className="explorer-filter-content" role="tabpanel" id="explorer-filter-content" aria-labelledby={`filter-tab-${tab}`}>
+        {tab === 'Trier' && <div className="explorer-sort-options">{SORT_OPTIONS.map(option =>
+          <button type="button" role="radio" aria-checked={sortBy === option.id} key={option.id} onClick={() => onSort?.(option.id)}>
+            {option.label}<span>{sortBy === option.id && <Check size={16} />}</span>
+          </button>)}</div>}
+        {tab === 'Plateformes' && <>
+          <button type="button" role="switch" aria-checked={mine} disabled={!preferred.length} className="explorer-mine"
+            onClick={() => onApply(mine ? [] : preferred, genres, age, rating, year)}>
+            <span><strong>Mes plateformes</strong><small>{preferred.length ? preferred.map(id => available.find(p => p.id === id)?.label || id).join(', ') : 'À choisir dans Réglages'}</small></span>
+            <i className={mine ? 'is-on' : ''} />
+          </button>
+          <div className="explorer-platform-grid">{available.map(platform => <button type="button" key={platform.id}
+            aria-pressed={platforms.includes(platform.id)} onClick={() => onApply(toggle(platforms, platform.id), genres, age, rating, year)}>
+            {platform.logo && <img src={platform.logo.startsWith('data:') || platform.logo.startsWith('/brand/') ? platform.logo : `https://image.tmdb.org/t/p/w92${platform.logo}`} alt="" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}
+            <span>{platform.label}</span>{platforms.includes(platform.id) && <Check size={14} className="explorer-selected-check" />}
+          </button>)}</div>
+        </>}
+        {tab === 'Genres' && <div className="explorer-genre-grid">{GENRE_OPTIONS.map(genre => <button type="button" key={genre} aria-pressed={genres.includes(genre)}
+          onClick={() => onApply(platforms, toggle(genres, genre), age, rating, year)}>{genre}</button>)}</div>}
+        {tab === 'Note' && <div className="explorer-slider"><strong>{rating === 'Toutes' ? 'Toutes les notes' : `★ ${rating.replace('.', ',').replace('+', '')} et plus`}</strong>
+          <input type="range" min={0} max={RATING_OPTIONS.length - 1} value={Math.max(0, RATING_OPTIONS.indexOf(rating))} aria-label="Note minimale" aria-valuetext={rating}
+            onChange={event => onApply(platforms, genres, age, RATING_OPTIONS[Number(event.target.value)], year)} />
+          <div><span>Toutes</span><span>9+</span></div>
+        </div>}
+        {tab === 'Âge' && <div className="explorer-slider"><strong>{AGE_OPTIONS.find(option => option.id === age)?.label || 'Tous les âges'}</strong>
+          <input type="range" min={0} max={AGE_OPTIONS.length - 1} value={Math.max(0, AGE_OPTIONS.findIndex(option => option.id === age))} aria-label="Âge conseillé" aria-valuetext={AGE_OPTIONS.find(option => option.id === age)?.label}
+            onChange={event => onApply(platforms, genres, AGE_OPTIONS[Number(event.target.value)].id, rating, year)} />
+          <div><span>Tous</span><span>18 ans</span></div><p>Classification US TMDB. Un âge inconnu est exclu.</p>
+        </div>}
+        {tab === 'Année' && <div className="explorer-slider"><strong>{year === 'Toutes' ? 'Toutes les années' : `Sortis après ${year}`}</strong>
+          <input type="range" min={MOVIE_RELEASE_YEAR_MIN - 1} max={currentYear} value={year === 'Toutes' ? MOVIE_RELEASE_YEAR_MIN - 1 : Number(year)}
+            aria-label="Films sortis après" aria-valuetext={year} onChange={event => changeYear(Number(event.target.value) < MOVIE_RELEASE_YEAR_MIN ? 'Toutes' : event.target.value)} />
+          <div><span>Toutes</span><span>{currentYear}</span></div>
+          <label>Année <select value={year} onChange={event => changeYear(event.target.value)}><option>Toutes</option>
+            {Array.from({ length: currentYear - MOVIE_RELEASE_YEAR_MIN + 1 }, (_, index) => <option key={index}>{currentYear - index}</option>)}</select></label>
+        </div>}
+      </div>
+      <footer><button type="button" className="explorer-filter-submit" onClick={onClose}>
+        {resultCount === 0 ? 'Aucun titre avec ces filtres' : resultCount == null ? 'Afficher les résultats' : `Afficher ${resultCount} titres`}
+      </button></footer>
+    </div>
+  </DialogLayer>;
 }

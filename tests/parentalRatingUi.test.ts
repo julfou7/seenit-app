@@ -13,7 +13,7 @@ test('SEENIT-PARENTAL-001 unifie fiche, cartes et Explorer sur le résolveur par
 });
 
 test('SEENIT-PARENTAL-001 remplace PEGI par une borne d’âge maximale cumulative', () => {
-  assert.doesNotMatch(filterModal, /Classification PEGI/i); assert.match(filterModal, /Âge conseillé maximum/); assert.match(filterModal, /id: 'age:0'/); assert.match(filterModal, /id: 'age:10'/); assert.match(filterModal, /id: 'age:18'/); assert.doesNotMatch(filterModal, /id: '10'/, 'les anciens tokens exacts ne doivent plus réactiver les heuristiques legacy'); assert.match(facade, /pegi:\s*'Tous'/, 'la façade doit neutraliser le filtre parental historique du client TMDB');
+  assert.doesNotMatch(filterModal, /Classification PEGI/i); assert.match(filterModal, /aria-label="Âge conseillé"/); assert.match(filterModal, /id: 'age:0'/); assert.match(filterModal, /\[7, 10, 13, 14, 17, 18\]/); assert.match(filterModal, /id: `age:\$\{age\}`/); assert.doesNotMatch(filterModal, /id: '10'/, 'les anciens tokens exacts ne doivent plus réactiver les heuristiques legacy'); assert.match(facade, /pegi:\s*'Tous'/, 'la façade doit neutraliser le filtre parental historique du client TMDB');
 });
 
 test('issue #651 retire le CTA de correction d’âge des fiches sans casser les overrides historiques', () => {

@@ -23,9 +23,9 @@ test('SEENIT-DISCOVER-002 applique une borne strictement supérieure à l’ann�
 });
 
 test('SEENIT-DISCOVER-002 force le filtre sur les films et le propage au moteur canonique', () => {
-  assert.match(filterModalSource, /handleMovieReleaseAfterYearChange[\s\S]*setDraftCategory\('Films'\)/);
+  assert.match(filterModalSource, /changeYear[\s\S]*setActiveCategory\('Films'\)/);
   assert.match(filterModalSource, /initialMovieReleaseAfterYear/);
-  assert.match(filterModalSource, /onApply\(selectedPlatforms, selectedGenres, pegi, rating, movieReleaseAfterYear\)/);
+  assert.match(filterModalSource, /onApply\(platforms, genres, age, rating, value\)/);
   assert.match(discoverSource, /movieReleaseAfterYear,/);
   assert.match(tmdbCoreSource, /effectiveType = movieReleaseDateGte \? 'movie' : type/);
   assert.match(tmdbCoreSource, /params\.set\('primary_release_date\.gte', movieReleaseDateGte\)/);

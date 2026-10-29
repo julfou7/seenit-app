@@ -1,3 +1,4 @@
+import '../../src/screens/explorer.css';
 import { useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BottomNav } from '../../src/components/BottomNav';
@@ -27,11 +28,12 @@ function Harness() {
       <h1>Explorer</h1><button id="outside" type="button">Consulter un résultat</button>
       <div style={{ height: 2400 }}>Résultats de recherche</div>
     </div>
-    <DiscoverSearchDock handleTouchStart={()=>{}} handleTouchMove={()=>{}} handleTouchEnd={()=>{}}
-      isSearchVisible={visible} isSearchFocused={focused} setIsSearchFocused={setFocused} setIsSearchVisible={setVisible}
-      query={query} setQuery={setQuery} hasActiveFilters activeCategory="Tout" activeFilterCount={1}
-      setActiveCategory={()=>{}} setShowGenreMenu={()=>{}} setSelectedPlatforms={()=>{}} setSelectedGenres={()=>{}}
-      setPegi={()=>{}} setMinRating={()=>{}} />
+    <div data-discover-search-mode={visible}>
+    <button id="open-search" onClick={() => setVisible(true)}>Rechercher</button>
+    <DiscoverSearchDock isSearchMode={visible} isSearchFocused={focused} setIsSearchFocused={setFocused}
+      query={query} setQuery={setQuery} activeCategory="Tout" activeFilterCount={1}
+      setActiveCategory={()=>{}} setShowGenreMenu={()=>{}} exitSearch={() => { setVisible(false); setQuery(''); }} />
+    </div>
     <BottomNav currentTab={tab} onTabChange={setTab} onLongPress={shortcut} />
   </main>;
 }

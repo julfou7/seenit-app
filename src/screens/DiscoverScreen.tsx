@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { tmdb, discoverSeenIt, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
 import { type Show } from '../types';
 import { useShows } from '../hooks/useShows';
+import { removeTrackedMedia } from '../features/shows/removeTrackedMedia';
 import { useToastStore } from '../store/toastStore';
 import { getRecommendations } from '../lib/recommendations';
 import { hasMoreTmdbPages } from '../features/discover/discoverPagination';
@@ -20,12 +21,15 @@ import {
   useDebounce,
 } from './discoverPresentation';
 import { DiscoverView } from './DiscoverView';
+import { filterRemoteSearch } from '../features/discover/searchRemoteFilters';
+import { resolveParentalRatingBatch } from '../features/discover/progressiveAgeFilter';
+import { getParentalRatingOverride } from '../store/parentalRatingStore';
 import { useNavigationSearchShortcut } from '../features/navigation/useTabShortcut';
 
 export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const { showToast } = useToastStore();
   const { shows, addShow, updateShow, deleteShow } = useShows();
-  
+
   const showsByTmdbId = React.useMemo(() => {
     const map = new Map<number, Show>();
     for (const s of shows) {
@@ -40,7 +44,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [watchedIdsSnapshot, setWatchedIdsSnapshot] = useState<Set<number>>(() => new Set());
 
   const [query, setQuery] = useState('');
-  const [debouncedQuery] = useDebounce(query, 300);
+  const [delayedQuery] = useDebounce(query, 300);
+  const debouncedQuery = query.trim() ? delayedQuery : '';
   const [searchResults, setSearchResults] = useState<TMDBMedia[]>([]);
   const [totalTvCount, setTotalTvCount] = useState<number | null>(null);
   const [totalMovieCount, setTotalMovieCount] = useState<number | null>(null);
@@ -49,10 +54,12 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [popularPersons, setPopularPersons] = useState<TMDBMedia[]>([]);
   const [recommendations, setRecommendations] = useState<TMDBMedia[]>([]);
   const [heroDetails, setHeroDetails] = useState<Record<number, any>>({});
-  const [loading, setLoading] = useState(true);
+  const [homeLoading, setHomeLoading] = useState(true);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const loading = debouncedQuery.trim() ? searchLoading : homeLoading;
   const [homeEnrichmentReady, setHomeEnrichmentReady] = useState(false);
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
-  
+
   const [activeCategory, setActiveCategoryState] = useState("Tout");
 
   const displayRecommendations = React.useMemo(() => {
@@ -62,7 +69,6 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     });
   }, [recommendations, showsByTmdbId]);
   const [sortBy, setSortBy] = useState<'popular' | 'rating' | 'date' | 'title'>('popular');
-  const [isSortPickerOpen, setIsSortPickerOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [selectedGenreIds, setSelectedGenreIds] = useState<string[]>([]);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
@@ -116,11 +122,9 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       setSelectedPersonId(null);
       setPreviewMedia(null);
       setTrailerModalVideos(null);
-      setShowAllPersons(false);
-      setExpandedRecs(false);
-      setShowAffinityInfo(false);
       setIsSearchFocused(false);
-      
+      setIsSearchMode(false);
+
       setActiveHeroIndex(0);
       if (heroCarouselRef.current) {
         try {
@@ -153,17 +157,48 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [previewMedia, setPreviewMedia] = useState<TMDBMedia | null>(null);
   const handleLongPress = useCallback((media: TMDBMedia) => setPreviewMedia(media), []);
 
-  const [isSearchVisible, setIsSearchVisible] = useState(true);
-  useNavigationSearchShortcut(navigationShortcut, () => setIsSearchVisible(true), '[data-app-tab="discover"] [data-navigation-search]');
-  const [showScrollTop, setShowScrollTop] = useState(false);
-  const lastScrollY = useRef(0);
-  const pendingScrollY = useRef(0);
-  const scrollFrame = useRef<number | null>(null);
+  const [isSearchMode, setIsSearchMode] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const isSearchFocusedRef = useRef(false);
-  isSearchFocusedRef.current = isSearchFocused;
-  const [cols, setCols] = useState(() => (typeof window !== 'undefined' && window.innerWidth >= 640 ? 4 : 3));
-
+  const [searchElapsedMs, setSearchElapsedMs] = useState<number | null>(null);
+  const explorerScroll = useRef(0);
+  const restoringScroll = useRef(false);
+  const enterSearch = useCallback(() => {
+    setIsSearchMode(current => {
+      if (!current) explorerScroll.current = containerRef.current?.scrollTop ?? 0;
+      return true;
+    });
+  }, []);
+  const exitSearch = useCallback(() => {
+    restoringScroll.current = true;
+    setIsSearchMode(false);
+    setIsSearchFocused(false);
+    setQuery('');
+  }, []);
+  useEffect(() => {
+    if (isSearchMode || debouncedQuery || !restoringScroll.current || loading) return;
+    const frame = requestAnimationFrame(() => {
+      if (containerRef.current) containerRef.current.scrollTop = explorerScroll.current;
+      restoringScroll.current = false;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [isSearchMode, debouncedQuery, loading]);
+  useEffect(() => {
+    if (!isSearchMode) return;
+    const closeSearch = () => exitSearch();
+    const backSearch = (event: Event) => {
+      event.preventDefault();
+      const input = document.querySelector<HTMLInputElement>('[data-app-tab="discover"] [data-navigation-search]');
+      if (input === document.activeElement) { input.blur(); setIsSearchFocused(false); if (!query.trim()) exitSearch(); }
+      else exitSearch();
+    };
+    window.addEventListener('app-close-modals', closeSearch);
+    window.addEventListener('discover-back-one-level', backSearch);
+    return () => {
+      window.removeEventListener('app-close-modals', closeSearch);
+      window.removeEventListener('discover-back-one-level', backSearch);
+    };
+  }, [isSearchMode, query, exitSearch]);
+  useNavigationSearchShortcut(navigationShortcut, enterSearch, '[data-app-tab="discover"] [data-navigation-search]');
   const handleHeroScroll = () => {
     if (heroCarouselRef.current) {
       const scrollLeft = heroCarouselRef.current.scrollLeft;
@@ -189,12 +224,6 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   }, [activeCategory]);
 
   useEffect(() => {
-    const handleResize = () => setCols(window.innerWidth >= 640 ? 4 : 3);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  useEffect(() => {
     const completed = new Set<number>();
     for (const s of shows) {
       if (s.tmdbId != null) {
@@ -218,7 +247,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     const isTv = media.media_type === 'tv' || activeCategory === 'Séries' || media.first_air_date !== undefined;
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
     const numId = Number(media.id);
-    const existingShow = showsByTmdbId.get(numId);
+    const existingShow = shows.find(show => Number(show.tmdbId) === numId && show.mediaType === (isTv ? 'tv' : 'movie'));
 
     if (existingShow) {
       if (isTv) {
@@ -238,8 +267,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
             updatedAt: Date.now()
           });
           showToast(
-            `« ${titleToUse} » remis dans "À voir"`, 
-            'success', 
+            `« ${titleToUse} » remis dans "À voir"`,
+            'success',
             existingShow,
             async () => {
               await updateShow(existingShow.id, {
@@ -257,8 +286,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
             updatedAt: Date.now()
           });
           showToast(
-            `« ${titleToUse} » remis dans "À voir"`, 
-            'success', 
+            `« ${titleToUse} » remis dans "À voir"`,
+            'success',
             existingShow,
             async () => {
               await updateShow(existingShow.id, {
@@ -272,7 +301,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       } else {
         const isCurrentlySeen = existingShow.status === 'completed' || existingShow.seenEpisodes?.includes('movie');
         const newStatus = isCurrentlySeen ? 'plan_to_watch' : 'completed';
-        const newSeenEpisodes = isCurrentlySeen 
+        const newSeenEpisodes = isCurrentlySeen
           ? (existingShow.seenEpisodes || []).filter((e: string) => e !== 'movie')
           : Array.from(new Set([...(existingShow.seenEpisodes || []), 'movie']));
 
@@ -288,8 +317,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
         });
 
         showToast(
-          newStatus === 'completed' 
-            ? `« ${titleToUse} » marqué comme vu !` 
+          newStatus === 'completed'
+            ? `« ${titleToUse} » marqué comme vu !`
             : `« ${titleToUse} » marqué comme à voir.`,
           'success',
           existingShow,
@@ -335,12 +364,16 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
         }
       );
     }
-  }, [activeCategory, addShow, deleteShow, showsByTmdbId, showToast, updateShow]);
+  }, [activeCategory, addShow, deleteShow, showsByTmdbId, shows, showToast, updateShow]);
 
   const handleAddMedia = useCallback(async (media: TMDBMedia) => {
-    const isTv = media.media_type === 'tv' || activeCategory === 'Séries';
+    const isTv = media.media_type === 'tv' || media.media_type === 'series' || (!media.media_type && Boolean(media.first_air_date));
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
-    if (showsByTmdbId.has(media.id)) return;
+    const existing = shows.find(show => Number(show.tmdbId) === Number(media.id) && show.mediaType === (isTv ? 'tv' : 'movie'));
+    if (existing) {
+      await removeTrackedMedia(existing, deleteShow);
+      return;
+    }
 
     const newShowData: any = {
       tmdbId: Number(media.id),
@@ -352,7 +385,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       mediaType: isTv ? 'tv' : 'movie',
       seasonRecords: {},
       episodeRecords: {},
-      status: 'watching',
+      status: 'plan_to_watch',
       updatedAt: Date.now(),
       createdAt: Date.now(),
       seenEpisodes: [],
@@ -372,85 +405,28 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
         }
       }
     );
-  }, [activeCategory, addShow, deleteShow, showsByTmdbId, showToast]);
-
-  const handleScroll = useCallback((event: React.UIEvent<HTMLDivElement>) => {
-    pendingScrollY.current = event.currentTarget.scrollTop;
-    if (scrollFrame.current !== null) return;
-    scrollFrame.current = requestAnimationFrame(() => {
-      scrollFrame.current = null;
-      if (isSearchFocusedRef.current) return;
-      const currentScrollY = pendingScrollY.current;
-
-      if (currentScrollY < 300) {
-        setIsSearchVisible(current => current ? current : true);
-        setShowScrollTop(current => current ? false : current);
-      } else if (currentScrollY > lastScrollY.current + 10) {
-        setIsSearchVisible(current => current ? false : current);
-        setShowScrollTop(current => current ? false : current);
-      } else if (currentScrollY < lastScrollY.current - 10) {
-        setIsSearchVisible(current => current ? current : true);
-        setShowScrollTop(current => current ? current : true);
-      }
-
-      lastScrollY.current = currentScrollY;
-    });
-  }, []);
-
-  useEffect(() => () => {
-    if (scrollFrame.current !== null) cancelAnimationFrame(scrollFrame.current);
-  }, []);
+  }, [activeCategory, addShow, deleteShow, showsByTmdbId, shows, showToast]);
 
   const hasActiveFilters = selectedPlatforms.length > 0
     || selectedGenres.length > 0
     || pegi !== 'Tous'
     || minRating !== 'Toutes'
-    || movieReleaseAfterYear !== 'Toutes';
+    || movieReleaseAfterYear !== 'Toutes'
+    || sortBy !== 'popular';
   const activeFilterCount = selectedPlatforms.length
     + selectedGenres.length
     + (pegi !== 'Tous' ? 1 : 0)
     + (minRating !== 'Toutes' ? 1 : 0)
-    + (movieReleaseAfterYear !== 'Toutes' ? 1 : 0);
+    + (movieReleaseAfterYear !== 'Toutes' ? 1 : 0)
+    + (sortBy !== 'popular' ? 1 : 0);
 
-  const [expandedRecs, setExpandedRecs] = useState(false);
-  const [showAffinityInfo, setShowAffinityInfo] = useState(false);
-
-  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
-    personnes: false,
-    series: false,
-    films: false,
-    documentaires: false
-  });
-  const [showAllPersons, setShowAllPersons] = useState(false);
 
   const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [homeHasMore, setHomeHasMore] = useState(true);
+  const hasMore = !debouncedQuery.trim() && homeHasMore;
   const homeRequestGenerationRef = useRef(0);
   const searchRequestGenerationRef = useRef(0);
-
-  const touchStartY = useRef<number | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (touchStartY.current !== null) {
-      const diff = e.touches[0].clientY - touchStartY.current;
-      if (diff > 25 && !isSearchVisible) {
-        setIsSearchVisible(true);
-        touchStartY.current = null;
-      } else if (diff < -25 && isSearchVisible) {
-        setIsSearchVisible(false);
-        touchStartY.current = null;
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    touchStartY.current = null;
-  };
 
   const [trailerModalVideos, setTrailerModalVideos] = useState<any[] | null>(null);
 
@@ -474,19 +450,15 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     }
   };
 
-  const toggleSection = (key: string) => {
-    setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
   useEffect(() => {
     setPage(1);
-    setHasMore(true);
+    setHomeHasMore(true);
     setPopular([]);
     setTrending([]);
-    if (!debouncedQuery.trim() && activeCategory === 'Tout') {
+    if (activeCategory === 'Tout') {
       setHomeEnrichmentReady(false);
     }
-  }, [activeCategory, debouncedQuery, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder]);
+  }, [activeCategory, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder]);
 
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
@@ -502,14 +474,14 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   useEffect(() => {
     const requestGeneration = ++homeRequestGenerationRef.current;
     const isCurrentRequest = () => homeRequestGenerationRef.current === requestGeneration;
-    if (isOffline || debouncedQuery.trim()) {
+    if (isOffline) {
       return () => {
         if (isCurrentRequest()) homeRequestGenerationRef.current += 1;
       };
     }
 
     async function fetchHome() {
-      if (page === 1) setLoading(true);
+      if (page === 1) setHomeLoading(true);
 
       let nextPopular: TMDBMedia[] | null = null;
       let nextTrending: TMDBMedia[] | null = null;
@@ -610,7 +582,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
         if (trendingList.length > 0) {
           setTrending(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
           setPopular(prev => page === 1 ? trendingList : mergeMedia(prev, trendingList));
-          if (page === 1) setLoading(false);
+          if (page === 1) setHomeLoading(false);
         }
 
         const [popTvRes, popMovRes, personRes] = await Promise.all([
@@ -664,8 +636,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       if (nextPersons !== null) {
         setPopularPersons(prev => page === 1 ? nextPersons! : mergeMedia(prev, nextPersons!));
       }
-      setHasMore(nextHasMore);
-      setLoading(false);
+      setHomeHasMore(nextHasMore);
+      setHomeLoading(false);
       setIsLoadingMore(false);
       if (page === 1) {
         void getRecommendations(20)
@@ -680,21 +652,25 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     return () => {
       if (isCurrentRequest()) homeRequestGenerationRef.current += 1;
     };
-  }, [debouncedQuery, isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder, hasActiveFilters]);
+  }, [isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder, hasActiveFilters]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const requestGeneration = ++searchRequestGenerationRef.current;
     const isCurrentRequest = () => searchRequestGenerationRef.current === requestGeneration;
     if (isOffline || !debouncedQuery.trim()) {
       setSearchResults([]);
-      setHasMore(true);
+      setSearchLoading(false);
       return () => {
-        if (isCurrentRequest()) searchRequestGenerationRef.current += 1;
+        controller.abort();
+      if (isCurrentRequest()) searchRequestGenerationRef.current += 1;
       };
     }
 
     async function search() {
-      setLoading(true);
+      setSearchLoading(true);
+      const searchStarted = performance.now();
+      setSearchElapsedMs(null);
       setTotalTvCount(null);
       setTotalMovieCount(null);
 
@@ -709,48 +685,42 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
           ...(res1.value.results || []),
           ...(res2?.ok ? (res2.value.results || []) : [])
         ];
-        const results = combined.slice(0, 30);
+        const results = await filterRemoteSearch(combined.slice(0, 30), pegi, selectedPlatforms, {
+          ratings: resolveParentalRatingBatch,
+          ratingOverride: getParentalRatingOverride,
+          providerIds: async item => {
+            const response = await tmdb.getWatchProviders(Number(item.id), item.media_type === 'movie' ? 'movie' : 'tv');
+            if (!response.ok) return [];
+            const fr = response.value?.results?.FR;
+            return [...(fr?.flatrate || []), ...(fr?.free || []), ...(fr?.ads || [])].map(provider => Number(provider.provider_id));
+          },
+        }, controller.signal);
+        if (!isCurrentRequest()) return;
         setSearchResults(results);
-        
+
         const isShortQuery = debouncedQuery.trim().length <= 3;
         if (res1.value.total_tv !== undefined) setTotalTvCount(isShortQuery ? results.filter(r => r.media_type === 'tv' || r.media_type === 'series').length : res1.value.total_tv);
         if (res1.value.total_movie !== undefined) setTotalMovieCount(isShortQuery ? results.filter(r => r.media_type === 'movie').length : res1.value.total_movie);
       } else {
         setSearchResults([]);
       }
-      setHasMore(false);
-      setLoading(false);
-      setIsLoadingMore(false);
+      setSearchElapsedMs(performance.now() - searchStarted);
+
+      setSearchLoading(false);
     }
 
-    void search();
+    void search().catch(() => {
+      if (!isCurrentRequest()) return;
+      setSearchResults([]); setSearchLoading(false);
+    });
     return () => {
+      controller.abort();
       if (isCurrentRequest()) searchRequestGenerationRef.current += 1;
     };
-  }, [debouncedQuery, isOffline]);
+  }, [debouncedQuery, isOffline, pegi, selectedPlatforms]);
 
   const rawList = useMemo(() => {
-    if (debouncedQuery.trim()) {
-      const qClean = debouncedQuery.trim().toLowerCase();
-      const existingIds = new Set(searchResults.map(r => Number(r.id)));
-      const matchingLocal = shows
-        .filter(s => {
-          const t = (s.title || '').toLowerCase();
-          const numId = Number(s.tmdbId || s.id);
-          return t.includes(qClean) && (!numId || !existingIds.has(numId));
-        })
-        .map(s => ({
-          id: Number(s.tmdbId || s.id),
-          title: s.title,
-          name: s.title,
-          poster_path: s.posterPath,
-          backdrop_path: s.backdropPath,
-          vote_average: s.userRating || (s as any).rating,
-          first_air_date: s.firstAirDate || ((s as any).year ? `${(s as any).year}-01-01` : undefined),
-          media_type: (s.mediaType === 'movie' ? 'movie' : 'tv') as 'tv' | 'movie',
-        }));
-      return [...matchingLocal, ...searchResults].slice(0, 30);
-    }
+    if (debouncedQuery.trim()) return searchResults;
     if (activeCategory === 'Personnes') return popularPersons;
     return popular.length > 0 ? popular : trending;
   }, [debouncedQuery, searchResults, popular, trending, popularPersons, activeCategory, shows]);
@@ -875,12 +845,10 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   );
 
   const top10 = useMemo(() => {
-    if (debouncedQuery.trim() || activeCategory === 'Personnes' || hasActiveFilters || sortBy !== 'popular') return [];
+    if (debouncedQuery.trim() || activeCategory !== 'Tout' || hasActiveFilters || sortBy !== 'popular') return [];
     const seen = new Set<string>();
     const list: TMDBMedia[] = [];
     for (const item of processedResults) {
-      if (activeCategory === 'Au cinéma' && !isMovieAtCinema(item)) continue;
-      if (activeCategory === 'Top 100' && !item.vote_average) continue;
       if (item.media_type === 'person') continue;
       const type = item.media_type || (item.first_air_date ? 'tv' : 'movie');
       const key = `${type}_${item.id}`;
@@ -921,7 +889,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
 
   const uniqueProcessedResults = useMemo(() => {
     const seen = new Set<string>();
-    const top10Keys = (!debouncedQuery.trim() && top10.length > 0 && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Top 100' || activeCategory === 'Au cinéma'))
+    const top10Keys = (!isSearchMode && !debouncedQuery.trim() && top10.length > 0 && activeCategory === 'Tout' && !hasActiveFilters)
       ? new Set(top10.map(item => {
           const type = item.media_type || (item.first_air_date ? 'tv' : 'movie');
           return `${type}_${item.id}`;
@@ -939,7 +907,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       if (debouncedQuery.trim() && list.length >= 30) break;
     }
     return list;
-  }, [processedResults, debouncedQuery, top10, activeCategory]);
+  }, [processedResults, debouncedQuery, top10, activeCategory, hasActiveFilters, isSearchMode]);
 
   const personResults = useMemo(() => {
     return uniqueProcessedResults.filter(r => r.media_type === 'person');
@@ -961,24 +929,24 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     : uniqueProcessedResults;
 
   const handleLoadMore = useCallback(() => {
-    if (isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
+    if (isSearchMode || isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
     setIsLoadingMore(true);
     setPage(p => p + 1);
-  }, [criticalHomeSliceActive, debouncedQuery, hasMore, isLoadingMore, loading]);
+  }, [criticalHomeSliceActive, debouncedQuery, hasMore, isLoadingMore, loading, isSearchMode]);
 
-  const observerTargetNodeRef = useRef<HTMLDivElement | null>(null);
+  const [observerTargetNode, setObserverTargetNode] = useState<HTMLDivElement | null>(null);
 
   const observerTargetRef = useCallback((node: HTMLDivElement | null) => {
-    observerTargetNodeRef.current = node;
+    setObserverTargetNode(node);
   }, []);
 
   useEffect(() => {
-    const node = observerTargetNodeRef.current;
-    if (!node || isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
+    const node = observerTargetNode;
+    if (!node || isSearchMode || isLoadingMore || loading || criticalHomeSliceActive || !hasMore || debouncedQuery.trim()) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
+        if (entries.at(-1)?.isIntersecting) {
           handleLoadMore();
         }
       },
@@ -987,12 +955,12 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     observer.observe(node);
 
     return () => observer.disconnect();
-  }, [criticalHomeSliceActive, debouncedQuery, handleLoadMore, hasMore, isLoadingMore, loading]);
+  }, [criticalHomeSliceActive, debouncedQuery, handleLoadMore, hasMore, isLoadingMore, loading, isSearchMode, observerTargetNode]);
 
-  const showHeroSurface = !debouncedQuery.trim()
+  const showHeroSurface = !isSearchMode && !debouncedQuery.trim()
     && !hasActiveFilters
     && sortBy === 'popular'
-    && (activeCategory === 'Tout' || activeCategory === 'Séries' || activeCategory === 'Films' || activeCategory === 'Pépites' || activeCategory === 'Au cinéma');
+    && activeCategory === 'Tout';
 
-  return <DiscoverView model={{ activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleScroll, handleToggleWatched, handleTouchEnd, handleTouchMove, handleTouchStart, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchVisible, isSearchFocused, isSortPickerOpen, loading, minRating, movieReleaseAfterYear, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setIsSearchVisible, setIsSortPickerOpen, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setShowScrollTop, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showScrollTop, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
+  return <DiscoverView model={{ shows, isSearchMode, enterSearch, exitSearch, searchElapsedMs, activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleToggleWatched, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchFocused, loading, minRating, movieReleaseAfterYear, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
 }

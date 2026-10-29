@@ -284,7 +284,7 @@ test('SEENIT-PERF-001 borne le fan-out diffuseurs et stabilise les cartes Explor
   assert.match(discoverSource, /const handleAddMedia = useCallback/);
   assert.match(discoverSource, /onLongPress=\{handleLongPress\}/);
   assert.match(discoverSource, /useGridVirtualWindow/);
-  assert.match(discoverSource, /debouncedQuery\.trim\(\) \? \(/);
+  assert.match(discoverSource, /isSearchMode && query\.trim\(\) \? <DiscoverSearchResults/);
   assert.match(discoverSource, /<BoundedDiscoverGrid/);
   assert.ok(discoverSource.includes("`grid_${item.media_type || 'media'}_${item.id}`"));
   assert.match(appSource, /const openTmdbMedia = useCallback/);

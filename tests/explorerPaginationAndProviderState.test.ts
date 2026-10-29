@@ -37,17 +37,10 @@ test('Explorer reste monté lors d’un changement d’onglet', () => {
     'Explorer doit rester monté et être masqué uniquement par CSS hors onglet actif');
 });
 
-test('Valider les filtres remonte Explorer avant de remplacer la liste', () => {
-  const validateStart = filterModalSource.indexOf('const handleValidate');
-  const validateEnd = filterModalSource.indexOf('\n  };', validateStart);
-  assert.ok(validateStart >= 0 && validateEnd > validateStart, 'handleValidate doit être détectable');
-  const validateSource = filterModalSource.slice(validateStart, validateEnd);
-  const scrollIndex = validateSource.indexOf("scrollTo({ top: 0, behavior: 'auto' })");
-  const applyIndex = validateSource.indexOf('onApply(selectedPlatforms, selectedGenres, pegi, rating, movieReleaseAfterYear)');
-  assert.ok(scrollIndex >= 0 && applyIndex > scrollIndex,
-    'le viewport doit revenir en haut avant l’application des nouveaux résultats');
-  assert.match(validateSource, /:scope > \.flex-1\.overflow-y-auto/,
-    'le reset cible uniquement le scroll principal d’Explorer, pas la zone interne de la modale');
+test('SEENIT-DISCOVER-003 E-20 le panneau applique sans scroll ni fermeture implicites', () => {
+ assert.doesNotMatch(filterModalSource, /handleValidate|scrollTo|scrollTop/);
+ assert.match(filterModalSource, /onClick=\{\(\) => onApply\(toggle\(platforms/);
+ assert.match(filterModalSource, /onClick=\{onClose\}/);
 });
 
 test('Les cartes exposent un état de recherche diffuseur sans dupliquer le cache', () => {

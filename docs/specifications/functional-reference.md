@@ -384,15 +384,11 @@ Firestore privé.
 
 ## 7. Explorer
 
-Pendant la saisie dans Explorer, le champ reste à 8 px du clavier et l'îlot de navigation est masqué.
-La fermeture du clavier ou la sortie du champ restaure le placement habituel, la requête et les filtres
-restent conservés (`SEENIT-DISCOVER-003`, #774).
-Dans Explorer, la loupe à gauche de la navigation rouvre et focalise la barre à tout moment,
-y compris après son repli au défilement. La position des résultats, la requête et les filtres sont conservés.
+Le contrat E-01..33 du [handoff Explorer](../design/explorer-refonte-2026-10-28.md) (#787) remplace les commandes flottantes : loupe et filtres dans la rangée collante, navigation commune inchangée. La recherche est un mode dédié qui masque la nav, y compris clavier fermé avec texte. La sortie restaure la position Explorer. La bibliothèque locale instantanée précède les listes TMDB/personnes ; les filtres ne concernent que TMDB. Le panneau applique chaque choix immédiatement et les pastilles rouvrent le bon onglet. L’aperçu propose trois actions et garde les commandes YouTube natives.
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
-- Recherche multi-pages TMDB, regroupée en personnes, séries et films.
+- Recherche multi-pages TMDB en listes : bibliothèque locale, films et séries, puis personnes. Les personnages de fiction de la bibliothèque et des univers prouvés sont cherchés côté backend et ouvrent la fiche dédiée P-01..12 ; la section reste masquée sans source.
 - Filtres par plateformes choisies dans les réglages, genres, **Âge conseillé** maximal et note minimale.
 - Le filtre **Films · sortis après** accepte une année de 1900 à l'année courante. Choisir `Y` force
   le type **Films** et conserve uniquement les films dont `release_date` est strictement postérieure à
@@ -411,7 +407,7 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
   pagination ; le backend garde une concurrence fournisseur bornée et peut admettre la queue d'une page
   après une courte attente anti-stall, sans attendre le timeout fournisseur de 10 s. Elle ne charge pas
   les fiches TMDB complètes des résultats Explorer.
-- Le panneau « Type de contenu » permet notamment de choisir **Top 100** ; ce choix change de catégorie et ne constitue pas un tri.
+- **Top 100** reste une catégorie de la rangée collante, distincte du tri ; le panneau ne duplique plus les types de contenu.
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
 - Le bouton Reprendre du Hero suit les épisodes vus persistés : un ancien pointeur de reprise ne
@@ -421,15 +417,14 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
   Un épisode annoncé avec une date future ne devient pas une reprise avant sa diffusion ; une série
   terminée sans pointeur de prochain épisode n'en invente pas en attendant sa synchronisation.
   Si la série n'a pas été commencée, un prochain épisode futur affiche À venir avec son numéro exact.
-  Le synopsis compact se coupe sur une fin de mot et Voir plus permet de lire le texte entier.
+  Le synopsis et Voir plus quittent le hero compact ; le synopsis reste dans l’aperçu et la fiche.
   Les pages Discover récemment obtenues sont réutilisées directement sur l'appareil pour un retour écran,
   une combinaison identique ou une page déjà parcourue. Cela inclut le flux par défaut **Tout**
   (tendances + populaires) ainsi que Top 100, Pépites et Documentaires ; les personnes restent hors
   persistance client. Ces listes expirent rapidement afin de laisser TMDB reprendre la main sur les
   données volatiles.
-- Le chargement du Hero réserve immédiatement la rangée de progression ; son remplacement par les
-  indicateurs interactifs ne décale ni les catégories, ni le titre Explorer, ni la grille.
-- La barre de recherche se masque pendant la descente et ne se réaffiche que lorsque le défilement repart réellement vers le haut ; le geste tactile et le `scrollTop` utilisent la même sémantique de direction.
+- Le hero réserve 368 px, avec ses indicateurs à l’intérieur ; les catégories et la grille restent stables au chargement.
+- La loupe reste accessible dans la rangée collante à toute profondeur ; aucune recherche ne dépend d’un geste de défilement caché.
 - Le scroll infini conserve des clés de cartes stables, évite de rerendre les cartes déjà chargées pour
   un simple changement d'en-tête et ne matérialise que les lignes visibles avec un débord borné. Des
   espaceurs conservent la hauteur logique des pages déjà chargées. La fin de pagination suit les
@@ -1086,3 +1081,5 @@ Terrain229 : une réouverture de panneau ne suffit pas à prouver sa fluidité. 
 ### Notifications unifiées #778
 
 Le titre nomme l’œuvre ; le type est dans l’en-tête Android (`subText`), le compact donne un fait et le développé ajoute du contexte. Les téléchargements distinguent envoi au client, import et preuve Plex exacte. Les sept canaux dédiés sont créés au démarrage sans recréer Téléchargements ni écraser les choix Android. Les réglages exposent Actualités et l’accès au panneau système ; la migration v8 reprogramme les rappels. Les images gardent le cache privé borné, contain et l’hydratation à la livraison. Les alertes vues/archivées sont retirées ; une notification Vu peut afficher la reprise suivante avec la même identité sans son. Voir SEENIT-NOTIFICATION-005 à 008 et [contrat](notification-refactor-2026-10-27.md).
+
+Complément Explorer29/10 (#398/#787) : [fiche personnage](../design/explorer-personnage-2026-10-29.md), reprise exacte sur crédits par épisode, cache public borné, calcul au premier accès uniquement ; progression/favoris isolés par UID. Toasts au-dessus du champ et retour aux résultats avec la même requête, clavier fermé.

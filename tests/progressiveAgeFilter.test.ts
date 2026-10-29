@@ -375,7 +375,7 @@ test('issue #326 le point d’entrée production utilise le moteur progressif sa
   );
   assert.match(
     discoverViewCore,
-    /!suppressEndOfResults && \(uniqueProcessedResults\.length > 0/,
+    /!model\.suppressEndOfResults && visibleProcessedResults\.length > 0/,
     'le point d’entrée UI réel doit masquer « Fin des résultats » pendant un snapshot progressif',
   );
   assert.equal(existsSync(removedClientPath), false);

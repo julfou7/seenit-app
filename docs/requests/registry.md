@@ -161,3 +161,7 @@ Complément USR-2026-10-23-005 : ZIP(10) SPEC-DEV-V4.md reçue24/10, complète (
 
 - 2026-10-28 · #295 / #738 · Retours TV réels : fiches/hero Tizen 4, thèmes cohérents et toasts, profils centrés, apps utiles et logos, réglages honnêtes, aperçu Sport ; conserver association et CANAL+ validé, sans toucher au mobile.
 - 2026-10-28 · #295 · Netflix natif confirmé visuellement par le propriétaire : mémoriser une variante réellement installée pour cette TV, avec choix générique « Utiliser cette version », partagé entre profils sans modifier leurs favoris.
+
+| USR-2026-10-29-001 | 2026-10-29 | Refonte Explorer mobile selon ZIP28/10 et choix ouverts validés : hero compact, recherche liste, filtres directs et aperçu. Remplace la loupe annexe de #774 ; aucune APK demandée. | SEENIT-DISCOVER-003, #787 | active |
+
+Complément USR-2026-10-29-001 : maquette 4c et exemple Saul Goodman reçus ; fiche de personnage de fiction distincte de la fiche acteur, à relier au cadrage #398. Voir `docs/design/explorer-personnage-2026-10-29.md`. Source bibliothèque + univers reliés validée, choix du calcul exact différé délégué à l’agent ; aucun ratio d’épisodes ou co-crédit inventé. Le delta P-01..12 / E-18 / E-19 complète la maquette.
