@@ -5,7 +5,8 @@ import type { TMDBMedia } from '../../src/features/shows/tmdbClient';
 export const telemetry = { calls: 0, opened: [] as Array<string | number>, statuses: [] as string[], documentWrites: [] as string[], deleted: [] as string[] };
 const media: TMDBMedia[] = Array.from({ length: 60 }, (_, i) => ({ id: 1000 + i, media_type: i % 2 ? 'tv' : 'movie', title: 'Les mondes de demain ' + i, name: 'Les mondes de demain ' + i, release_date: i % 2 ? undefined : '2026-01-01', first_air_date: i % 2 ? '2026-01-01' : undefined, vote_average: 8, vote_count: 800, popularity: 50, poster_path: '/fixture.svg', backdrop_path: '/fixture.svg', genre_ids: [28, 10759] }));
 const seed: Show[] = [{ id: 'local42', userId: 'explorer-test', tmdbId: 42, title: 'Breaking Bad', mediaType: 'tv', firstAirDate: '2008-01-20', seenEpisodes: ['1-1'], totalEpisodes: 62, status: 'watching', isArchived: false, posterPath: '/fixture.svg', backdropPath: null, updatedAt: 1, createdAt: 1, episodeRecords: {} }];
-seed.push({...seed[0],id:'local-got',tmdbId:7778,title:'Le Trône de fer'});
+seed.push({...seed[0],id:'local-got',tmdbId:7778,title:'Le Trône de fer',seenEpisodes:['1x1'],episodeRecords:{'1x1':{watchedAt:123}},nextEpisodeToWatch:{season_number:1,episode_number:2,air_date:'2020-01-01'}});
+seed.push({...seed[0],id:'collision-tv',tmdbId:1000,title:'Une autre série'});
 export const useShowsStore = create(() => ({ shows: seed, addShowOptimistic(show: Show) { useShowsStore.setState(state=>({shows:[...state.shows.filter(item=>item.id!==show.id),show]})); } }));
 export const useShows = () => ({
   shows: useShowsStore(state => state.shows),
@@ -30,7 +31,7 @@ const details = (id: number) => Promise.resolve({ ok: true, value: { ...media.fi
 const list = async () => ({ ok: true, value: { results: media, total_pages: 1 } });
 export const tmdb = {
   getPersonDetails: async (id: number) => ({ ok: true, value: { id, name: 'Bob Odenkirk', biography: 'Bob est un acteur.', profile_path: '/bob.svg', known_for_department: 'Acting' } }),
-  getPersonCredits: async () => ({ ok: true, value: { cast: [], crew: [] } }),
+  getPersonCredits: async () => ({ ok: true, value: { cast: [{...media[1],id:7778,title:undefined,name:'Game of Thrones',media_type:'tv',character:'Personnage',episode_count:10}], crew: [] } }),
   getPersonImages: async () => ({ ok: true, value: { profiles: [] } }),
   getTrending: list, getPopular: list, getPopularPersons: async () => ({ ok: true, value: { results: [], total_pages: 1 } }),
   getTopRated: list, getTopRatedRecent: list, getNowPlaying: list, discoverByGenre: list,

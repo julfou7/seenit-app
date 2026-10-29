@@ -9,8 +9,9 @@ import { PersonDetailModal } from './PersonDetailModal';
 import { FilterModal, type FilterTab } from '../components/FilterModal';
 import { TrailerModal } from '../components/TrailerModal';
 import { isSearchCompatibleCategory } from '../features/discover/filterPolicy';
-import { BoundedDiscoverGrid, CATEGORIES, checkIsUpToDate } from './discoverPresentation';
+import { BoundedDiscoverGrid, CATEGORIES } from './discoverPresentation';
 import { GridSkeletons, HeroCard, HeroSkeleton } from './DiscoverHero';
+import { removeTrackedMedia } from '../features/shows/removeTrackedMedia';
 import { useCharacterSearch } from '../hooks/useCharacterSearch';
 import { CharacterDetailModal } from '../components/CharacterDetailModal';
 import type { CharacterRecord } from '../features/discover/characters';
@@ -20,6 +21,8 @@ interface DiscoverViewProps { model: DiscoverViewModel & { suppressEndOfResults?
 
 export function DiscoverView({ model }: DiscoverViewProps) {
   const { activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleToggleWatched, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, loading, minRating, movieReleaseAfterYear, observerTargetRef, onShowClick, pegi, previewMedia, query, selectedGenres, selectedPersonId, selectedPlatforms, setActiveCategory, setActiveHeroIndex, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showsByTmdbId, sortBy, trailerModalVideos, visibleHeroItems, visibleProcessedResults, isSearchMode, enterSearch } = model;
+  const previewType = previewMedia?.media_type === 'tv' || (!previewMedia?.media_type && previewMedia?.first_air_date !== undefined) ? 'tv' : 'movie';
+  const previewShow = previewMedia ? model.shows.find(show => Number(show.tmdbId) === Number(previewMedia.id) && show.mediaType === previewType) : undefined;
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterRecord | null>(null);
   const characterSearch = useCharacterSearch(model.shows, isSearchMode ? debouncedQuery : '', !selectedCharacter);
   const closeKeyboard = () => { document.querySelector<HTMLInputElement>('[data-navigation-search]')?.blur(); model.setIsSearchFocused(false); };
@@ -89,10 +92,10 @@ export function DiscoverView({ model }: DiscoverViewProps) {
       </div>
     </div>
     <DiscoverSearchDock {...model} />
-    {selectedCharacter && <CharacterDetailModal character={selectedCharacter} shows={model.shows} onClose={closeCharacter} onCharacterClick={openCharacter} onPersonClick={resultModel.openPersonModal} onShowClick={onShowClick} />}
-    {previewMedia && <PreviewModal media={previewMedia} isAdded={showsByTmdbId.has(Number(previewMedia.id))}
-      isWatched={showsByTmdbId.get(Number(previewMedia.id))?.status === 'completed' || showsByTmdbId.get(Number(previewMedia.id))?.seenEpisodes?.includes('movie') || checkIsUpToDate(showsByTmdbId.get(Number(previewMedia.id)))}
-      onClose={() => setPreviewMedia(null)} onAddClick={handleAddMedia} onToggleWatched={handleToggleWatched} onShowClick={onShowClick} />}
+    {selectedCharacter && <CharacterDetailModal key={selectedCharacter.id} character={selectedCharacter} shows={model.shows} onClose={closeCharacter} onCharacterClick={openCharacter} onPersonClick={resultModel.openPersonModal} onShowClick={onShowClick} />}
+    {previewMedia && <PreviewModal media={previewMedia} isAdded={Boolean(previewShow)}
+      isWatched={Boolean(previewShow && (previewShow.status === 'completed' || previewShow.seenEpisodes.includes('movie')))}
+      onClose={() => setPreviewMedia(null)} onAddClick={handleAddMedia} onRemoveClick={() => { if (previewShow) return removeTrackedMedia(previewShow, deleteShow); }} onToggleWatched={handleToggleWatched} onShowClick={onShowClick} />}
     {selectedPersonId && <PersonDetailModal personId={selectedPersonId} onClose={() => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal) window.history.back(); }} onShowClick={onShowClick} />}
     {trailerModalVideos && <TrailerModal videos={trailerModalVideos} onClose={() => setTrailerModalVideos(null)} />}
     {showGenreMenu && <FilterModal onClose={() => setShowGenreMenu(false)} activeCategory={activeCategory} setActiveCategory={setActiveCategory}

@@ -3,7 +3,7 @@ async function buildSearchKeyboardHarness(root) {
  const runtime = path.join(root,'tests/fixtures/explorerRefonteRuntime.ts');
  const nav = path.join(root,'tests/fixtures/navbar13jRuntime.ts');
  await esbuild.build({ entryPoints:[path.join(root,'tests/fixtures/explorerRefonte.tsx')], outfile:path.join(root,'dist/__seenit-search-keyboard.js'), bundle:true, platform:'browser', format:'iife', target:['chrome120'], logLevel:'silent', plugins:[{name:'explorer-ports',setup(b){
-   b.onResolve({filter:/^firebase\/firestore$/},args=>args.importer.endsWith('DiscoverScreen.tsx')?{path:runtime}:undefined);
+   b.onResolve({filter:/^firebase\/firestore$/},args=>args.importer.endsWith('removeTrackedMedia.ts')?{path:runtime}:undefined);
    b.onResolve({filter:/\/(?:downloadConfigStore|liveDownloadStore|logStore)$/},()=>({path:nav}));
    b.onResolve({filter:/\/(?:tmdb|useShows|showsStore|toastStore|firebase|recommendations|usePassiveWatchProvider|parentalRatingStore|progressiveAgeFilter|cinemaSearchEvidence|apiAuth)$/},()=>({path:runtime}));
  }}]});
@@ -106,6 +106,16 @@ async function testSearchKeyboardHarness(client, root) {
   await check(client,'document.querySelector(".explorer-category[aria-pressed=true]")?.textContent==="Films"','année force Films');
   await click('document.querySelector("[aria-label=\\\"Fermer les filtres\\\"]")');
   await testCharacterJourney(client,root,width,shot);
+  await evaluate(client,'window.__explorer.library(true);window.__explorer.clearToast()');
+  await check(client,'[...document.querySelectorAll(".media-grid-card")].some(n=>n.textContent.includes("Le Trône de fer"))','bibliothèque réelle montée');
+  await evaluate(client,'[...document.querySelectorAll(".media-grid-card")].find(n=>n.textContent.includes("Le Trône de fer")).querySelector("button").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true}))');
+  await check(client,'[...document.querySelectorAll("[aria-label=\\\"Aperçu du média\\\"] button")].some(b=>b.textContent===\"Retirer d’À voir\" && !b.disabled)','retrait actif dans bibliothèque');
+  await click('[...document.querySelectorAll("[aria-label=\\\"Aperçu du média\\\"] button")].find(b=>b.textContent===\"Retirer d’À voir\")');
+  await check(client,'!window.__explorer.shows().some(show=>show.id==="local-got")','bibliothèque retire le document');
+  await evaluate(client,'window.__explorer.undoToast()');
+  await check(client,'window.__explorer.shows().find(show=>show.id==="local-got")?.episodeRecords["1x1"]?.watchedAt===123','annuler bibliothèque conserve la progression');
+  await evaluate(client,'window.__explorer.library(false)');
+
   reports.push({width,navs,status:'pass'});
  }
  fs.writeFileSync(path.join(root,'quality-reports/explorer-refonte.json'),JSON.stringify(reports,null,2));
@@ -123,6 +133,7 @@ async function testCharacterJourney(client,root,width,shot) {
  await click(button('Bande-annonce'));
  await check(client,'document.querySelector("[aria-label=\\\"Aperçu du média\\\"]")?.textContent.includes("Ouvrir la fiche")','E-01 ouvre le même aperçu');
  await shot('explorer-apercu-'+width);
+ await check(client,'[...document.querySelectorAll("[aria-label=\\\"Aperçu du média\\\"] button")].some(b=>b.textContent===\"Ajouter à À voir\" && !b.disabled)','aperçu film distinct de la série au même identifiant');
  await click(q('[aria-label="Fermer l’aperçu"]'));
  await check(client,'!document.querySelector("[aria-label=\\\"Aperçu du média\\\"]")','fermeture aperçu');
  await click(q('[aria-label="Rechercher"]'));
@@ -143,10 +154,21 @@ async function testCharacterJourney(client,root,width,shot) {
  await click(q('[aria-label="Ne plus suivre ce personnage"]'));
  await click(q('.character-neighbors button[data-available=true]'));
  await check(client,'document.querySelector(".character-sheet h1")?.textContent==="Walter White"','P-07 ouvre la fiche voisine');
- await click(q('[aria-label="Retour depuis la fiche personnage"]'));
- await check(client,'document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman"','P-09 retour au personnage précédent');
+ await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});
+ await check(client,'document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman"','P-09 premier retour au personnage précédent');
+ await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});
+ await check(client,'!document.querySelector(".character-sheet")','P-09 second Retour ferme le personnage');
+ await click('[...document.querySelectorAll("[aria-label=Personnages] button")].find(b=>b.textContent.includes("Saul Goodman"))');
+ await check(client,'document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman"','réouverture personnage après retours successifs');
  await click(q('[aria-label="Joué par Bob Odenkirk"]'));
  await check(client,'[...document.querySelectorAll("[data-dialog-layer]")].some(n=>n.getAttribute("aria-label")==="Fiche personne" && n.textContent.includes("Bob Odenkirk"))','P-04 ouvre la fiche acteur réelle');
+ await check(client,'[...document.querySelectorAll("[aria-label=\\\"Fiche personne\\\"] .media-grid-card")].some(n=>n.textContent.includes("Game of Thrones"))','filmographie acteur chargée');
+ await evaluate(client,'[...document.querySelectorAll("[aria-label=\\\"Fiche personne\\\"] .media-grid-card")].find(n=>n.textContent.includes("Game of Thrones")).querySelector("button").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true}))');
+ await check(client,'[...document.querySelectorAll("[aria-label=\\\"Aperçu du média\\\"] button")].some(b=>b.textContent===\"Retirer d’À voir\" && !b.disabled)','retrait actif depuis la fiche acteur');
+ await click('[...document.querySelectorAll("[aria-label=\\\"Aperçu du média\\\"] button")].find(b=>b.textContent===\"Retirer d’À voir\")');
+ await check(client,'!window.__explorer.shows().some(show=>show.id==="local-got")','aperçu acteur retire sans réinitialiser');
+ await evaluate(client,'window.__explorer.undoToast()');
+ await check(client,'window.__explorer.shows().find(show=>show.id==="local-got")?.episodeRecords["1x1"]?.watchedAt===123','annuler acteur conserve les données de visionnage');
  await evaluate(client,'history.back()');
  await check(client,'![...document.querySelectorAll("[data-dialog-layer]")].some(n=>n.getAttribute("aria-label")==="Fiche personne") && document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman"','retour acteur vers personnage');
  await click(q('.character-works>button'));

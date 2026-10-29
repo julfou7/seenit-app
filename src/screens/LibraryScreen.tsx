@@ -1,3 +1,4 @@
+import { removeTrackedMedia } from '../features/shows/removeTrackedMedia';
 import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
@@ -451,7 +452,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
       s => isTvUpcoming(s) && s.status !== 'dropped'
     );
 
-    const isCinemaMovie = (s: any) => {
+    const isCinemaMovie = (s: Show) => {
       if (s.mediaType !== 'movie') return false;
       if (s.status === 'completed' || s.seenEpisodes?.includes('movie')) return false;
       return isMovieAtCinema(s) || isMovieAtCinema(getLibraryItem(s).media);
@@ -550,6 +551,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
           ))}
           onClose={closePreview}
           onAddClick={handleAddMedia}
+          onRemoveClick={media => { const show = findCurrentShow(media); if (show) return removeTrackedMedia(show, deleteShow); }}
           onToggleWatched={handleToggleWatched}
           onShowClick={handlePreviewShowClick}
         />

@@ -369,6 +369,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
 });
 
 export interface PreviewModalProps {
+  onRemoveClick?: (media: TMDBMedia) => void | Promise<void>;
   media: TMDBMedia;
   isAdded?: boolean;
   isWatched?: boolean;
@@ -384,6 +385,7 @@ export function PreviewModal({
   isWatched,
   onClose,
   onAddClick,
+  onRemoveClick,
   onToggleWatched,
   onShowClick
 }: PreviewModalProps) {
@@ -442,7 +444,7 @@ export function PreviewModal({
 
   const shows = useShowsStore((state) => state.shows);
   const show = shows.find(s => Number(s.tmdbId) === Number(media.id) && s.mediaType === (isTv ? 'tv' : 'movie'));
-  const alreadySeen = Boolean(isWatched || show?.status === 'completed' || show?.seenEpisodes?.includes('movie'));
+  const alreadySeen = Boolean(show ? show.status === 'completed' || (!isTv && show.seenEpisodes?.includes('movie')) : isWatched);
   const added = Boolean(show || isAdded);
   const openDetails = () => { onShowClick(media.id, isTv ? 'tv' : 'movie'); onClose(); };
 
@@ -532,7 +534,7 @@ export function PreviewModal({
           </div>
 
           <div className="flex flex-col gap-2 mt-2 shrink-0">
-            <button type="button" disabled={alreadySeen} onClick={() => { onAddClick(media); onClose(); }}
+            <button type="button" disabled={alreadySeen || (added && !onRemoveClick)} onClick={() => { if (added) onRemoveClick?.(media); else onAddClick(media); onClose(); }}
               className="min-h-[50px] rounded-xl bg-[#E5A93D] text-black font-extrabold text-sm disabled:opacity-70">
               {alreadySeen ? 'Déjà vu' : added ? 'Retirer d’À voir' : 'Ajouter à À voir'}
             </button>

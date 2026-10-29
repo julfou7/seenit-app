@@ -209,3 +209,5 @@ Voir la [fiche personnage 4c](explorer-personnage-2026-10-29.md), personnage de 
 ## Précisions de non-régression issues de la revue
 
 Un résultat TMDB déjà suivi reste visible si son titre alternatif ne correspond pas à la recherche locale. La déduplication concerne uniquement les entrées locales réellement affichées. Annuler un retrait restaure le document sous son identifiant d’origine et le même compte, puis remet à jour le store local sans attendre le listener.
+
+Le retrait de l’aperçu partagé possède une action dédiée dans Explorer, la fiche acteur et la bibliothèque ; un consommateur qui ne la fournit pas ne peut pas déclencher l’ajout à la place. Les données de suivi existantes déterminent l’état vu, sans assimiler une série partiellement regardée à une série terminée. Les dialogues personnage sont recréés par identité pour réarmer chaque Retour Android/Échap après navigation entre personnages. Ces parcours sont vérifiés dans les composants de production.

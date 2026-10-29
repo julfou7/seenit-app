@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { LibraryScreen } from '../../src/screens/LibraryScreen';
 import { DiscoverScreen } from '../../src/screens/DiscoverScreen';
 import { BottomNav } from '../../src/components/BottomNav';
 import { DialogLayer } from '../../src/components/ui/DialogLayer';
@@ -14,6 +15,7 @@ useShowsStore.setState({shows:[...useShowsStore.getState().shows,{...original,id
 interface MediaSelection { id: string | number; type?: 'tv' | 'movie'; season?: number; episode?: number }
 function Harness() {
  const [tab, setTab] = useState('discover');
+ const [library, setLibrary] = useState(false);
  const [request, setRequest] = useState<number>();
  const [media,setMedia]=useState<MediaSelection|null>(null);
  const message=useToastStore(state=>state.message);
@@ -24,14 +26,14 @@ function Harness() {
   window.history.pushState({tab:'discover',selectedShow:selected},'');
   setMedia(selected);
  };
- Object.assign(window, { __explorer: { telemetry, enabled: api.enabled, tab: setTab, shows: () => useShowsStore.getState().shows,
+ Object.assign(window, { __explorer: { telemetry, library: setLibrary, enabled: api.enabled, tab: setTab, shows: () => useShowsStore.getState().shows,
   clearToast:()=>useToastStore.setState({message:''}),
   undoToast:()=>useToastStore.getState().undo?.(),
   uid:(uid:string)=>{auth.currentUser.uid=uid;useShowsStore.setState({shows:[...useShowsStore.getState().shows]});},
   keyboard: (height: number) => { viewport.height = height; viewport.dispatchEvent(new Event('resize')); } } });
  return <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
    <div data-app-tab="discover" aria-hidden={tab !== 'discover'} style={{ display: tab === 'discover' ? 'flex' : 'none', flex: 1, minHeight: 0 }}>
-     <DiscoverScreen navigationShortcut={request} onShowClick={openMedia} />
+     {library ? <LibraryScreen onShowClick={openMedia} /> : <DiscoverScreen navigationShortcut={request} onShowClick={openMedia} />}
    </div>
    {media&&<DialogLayer label="Fiche média test" blocking={false} historyMode="external" onDismiss={()=>history.back()} style={{position:'fixed',inset:0,zIndex:150,background:'#09090b',padding:30}}>
     <p id="media-target">{media.id} {media.season}x{media.episode}</p>
