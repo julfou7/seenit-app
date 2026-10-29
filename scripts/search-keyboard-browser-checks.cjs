@@ -3,6 +3,7 @@ async function buildSearchKeyboardHarness(root) {
  const runtime = path.join(root,'tests/fixtures/explorerRefonteRuntime.ts');
  const nav = path.join(root,'tests/fixtures/navbar13jRuntime.ts');
  await esbuild.build({ entryPoints:[path.join(root,'tests/fixtures/explorerRefonte.tsx')], outfile:path.join(root,'dist/__seenit-search-keyboard.js'), bundle:true, platform:'browser', format:'iife', target:['chrome120'], logLevel:'silent', plugins:[{name:'explorer-ports',setup(b){
+   b.onResolve({filter:/^firebase\/firestore$/},args=>args.importer.endsWith('DiscoverScreen.tsx')?{path:runtime}:undefined);
    b.onResolve({filter:/\/(?:downloadConfigStore|liveDownloadStore|logStore)$/},()=>({path:nav}));
    b.onResolve({filter:/\/(?:tmdb|useShows|showsStore|toastStore|firebase|recommendations|usePassiveWatchProvider|parentalRatingStore|progressiveAgeFilter|cinemaSearchEvidence|apiAuth)$/},()=>({path:runtime}));
  }}]});
@@ -19,12 +20,13 @@ async function check(client, expression, label) {
   if(await evaluate(client, expression))return;
   await new Promise(resolve=>setTimeout(resolve,40));
  }
- throw Error('#787 '+label+' '+JSON.stringify(await evaluate(client,'({text:document.body.innerText.slice(0,1000),input:document.querySelector("input")?.getBoundingClientRect().toJSON(),scroll:document.querySelector(".explorer-scroll")?.scrollTop,editing:document.querySelector("[data-discover-search-editing]")?.getAttribute("data-discover-search-editing"),viewport:visualViewport.height,dock:document.querySelector(".explorer-search-dock")?.getAttribute("style"),active:document.activeElement?.id,geometry:[...document.querySelectorAll("main,[data-app-tab],.explorer-root,.explorer-scroll,.explorer-content")].map(n=>({class:n.className,rect:n.getBoundingClientRect().toJSON(),height:n.scrollHeight}))})')));
+ throw Error('#787 '+label+' '+JSON.stringify(await evaluate(client,'({text:document.body.innerText.slice(0,1000),input:document.querySelector("input")?.getBoundingClientRect().toJSON(),scroll:document.querySelector(".explorer-scroll")?.scrollTop,editing:document.querySelector("[data-discover-search-editing]")?.getAttribute("data-discover-search-editing"),viewport:visualViewport.height,dock:document.querySelector(".explorer-search-dock")?.getAttribute("style"),active:document.activeElement?.id,buttons:[...document.querySelectorAll("button")].map(b=>b.getAttribute("aria-label")).filter(Boolean),geometry:[...document.querySelectorAll("main,[data-app-tab],.explorer-root,.explorer-scroll,.explorer-content")].map(n=>({class:n.className,rect:n.getBoundingClientRect().toJSON(),height:n.scrollHeight}))})')));
 }
 async function testSearchKeyboardHarness(client, root) {
+ await client.send('Emulation.setFocusEmulationEnabled',{enabled:true});
  const reports=[];
  const click = expression => evaluate(client, `(${expression}).click()`);
- const find = text => `[...document.querySelectorAll('button')].find(b=>b.textContent.trim()===${JSON.stringify(text)})`;
+ const find = text => `[...document.querySelectorAll("button")].find(b=>b.textContent.trim()===${JSON.stringify(text)})`;
  const shot = async name => fs.writeFileSync(path.join(root,'quality-reports',name+'.png'), Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  for(const width of [360,390,412]){
   await client.send('Emulation.setDeviceMetricsOverride',{width,height:915,deviceScaleFactor:1,mobile:true});
@@ -78,6 +80,17 @@ async function testSearchKeyboardHarness(client, root) {
   await evaluate(client,'window.__explorer.clearToast();window.__explorer.keyboard(915)');
   await click('document.querySelector("[aria-label=\\\"Quitter la recherche\\\"]")');
   await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none"','sortie recherche');
+  await click('document.querySelector("[aria-label=Rechercher]")');
+  await client.send('Input.insertText',{text:'Game of Thrones'});
+  await check(client,'Boolean(document.querySelector("[aria-label=\\\"Retirer Game of Thrones d’À voir\\\"]"))','titre alternatif suivi conservé dans TMDB');
+  await click('document.querySelector("[aria-label=\\\"Retirer Game of Thrones d’À voir\\\"]")');
+  await check(client,'!window.__explorer.shows().some(show=>show.id==="local-got")','retrait du document original');
+  await evaluate(client,'window.__explorer.undoToast()');
+  await check(client,'window.__explorer.shows().some(show=>show.id==="local-got") && window.__explorer.telemetry.documentWrites.at(-1)==="users/explorer-test/shows/local-got"','annulation restaure le même document sans attendre le listener');
+  await click('document.querySelector("[aria-label=\\\"Retirer Game of Thrones d’À voir\\\"]")');
+  await check(client,'window.__explorer.telemetry.deleted.at(-1)==="local-got"','second retrait vise la même identité');
+  await evaluate(client,'window.__explorer.undoToast();window.__explorer.clearToast()');
+  await click('document.querySelector("[aria-label=\\\"Quitter la recherche\\\"]")');
   await click('document.querySelector(".explorer-control-filter")');
   await check(client,'Boolean(document.querySelector(".explorer-filter-sheet"))','panneau filtres');
   await click('document.querySelector("[role=switch]")');

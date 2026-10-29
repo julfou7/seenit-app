@@ -205,3 +205,7 @@ Base de code relevée : `main` au commit `bc571c2` (28/10/2026).
 ## Complément reçu le29octobre
 
 Voir la [fiche personnage 4c](explorer-personnage-2026-10-29.md), personnage de fiction distinct de l’acteur. Le périmètre de la source est soumis au propriétaire ; le repli masqué reste actif dans E-01..33 tant que cet index n’existe pas.
+
+## Précisions de non-régression issues de la revue
+
+Un résultat TMDB déjà suivi reste visible si son titre alternatif ne correspond pas à la recherche locale. La déduplication concerne uniquement les entrées locales réellement affichées. Annuler un retrait restaure le document sous son identifiant d’origine et le même compte, puis remet à jour le store local sans attendre le listener.

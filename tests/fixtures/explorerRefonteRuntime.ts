@@ -2,17 +2,20 @@ import { create } from 'zustand';
 import { useRef } from 'react';
 import type { Show } from '../../src/types';
 import type { TMDBMedia } from '../../src/features/shows/tmdbClient';
-export const telemetry = { calls: 0, opened: [] as Array<string | number>, statuses: [] as string[] };
+export const telemetry = { calls: 0, opened: [] as Array<string | number>, statuses: [] as string[], documentWrites: [] as string[], deleted: [] as string[] };
 const media: TMDBMedia[] = Array.from({ length: 60 }, (_, i) => ({ id: 1000 + i, media_type: i % 2 ? 'tv' : 'movie', title: 'Les mondes de demain ' + i, name: 'Les mondes de demain ' + i, release_date: i % 2 ? undefined : '2026-01-01', first_air_date: i % 2 ? '2026-01-01' : undefined, vote_average: 8, vote_count: 800, popularity: 50, poster_path: '/fixture.svg', backdrop_path: '/fixture.svg', genre_ids: [28, 10759] }));
 const seed: Show[] = [{ id: 'local42', userId: 'explorer-test', tmdbId: 42, title: 'Breaking Bad', mediaType: 'tv', firstAirDate: '2008-01-20', seenEpisodes: ['1-1'], totalEpisodes: 62, status: 'watching', isArchived: false, posterPath: '/fixture.svg', backdropPath: null, updatedAt: 1, createdAt: 1, episodeRecords: {} }];
-export const useShowsStore = create(() => ({ shows: seed, addShowOptimistic() {} }));
+seed.push({...seed[0],id:'local-got',tmdbId:7778,title:'Le Trône de fer'});
+export const useShowsStore = create(() => ({ shows: seed, addShowOptimistic(show: Show) { useShowsStore.setState(state=>({shows:[...state.shows.filter(item=>item.id!==show.id),show]})); } }));
 export const useShows = () => ({
   shows: useShowsStore(state => state.shows),
   addShow: async (data: Omit<Show, 'id' | 'userId'>) => { telemetry.statuses.push(data.status); const id = 'added-' + data.tmdbId; useShowsStore.setState(state => ({ shows: [...state.shows, { ...data, id, userId: 'explorer-test' }] })); return id; },
-  deleteShow: async (id: string) => { useShowsStore.setState(state => ({ shows: state.shows.filter(show => show.id !== id) })); },
+  deleteShow: async (id: string) => { telemetry.deleted.push(id); useShowsStore.setState(state => ({ shows: state.shows.filter(show => show.id !== id) })); },
   updateShow: async () => {},
 });
-export const useToastStore = create(() => ({ message: '', showToast: (message: string, ..._rest: unknown[]) => useToastStore.setState({ message }) }));
+export const useToastStore = create(() => ({ message: '', undo: undefined as (() => Promise<void>) | undefined, showToast: (message: string, _type?:unknown, _show?:unknown, undo?:()=>Promise<void>) => useToastStore.setState({ message, undo }) }));
+export const doc = (_db: unknown, ...segments: string[]) => segments.join('/');
+export const setDoc = async (reference: string, _data:unknown) => {telemetry.documentWrites.push(reference);};
 export const auth = { currentUser: { uid: 'explorer-test' }, onAuthStateChanged: () => () => {} };
 export const db = {};
 export const getRecommendations = async () => [];
@@ -40,6 +43,7 @@ export const tmdb = {
       { ...media[0], id: 42, name: 'Breaking Bad', title: 'Breaking Bad', media_type: 'tv' },
       { ...media[0], id: 42, name: undefined, title: 'Breaking Bad au cinéma', media_type: 'movie' },
       { ...media[0], id: 101, title: 'Atréides', media_type: 'movie' },
+      { ...media[0], id: 7778, name: 'Game of Thrones', title: undefined, media_type: 'tv' },
       { id: 303, name: 'Bryan Cranston', media_type: 'person', known_for_department: 'Acting', profile_path: '/fixture.svg' },
     ] : [], total_pages: 2 } };
   },

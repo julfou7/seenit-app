@@ -30,7 +30,7 @@ function ResultAction({ item, model }: { item: TMDBMedia; model: DiscoverViewMod
 export function DiscoverSearchResults({ model, characters = [], charactersLoading = false, onCharacterClick }: { model: DiscoverViewModel; characters?: CharacterRecord[]; charactersLoading?: boolean; onCharacterClick?: (character: CharacterRecord) => void }) {
   const { query, debouncedQuery, shows, uniqueProcessedResults, loading, searchElapsedMs, onShowClick, openPersonModal } = model;
   const library = useMemo(() => searchLibrary(shows, query), [shows, query]);
-  const libraryKeys = useMemo(() => new Set(shows.map(show => searchMediaKey(show.tmdbId, show.mediaType))), [shows]);
+  const libraryKeys = useMemo(() => new Set(library.map(show => searchMediaKey(show.tmdbId, show.mediaType))), [library]);
   const current = query.trim() === debouncedQuery.trim();
   const remote = current ? uniqueProcessedResults.filter(item => !libraryKeys.has(searchMediaKey(item.id, item.media_type))) : [];
   const media = remote.filter(item => item.media_type !== 'person');

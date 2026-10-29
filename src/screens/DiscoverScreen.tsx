@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { tmdb, discoverSeenIt, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
 import { type Show } from '../types';
 import { useShows } from '../hooks/useShows';
+import { auth, db } from '../lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { useShowsStore } from '../store/showsStore';
 import { useToastStore } from '../store/toastStore';
 import { getRecommendations } from '../lib/recommendations';
 import { hasMoreTmdbPages } from '../features/discover/discoverPagination';
@@ -368,8 +371,13 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
     const existing = shows.find(show => Number(show.tmdbId) === Number(media.id) && show.mediaType === (isTv ? 'tv' : 'movie'));
     if (existing) {
+      const owner = auth.currentUser?.uid;
       await deleteShow(existing.id);
-      showToast(`« ${titleToUse} » retiré d’À voir`, 'unfollow', existing, async () => { await addShow(existing); });
+      showToast(`« ${titleToUse} » retiré d’À voir`, 'unfollow', existing, async () => {
+        if (!owner || auth.currentUser?.uid !== owner) return;
+        await setDoc(doc(db, 'users', owner, 'shows', existing.id), existing);
+        if (auth.currentUser?.uid === owner) useShowsStore.getState().addShowOptimistic(existing);
+      });
       return;
     }
 

@@ -10,7 +10,7 @@ const viewport = Object.assign(new EventTarget(), { height: innerHeight, width: 
 Object.defineProperty(window, 'visualViewport', { configurable: true, value: viewport });
 writeUserScopedJson('explorer-test', 'platforms', [8, 119, 1899]);
 const original=useShowsStore.getState().shows[0];
-useShowsStore.setState({shows:[original,{...original,id:'bb1396',tmdbId:1396,seenEpisodes:['1x1']}]});
+useShowsStore.setState({shows:[...useShowsStore.getState().shows,{...original,id:'bb1396',tmdbId:1396,seenEpisodes:['1x1']}]});
 interface MediaSelection { id: string | number; type?: 'tv' | 'movie'; season?: number; episode?: number }
 function Harness() {
  const [tab, setTab] = useState('discover');
@@ -26,6 +26,7 @@ function Harness() {
  };
  Object.assign(window, { __explorer: { telemetry, enabled: api.enabled, tab: setTab, shows: () => useShowsStore.getState().shows,
   clearToast:()=>useToastStore.setState({message:''}),
+  undoToast:()=>useToastStore.getState().undo?.(),
   uid:(uid:string)=>{auth.currentUser.uid=uid;useShowsStore.setState({shows:[...useShowsStore.getState().shows]});},
   keyboard: (height: number) => { viewport.height = height; viewport.dispatchEvent(new Event('resize')); } } });
  return <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
