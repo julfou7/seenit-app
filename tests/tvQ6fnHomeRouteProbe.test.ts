@@ -43,13 +43,16 @@ test('#295 sonde les preuves qui distinguent no-root, root moderne et port old-T
   assert.match(source, /--to-command/);
   assert.match(source, /\/proc\/self\/ns\/mnt/);
 
-  for (const symbol of [
+  for (const symbolPattern of [
     'app_control_set_defapp',
     'app_operation_(get|set)_current_app',
     'aul_get_default_app',
     'vconf_(get|set)_(str|int)'
   ]) {
-    assert.match(source, new RegExp(symbol));
+    assert.ok(
+      source.includes(symbolPattern),
+      `le probe doit rechercher littéralement le motif de symbole ${symbolPattern}`
+    );
   }
 });
 
