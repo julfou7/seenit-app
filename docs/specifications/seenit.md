@@ -705,9 +705,11 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   d'UI parent sans rapport. Explorer matérialise trente cartes au premier rendu puis uniquement les lignes
   visibles avec trois lignes de débord de chaque côté ; des espaceurs conservent la hauteur et la position
   exactes du scroll infini sans garder tout son DOM, ses images décodées et ses Effects.
-- Les sous-vues Statistiques et Ma Liste sont chargées à leur première ouverture puis conservent leur
-  état ; lorsqu'elles sont masquées par l'autre sous-vue, Réglages ou un autre onglet, leurs Effects sont
-  suspendus. Leur réouverture ne remonte pas en rafale les cartes déjà visitées.
+- Les sous-vues Ma liste, Chiffres et Mon année de l'onglet Moi sont chargées à leur première ouverture
+  puis conservent leur état ; lorsqu'elles sont masquées par une autre sous-vue, Réglages ou un autre onglet,
+  leurs Effects sont suspendus. Leur réouverture ne remonte pas en rafale les cartes déjà visitées. Ma liste
+  est la sous-vue initiale : les statistiques avancées et leurs enrichissements TMDB ne démarrent qu'à la
+  première ouverture de Chiffres.
 - Les statistiques avancées du Profil conservent une baseline locale versionnée et cloisonnée par UID,
   composée du résultat affichable, des compteurs agrégés et des contributions TMDB indexées par
   `mediaType + tmdbId`. Après redémarrage, cette baseline est restituée immédiatement puis réconciliée
@@ -720,11 +722,11 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   de travail plus volumineux (médias, agrégats et contributions) réside dans IndexedDB : une limite de quota
   `localStorage`, une interruption de lot ou un échec TMDB ne peuvent donc jamais remplacer la dernière
   baseline d'affichage complète par un classement partiel. La baseline historique v1 est migrée puis retirée.
-- Ma Liste ne monte que les rangées proches du viewport vertical. Une rangée réduite matérialise une
-  fenêtre d'au moins six cartes, complétée seulement par les cartes visibles et trois cartes de débord de
-  chaque côté ; À Regarder applique la même règle avec un minimum de huit cartes. Les cartes sorties de la
-  fenêtre sont démontées et remplacées par des espaceurs qui préservent la largeur, l'inertie et la position
-  du rail. Une grille « Voir tout » monte au plus douze cartes supplémentaires par action. Les objets de
+- Ma liste ne monte qu'une section à la fois, choisie par une pastille qui affiche son nombre de titres.
+  Sa grille monte au plus douze cartes à l'ouverture de la section puis douze de plus par « Charger plus » ;
+  changer de pastille repart d'un lot borné. À Regarder conserve ses rails fenêtrés : au moins huit cartes,
+  complétées seulement par les cartes visibles et trois cartes de débord de chaque côté, les cartes sorties
+  de la fenêtre étant remplacées par des espaceurs qui préservent la largeur, l'inertie et la position du rail. Les objets de
   carte issus d'un média inchangé restent référentiellement stables, y compris après une synchronisation
   distante, afin qu'une mise à jour isolée de la bibliothèque ne rerende pas toutes les sections.
 - Les réponses asynchrones sont rattachées à la clé typée demandée. Une réponse de `movie:42` ne peut

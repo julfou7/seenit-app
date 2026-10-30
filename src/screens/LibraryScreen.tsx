@@ -1,5 +1,5 @@
 import { removeTrackedMedia } from '../features/shows/removeTrackedMedia';
-import React, { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
 import { type TMDBMedia, isMovieAtCinema } from '../features/shows/tmdb';
@@ -10,7 +10,6 @@ import { useToastStore } from '../store/toastStore';
 import { Show } from '../types';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { cn } from '../lib/utils';
-import { useHorizontalVirtualWindow } from '../hooks/useBoundedVirtualWindow';
 import { buildLibraryMedia } from './libraryPresentation';
 
 interface Props {
@@ -18,10 +17,7 @@ interface Props {
   isEmbedded?: boolean;
 }
 
-const LIBRARY_ROW_BATCH_SIZE = 6;
 const LIBRARY_GRID_BATCH_SIZE = 12;
-const LIBRARY_ROW_ROOT_MARGIN = '320px 0px';
-const LIBRARY_ROW_OVERSCAN = 3;
 
 const getMediaKey = (mediaType: string | undefined, id: string | number) =>
   `${mediaType === 'movie' ? 'movie' : 'tv'}:${Number(id)}`;
@@ -34,7 +30,6 @@ interface LibraryItem {
 interface LibrarySectionData {
   id: string;
   title: string;
-  emoji: string;
   data: LibraryItem[];
 }
 
@@ -66,7 +61,7 @@ function findCurrentShow(media: TMDBMedia): Show | undefined {
   );
 }
 
-interface LibraryRowProps {
+interface LibraryGridProps {
   data: LibraryItem[];
   onShowClick: (id: string | number, mediaType?: 'tv' | 'movie') => void;
   onToggleWatched: (media: TMDBMedia) => void;
@@ -74,107 +69,7 @@ interface LibraryRowProps {
   onAddClick: (media: TMDBMedia) => void;
 }
 
-const LibraryRow = React.memo(function LibraryRow({
-  data,
-  onShowClick,
-  onToggleWatched,
-  onLongPress,
-  onAddClick,
-}: LibraryRowProps) {
-  const {
-    containerRef: scrollContainerRef,
-    itemMeasureRef,
-    range,
-    leadingSpacerSize,
-    trailingSpacerSize,
-  } = useHorizontalVirtualWindow(data.length, LIBRARY_ROW_BATCH_SIZE, LIBRARY_ROW_OVERSCAN);
-  const visibleItems = data.slice(range.start, range.end);
-
-  return (
-    <div
-      ref={scrollContainerRef}
-      data-library-row
-      className="flex overflow-x-auto hide-scrollbar px-4 sm:px-6 gap-1.5 sm:gap-1.5 pb-2"
-    >
-      {leadingSpacerSize > 0 && (
-        <div aria-hidden="true" className="shrink-0" style={{ width: leadingSpacerSize }} />
-      )}
-      {visibleItems.map(({ media, show }, index) => {
-        return (
-          <div
-            key={getMediaKey(media.media_type, media.id)}
-            ref={index === 0 ? itemMeasureRef : undefined}
-            className="w-[calc((100vw-2rem-12px)/3)] sm:w-[calc((100vw-3rem-18px)/4)] md:w-[calc((100vw-3rem-24px)/5)] lg:w-[calc((100vw-3rem-30px)/6)] xl:w-[calc((100vw-3rem-36px)/7)] 2xl:w-[calc((100vw-3rem-42px)/8)] shrink-0"
-          >
-            <GridMediaCard
-              media={media}
-              show={show}
-              hideBadges={true}
-              showProgress={true}
-              onShowClick={onShowClick}
-              onToggleWatched={onToggleWatched}
-              onLongPress={onLongPress}
-              onAddClick={onAddClick}
-            />
-          </div>
-        );
-      })}
-      {trailingSpacerSize > 0 && (
-        <div aria-hidden="true" className="shrink-0" style={{ width: trailingSpacerSize }} />
-      )}
-    </div>
-  );
-}, (previous, next) =>
-  areLibraryItemsEqual(previous.data, next.data) &&
-  previous.onShowClick === next.onShowClick &&
-  previous.onToggleWatched === next.onToggleWatched &&
-  previous.onLongPress === next.onLongPress &&
-  previous.onAddClick === next.onAddClick
-);
-
-interface DeferredLibraryRowProps extends LibraryRowProps {
-  eager?: boolean;
-}
-
-const DeferredLibraryRow = React.memo(function DeferredLibraryRow({
-  eager = false,
-  ...rowProps
-}: DeferredLibraryRowProps) {
-  const [shouldRender, setShouldRender] = useState(eager);
-  const placeholderRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (shouldRender) return;
-    const element = placeholderRef.current;
-    if (!element || typeof IntersectionObserver === 'undefined') {
-      setShouldRender(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(entries => {
-      if (!entries.some(entry => entry.isIntersecting)) return;
-      observer.disconnect();
-      startTransition(() => setShouldRender(true));
-    }, { rootMargin: LIBRARY_ROW_ROOT_MARGIN });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [shouldRender]);
-
-  return (
-    <div ref={placeholderRef} className={shouldRender ? undefined : 'min-h-[220px]'}>
-      {shouldRender ? <LibraryRow {...rowProps} /> : null}
-    </div>
-  );
-}, (previous, next) =>
-  previous.eager === next.eager &&
-  areLibraryItemsEqual(previous.data, next.data) &&
-  previous.onShowClick === next.onShowClick &&
-  previous.onToggleWatched === next.onToggleWatched &&
-  previous.onLongPress === next.onLongPress &&
-  previous.onAddClick === next.onAddClick
-);
-
-const ExpandedLibraryGrid = React.memo(function ExpandedLibraryGrid(props: LibraryRowProps) {
+const LibrarySectionGrid = React.memo(function LibrarySectionGrid(props: LibraryGridProps) {
   const { data, onShowClick, onToggleWatched, onLongPress, onAddClick } = props;
   const [visibleCount, setVisibleCount] = useState(() => Math.min(LIBRARY_GRID_BATCH_SIZE, data.length));
 
@@ -183,13 +78,12 @@ const ExpandedLibraryGrid = React.memo(function ExpandedLibraryGrid(props: Libra
   }, [data.length]);
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-x-1.5 gap-y-4 px-4 sm:px-6">
+    <div className="moi-grid">
       {data.slice(0, visibleCount).map(({ media, show }) => (
         <GridMediaCard
           key={getMediaKey(media.media_type, media.id)}
           media={media}
           show={show}
-          hideBadges={true}
           showProgress={true}
           onShowClick={onShowClick}
           onToggleWatched={onToggleWatched}
@@ -203,7 +97,7 @@ const ExpandedLibraryGrid = React.memo(function ExpandedLibraryGrid(props: Libra
           onClick={() => startTransition(() => {
             setVisibleCount(current => Math.min(data.length, current + LIBRARY_GRID_BATCH_SIZE));
           })}
-          className="col-span-full w-full py-3 rounded-xl bg-zinc-900 border border-white/10 text-xs font-bold text-zinc-300 hover:bg-zinc-800 active:scale-[0.98] transition-transform"
+          className="moi-more"
         >
           Charger plus
         </button>
@@ -218,70 +112,13 @@ const ExpandedLibraryGrid = React.memo(function ExpandedLibraryGrid(props: Libra
   previous.onAddClick === next.onAddClick
 );
 
-interface LibrarySectionProps extends Omit<LibraryRowProps, 'data'> {
-  section: LibrarySectionData;
-  expanded: boolean;
-  eager?: boolean;
-  onToggleExpanded: (sectionId: string) => void;
-}
-
-const LibrarySection = React.memo(function LibrarySection({
-  section,
-  expanded,
-  eager,
-  onToggleExpanded,
-  ...rowProps
-}: LibrarySectionProps) {
-  const contentProps = { ...rowProps, data: section.data };
-
-  return (
-    <div className="space-y-3">
-      <div className="px-4 sm:px-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
-            <span className="text-base">{section.emoji}</span>
-            <span>{section.title}</span>
-          </h2>
-        </div>
-        {section.data.length > 3 && (
-          <button
-            type="button"
-            onClick={() => onToggleExpanded(section.id)}
-            className="text-xs font-bold text-[#E5A93D] hover:underline cursor-pointer"
-          >
-            {expanded ? 'Réduire' : 'Voir tout'}
-          </button>
-        )}
-      </div>
-
-      {expanded ? (
-        <ExpandedLibraryGrid {...contentProps} />
-      ) : (
-        <DeferredLibraryRow {...contentProps} eager={eager} />
-      )}
-    </div>
-  );
-}, (previous, next) =>
-  previous.section.id === next.section.id &&
-  previous.section.title === next.section.title &&
-  previous.section.emoji === next.section.emoji &&
-  areLibraryItemsEqual(previous.section.data, next.section.data) &&
-  previous.expanded === next.expanded &&
-  previous.eager === next.eager &&
-  previous.onToggleExpanded === next.onToggleExpanded &&
-  previous.onShowClick === next.onShowClick &&
-  previous.onToggleWatched === next.onToggleWatched &&
-  previous.onLongPress === next.onLongPress &&
-  previous.onAddClick === next.onAddClick
-);
-
 export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
   const { shows, addShow, deleteShow } = useShows();
   const updateShow = useShowsStore(state => state.updateShowOptimistic);
   const showToast = useToastStore(state => state.showToast);
 
   const [previewMedia, setPreviewMedia] = useState<TMDBMedia | null>(null);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
 
   const handleShowClick = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     onShowClick(String(id), mediaType);
@@ -289,10 +126,6 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
 
   const handleLongPress = useCallback((media: TMDBMedia) => {
     setPreviewMedia(media);
-  }, []);
-
-  const handleToggleExpanded = useCallback((sectionId: string) => {
-    setExpandedSection(current => current === sectionId ? null : sectionId);
   }, []);
 
   const handleAddMedia = useCallback(async (media: TMDBMedia) => {
@@ -303,7 +136,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
 
     const titleToUse = media.name || media.title || media.original_name || media.original_title || '';
 
-    const newShowData: any = {
+    const newShowData: Omit<Show, 'id' | 'userId'> & { year: string; rating?: number; seasonRecords: Record<string, never> } = {
       tmdbId: Number(media.id),
       title: titleToUse,
       posterPath: media.poster_path,
@@ -478,17 +311,23 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
       (s.status === 'completed' || s.seenEpisodes?.includes('movie'))
     );
 
-    return [
-      { id: 'favorites', title: 'Mes Favoris', emoji: '❤️', data: favorites.map(getLibraryItem) },
-      { id: 'watching', title: 'Séries en cours', emoji: '▶️', data: watching.map(getLibraryItem) },
-      { id: 'toStartTv', title: 'Séries à commencer', emoji: '🔖', data: toStartTv.map(getLibraryItem) },
-      { id: 'upcomingTv', title: 'Séries à venir', emoji: '📅', data: upcomingTv.map(getLibraryItem) },
-      { id: 'toWatchCinema', title: 'Films au cinéma', emoji: '🎟️', data: toWatchCinema.map(getLibraryItem) },
-      { id: 'toWatchMovie', title: 'Films à voir', emoji: '🎬', data: toWatchMovie.map(getLibraryItem) },
-      { id: 'upToDate', title: 'Séries à jour', emoji: '✅', data: upToDate.map(getLibraryItem) },
-      { id: 'completedMovies', title: 'Films vus', emoji: '🍿', data: completedMovies.map(getLibraryItem) },
-    ].filter(s => s.data.length > 0);
+    const result: LibrarySectionData[] = [
+      { id: 'favorites', title: 'Favoris', data: favorites.map(getLibraryItem) },
+      { id: 'watching', title: 'En cours', data: watching.map(getLibraryItem) },
+      { id: 'toStartTv', title: 'À commencer', data: toStartTv.map(getLibraryItem) },
+      { id: 'upcomingTv', title: 'À venir', data: upcomingTv.map(getLibraryItem) },
+      { id: 'toWatchCinema', title: 'Au cinéma', data: toWatchCinema.map(getLibraryItem) },
+      { id: 'toWatchMovie', title: 'Films à voir', data: toWatchMovie.map(getLibraryItem) },
+      { id: 'upToDate', title: 'À jour', data: upToDate.map(getLibraryItem) },
+      { id: 'completedMovies', title: 'Films vus', data: completedMovies.map(getLibraryItem) },
+    ];
+    return result.filter(s => s.data.length > 0);
   }, [shows]);
+
+  // Une section vidée entre-temps laisse la place à En cours, puis à la première restante.
+  const activeSection = sections.find(section => section.id === selectedSectionId)
+    ?? sections.find(section => section.id === 'watching')
+    ?? sections[0];
 
   const previewShow = previewMedia ? findCurrentShow(previewMedia) : undefined;
 
@@ -515,28 +354,40 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
       )}
 
       {sections.length === 0 ? (
-        <div className={cn("flex flex-col items-center justify-center px-6 text-center space-y-4", !isEmbedded && "pt-20")}>
-          <div className="w-20 h-20 rounded-full bg-zinc-900 flex items-center justify-center border border-white/5">
-            <Inbox size={32} className="text-zinc-600" />
-          </div>
-          <h2 className="text-lg font-bold text-zinc-300">Votre liste est vide</h2>
-          <p className="text-xs text-zinc-500 max-w-[250px]">Vous n'avez pas encore ajouté de séries ou de films à votre liste.</p>
+        <div className={cn("moi-empty", !isEmbedded && "pt-20")}>
+          <Inbox size={32} className="text-zinc-600" aria-hidden="true" />
+          <strong>Ta liste est vide</strong>
+          <span>Ajoute une série ou un film depuis Explorer pour le retrouver ici.</span>
         </div>
       ) : (
-        <div className="space-y-8 pb-2">
-          {sections.map((section, index) => (
-            <LibrarySection
-              key={section.id}
-              section={section}
-              expanded={expandedSection === section.id}
-              eager={index === 0}
-              onToggleExpanded={handleToggleExpanded}
+        <div className="pb-2">
+          <div className="moi-chips" role="group" aria-label="Sections de Ma liste">
+            {sections.map(section => {
+              const selected = section.id === activeSection?.id;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  className="moi-chip"
+                  aria-pressed={selected}
+                  onClick={() => startTransition(() => setSelectedSectionId(section.id))}
+                >
+                  {section.title}
+                  <span className="moi-chip-count">{section.data.length}</span>
+                </button>
+              );
+            })}
+          </div>
+          {activeSection && (
+            <LibrarySectionGrid
+              key={activeSection.id}
+              data={activeSection.data}
               onShowClick={handleShowClick}
               onToggleWatched={handleToggleWatched}
               onLongPress={handleLongPress}
               onAddClick={handleAddMedia}
             />
-          ))}
+          )}
         </div>
       )}
 
