@@ -1,6 +1,6 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { Activity, startTransition, useCallback, useState, useEffect, useRef } from 'react';
-import { Settings, ArrowLeft } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { SettingsScreen } from './SettingsScreen';
@@ -312,7 +312,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
       {showSettings && isProfileVisible && (
         <DialogLayer onDismiss={handleAnimatedBackSettings} label="Réglages" historyMode="local" role="dialog"
           className={cn(
-            "fixed inset-0 max-w-md mx-auto bg-black z-50 flex flex-col transition-transform duration-300 ease-out",
+            "reg-root fixed inset-0 max-w-md mx-auto z-50 flex flex-col transition-transform duration-300 ease-out",
             isExitingSettings ? "translate-x-full" : "translate-x-0"
           )}
           style={
@@ -324,18 +324,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
           onTouchMove={handleTouchMoveSettings}
           onTouchEnd={handleTouchEndSettings}
         >
-          <div className="flex items-center justify-between seenit-dialog-header pb-3.5 px-4 border-b border-white/10 bg-zinc-950/90 backdrop-blur-md sticky top-0 z-10">
-            <button
-              onClick={handleAnimatedBackSettings}
-              type="button" className="min-h-11 flex items-center gap-1.5 text-zinc-400 hover:text-white font-medium text-sm transition-colors"
-            >
-              <ArrowLeft size={18} />
-              <span>Retour</span>
-            </button>
-            <span className="text-sm font-bold text-white">Réglages</span>
-            <div className="w-12" />
-          </div>
-          <SettingsScreen />
+          <SettingsScreen onClose={handleAnimatedBackSettings} />
         </DialogLayer>
       )}
     </div>

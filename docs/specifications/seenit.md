@@ -1105,7 +1105,7 @@ pour le cache des sagas et univers.
   fenêtre agrège, dans l'ordre croissant, les notes de chaque release officielle strictement supérieure
   à la version installée et inférieure ou égale à la cible. Une pagination ou une source d'historique
   indisponible ne bloque jamais l'installation et retombe sur les seules notes de la cible.
-- **SEENIT-UPDATE-005** — Depuis Réglages → À propos & Avancé, la fiche Version ouvre l'historique
+- **SEENIT-UPDATE-005** — Depuis Réglages → Application, la ligne Nouveautés ouvre l’historique
   complet des releases SeenIt officielles disposant de leur APK canonique. Les versions sont présentées
   de la plus récente à la plus ancienne par pagination bornée. Une page distante indisponible conserve les
   entrées officielles déjà chargées ou, à défaut, la dernière release connue ; elle ne bloque pas l'écran.

@@ -55,7 +55,7 @@ Ce contrat automatisé ne vaut pas preuve de lecture ou de rotation sur un tél�
 | Carte série `SwipeableCard`, par défaut | Gauche / droite | Supprimer / Abandonner, configurables par le parent | Afficher l'action réellement liée, conserver confirmation/annulation du contexte. |
 | Carte téléchargement | Droite | Retirer historique ou demander confirmation pour annuler actif | Aucun effacement de fichier implicite ; directions différentes justifiées par le contexte. |
 | Grille Explorer | Appui long 500 ms, ou menu contextuel | Aperçu lorsque `onLongPress` existe ; mouvement annule le timer | Ajouter annulation au démontage/pointercancel et alternative accessible : #180. |
-| Réglages et personne | Depuis bord gauche (zone 70 px), glissement droit > 90 px | Ferme le panneau | Conflit avec geste système Android à vérifier ; ne pas généraliser à tous les écrans. |
+| Réglages et personne | Depuis bord gauche (zone 70 px), glissement droit > 90 px | Ferme le panneau ; dans un écran de Réglages (Plateformes, Notifications, Plex, Appareils, Compte, Application), revient à l'accueil des Réglages | Conflit avec geste système Android à vérifier ; ne pas généraliser à tous les écrans. |
 | Fiche média | Handlers de bord actuellement vides | Pas de swipe Retour personnalisé actif | Utiliser Retour visible/natif ; ne pas promettre ce geste partout. |
 | Toast média `À voir` / `Vu` | Appui/clic, Entrée ou Espace | Ouvre la fiche Film/Série exacte | Livré par `SEENIT-UX-006` ; exige `mediaType + tmdbId`, jamais titre/année. |
 | Toast de retrait du suivi | Appui/clic | Aucun effet de navigation | La suppression reste non navigable ; `Annuler` reste une action distincte. |

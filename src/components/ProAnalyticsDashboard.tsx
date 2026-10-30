@@ -10,8 +10,10 @@ import {
   collectProfileViewings,
   defaultProfileYear,
   formatProfileHours,
+  formatProfileImportNote,
   formatProfilePunchSlot,
-  listProfileYears,
+  listProfileYearTotals,
+  partitionProfileViewings,
 } from '../features/profile/profileYearStats';
 
 const BAR_MAX_HEIGHT = 92;
@@ -63,11 +65,12 @@ export function ProAnalyticsDashboard({
   onPersonClick?: (personId: number) => void;
 }) {
   const { data, loading } = useProAnalytics(shows, libraryReady);
-  const viewings = useMemo(() => collectProfileViewings(shows), [shows]);
-  const years = useMemo(() => listProfileYears(viewings), [viewings]);
+  const { viewings, imports } = useMemo(() => partitionProfileViewings(collectProfileViewings(shows)), [shows]);
+  const yearTotals = useMemo(() => listProfileYearTotals(viewings), [viewings]);
   const [pickedYear, setPickedYear] = useState<number | null>(null);
+  const [yearMenuOpen, setYearMenuOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const year = pickedYear !== null && years.includes(pickedYear) ? pickedYear : defaultProfileYear(viewings);
+  const year = pickedYear !== null && yearTotals.some(entry => entry.year === pickedYear) ? pickedYear : defaultProfileYear(viewings);
   const stats = useMemo(() => buildProfileYearStats(viewings, year), [viewings, year]);
   const badges = useMemo(() => data ? buildProfileBadges(data) : [], [data]);
 
@@ -77,27 +80,58 @@ export function ProAnalyticsDashboard({
   const average = stats.months.length > 0 ? stats.months.reduce((sum, value) => sum + value, 0) / stats.months.length : 0;
   const maxShare = Math.max(1, ...stats.platforms.map(platform => platform.share));
   const unlockedBadges = badges.filter(badge => badge.unlocked).length;
+  const importNote = formatProfileImportNote(imports, year);
 
-  const cycleYear = () => {
-    const index = years.indexOf(year);
-    setPickedYear(years[(index + 1) % years.length]);
+  const pickYear = (next: number) => {
+    setPickedYear(next);
     setSelectedMonth(null);
+    setYearMenuOpen(false);
   };
 
   return (
     <div className="moi-stats">
       <div className="moi-stats-top">
         <span>{isCurrentYear ? 'Depuis le 1er janvier' : `En ${year}`}</span>
-        <button
-          type="button"
-          className="moi-year"
-          onClick={cycleYear}
-          disabled={years.length < 2}
-          aria-label={years.length < 2 ? `Année ${year}` : `Année ${year}, changer d’année`}
-        >
-          {year}
-          {years.length > 1 && <ChevronDown size={13} strokeWidth={2.4} aria-hidden="true" />}
-        </button>
+        <div className="moi-year-picker">
+          <button
+            type="button"
+            className="moi-year"
+            onClick={() => setYearMenuOpen(open => !open)}
+            disabled={yearTotals.length < 2}
+            aria-haspopup="listbox"
+            aria-expanded={yearMenuOpen}
+            aria-label={yearTotals.length < 2 ? `Année ${year}` : `Année ${year}, choisir une autre année`}
+          >
+            {year}
+            {yearTotals.length > 1 && <ChevronDown size={13} strokeWidth={2.4} aria-hidden="true" />}
+          </button>
+          {yearMenuOpen && (
+            <>
+              <button type="button" className="moi-year-backdrop" aria-label="Fermer la liste des années" onClick={() => setYearMenuOpen(false)} />
+              <ul
+                className="moi-year-menu"
+                role="listbox"
+                aria-label="Années"
+                onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setYearMenuOpen(false); } }}
+              >
+                {yearTotals.map(entry => (
+                  <li key={entry.year}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={entry.year === year}
+                      onClick={() => pickYear(entry.year)}
+                      ref={entry.year === year ? element => element?.focus() : undefined}
+                    >
+                      <span>{entry.year}</span>
+                      <small>{entry.minutes > 0 ? formatProfileHours(entry.minutes) : '—'}</small>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="moi-bento">
@@ -153,6 +187,7 @@ export function ProAnalyticsDashboard({
             );
           })}
         </div>
+        {importNote && <p className="moi-import">{importNote}</p>}
       </section>
 
       <section className="moi-card">

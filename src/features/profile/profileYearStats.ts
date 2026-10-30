@@ -8,6 +8,7 @@ const EPISODE_MINUTES = 45;
 const MOVIE_MINUTES = 110;
 const DAY_MS = 86_400_000;
 const PROJECTION_WINDOW_DAYS = 28;
+const MAX_DAY_MINUTES = 24 * 60;
 
 export const PROFILE_MONTH_LABELS = ['Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
 export const PROFILE_MONTH_SHORT = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
@@ -83,11 +84,62 @@ export function collectProfileViewings(shows: readonly Show[]): ProfileViewing[]
   return viewings;
 }
 
-/** Années disponibles, la plus récente d'abord ; l'année courante est toujours proposée. */
+export interface ProfileImportDay {
+  day: string;
+  watchedAt: number;
+  minutes: number;
+  count: number;
+}
+
+/**
+ * Plus de 24 h de visionnage le même jour n'est pas un vrai jour de visionnage :
+ * c'est un import (TV Time date chaque épisode au moment de l'import) ou un rattrapage
+ * en masse. Ces journées sortent des chiffres par période sans toucher aux totaux du Profil.
+ */
+export function partitionProfileViewings(viewings: readonly ProfileViewing[]): { viewings: ProfileViewing[]; imports: ProfileImportDay[] } {
+  const days = new Map<string, ProfileImportDay>();
+  for (const viewing of viewings) {
+    const key = historyLocalDayKey(viewing.watchedAt);
+    const day = days.get(key) || { day: key, watchedAt: viewing.watchedAt, minutes: 0, count: 0 };
+    day.minutes += viewing.minutes;
+    day.count++;
+    days.set(key, day);
+  }
+  const imports = [...days.values()].filter(day => day.minutes > MAX_DAY_MINUTES).sort((left, right) => left.watchedAt - right.watchedAt);
+  if (imports.length === 0) return { viewings: [...viewings], imports };
+  const excluded = new Set(imports.map(day => day.day));
+  return { viewings: viewings.filter(viewing => !excluded.has(historyLocalDayKey(viewing.watchedAt))), imports };
+}
+
+const importDate = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
+
+/** « Sans l'import du 14 juillet (4 586 h) » pour l'année affichée, sinon null. */
+export function formatProfileImportNote(imports: readonly ProfileImportDay[], year: number): string | null {
+  const inYear = imports.filter(day => new Date(day.watchedAt).getFullYear() === year);
+  if (inYear.length === 0) return null;
+  const minutes = inYear.reduce((sum, day) => sum + day.minutes, 0);
+  return inYear.length === 1
+    ? `Sans l’import du ${importDate.format(new Date(inYear[0].watchedAt))} (${formatProfileHours(minutes)})`
+    : `Sans ${inYear.length} journées d’import (${formatProfileHours(minutes)})`;
+}
+
+const FIRST_PLAUSIBLE_YEAR = 2000;
+
+/** Années proposées avec leur temps, la plus récente d'abord ; l'année courante est toujours présente. */
+export function listProfileYearTotals(viewings: readonly ProfileViewing[], now = Date.now()): { year: number; minutes: number }[] {
+  const current = new Date(now).getFullYear();
+  const totals = new Map<number, number>([[current, 0]]);
+  for (const viewing of viewings) {
+    const year = new Date(viewing.watchedAt).getFullYear();
+    // Une date avant 2000 ou dans le futur est une horloge fausse, pas une année à proposer.
+    if (year < FIRST_PLAUSIBLE_YEAR || year > current) continue;
+    totals.set(year, (totals.get(year) || 0) + viewing.minutes);
+  }
+  return [...totals.entries()].map(([year, minutes]) => ({ year, minutes })).sort((left, right) => right.year - left.year);
+}
+
 export function listProfileYears(viewings: readonly ProfileViewing[], now = Date.now()): number[] {
-  const years = new Set<number>([new Date(now).getFullYear()]);
-  for (const viewing of viewings) years.add(new Date(viewing.watchedAt).getFullYear());
-  return [...years].sort((left, right) => right - left);
+  return listProfileYearTotals(viewings, now).map(entry => entry.year);
 }
 
 /** L'année courante si elle a des visionnages, sinon la plus récente qui en a. */
@@ -97,7 +149,7 @@ export function defaultProfileYear(viewings: readonly ProfileViewing[], now = Da
   for (const viewing of viewings) {
     const year = new Date(viewing.watchedAt).getFullYear();
     if (year === current) return current;
-    if (year < current && (latest === null || year > latest)) latest = year;
+    if (year >= FIRST_PLAUSIBLE_YEAR && year < current && (latest === null || year > latest)) latest = year;
   }
   return latest ?? current;
 }

@@ -2,8 +2,9 @@ import { Download, Loader2 } from 'lucide-react';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
+import { SettingsRow } from './settings/SettingsUi';
 
-export function DownloadFeatureSettingsCard() {
+function useDownloadFeatureToggle() {
   const enabled = useDownloadConfigStore(isDownloadFeatureEnabled);
   const isHydrated = useDownloadConfigStore(state => state.isHydrated);
   const isSaving = useDownloadConfigStore(state => state.isSaving);
@@ -26,6 +27,28 @@ export function DownloadFeatureSettingsCard() {
       'success'
     );
   };
+
+  return { enabled, isHydrated, isSaving, handleToggle };
+}
+
+/** Ligne des Réglages : même bascule et mêmes toasts que la carte des réglages rapides. */
+export function DownloadFeatureSettingsRow() {
+  const { enabled, isHydrated, isSaving, handleToggle } = useDownloadFeatureToggle();
+  return (
+    <SettingsRow
+      icon={Download}
+      label="Téléchargements"
+      sub={enabled ? "L'onglet et les actions de téléchargement sont visibles" : "Masqués par défaut pour ce compte"}
+      toggle={enabled}
+      busy={isSaving}
+      disabled={!isHydrated || isSaving}
+      onClick={() => void handleToggle()}
+    />
+  );
+}
+
+export function DownloadFeatureSettingsCard() {
+  const { enabled, isHydrated, isSaving, handleToggle } = useDownloadFeatureToggle();
 
   return (
     <section className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5" aria-labelledby="downloads-visibility-title">

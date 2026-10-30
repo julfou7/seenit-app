@@ -9,8 +9,11 @@ import {
   buildProfileYearStory,
   collectProfileViewings,
   defaultProfileYear,
+  formatProfileImportNote,
   formatProfilePunchSlot,
+  listProfileYearTotals,
   listProfileYears,
+  partitionProfileViewings,
 } from '../src/features/profile/profileYearStats.ts';
 
 const profileSource = readFileSync('src/screens/ProfileScreen.tsx', 'utf8');
@@ -72,6 +75,18 @@ test('Moi · collecte un visionnage daté par épisode ou film vu, avec la prove
   assert.deepEqual(listProfileYears(viewings, NOW), [2026, 2025]);
   assert.equal(defaultProfileYear(viewings, NOW), 2026);
   assert.equal(defaultProfileYear(viewings.filter(viewing => viewing.showId === 'old'), NOW), 2025);
+});
+
+test('Moi · le sélecteur d’année liste les années réelles avec leur temps, sans dates impossibles', () => {
+  const shows = [...library(), show({ id: 'clock', title: 'Horloge fausse', seenEpisodes: ['1x1', '1x2'], episodeRecords: { '1x1': { watchedAt: new Date(1999, 5, 1).getTime() }, '1x2': { watchedAt: at(2031, 0, 1) } } })];
+  const totals = listProfileYearTotals(collectProfileViewings(shows), NOW);
+  assert.deepEqual(totals.map(entry => entry.year), [2026, 2025], '1999 et 2031 ne sont pas proposées');
+  assert.equal(totals[0].minutes, 18 * 45 + 155);
+  assert.equal(totals[1].minutes, 3 * 45);
+  assert.deepEqual(listProfileYearTotals([], NOW), [{ year: 2026, minutes: 0 }]);
+  assert.match(dashboardSource, /role="listbox"/);
+  assert.match(dashboardSource, /role="option"/);
+  assert.doesNotMatch(dashboardSource, /cycleYear/);
 });
 
 test('Moi · Chiffres par année : total, mois jusqu’au mois courant, record et plateformes', () => {
@@ -136,6 +151,24 @@ test('Moi · projection « tu finis le… » sur les quatre dernières semaines'
   assert.equal(buildProfileProjection(dropped, collectProfileViewings(dropped), NOW), null);
 });
 
+test('Moi · une journée de plus de 24 h (import TV Time) sort des Chiffres et de Mon année', () => {
+  const imported = episodes(1, 1, 300, () => at(2026, 6, 14, 18) + 3, {});
+  const shows = [...library(), show({ id: 'import', tmdbId: 77, title: 'Import', ...imported })];
+  const { viewings, imports } = partitionProfileViewings(collectProfileViewings(shows));
+  assert.equal(imports.length, 1);
+  assert.equal(imports[0].count, 300);
+  assert.equal(imports[0].minutes, 300 * 45);
+  assert.ok(viewings.every(viewing => viewing.showId !== 'import'));
+  assert.equal(viewings.length, collectProfileViewings(library()).length, 'les vrais jours restent intacts');
+  assert.equal(formatProfileImportNote(imports, 2026), 'Sans l’import du 14 juillet (225 h)');
+  assert.equal(formatProfileImportNote(imports, 2025), null);
+  assert.equal(buildProfileYearStats(viewings, 2026, NOW).recordMonth, 6, 'juillet reste un vrai mois, sans l’import');
+  assert.equal(buildProfileYearStats(viewings, 2026, NOW).months[6], 8 * 45 + 155);
+
+  const busy = partitionProfileViewings(collectProfileViewings([show({ id: 'binge', ...episodes(1, 1, 30, () => at(2026, 8, 1, 20)) })]));
+  assert.equal(busy.imports.length, 0, '22 h 30 dans la journée reste un vrai marathon');
+});
+
 test('Moi · badges : mêmes seuils historiques, progression bornée', () => {
   const badges = buildProfileBadges({ totalMinutes: 300, totalEpisodesSeen: 8, totalMoviesSeen: 0, completedTvCount: 0 });
   assert.deepEqual(badges.map(badge => badge.title), ['Centenaire', 'Oiseau de nuit', 'Grand écran', 'Binge-Master']);
@@ -175,6 +208,8 @@ test('Moi · Ma liste en pastilles comptées et grille unique des cartes habitue
 
 test('Moi · Chiffres et Mon année gardent un seul or et les personnes fréquentes', () => {
   assert.match(dashboardSource, /buildProfileYearStats\(viewings, year\)/);
+  assert.match(dashboardSource, /partitionProfileViewings\(collectProfileViewings\(shows\)\)/);
+  assert.match(storySource, /partitionProfileViewings\(collectProfileViewings\(shows\)\)/);
   assert.match(dashboardSource, /Devant l’écran/);
   assert.match(dashboardSource, /Heures par mois/);
   assert.match(dashboardSource, /Quand tu regardes/);

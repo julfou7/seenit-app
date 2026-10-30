@@ -28,6 +28,12 @@
 .moi-year{position:relative;height:32px;padding:0 12px;border-radius:16px;border:1px solid rgba(255,255,255,.10);background:#1C1C1F;color:#e4e4e7;font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
 .moi-year::after{content:'';position:absolute;inset:-6px -4px}
 .moi-year:disabled{opacity:1}
+.moi-year-picker{position:relative}
+.moi-year-backdrop{position:fixed;inset:0;z-index:40;border:0;background:transparent}
+.moi-year-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:41;min-width:150px;max-height:280px;overflow-y:auto;margin:0;padding:4px;list-style:none;border-radius:14px;background:#1C1C1F;box-shadow:0 14px 40px rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.10)}
+.moi-year-menu button{width:100%;min-height:44px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:#e4e4e7;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;font-weight:700}
+.moi-year-menu button small{font-size:12px;font-weight:700;color:#8b8b94}
+.moi-year-menu button[aria-selected=true]{background:rgba(229,169,61,.16);color:#F2C36B}
 .moi-bento{display:grid;grid-template-columns:1.35fr 1fr;gap:8px}
 .moi-hero{grid-row:span 2;padding:16px;border-radius:20px;background:#141417;display:flex;flex-direction:column;justify-content:space-between;gap:10px}
 .moi-hero>span{font-size:13px;color:#a1a1aa}
@@ -57,6 +63,8 @@
 .moi-punch-cell>i{display:block;border-radius:50%}
 .moi-note{margin:0;font-size:13px;line-height:1.45;color:#d4d4d8}
 .moi-note b{color:#fff}
+.moi-import{margin:0;font-size:12px;line-height:1.4;color:#71717a}
+.moi-story-import{margin:-10px 0 16px}
 .moi-where{display:grid;grid-template-columns:86px 1fr 40px;gap:10px;align-items:center}
 .moi-where>span{font-size:13px;font-weight:700;color:#e4e4e7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .moi-where>small{font-size:12px;font-weight:700;color:#a1a1aa;text-align:right}
