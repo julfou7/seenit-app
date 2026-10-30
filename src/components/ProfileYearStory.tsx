@@ -7,13 +7,16 @@ import {
   collectProfileViewings,
   defaultProfileYear,
   formatProfileHours,
+  formatProfileImportNote,
+  partitionProfileViewings,
 } from '../features/profile/profileYearStats';
 
 export function ProfileYearStory({ shows, libraryReady = true }: { shows: Show[]; libraryReady?: boolean }) {
-  const viewings = useMemo(() => collectProfileViewings(shows), [shows]);
+  const { viewings, imports } = useMemo(() => partitionProfileViewings(collectProfileViewings(shows)), [shows]);
   const year = defaultProfileYear(viewings);
   const story = useMemo(() => buildProfileYearStory(viewings, year), [viewings, year]);
   const projection = useMemo(() => buildProfileProjection(shows, viewings), [shows, viewings]);
+  const importNote = formatProfileImportNote(imports, year);
 
   if (!story) {
     return (
@@ -28,6 +31,7 @@ export function ProfileYearStory({ shows, libraryReady = true }: { shows: Show[]
     <div className="moi-story">
       {year !== new Date().getFullYear() && <span className="moi-story-year">En {year}</span>}
       <h2>{story.headline}</h2>
+      {importNote && <p className="moi-import moi-story-import">{importNote}</p>}
       {story.months.map(month => (
         <div key={month.month} className="moi-step">
           <div className="moi-step-rail">

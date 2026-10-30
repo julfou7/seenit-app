@@ -1,12 +1,13 @@
 import { useAnimatedBadges } from '../hooks/useAnimatedBadges';
 import { DialogLayer } from '../components/ui/DialogLayer';
 import { hydratePlatformPreferences } from '../features/providers/platformPreferenceHydration';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Cloud, LogIn, LogOut, FileText, CheckCircle2, MonitorPlay, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronDown, ChevronUp, ChevronRight, Check, AlertCircle, Info, Bug, Sparkles, Download, X, UploadCloud, DownloadCloud } from 'lucide-react';
+import { Cloud, LogIn, FileText, CheckCircle2, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronRight, Check, AlertCircle, Sparkles, Download, X, UploadCloud, DownloadCloud, LayoutGrid, Server, MonitorSmartphone, Package, Tv, Clock, Newspaper, Film, Smartphone, FlaskConical, Sun } from 'lucide-react';
 import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { registerPlugin } from '@capacitor/core';
+import { PushNotifications } from '@capacitor/push-notifications';
 import { DEFAULT_NOTIFICATION_PREFS, mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
@@ -15,7 +16,7 @@ import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
 import { cn } from '../lib/utils';
 import { CsvImporter } from '../components/CsvImporter';
 import { useToastStore } from '../store/toastStore';
-import { useSyncStore } from '../store/syncStore';
+import { useSyncStore, type PlexSyncStatus } from '../store/syncStore';
 import { useShowsStore } from '../store/showsStore';
 import { useLogStore, appLogger, LogCategory } from '../store/logStore';
 import { useUpdateStore, CURRENT_APP_VERSION } from '../store/updateStore';
@@ -28,42 +29,77 @@ import {
   type PlexAuthAttempt
 } from '../services/plex';
 import { performPlexSync, purgeAllPlexSlugsInDb } from '../features/plex/syncPlex';
-import { SeenItLogo } from '../components/SeenItLogo';
+import { isPlexSyncTerminal } from '../features/plex/plexSyncPresentation';
 import { ReleaseHistoryViewer } from '../components/ChangelogViewer';
+import { DownloadFeatureSettingsRow } from '../components/DownloadFeatureSettingsCard';
+import {
+  SettingsCard,
+  SettingsConfirm,
+  SettingsGroup,
+  SettingsHeader,
+  SettingsRow,
+  SettingsSubscreen,
+  formatSettingsAgo,
+  type SettingsTone,
+} from '../components/settings/SettingsUi';
+import { getProfileAvatarUrl, getProfileInitials } from '../features/profile/profileAvatar';
+import './reglages.css';
 import { downloadAndInstallApk, getUpdateProgressPresentation, UpdateProgress } from '../services/appUpdater';
 import {
   activatePlexUserScope,
   clearPlexCredentials,
+  getPlexLastSyncTimestamp,
   getStoredPlexToken,
   getStoredPlexUsername,
   storePlexCredentials
 } from '../features/plex/plexStorage';
 import { usePlexAvailabilityStore } from '../features/plex/plexAvailability';
-import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
+import { readUserScopedJson, subscribeUserScopedStorageField, writeUserScopedJson } from '../lib/userIsolation';
 import { resolveNotificationMediaVisual } from '../features/notifications/notificationMedia';
 import { sendMediaReminderNotification } from '../features/notifications/mediaReminderNotification';
 import { buildNotificationTestSample, type NotificationTestType } from '../features/notifications/notificationTestSample';
 const NotificationSettings = registerPlugin<{ open(): Promise<void> }>('SeenItNotificationSettings');
 
 const STREAMING_PLATFORMS = [
-  { id: 8, name: 'Netflix' },
-  { id: 119, name: 'Prime Video' },
-  { id: 337, name: 'Disney+' },
-  { id: 381, name: 'Canal+ / MyCanal' },
-  { id: 350, name: 'Apple TV+' },
-  { id: 531, name: 'Paramount+' },
-  { id: 1899, name: 'Max' },
-  { id: 234, name: 'France TV' },
-  { id: 239, name: 'Arte' }
+  { id: 8, name: 'Netflix', short: 'NF', tile: '#141414', ink: '#ff5a5f' },
+  { id: 119, name: 'Prime Video', short: 'PV', tile: '#0b2a3a', ink: '#67e8f9' },
+  { id: 337, name: 'Disney+', short: 'D+', tile: '#0e1d3a', ink: '#93c5fd' },
+  { id: 381, name: 'Canal+', short: 'C+', tile: '#f4f4f5', ink: '#111' },
+  { id: 350, name: 'Apple TV+', short: 'tv', tile: '#f4f4f5', ink: '#111' },
+  { id: 531, name: 'Paramount+', short: 'P+', tile: '#0b1f4d', ink: '#93c5fd' },
+  { id: 1899, name: 'Max', short: 'MX', tile: '#0f1f4d', ink: '#bfdbfe' },
+  { id: 234, name: 'France TV', short: 'FTV', tile: '#16233f', ink: '#fca5a5' },
+  { id: 239, name: 'Arte', short: 'AR', tile: '#2a1410', ink: '#fdba74' }
 ];
+
+const NOTIFICATION_TESTS: { type: NotificationTestType; label: string; sub: string }[] = [
+  { type: 'release_today_tv', label: 'Test · nouvel épisode', sub: 'Série de ta liste' },
+  { type: 'season_d7', label: 'Test · nouvelle saison', sub: 'Rappel J-7' },
+  { type: 'movie_theater', label: 'Test · sortie au cinéma', sub: 'Film de ta liste' },
+  { type: 'movie_dvd_vod', label: 'Test · sortie DVD / VOD', sub: 'Aperçu, aucune date inventée' },
+];
+
+const describeError = (error: unknown) => error instanceof Error ? error.message : String(error);
+
+type SettingsPage = 'plats' | 'notifs' | 'plex' | 'devices' | 'compte' | 'app';
+type NotificationPermissionState = 'granted' | 'denied' | 'prompt' | 'unknown';
+const PLEX_FRESH_MS = 24 * 60 * 60 * 1000;
 
 type PlexAuthSession = Readonly<{
   uid: string;
   attempt: PlexAuthAttempt;
 }>;
 
-export function SettingsScreen() {
+export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
   const [animatedBadges, setAnimatedBadges] = useAnimatedBadges();
+  const [page, setPage] = useState<SettingsPage | null>(null);
+  const [confirm, setConfirm] = useState<'logout' | 'plexout' | null>(null);
+  const [showNotificationTests, setShowNotificationTests] = useState(false);
+  const [showCsvImport, setShowCsvImport] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('unknown');
+  const [avatarFailed, setAvatarFailed] = useState(false);
+  const plexSyncStatus = useSyncStore(state => state.plexSyncStatus);
+  const isQuotaExceeded = useSyncStore(state => state.isQuotaExceeded);
   const { showToast } = useToastStore();
   const syncStatus = useSyncStore(state => state.syncStatus);
   const shows = useShowsStore(state => state.shows);
@@ -153,7 +189,7 @@ export function SettingsScreen() {
         } catch {
           appLogger.warn('plex', 'Compte Plex associé, mais la première synchronisation complète a échoué.');
         }
-      } catch (error: any) {
+      } catch (error: unknown) {
         if (!active || (error instanceof PlexAuthError && error.code === 'cancelled')) return;
 
         const message = error instanceof PlexAuthError
@@ -199,7 +235,7 @@ export function SettingsScreen() {
         const opened = window.open(authUrl, '_blank', 'noopener,noreferrer');
         if (!opened) throw new Error("Le navigateur a bloqué l'ouverture de Plex.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       setPlexAuthSession(null);
       const message = error instanceof PlexAuthError
         ? error.message
@@ -228,8 +264,8 @@ export function SettingsScreen() {
     setPlexSyncMode(delta ? 'delta' : 'full');
     try {
       await performPlexSync({ delta, silent: false, ignoreCooldown: true });
-    } catch (e: any) {
-      showToast(`Erreur système: ${e?.message || e}`, "error");
+    } catch (e: unknown) {
+      showToast(`Erreur système: ${describeError(e)}`, "error");
     } finally {
       setPlexSyncMode(null);
     }
@@ -364,8 +400,8 @@ export function SettingsScreen() {
       } else {
         showToast(`Erreur : ${res.error || 'Erreur inconnue'}`, "error");
       }
-    } catch (e: any) {
-      showToast(`Erreur : ${e?.message || e}`, "error");
+    } catch (e: unknown) {
+      showToast(`Erreur : ${describeError(e)}`, "error");
     }
   };
 
@@ -404,8 +440,8 @@ export function SettingsScreen() {
       }
 
       showToast("✅ Données Cloud rechargées avec succès !", "success");
-    } catch (e: any) {
-      showToast(`Erreur : ${e?.message || e}`, "error");
+    } catch (e: unknown) {
+      showToast(`Erreur : ${describeError(e)}`, "error");
     }
   };
 
@@ -582,612 +618,467 @@ export function SettingsScreen() {
     }
   };
 
-  return (
-    <div className="flex-1 overflow-y-auto bg-black text-white px-4 sm:px-6 pt-4 sm:pt-5 pb-nav custom-scrollbar relative">
-      <div className="max-w-md mx-auto w-full">
-        <div className="absolute top-0 left-0 w-64 h-32 bg-[#E5A93D]/10 blur-[100px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
+  const isNative = Capacitor.isNativePlatform();
+  const isAndroid = Capacitor.getPlatform() === 'android';
+  const devicePlace = isNative ? 'ce téléphone' : 'ce navigateur';
+  const avatarUrl = getProfileAvatarUrl(user);
 
-        {/* Header Mobile Compact */}
-        <div className="mb-4">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-0.5">Réglages</h1>
-          <p className="text-zinc-400 text-[11px] font-medium">
-            Profil, Plateformes, Notifications & Intégrations.
-          </p>
-        </div>
+  useEffect(() => { setAvatarFailed(false); }, [user?.uid, avatarUrl]);
 
-        <div className="space-y-3 sm:space-y-4">
+  const [plexReport, setPlexReport] = useState<PlexSyncStatus | null>(null);
+  useEffect(() => {
+    const uid = user?.uid;
+    const refresh = () => setPlexReport(readUserScopedJson<PlexSyncStatus | null>(uid, 'plex_last_sync_report_v1', null));
+    refresh();
+    return subscribeUserScopedStorageField(uid, 'plex_last_sync_report_v1', refresh);
+  }, [user?.uid]);
 
-          {/* SECTION 1: MON COMPTE */}
-          <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
-            <h2 className="font-bold text-sm text-zinc-100 mb-3 flex items-center gap-2.5">
-              <Cloud className="text-emerald-500" size={18} />
-              Mon Profil
-            </h2>
-            {!user ? (
-              <div className="flex flex-col items-center text-center p-2">
-                <p className="text-xs text-zinc-400 mb-4 font-medium">
-                  Connectez-vous pour synchroniser votre bibliothèque en temps réel entre tous vos appareils.
-                </p>
-                <button
-                  onClick={handleLogin}
-                  className="w-full flex items-center justify-center gap-2 bg-white text-zinc-950 font-bold py-2.5 px-4 rounded-xl hover:bg-zinc-200 active:scale-95 transition-all text-xs shadow-lg cursor-pointer"
-                >
-                  <LogIn size={16} />
-                  Continuer avec Google
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-col min-w-0 bg-zinc-950/50 p-2.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Connecté avec</span>
-                  <span className="font-bold text-xs text-white truncate">{user.email}</span>
-                </div>
+  // L'état réel de la permission n'est lu qu'à l'ouverture des écrans qui l'affichent.
+  useEffect(() => {
+    if (page !== 'notifs' && page !== 'devices') return;
+    let active = true;
+    void (async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const { receive } = await PushNotifications.checkPermissions();
+          if (active) setNotificationPermission(receive === 'granted' ? 'granted' : receive === 'denied' ? 'denied' : 'prompt');
+        } else if (typeof window !== 'undefined' && 'Notification' in window) {
+          const permission = Notification.permission;
+          if (active) setNotificationPermission(permission === 'granted' ? 'granted' : permission === 'denied' ? 'denied' : 'prompt');
+        }
+      } catch {
+        if (active) setNotificationPermission('unknown');
+      }
+    })();
+    return () => { active = false; };
+  }, [page]);
 
-                {/* Multi-appareils & Synchronisation Cloud */}
-                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-indigo-300 flex items-center gap-1.5">
-                      <Cloud size={14} className="text-indigo-400" />
-                      Synchronisation Cloud
-                    </span>
-                    <span className="text-[10px] font-semibold px-2 py-0.5 bg-indigo-500/20 text-indigo-200 rounded-full">
-                      {shows.length} série(s) en mémoire
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-zinc-400 leading-relaxed">
-                    Sauvegardez vos séries et réglages sur le Cloud pour y accéder instantanément sur votre téléphone ou votre ordinateur.
-                  </p>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    <button
-                      onClick={handleBackupToCloud}
-                      className="flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold py-2 px-2.5 rounded-lg text-[11px] transition-all cursor-pointer shadow"
-                    >
-                      <UploadCloud size={14} />
-                      Sauvegarder
-                    </button>
-                    <button
-                      onClick={handleRestoreFromCloud}
-                      className="flex items-center justify-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-2.5 rounded-lg text-[11px] border border-white/10 transition-all cursor-pointer"
-                    >
-                      <DownloadCloud size={14} />
-                      Recharger
-                    </button>
-                  </div>
-                </div>
+  const handleRequestNotifications = async () => {
+    const token = await requestNotificationPermission();
+    if (token || (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted')) {
+      setNotificationPermission('granted');
+      showToast("Notifications activées avec succès !", "success");
+    } else {
+      showToast("Permission refusée par le système.", "error");
+    }
+  };
 
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center justify-center gap-2 bg-red-500/10 text-red-500 hover:bg-red-500/20 active:scale-95 font-bold py-2 px-4 rounded-xl transition-all text-xs border border-red-500/20 cursor-pointer"
-                >
-                  <LogOut size={14} />
-                  Se déconnecter
-                </button>
-              </div>
-            )}
-          </div>
+  const openVersionNotes = async () => {
+    setShowVersionNotesModal(true);
+    if (!latestRelease) {
+      await checkForUpdates(false);
+    }
+    await loadReleaseHistory(false);
+  };
 
-          <section className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
-            <label className="flex min-h-11 items-center justify-between gap-3 text-sm font-bold"><span>Badges animés<small className="block mt-1 text-xs font-normal text-zinc-400">Animation des sorties du jour dans À voir.</small></span><input type="checkbox" checked={animatedBadges} onChange={event => setAnimatedBadges(event.target.checked)} className="h-6 w-6 accent-[#E5A93D]" /></label>
-          </section>
+  const selectedPlatformNames = STREAMING_PLATFORMS.filter(platform => userPlatforms.includes(platform.id)).map(platform => platform.name);
+  const platformSummary = selectedPlatformNames.length ? selectedPlatformNames.join(', ') : 'Aucune choisie';
+  const activeNotifications = Object.values(notificationPrefs).filter(Boolean).length;
+  const notificationSummary = activeNotifications === 0 ? 'Aucune activée' : `${activeNotifications} ${activeNotifications > 1 ? 'activées' : 'activée'}`;
 
-          {/* SECTION 2: PLATEFORMES */}
-          <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
-            <div className="flex items-center gap-2.5 mb-2.5">
-              <MonitorPlay className="text-[#E5A93D]" size={18} />
-              <h2 className="font-bold text-sm text-zinc-100">Plateformes de Streaming</h2>
-            </div>
-            <p className="text-xs text-zinc-400 mb-4 leading-relaxed font-medium">
-              Sélectionnez vos abonnements pour y accéder directement.
-            </p>
+  const ownedPlexSync = plexSyncStatus && (!plexSyncStatus.progress || plexSyncStatus.progress.uid === user?.uid) ? plexSyncStatus : null;
+  const plexBusy = Boolean(plexSyncMode) || Boolean(ownedPlexSync && !isPlexSyncTerminal(ownedPlexSync.progress?.phase, ownedPlexSync.message));
+  const plexLastSync = getPlexLastSyncTimestamp(user?.uid);
+  const plexState: { text: string; tone?: SettingsTone } = !user
+    ? { text: 'Connecte-toi pour associer Plex' }
+    : plexAuthSession
+      ? { text: 'En attente de l’autorisation…', tone: 'busy' }
+      : !plexToken
+        ? { text: 'Non connecté' }
+        : plexBusy
+          ? { text: 'Synchro en cours…', tone: 'busy' }
+          : plexLastSync
+            ? {
+              text: `Connecté · synchro ${formatSettingsAgo(plexLastSync)}`,
+              tone: Date.now() - plexLastSync < PLEX_FRESH_MS ? 'ok' : 'warn',
+            }
+            : { text: 'Connecté · jamais synchronisé', tone: 'warn' };
+  const plexServers = plexReport?.progress?.uid === user?.uid ? plexReport?.progress?.servers || [] : [];
+  const plexLinkedCount = shows.filter(show => Boolean(show.plexGuid || show.plexSlug)).length;
+  const accountCounts = {
+    series: shows.filter(show => show.mediaType === 'tv').length,
+    films: shows.filter(show => show.mediaType === 'movie').length,
+    favorites: shows.filter(show => show.isFavorite).length,
+    episodes: shows.reduce((sum, show) => sum + (show.mediaType === 'tv' ? (show.seenEpisodes || []).filter(episode => episode !== 'movie').length : 0), 0),
+  };
 
-            <div className="grid grid-cols-2 gap-2">
-              {STREAMING_PLATFORMS.map(platform => {
-                const isSelected = userPlatforms.includes(platform.id);
-                return (
-                  <button
-                    key={platform.id}
-                    onClick={() => handleTogglePlatform(platform.id)}
-                    className={cn(
-                      "flex items-center justify-between px-3 py-2.5 rounded-xl border text-left transition-all active:scale-95 touch-manipulation",
-                      isSelected
-                        ? "bg-[#E5A93D]/10 border-[#E5A93D]/40 text-[#E5A93D]"
-                        : "bg-black/40 border-white/5 text-zinc-400 hover:bg-zinc-800/60"
-                    )}
-                  >
-                    <span className="font-semibold text-xs truncate mr-1">{platform.name}</span>
-                    <div className={cn(
-                      "w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-colors",
-                      isSelected ? "bg-[#E5A93D] border-[#E5A93D]" : "border-zinc-600"
-                    )}>
-                      {isSelected && <CheckCircle2 size={10} className="text-black stroke-[3]" />}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* SECTION 3: NOTIFICATIONS */}
-          <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
-            <div className="flex items-center gap-2.5 mb-2.5">
-              <Bell className="text-[#E5A93D]" size={18} />
-              <h2 className="font-bold text-sm text-zinc-100">Notifications & Rappels</h2>
-            </div>
-            <p className="text-xs text-zinc-400 mb-3 leading-relaxed font-medium">
-              Alertes quotidiennes envoyées à <strong>09h00</strong>.
-            </p>
-
-            {typeof window !== 'undefined' && window.self !== window.top && (
-              <div className="mb-3.5 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300 leading-relaxed font-medium">
-                ⚠️ <strong>Note Android :</strong> Chrome bloque les notifications dans cet aperçu.
-              </div>
-            )}
-
-            <div className="flex flex-col gap-4 mb-5">
-              <div className="flex items-center justify-between group">
-                <div className="flex flex-col">
-                  <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Nouvel épisode (Séries)</span>
-                  <span className="text-[10px] text-zinc-500">Le jour de la diffusion</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => triggerTestNotif('release_today_tv')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
-                    checked={notificationPrefs.release_today_tv}
-                    onChange={(e) => handleToggleNotif('release_today_tv', e.target.checked)}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between group">
-                <div className="flex flex-col">
-                  <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Nouvelle saison (Séries)</span>
-                  <span className="text-[10px] text-zinc-500">Rappel J-7</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => triggerTestNotif('season_d7')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
-                    checked={notificationPrefs.season_d7}
-                    onChange={(e) => handleToggleNotif('season_d7', e.target.checked)}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between group">
-                <div className="flex flex-col">
-                  <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Sortie au cinéma (Films)</span>
-                  <span className="text-[10px] text-zinc-500">Le jour J</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => triggerTestNotif('movie_theater')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
-                    checked={notificationPrefs.movie_theater}
-                    onChange={(e) => handleToggleNotif('movie_theater', e.target.checked)}
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between group">
-                <div className="flex flex-col">
-                  <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Sortie DVD / VOD (Films)</span>
-                  <span className="text-[10px] text-zinc-500">Aperçu — aucune date VOD inventée</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => triggerTestNotif('movie_dvd_vod')} className="text-[10px] font-bold text-zinc-400 hover:text-white px-2 py-1 bg-zinc-800 rounded-md transition-colors">🧪 Test</button>
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded text-[#E5A93D] focus:ring-[#E5A93D] bg-zinc-800 border-zinc-700 cursor-pointer"
-                    checked={notificationPrefs.movie_dvd_vod}
-                    onChange={(e) => handleToggleNotif('movie_dvd_vod', e.target.checked)}
-                  />
-                </div>
-              </div>
-              <label className="flex items-center justify-between gap-4">
-                <span className="text-xs text-zinc-200 font-bold">Actualités des séries<span className="block text-[10px] text-zinc-500 font-normal">Renouvellements et saisons annoncées</span></span>
-                <input type="checkbox" checked={notificationPrefs.news} onChange={event => handleToggleNotif('news', event.target.checked)} className="w-4 h-4 accent-[#E5A93D]" />
-              </label>
-            </div>
-
-            <button
-              onClick={async () => {
-                const token = await requestNotificationPermission();
-                if (token || (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted')) {
-                  showToast("Notifications activées avec succès !", "success");
-                } else {
-                  showToast("Permission refusée par le système.", "error");
-                }
-              }}
-              className="w-full flex items-center justify-center gap-2 bg-[#E5A93D]/10 hover:bg-[#E5A93D]/20 active:scale-95 text-[#E5A93D] border border-[#E5A93D]/30 font-bold py-2.5 px-4 rounded-xl text-xs transition-all cursor-pointer"
-            >
-              <Bell size={15} />
-              Autoriser le système Android/Web
-            </button>
-            {Capacitor.getPlatform() === 'android' && <button
-              onClick={() => { void NotificationSettings.open().catch(() => showToast('Réglages Android indisponibles.', 'error')); }}
-              className="mt-3 w-full py-2.5 text-xs text-zinc-300 border border-zinc-700 rounded-xl"
-            >Réglages Android des notifications</button>}
-          </div>
-
-          {/* SECTION 4: INTÉGRATIONS & SYNCHRO */}
-          <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
-            <h2 className="font-bold text-sm text-zinc-100 mb-4 flex items-center gap-2.5">
-              <RefreshCw className="text-indigo-400" size={18} />
-              Données & Synchronisation
-            </h2>
-
-            {/* Plex */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <MonitorPlay className="text-orange-500" size={14} />
-                <h3 className="font-bold text-xs text-zinc-200">Intégration Plex</h3>
-              </div>
-              <p className="text-[11px] text-zinc-400 mb-3 leading-relaxed font-medium">
-                Synchronisez votre historique automatiquement.
-              </p>
-              {!user ? (
-                <div className="p-2 bg-zinc-800/50 rounded-xl text-center text-[11px] text-zinc-400 border border-white/5 font-medium">
-                  Connectez-vous pour associer Plex.
-                </div>
-              ) : !plexToken ? (
-                <div className="flex flex-col gap-2">
-                  {plexAuthError && (
-                    <p className="text-[10px] text-red-300 bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-2 leading-relaxed">
-                      {plexAuthError}
-                    </p>
-                  )}
-                  <button
-                    onClick={handlePlexLogin}
-                    disabled={isStartingPlexAuth || !!plexAuthSession}
-                    className="w-full flex items-center justify-center gap-2 bg-orange-500/10 hover:bg-orange-500/20 active:scale-95 text-orange-500 font-bold py-2 px-4 rounded-xl text-xs transition-all cursor-pointer border border-orange-500/20 disabled:opacity-50"
-                  >
-                    {isStartingPlexAuth
-                      ? 'Ouverture...'
-                      : plexAuthSession
-                        ? 'En attente...'
-                        : plexAuthError
-                          ? 'Réessayer l’association Plex'
-                          : 'Associer mon compte Plex'}
-                  </button>
-                  {plexAuthSession && (
-                    <button
-                      onClick={handleCancelPlexLogin}
-                      className="text-[10px] text-zinc-500 font-medium hover:text-zinc-300 underline self-center"
-                    >
-                      Annuler l’association
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handlePlexSync(true)}
-                      disabled={!!plexSyncMode}
-                      className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold py-2 px-3 rounded-xl text-xs transition-colors border border-white/5 disabled:opacity-50"
-                    >
-                      {plexSyncMode === 'delta' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                      Rapide
-                    </button>
-                    <button
-                      onClick={() => handlePlexSync(false)}
-                      disabled={!!plexSyncMode}
-                      className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold py-2 px-3 rounded-xl text-xs transition-colors border border-white/5 disabled:opacity-50"
-                    >
-                      {plexSyncMode === 'full' ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                      Complète
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between mt-1 px-1">
-                    <button
-                      onClick={async () => {
-                        const count = await purgeAllPlexSlugsInDb();
-                        showToast(`🧹 ${count} slug(s) Plex nettoyé(s) avec succès !`, "success");
-                      }}
-                      className="text-[10px] text-amber-500/80 font-medium hover:text-amber-400 underline text-left"
-                    >
-                      Purger les slugs Plex en cache
-                    </button>
-                    <button onClick={handlePlexLogout} className="text-[10px] text-zinc-500 font-medium hover:text-zinc-300 underline text-right">
-                      Déconnecter Plex
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="h-px w-full bg-zinc-800/80 mb-4" />
-
-            {/* CSV Import */}
-            <div className="mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <FileText className="text-indigo-400" size={14} />
-                <h3 className="font-bold text-xs text-zinc-200">Importer TV Time (CSV)</h3>
-              </div>
-              <CsvImporter />
-            </div>
-
-            <div className="h-px w-full bg-zinc-800/80 mb-4" />
-
-            {/* Force Sync TMDB */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Cloud className="text-emerald-500" size={14} />
-                <h3 className="font-bold text-xs text-zinc-200">Forcer la synchro (TMDB)</h3>
-              </div>
-              <p className="text-[11px] text-zinc-400 mb-3 leading-relaxed font-medium">
-                Mettre à jour les données TMDB de toutes vos séries manuellement.
-              </p>
-              {syncStatus ? (
-                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs font-bold text-amber-400">
-                    <span className="flex items-center gap-1.5">
-                      <Loader2 size={13} className="animate-spin text-amber-400" />
-                      En cours...
-                    </span>
-                    <span className="text-[11px]">{syncStatus.total - syncStatus.pending + 1} / {syncStatus.total}</span>
-                  </div>
-                  <div className="w-full bg-zinc-800 rounded-full h-1.5 overflow-hidden">
-                    <div
-                      className="bg-[#E5A93D] h-full transition-all duration-300"
-                      style={{ width: `${Math.round(((syncStatus.total - syncStatus.pending + 1) / Math.max(1, syncStatus.total)) * 100)}%` }}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <button
-                  onClick={handleForceSync}
-                  disabled={isSyncing || !user}
-                  className="w-full flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-4 rounded-xl text-xs transition-all cursor-pointer border border-white/5 disabled:opacity-50"
-                >
-                  <RefreshCw size={14} className={cn(isSyncing && "animate-spin")} />
-                  {isSyncing ? 'Synchronisation...' : 'Actualiser les séries'}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* SECTION 5: AVANCÉ & LOGS */}
-          <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5">
-            <h2 className="font-bold text-sm text-zinc-100 mb-4 flex items-center gap-2.5">
-              <Terminal className="text-zinc-400" size={18} />
-              À propos & Avancé
-            </h2>
-
-            <div className="flex flex-col gap-3">
-              {/* Interactive Version Card / Button */}
-              <button
-                type="button"
-                onClick={async () => {
-                  setShowVersionNotesModal(true);
-                  if (!latestRelease) {
-                    await checkForUpdates(false);
-                  }
-                  await loadReleaseHistory(false);
-                }}
-                className="w-full flex items-center justify-between bg-zinc-800/40 hover:bg-zinc-800/80 active:scale-[0.99] p-3 rounded-xl border border-zinc-800 transition-all cursor-pointer group text-left"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/20 group-hover:scale-105 transition-transform">
-                    <FileText size={15} />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs text-zinc-200 font-bold group-hover:text-white transition-colors">Version installée</span>
-                    <span className="text-[10px] text-zinc-400">Appuyez pour voir toutes les versions</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-amber-400 font-mono bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                    v{currentVersion}
-                  </span>
-                  <ChevronRight size={15} className="text-zinc-500 group-hover:text-zinc-300 transition-colors" />
-                </div>
-              </button>
-
-              {/* Update Available In-Place Card */}
-              {hasUpdate && latestRelease && (
-                <div className="p-3.5 bg-gradient-to-r from-amber-500/15 via-amber-500/10 to-transparent border border-amber-500/30 rounded-xl flex flex-col gap-2.5 shadow-lg shadow-amber-500/5 animate-in fade-in duration-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-7 h-7 rounded-lg bg-amber-500 flex items-center justify-center text-black shadow-md shadow-amber-500/20 shrink-0">
-                        <Sparkles size={14} />
-                      </div>
-                      <div>
-                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <span>Nouvelle version v{latestRelease.version}</span>
-                          <span className="px-1.5 py-0.5 text-[9px] bg-amber-500 text-black font-extrabold rounded-full">
-                            DISPONIBLE
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-zinc-300">Une mise à jour de SeenIt est prête à être installée.</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      onClick={() => {
-                        setShowVersionNotesModal(true);
-                        void loadReleaseHistory(false);
-                      }}
-                      className="flex-1 py-2 px-3 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 text-xs font-bold rounded-xl transition-all cursor-pointer text-center border border-white/5"
-                    >
-                      Voir les notes
-                    </button>
-                    <button
-                      onClick={handleStartUpdate}
-                      disabled={apkUpdateProgress?.status === 'downloading'}
-                      className="flex-1 py-2 px-3 bg-amber-500 hover:bg-amber-400 active:scale-95 text-black text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50"
-                    >
-                      <Download size={13} />
-                      Installer
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCheckUpdates}
-                  disabled={isCheckingUpdates}
-                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-3 rounded-xl text-xs transition-colors border border-white/5 disabled:opacity-50 cursor-pointer"
-                >
-                  <RefreshCw size={14} className={cn(isCheckingUpdates && "animate-spin text-amber-400")} />
-                  Vérifier les M.A.J
-                </button>
-                <button
-                  onClick={() => setShowLogsPanel(!showLogsPanel)}
-                  className="flex-1 flex items-center justify-center gap-2 bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-zinc-200 font-bold py-2 px-3 rounded-xl text-xs transition-colors border border-white/5 cursor-pointer"
-                >
-                  <Bug size={14} />
-                  Logs Système
-                </button>
-              </div>
-
-              {/* Updater Progress */}
-              {apkUpdateProgress && (
-                <div className={cn(
-                  "mt-3 p-4 border rounded-xl flex flex-col gap-3",
-                  apkUpdatePresentation?.tone === 'error'
-                    ? "bg-red-500/10 border-red-500/25"
-                    : apkUpdatePresentation?.tone === 'success'
-                      ? "bg-emerald-500/10 border-emerald-500/25"
-                      : "bg-[#E5A93D]/10 border-[#E5A93D]/20"
-                )}>
-                  <div className={cn(
-                    "flex items-center justify-between text-xs font-bold",
-                    apkUpdatePresentation?.tone === 'error'
-                      ? "text-red-300"
-                      : apkUpdatePresentation?.tone === 'success'
-                        ? "text-emerald-300"
-                        : "text-[#E5A93D]"
-                  )}>
-                    <span className="flex items-center gap-2">
-                      {apkUpdateProgress.status === 'downloading' ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : apkUpdateProgress.status === 'done' ? (
-                        <CheckCircle2 size={14} />
-                      ) : (
-                        <Download size={14} />
-                      )}
-                      {apkUpdatePresentation?.label}
-                    </span>
-                    <span>{apkUpdateProgress.percent}%</span>
-                  </div>
-                  <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
-                    <div
-                      className={cn(
-                        "h-full transition-all duration-300",
-                        apkUpdatePresentation?.tone === 'error'
-                          ? "bg-red-500"
-                          : apkUpdatePresentation?.tone === 'success'
-                            ? "bg-emerald-500"
-                            : "bg-[#E5A93D]"
-                      )}
-                      style={{ width: `${apkUpdateProgress.percent}%` }}
-                    />
-                  </div>
-                  {apkUpdateProgress.status === 'error' && (
-                    <p className="text-[10px] text-red-400 leading-tight">
-                      {apkUpdateProgress.message || "Une erreur est survenue."}
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {/* Logs Panel */}
-              {showLogsPanel && (
-                <div className="mt-3 border border-zinc-800 rounded-xl bg-black/60 overflow-hidden flex flex-col">
-                  <div className="flex overflow-x-auto custom-scrollbar border-b border-zinc-800 bg-zinc-900">
-                    {['all', 'plex', 'sync', 'auth', 'system', 'network'].map(cat => (
-                      <button
-                        key={cat}
-                        onClick={() => setSelectedLogCategory(cat)}
-                        className={cn(
-                          "px-3 py-2 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors",
-                          selectedLogCategory === cat
-                            ? "text-[#E5A93D] border-b-2 border-[#E5A93D] bg-black/40"
-                            : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
-                        )}
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="p-3 max-h-64 overflow-y-auto custom-scrollbar font-mono text-[10px]">
-                    {logs.length === 0 ? (
-                      <div className="text-zinc-500 text-center py-4">Aucun log enregistré</div>
-                    ) : (
-                      logs.filter(l => selectedLogCategory === 'all' || l.category === selectedLogCategory).map(log => (
-                        <div key={log.id} className="mb-2 border-b border-zinc-800/50 pb-2 last:border-0">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-zinc-500 shrink-0">
-                              {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second:'2-digit' })}
-                            </span>
-                            <span className={cn(
-                              "px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider shrink-0",
-                              log.level === 'info' ? "bg-blue-500/10 text-blue-400" :
-                              log.level === 'warn' ? "bg-amber-500/10 text-amber-400" :
-                              log.level === 'error' ? "bg-red-500/10 text-red-400" :
-                              "bg-emerald-500/10 text-emerald-400"
-                            )}>
-                              {log.level}
-                            </span>
-                            <span className="text-zinc-400 uppercase text-[9px] shrink-0">[{log.category}]</span>
-                          </div>
-                          <div className={cn(
-                            "break-words leading-relaxed pl-1",
-                            log.level === 'error' ? "text-red-300" :
-                            log.level === 'warn' ? "text-amber-300" : "text-zinc-300"
-                          )}>
-                            {log.message}
-                            {log.details && (
-                              <pre className="mt-1 p-1.5 bg-black/50 rounded overflow-x-auto text-[9px] text-zinc-500">
-                                {typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : String(log.details)}
-                              </pre>
-                            )}
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-between p-2 bg-zinc-900 border-t border-zinc-800">
-                    <button
-                      onClick={() => clearLogs()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                    >
-                      <Trash2 size={12} />
-                      Effacer
-                    </button>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(getLogsAsText());
-                        setCopiedLogs(true);
-                        setTimeout(() => setCopiedLogs(false), 2000);
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
-                    >
-                      {copiedLogs ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                      {copiedLogs ? "Copié !" : "Copier tout"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center justify-center pt-8 pb-4 text-center">
-            <SeenItLogo className="w-16 h-16 opacity-30 mb-4 grayscale" />
-            <p className="text-xs text-zinc-500 font-medium">SeenIt — Made in Paris.</p>
-          </div>
-        </div>
+  const updaterProgress = apkUpdateProgress && (
+    <div className={cn(
+      "p-4 border rounded-xl flex flex-col gap-3",
+      apkUpdatePresentation?.tone === 'error'
+        ? "bg-red-500/10 border-red-500/25"
+        : apkUpdatePresentation?.tone === 'success'
+          ? "bg-emerald-500/10 border-emerald-500/25"
+          : "bg-[#E5A93D]/10 border-[#E5A93D]/20"
+    )}>
+      <div className={cn(
+        "flex items-center justify-between text-xs font-bold",
+        apkUpdatePresentation?.tone === 'error'
+          ? "text-red-300"
+          : apkUpdatePresentation?.tone === 'success'
+            ? "text-emerald-300"
+            : "text-[#E5A93D]"
+      )}>
+        <span className="flex items-center gap-2">
+          {apkUpdateProgress.status === 'downloading' ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : apkUpdateProgress.status === 'done' ? (
+            <CheckCircle2 size={14} />
+          ) : (
+            <Download size={14} />
+          )}
+          {apkUpdatePresentation?.label}
+        </span>
+        <span>{apkUpdateProgress.percent}%</span>
       </div>
+      <div className="w-full bg-black/40 rounded-full h-1.5 overflow-hidden">
+        <div
+          className={cn(
+            "h-full transition-all duration-300",
+            apkUpdatePresentation?.tone === 'error'
+              ? "bg-red-500"
+              : apkUpdatePresentation?.tone === 'success'
+                ? "bg-emerald-500"
+                : "bg-[#E5A93D]"
+          )}
+          style={{ width: `${apkUpdateProgress.percent}%` }}
+        />
+      </div>
+      {apkUpdateProgress.status === 'error' && (
+        <p className="text-[10px] text-red-400 leading-tight">
+          {apkUpdateProgress.message || "Une erreur est survenue."}
+        </p>
+      )}
+    </div>
+  );
+
+  const logsPanel = (
+    <div className="border border-zinc-800 rounded-xl bg-black/60 overflow-hidden flex flex-col">
+      <div className="flex overflow-x-auto custom-scrollbar border-b border-zinc-800 bg-zinc-900">
+        {['all', 'plex', 'sync', 'auth', 'system', 'network'].map(cat => (
+          <button
+            key={cat}
+            onClick={() => setSelectedLogCategory(cat)}
+            className={cn(
+              "px-3 py-2 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-colors",
+              selectedLogCategory === cat
+                ? "text-[#E5A93D] border-b-2 border-[#E5A93D] bg-black/40"
+                : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50"
+            )}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      <div className="p-3 max-h-64 overflow-y-auto custom-scrollbar font-mono text-[10px]">
+        {logs.length === 0 ? (
+          <div className="text-zinc-500 text-center py-4">Aucun log enregistré</div>
+        ) : (
+          logs.filter(l => selectedLogCategory === 'all' || l.category === selectedLogCategory).map(log => (
+            <div key={log.id} className="mb-2 border-b border-zinc-800/50 pb-2 last:border-0">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-zinc-500 shrink-0">
+                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute:'2-digit', second:'2-digit' })}
+                </span>
+                <span className={cn(
+                  "px-1.5 py-0.5 rounded text-[8px] uppercase tracking-wider shrink-0",
+                  log.level === 'info' ? "bg-blue-500/10 text-blue-400" :
+                  log.level === 'warn' ? "bg-amber-500/10 text-amber-400" :
+                  log.level === 'error' ? "bg-red-500/10 text-red-400" :
+                  "bg-emerald-500/10 text-emerald-400"
+                )}>
+                  {log.level}
+                </span>
+                <span className="text-zinc-400 uppercase text-[9px] shrink-0">[{log.category}]</span>
+              </div>
+              <div className={cn(
+                "break-words leading-relaxed pl-1",
+                log.level === 'error' ? "text-red-300" :
+                log.level === 'warn' ? "text-amber-300" : "text-zinc-300"
+              )}>
+                {log.message}
+                {log.details && (
+                  <pre className="mt-1 p-1.5 bg-black/50 rounded overflow-x-auto text-[9px] text-zinc-500">
+                    {typeof log.details === 'object' ? JSON.stringify(log.details, null, 2) : String(log.details)}
+                  </pre>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="flex items-center justify-between p-2 bg-zinc-900 border-t border-zinc-800">
+        <button
+          onClick={() => clearLogs()}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+        >
+          <Trash2 size={12} />
+          Effacer
+        </button>
+        <button
+          onClick={() => {
+            navigator.clipboard.writeText(getLogsAsText());
+            setCopiedLogs(true);
+            setTimeout(() => setCopiedLogs(false), 2000);
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] text-zinc-300 hover:text-white bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
+        >
+          {copiedLogs ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+          {copiedLogs ? "Copié !" : "Copier tout"}
+        </button>
+      </div>
+    </div>
+  );
+
+  const avatar = avatarUrl && !avatarFailed
+    ? <img src={avatarUrl} alt="" onError={() => setAvatarFailed(true)} />
+    : <span aria-hidden="true">{getProfileInitials(user?.displayName, user?.email)}</span>;
+  const accountName = user?.displayName || user?.email?.split('@')[0] || 'Compte';
+  const accountState = isQuotaExceeded
+    ? { text: 'Quota cloud atteint · synchro en pause', tone: 'error' as const }
+    : { text: 'Synchronisation automatique', tone: 'ok' as const };
+
+  const pages: Record<SettingsPage, { title: string; content: ReactNode }> = {
+    plats: {
+      title: 'Mes plateformes',
+      content: (
+        <>
+          <p className="reg-intro">Sert pour « inclus dans ton abonnement », le filtre Mes plateformes et les notifications.</p>
+          <div className="reg-plats">
+            {STREAMING_PLATFORMS.map(platform => {
+              const selected = userPlatforms.includes(platform.id);
+              return (
+                <button key={platform.id} type="button" className="reg-plat" aria-pressed={selected} onClick={() => handleTogglePlatform(platform.id)}>
+                  <span className="reg-plat-logo" style={{ background: platform.tile, color: platform.ink }} aria-hidden="true">{platform.short}</span>
+                  {platform.name}
+                  {selected && <span className="reg-plat-check" aria-hidden="true"><Check size={11} strokeWidth={3.4} /></span>}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ),
+    },
+    notifs: {
+      title: 'Notifications',
+      content: (
+        <>
+          {notificationPermission === 'granted' ? (
+            <SettingsCard tile={<Check size={20} strokeWidth={3} />} tone="ok" title={`Autorisées sur ${devicePlace}`}
+              sub={isAndroid ? 'Son, vibration et masquage se règlent par type dans Android.' : 'Le navigateur affiche les rappels même app fermée.'}
+              status="Rappels envoyés à 09:00" />
+          ) : (
+            <SettingsCard tile={<Bell size={20} />} tone={notificationPermission === 'denied' ? 'error' : undefined}
+              title={notificationPermission === 'denied' ? `Bloquées sur ${devicePlace}` : 'Notifications à autoriser'}
+              sub={notificationPermission === 'denied' ? 'Autorise SeenIt dans les réglages du système, puis reviens ici.' : 'Rappels envoyés à 09:00 pour tes séries et tes films.'}>
+              {window.self !== window.top && <p className="reg-message">Chrome bloque les notifications dans cet aperçu.</p>}
+              <button type="button" className="reg-primary" onClick={() => void handleRequestNotifications()}>Autoriser les notifications</button>
+            </SettingsCard>
+          )}
+          <SettingsGroup title="Séries">
+            <SettingsRow icon={Tv} label="Nouvel épisode" sub="Le jour de la diffusion" toggle={notificationPrefs.release_today_tv} onClick={() => void handleToggleNotif('release_today_tv', !notificationPrefs.release_today_tv)} />
+            <SettingsRow icon={Clock} label="Nouvelle saison" sub="7 jours avant" toggle={notificationPrefs.season_d7} onClick={() => void handleToggleNotif('season_d7', !notificationPrefs.season_d7)} />
+            <SettingsRow icon={Newspaper} label="Actualités" sub="Renouvellements, annulations, saisons annoncées" toggle={notificationPrefs.news} onClick={() => void handleToggleNotif('news', !notificationPrefs.news)} />
+          </SettingsGroup>
+          <SettingsGroup title="Films">
+            <SettingsRow icon={Film} label="Sortie au cinéma" sub="Le jour J, en France" toggle={notificationPrefs.movie_theater} onClick={() => void handleToggleNotif('movie_theater', !notificationPrefs.movie_theater)} />
+            <SettingsRow icon={Film} label="Sortie DVD / VOD" sub="Le jour J, si la date est connue" toggle={notificationPrefs.movie_dvd_vod} onClick={() => void handleToggleNotif('movie_dvd_vod', !notificationPrefs.movie_dvd_vod)} />
+          </SettingsGroup>
+          <SettingsGroup>
+            {isAndroid && (
+              <SettingsRow icon={Smartphone} label="Réglages Android" sub="Son et vibration par type"
+                onClick={() => { void NotificationSettings.open().catch(() => showToast('Réglages Android indisponibles.', 'error')); }} />
+            )}
+            <SettingsRow icon={FlaskConical} label="Envoyer une notification test" sub="Avec un titre de ta liste" chevron={false}
+              expanded={showNotificationTests} onClick={() => setShowNotificationTests(value => !value)} />
+            {showNotificationTests && NOTIFICATION_TESTS.map(test => (
+              <SettingsRow key={test.type} label={test.label} sub={test.sub} chevron={false} onClick={() => void triggerTestNotif(test.type)} />
+            ))}
+          </SettingsGroup>
+        </>
+      ),
+    },
+    plex: {
+      title: 'Plex',
+      content: !user ? (
+        <SettingsCard tile="PX" title="Plex" sub="Connecte-toi à ton compte SeenIt pour associer Plex." />
+      ) : !plexToken ? (
+        <SettingsCard tile="PX" tone={plexAuthError ? 'error' : undefined} title="Plex non connecté"
+          sub="Associe ton compte pour l’historique, les badges « Dans Plex » et les liens directs." spinning={Boolean(plexAuthSession)}
+          status={plexAuthSession ? 'En attente de l’autorisation dans Plex…' : undefined} statusTone="busy">
+          {plexAuthError && <p className="reg-message">{plexAuthError}</p>}
+          <button type="button" className="reg-primary" onClick={handlePlexLogin} disabled={isStartingPlexAuth || Boolean(plexAuthSession)}>
+            {isStartingPlexAuth ? 'Ouverture…' : plexAuthSession ? 'En attente…' : plexAuthError ? 'Réessayer l’association Plex' : 'Connecter Plex'}
+          </button>
+          {plexAuthSession && <button type="button" className="reg-secondary" onClick={handleCancelPlexLogin}>Annuler l’association</button>}
+        </SettingsCard>
+      ) : (
+        <>
+          <SettingsCard tile="PX" tone={plexState.tone === 'ok' ? 'ok' : undefined} title={getStoredPlexUsername(user.uid) || 'Compte Plex'}
+            sub={`${plexLinkedCount.toLocaleString('fr-FR')} ${plexLinkedCount > 1 ? 'titres reconnus' : 'titre reconnu'} dans ta liste`}
+            status={plexState.text} statusTone={plexState.tone} spinning={plexBusy}>
+            {!plexBusy && <button type="button" className="reg-primary" onClick={() => void handlePlexSync(true)}>Synchroniser maintenant</button>}
+          </SettingsCard>
+          {plexServers.length > 0 && (
+            <SettingsGroup title="État" foot="Un point vert : tout va bien. Orange : à vérifier.">
+              {plexServers.map((server, index) => (
+                <SettingsRow key={server.id || index} icon={Server} label={server.name}
+                  sub={`${server.owned === undefined ? '' : server.owned ? 'Ton serveur · ' : 'Partagé · '}${server.reason || `${server.watchedItems ?? 0} vus · ${server.inventoryItems ?? 0} indexés`}`}
+                  tone={server.reason ? 'warn' : 'ok'} dot />
+              ))}
+            </SettingsGroup>
+          )}
+          <SettingsGroup title="Actions">
+            <SettingsRow icon={RefreshCw} label="Synchro complète" sub="Relit toute ta bibliothèque Plex, depuis le début" busy={plexSyncMode === 'full'}
+              disabled={plexBusy} onClick={() => void handlePlexSync(false)} />
+            <SettingsRow icon={Trash2} label="Vider les liens Plex en cache" sub="Si un lien ouvre le mauvais titre"
+              onClick={async () => {
+                const count = await purgeAllPlexSlugsInDb();
+                showToast(`🧹 ${count} slug(s) Plex nettoyé(s) avec succès !`, "success");
+              }} />
+          </SettingsGroup>
+          <button type="button" className="reg-danger" onClick={() => setConfirm('plexout')}>Déconnecter Plex</button>
+        </>
+      ),
+    },
+    devices: {
+      title: 'Appareils',
+      content: (
+        <>
+          <SettingsGroup title={isNative ? 'Ce téléphone' : 'Ce navigateur'}>
+            <SettingsRow icon={Smartphone} label={isNative ? 'Ce téléphone' : 'Ce navigateur'}
+              sub={notificationPermission === 'granted' ? 'Notifications autorisées' : notificationPermission === 'denied' ? 'Notifications bloquées' : 'Notifications à autoriser'}
+              tone={notificationPermission === 'granted' ? 'ok' : notificationPermission === 'denied' ? 'error' : 'warn'} dot
+              onClick={notificationPermission === 'granted' ? undefined : () => setPage('notifs')} />
+          </SettingsGroup>
+          <SettingsGroup title="SeenIt TV" foot="La dissociation se fait depuis la TV. Rien n’est effacé de ton compte.">
+            <SettingsRow icon={Tv} label="Associer une TV" sub="Ouvre SeenIt TV, scanne le QR code affiché, puis confirme sur ce téléphone." />
+          </SettingsGroup>
+        </>
+      ),
+    },
+    compte: {
+      title: 'Compte',
+      content: user ? (
+        <>
+          <SettingsCard tile={<span className="reg-avatar">{avatar}</span>} title={accountName} sub={`${user.email || ''} · Google`}
+            status={accountState.text} statusTone={accountState.tone} />
+          <SettingsGroup title="Dans ton compte">
+            <SettingsRow icon={Cloud} label={`${accountCounts.series.toLocaleString('fr-FR')} séries · ${accountCounts.films.toLocaleString('fr-FR')} films`}
+              sub={`${accountCounts.favorites.toLocaleString('fr-FR')} favoris · ${accountCounts.episodes.toLocaleString('fr-FR')} épisodes vus`} />
+          </SettingsGroup>
+          <SettingsGroup>
+            <SettingsRow icon={UploadCloud} label="Sauvegarder maintenant" sub="La synchro est automatique, c’est un secours" onClick={() => void handleBackupToCloud()} />
+            <SettingsRow icon={DownloadCloud} label="Recharger depuis le cloud" sub="Remplace ce qui est sur ce téléphone" onClick={() => void handleRestoreFromCloud()} />
+          </SettingsGroup>
+          <button type="button" className="reg-danger" onClick={() => setConfirm('logout')}>Se déconnecter</button>
+        </>
+      ) : (
+        <SettingsCard tile={<LogIn size={20} />} title="Pas de compte connecté" sub="Connecte-toi pour retrouver ta bibliothèque sur tous tes appareils.">
+          <button type="button" className="reg-primary" onClick={handleLogin}>Continuer avec Google</button>
+        </SettingsCard>
+      ),
+    },
+    app: {
+      title: 'Application',
+      content: (
+        <>
+          {hasUpdate && latestRelease ? (
+            <SettingsCard tile={latestRelease.version.split('.').slice(0, 2).join('.')} tone="gold" title={`SeenIt ${latestRelease.version}`}
+              sub={`Tu as la ${currentVersion}`} status="Mise à jour prête à installer" statusTone="busy">
+              <button type="button" className="reg-primary" onClick={handleStartUpdate} disabled={apkUpdateProgress?.status === 'downloading'}>Installer la mise à jour</button>
+              {updaterProgress}
+            </SettingsCard>
+          ) : (
+            <SettingsCard tile={currentVersion.split('.').slice(0, 2).join('.')} title={`SeenIt ${currentVersion}`}
+              sub={lastChecked ? `Vérifiée ${formatSettingsAgo(lastChecked) || ''}` : 'Version installée'}
+              status={lastChecked ? 'À jour' : undefined} statusTone="ok" spinning={isCheckingUpdates}>
+              <button type="button" className="reg-secondary" onClick={handleCheckUpdates} disabled={isCheckingUpdates}>Vérifier les mises à jour</button>
+              {updaterProgress}
+            </SettingsCard>
+          )}
+          <SettingsGroup>
+            <SettingsRow icon={Sparkles} label="Nouveautés" sub="Toutes les versions et leurs changements" onClick={openVersionNotes} />
+            <SettingsRow icon={Sun} label="Badges animés" sub="Les sorties du jour bougent dans À voir" toggle={animatedBadges} onClick={() => setAnimatedBadges(!animatedBadges)} />
+          </SettingsGroup>
+          <SettingsGroup title="Fonctionnalités">
+            <DownloadFeatureSettingsRow />
+          </SettingsGroup>
+          <SettingsGroup title="Avancé">
+            <SettingsRow icon={FileText} label="Importer depuis TV Time" sub="Fichier CSV" chevron={false} expanded={showCsvImport} onClick={() => setShowCsvImport(value => !value)} />
+            {showCsvImport && <div className="reg-inline"><CsvImporter /></div>}
+            <SettingsRow icon={RefreshCw} label="Forcer la synchro TMDB"
+              sub={syncStatus ? `En cours · ${syncStatus.total - syncStatus.pending + 1} / ${syncStatus.total}` : 'Recharge les fiches et les dates'}
+              tone={syncStatus ? 'busy' : undefined} busy={isSyncing || Boolean(syncStatus)} disabled={isSyncing || Boolean(syncStatus) || !user}
+              chevron={false} onClick={() => void handleForceSync()} />
+            <SettingsRow icon={Terminal} label="Journal de diagnostic" sub="Copier ou vider, pour un rapport de bug" chevron={false}
+              expanded={showLogsPanel} onClick={() => setShowLogsPanel(value => !value)} />
+            {showLogsPanel && <div className="reg-inline">{logsPanel}</div>}
+          </SettingsGroup>
+        </>
+      ),
+    },
+  };
+
+  return (
+    <div className="reg-root flex-1 overflow-y-auto pb-nav custom-scrollbar">
+      <div className="reg-page">
+        <SettingsHeader title="Réglages" onBack={onClose} backLabel="Fermer les réglages" />
+
+        {user ? (
+          <button type="button" className="reg-account" onClick={() => setPage('compte')}>
+            <span className="reg-avatar">{avatar}</span>
+            <span className="reg-account-text">
+              <strong>{accountName}</strong>
+              <small>{user.email}</small>
+              <span className="reg-state" data-tone={accountState.tone}><span className="reg-dot" data-tone={accountState.tone} aria-hidden="true" />{accountState.text}</span>
+            </span>
+            <ChevronRight size={18} strokeWidth={2.4} className="reg-chev" aria-hidden="true" />
+          </button>
+        ) : (
+          <SettingsCard tile={<LogIn size={20} />} title="Compte" sub="Connecte-toi pour retrouver ta bibliothèque sur tous tes appareils.">
+            <button type="button" className="reg-primary" onClick={handleLogin}>Continuer avec Google</button>
+          </SettingsCard>
+        )}
+
+        <SettingsGroup>
+          <SettingsRow icon={LayoutGrid} label="Mes plateformes" sub={platformSummary} onClick={() => setPage('plats')} />
+          <SettingsRow icon={Bell} label="Notifications" sub={`${notificationSummary} · rappels à 09:00`} onClick={() => setPage('notifs')} />
+        </SettingsGroup>
+
+        <SettingsGroup title="Connexions">
+          <SettingsRow icon={Server} label="Plex" sub={plexState.text} tone={plexState.tone} dot={Boolean(plexState.tone)} onClick={() => setPage('plex')} />
+          <SettingsRow icon={MonitorSmartphone} label="Appareils" sub={`${isNative ? 'Ce téléphone' : 'Ce navigateur'} · SeenIt TV par QR code`} onClick={() => setPage('devices')} />
+        </SettingsGroup>
+
+        <SettingsGroup>
+          <SettingsRow icon={Package} label="Application"
+            sub={hasUpdate && latestRelease ? `Version ${latestRelease.version} disponible` : `Version ${currentVersion}${lastChecked ? ' · à jour' : ''}`}
+            badge={hasUpdate && latestRelease ? 'Mise à jour' : undefined} onClick={() => setPage('app')} />
+        </SettingsGroup>
+
+        {user && <button type="button" className="reg-danger" onClick={() => setConfirm('logout')}>Se déconnecter</button>}
+        <span className="reg-version">SeenIt {currentVersion}</span>
+      </div>
+
+      {page && (
+        <SettingsSubscreen title={pages[page].title} onClose={() => setPage(null)}>
+          {pages[page].content}
+        </SettingsSubscreen>
+      )}
+
+      {confirm === 'logout' && (
+        <SettingsConfirm title="Se déconnecter ?" body="Tes séries et films restent dans le cloud. Tu les retrouves en te reconnectant."
+          confirmLabel="Se déconnecter" onCancel={() => setConfirm(null)}
+          onConfirm={() => { setConfirm(null); void handleLogout(); }} />
+      )}
+      {confirm === 'plexout' && (
+        <SettingsConfirm title="Déconnecter Plex ?" body="Les badges et liens Plex disparaissent. Ton historique SeenIt ne bouge pas."
+          confirmLabel="Déconnecter" onCancel={() => setConfirm(null)}
+          onConfirm={() => { setConfirm(null); void handlePlexLogout(); }} />
+      )}
 
       {/* Dedicated Version Notes Modal */}
       {showVersionNotesModal && createPortal(

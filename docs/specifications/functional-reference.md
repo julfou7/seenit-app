@@ -928,19 +928,32 @@ d'un webhook réel.
 L'autorisation « notifications sur cet appareil » couvre aussi l'alerte de nouvelle version sur
 Android ; aucun réglage séparé n'est ajouté initialement.
 
-Les réglages généraux contiennent :
+Les Réglages s'ouvrent par la roue de Moi (ou « Tous les réglages » des réglages rapides) avec un
+seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq lignes, chacune avec son
+état réel, puis la déconnexion confirmée et la version installée :
 
-- compte Google, sauvegarde/rechargement Cloud et déconnexion ;
-- plateformes Netflix, Prime Video, Disney+, Canal+/MyCanal, Apple TV+, Paramount+, Max, France TV,
-  Arte ;
-- préférences et autorisation de notifications ;
-- association/déconnexion Plex, synchro Rapide/Complète et purge des slugs Plex ;
-- **Fonctionnalité personnelle → Téléchargements**, simple interrupteur désactivé par défaut ; aucune
-  URL ni clé C411/Sonarr/Radarr/qBittorrent n'est exposée dans les Réglages généraux ;
-- import TV Time CSV avec progression, correction des échecs et reprise ;
-- actualisation forcée des détails TMDB ;
-- version, historique complet des changelogs officiels, recherche et installation d'une mise à jour APK ;
-- logs techniques filtrables, copiables/exportables et effaçables.
+- **carte du compte** (avatar, nom, e-mail, « Synchronisation automatique » ou quota cloud atteint) →
+  écran **Compte** : contenu du compte (séries, films, favoris, épisodes vus), « Sauvegarder maintenant »
+  et « Recharger depuis le cloud » en secours, déconnexion confirmée ;
+- **Mes plateformes** (noms choisis) → tuiles Netflix, Prime Video, Disney+, Canal+, Apple TV+,
+  Paramount+, Max, France TV et Arte, un toucher par plateforme ;
+- **Notifications** (nombre activé, rappels à 09:00) → état réel de l'autorisation sur l'appareil avec
+  « Autoriser les notifications », interrupteurs Séries (nouvel épisode, nouvelle saison J-7,
+  actualités) et Films (cinéma, DVD/VOD), réglages Android, et « Envoyer une notification test » qui
+  déplie les quatre tests existants ;
+- **Connexions → Plex** (point vert si synchro de moins de 24 h, orange sinon) → compte et titres
+  reconnus, « Synchroniser maintenant », serveurs du dernier bilan de synchro, synchro complète, vidage
+  des liens Plex en cache et déconnexion confirmée ; association et annulation inchangées ;
+- **Connexions → Appareils** → ce téléphone ou ce navigateur et son autorisation de notifications,
+  association SeenIt TV par QR code confirmée sur le téléphone ; la dissociation se fait depuis la TV ;
+- **Application** (badge « Mise à jour » si une version est disponible) → version installée ou à
+  installer avec progression, « Vérifier les mises à jour », Nouveautés (historique des changelogs),
+  Badges animés, **Fonctionnalités → Téléchargements** (interrupteur désactivé par défaut, sans URL ni
+  clé C411/Sonarr/Radarr/qBittorrent), puis Avancé : import TV Time CSV, synchro TMDB forcée et journal
+  de diagnostic filtrable, copiable et effaçable.
+
+Chaque écran est un niveau de la pile Retour : Retour, le bouton rond, le bord gauche ou l'appui sur
+l'onglet actif ferme seulement cet écran.
 
 Le changelog présenté dans la fenêtre de mise à jour résume les effets visibles sous un titre unique
 et quelques phrases courtes par version. Lors d'un saut, il affiche dans l'ordre chaque release
@@ -950,7 +963,7 @@ restent disponibles et l'installation n'est pas bloquée. Les textes emploient l
 l'interface et ne montrent pas les identifiants Plex, UID, noms de cache, fichiers, tests ou détails
 de CI réservés aux preuves techniques.
 
-La fiche Version de « À propos & Avancé » charge indépendamment toutes les releases officielles
+La ligne Nouveautés de l'écran Application charge indépendamment toutes les releases officielles
 disponibles, de la plus récente à la plus ancienne. Cette consultation reste paginée et bornée ; une panne
 partielle conserve l'historique officiel déjà obtenu ou la dernière version connue.
 
