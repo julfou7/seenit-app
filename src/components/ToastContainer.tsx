@@ -71,7 +71,7 @@ export function ToastContainer() {
         didDragRef.current = true;
       }
       // If swiped downwards by 25px or more, dismiss the toast
-      if (Math.abs(diff) > 25) {
+      if (diff > 25) {
         hideToast();
       }
       touchStartY.current = null;
@@ -325,7 +325,7 @@ export function ToastContainer() {
           tabIndex={navigationTarget ? 0 : undefined}
           aria-label={navigationTarget ? `Ouvrir la fiche ${parsed.title || show?.title || ''}`.trim() : undefined}
           className={cn(
-            "fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-pan-y select-none active:cursor-grabbing flex justify-center",
+            "fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-pan-x select-none active:cursor-grabbing flex justify-center",
             navigationTarget ? "cursor-pointer" : "cursor-grab",
           )}
         >
@@ -456,7 +456,7 @@ export function ToastContainer() {
 
               {/* Actions */}
               {(hasUndoAction || canSkipPlexQueue) && (
-                <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                <div className="flex items-center gap-1.5 shrink-0 ml-auto">
                   {hasUndoAction && (
                     <button
                       type="button"
