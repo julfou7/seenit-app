@@ -1,6 +1,6 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { Activity, startTransition, useCallback, useState, useEffect, useRef } from 'react';
-import { Settings, Calendar, ArrowLeft } from 'lucide-react';
+import { Settings, ArrowLeft } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { SettingsScreen } from './SettingsScreen';
@@ -8,10 +8,16 @@ import { PersonDetailModal } from './PersonDetailModal';
 import { cn } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { ProAnalyticsDashboard } from '../components/ProAnalyticsDashboard';
-import { SeenItLogo } from '../components/SeenItLogo';
+import { ProfileYearStory } from '../components/ProfileYearStory';
 import { LibraryScreen } from './LibraryScreen';
 import { useToastStore } from '../store/toastStore';
+import { useShowsStore } from '../store/showsStore';
+import { useUpdateStore } from '../store/updateStore';
 import { getProfileAvatarUrl, getProfileInitials } from '../features/profile/profileAvatar';
+import './moi.css';
+
+type ProfileTab = 'library' | 'stats' | 'year';
+const PROFILE_TABS: [ProfileTab, string][] = [['library', 'Ma liste'], ['stats', 'Chiffres'], ['year', 'Mon année']];
 
 const ProfileStatsContent = React.memo(function ProfileStatsContent({
   onPersonClick,
@@ -20,6 +26,11 @@ const ProfileStatsContent = React.memo(function ProfileStatsContent({
 }) {
   const { shows, loading } = useShows();
   return <ProAnalyticsDashboard shows={shows} libraryReady={!loading} onPersonClick={onPersonClick} />;
+});
+
+const ProfileYearContent = React.memo(function ProfileYearContent() {
+  const { shows, loading } = useShows();
+  return <ProfileYearStory shows={shows} libraryReady={!loading} />;
 });
 
 export const ProfileScreen = React.memo(function ProfileScreen({
@@ -37,10 +48,12 @@ export const ProfileScreen = React.memo(function ProfileScreen({
   // valeur déjà disponible évite une frame « Utilisateur » au redémarrage.
   const [user, setUser] = useState<FirebaseUser | null>(() => auth.currentUser);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
-  const [activeTab, setActiveTab] = useState<'stats' | 'library'>('stats');
-  const [mountedProfileTabs, setMountedProfileTabs] = useState(() => new Set<'stats' | 'library'>(['stats']));
+  const [activeTab, setActiveTab] = useState<ProfileTab>('library');
+  const [mountedProfileTabs, setMountedProfileTabs] = useState(() => new Set<ProfileTab>(['library']));
   const [isProfileVisible, setIsProfileVisible] = useState(true);
   const showToast = useToastStore(state => state.showToast);
+  const followedCount = useShowsStore(state => state.shows.length);
+  const hasUpdate = useUpdateStore(state => state.hasUpdate);
   const avatarUrl = getProfileAvatarUrl(user);
 
   const [isExitingSettings, setIsExitingSettings] = useState(false);
@@ -59,7 +72,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
     window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true, personId }, '');
   }, []);
 
-  const handleProfileTabChange = useCallback((tab: 'stats' | 'library') => {
+  const handleProfileTabChange = useCallback((tab: ProfileTab) => {
     startTransition(() => {
       setMountedProfileTabs(previous => {
         if (previous.has(tab)) return previous;
@@ -84,7 +97,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
       }
     };
     const handleBackOneLevel = (event: Event) => {
-      if (selectedPersonId !== null || showSettings || activeTab === 'library') event.preventDefault();
+      if (selectedPersonId !== null || showSettings || activeTab !== 'library') event.preventDefault();
       if (selectedPersonId !== null) {
         setSelectedPersonId(null);
         return;
@@ -93,19 +106,19 @@ export const ProfileScreen = React.memo(function ProfileScreen({
         setShowSettings(false);
         return;
       }
-      if (activeTab === 'library') setActiveTab('stats');
+      if (activeTab !== 'library') setActiveTab('library');
     };
     const handleResetAll = () => {
       setSelectedPersonId(null);
       setShowSettings(false);
       setIsExitingSettings(false);
       setDragXSettings(0);
-      setMountedProfileTabs(new Set<'stats' | 'library'>(['stats']));
-      setActiveTab('stats');
+      setMountedProfileTabs(new Set<ProfileTab>(['library']));
+      setActiveTab('library');
       requestAnimationFrame(() => {
         if (rootRef.current) rootRef.current.scrollTop = 0;
       });
-      showToast('Profil réinitialisé : retour aux statistiques.', 'info');
+      showToast('Moi réinitialisé : retour à Ma liste.', 'info');
     };
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('profile-back-one-level', handleBackOneLevel);
@@ -200,94 +213,79 @@ export const ProfileScreen = React.memo(function ProfileScreen({
   const profileContentVisible = isProfileVisible && !showSettings;
   const avatarInitials = getProfileInitials(user?.displayName, user?.email);
 
+  const avatar = avatarUrl && !avatarLoadFailed ? (
+    <img
+      src={avatarUrl}
+      alt="Avatar"
+      onError={() => setAvatarLoadFailed(true)}
+    />
+  ) : (
+    <span role="img" aria-label="Avatar">{avatarInitials}</span>
+  );
+
   return (
-    <div ref={rootRef} className="flex-1 overflow-y-auto bg-transparent text-white pb-nav custom-scrollbar">
+    <div ref={rootRef} className="moi-root flex-1 overflow-y-auto pb-nav custom-scrollbar">
 
-      {/* 1. HERO SECTION */}
-      <div className="px-6 pt-12 pb-6 relative">
-        <div className="absolute top-0 left-0 w-64 h-32 bg-[#E5A93D]/10 blur-[100px] -z-10 rounded-full mix-blend-screen pointer-events-none" />
-        <div className="flex justify-between items-start mb-4">
-          <div className="relative">
-             <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full border-2 border-[#E5A93D] p-1 shadow-lg shadow-[#E5A93D]/10">
-               {avatarUrl && !avatarLoadFailed ? (
-                 <img
-                   src={avatarUrl}
-                   alt="Avatar"
-                   className="w-full h-full rounded-full object-cover"
-                   onError={() => setAvatarLoadFailed(true)}
-                 />
-               ) : (
-                 <div
-                   className="w-full h-full rounded-full bg-zinc-800 flex items-center justify-center text-xl sm:text-2xl font-black text-[#E5A93D]"
-                   role="img"
-                   aria-label="Avatar"
-                 >
-                   {avatarInitials}
-                 </div>
-               )}
-             </div>
-             <button
-               onClick={() => setShowSettings(true)}
-               className="absolute bottom-0 right-0 bg-[#E5A93D] hover:bg-[#d49931] p-1.5 sm:p-2 rounded-full border-2 border-[#121212] shadow-md transition-transform active:scale-95"
-               title="Réglages"
-             >
-               <Settings size={13} className="text-black font-bold" />
-             </button>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowSettings(true)}
-              className="bg-zinc-800/80 hover:bg-zinc-800 active:scale-95 text-zinc-200 px-3 py-2 rounded-xl transition-all border border-zinc-700/50 flex items-center gap-1.5 text-xs font-semibold"
-            >
-              <Settings size={15} className="text-[#E5A93D]" />
-              <span>Réglages</span>
-            </button>
-            {onQuickSettings && <button type="button" onClick={onQuickSettings} className="min-h-11 rounded-xl border border-white/10 px-3 text-xs font-semibold text-zinc-200">Réglages rapides</button>}
-          </div>
+      {/* 1. EN-TÊTE : identité, puis la roue des Réglages */}
+      <div className="moi-head">
+        {onQuickSettings ? (
+          <button type="button" className="moi-avatar" onClick={onQuickSettings} aria-label="Réglages rapides du compte">
+            {avatar}
+          </button>
+        ) : (
+          <span className="moi-avatar">{avatar}</span>
+        )}
+        <div className="moi-id">
+          <h1 className="moi-name">{user?.displayName || (user?.email?.split('@')[0]) || 'Utilisateur'}</h1>
+          <span className="moi-since">
+            depuis {creationYear} · {followedCount.toLocaleString('fr-FR')} {followedCount > 1 ? 'titres suivis' : 'titre suivi'}
+          </span>
         </div>
-
-        <h1 className="text-3xl font-black tracking-tight text-white flex items-center justify-between">
-          <span>{user?.displayName || (user?.email?.split('@')[0]) || 'Utilisateur'}</span>
-        </h1>
-        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-          <p className="text-xs text-zinc-400 font-medium flex items-center gap-1.5">
-            <Calendar size={13} className="text-[#E5A93D]" /> Membre depuis {creationYear}
-          </p>
-          <SeenItLogo variant="badge" />
-        </div>
+        <button
+          type="button"
+          className="moi-gear"
+          onClick={() => setShowSettings(true)}
+          aria-label="Réglages"
+          title={hasUpdate ? 'Réglages · mise à jour disponible' : 'Réglages'}
+        >
+          <Settings size={21} strokeWidth={2} aria-hidden="true" />
+          {hasUpdate && <span className="moi-gear-dot" aria-hidden="true" />}
+        </button>
       </div>
 
-      {/* 2. TAB SELECTOR */}
-      <div className="px-4 pb-4">
-        <div className="flex bg-zinc-900/80 rounded-xl p-1 border border-white/5">
-           <button
-             onClick={() => handleProfileTabChange('stats')}
-             className={cn("flex-1 text-sm font-bold py-2 rounded-lg transition-colors cursor-pointer", activeTab === 'stats' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500")}
-           >
-             Statistiques
-           </button>
-           <button
-             onClick={() => handleProfileTabChange('library')}
-             className={cn("flex-1 text-sm font-bold py-2 rounded-lg transition-colors cursor-pointer", activeTab === 'library' ? "bg-zinc-800 text-white shadow-sm" : "text-zinc-500")}
-           >
-             Ma Liste
-           </button>
-        </div>
+      {/* 2. SOUS-VUES */}
+      <div className="moi-seg">
+        {PROFILE_TABS.map(([tab, label]) => (
+          <button
+            key={tab}
+            type="button"
+            aria-pressed={activeTab === tab}
+            onClick={() => handleProfileTabChange(tab)}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
-      {/* 3. CONTENT — état conservé, Effects suspendus lorsque la sous-vue est masquée */}
+      {/* 3. CONTENU — état conservé, Effects suspendus lorsque la sous-vue est masquée */}
+      {mountedProfileTabs.has('library') && (
+        <Activity mode={profileContentVisible && activeTab === 'library' ? 'visible' : 'hidden'}>
+          <div className="moi-panel flex-1 flex flex-col">
+            <LibraryScreen onShowClick={handleLibraryShowClick} isEmbedded={true} />
+          </div>
+        </Activity>
+      )}
       {mountedProfileTabs.has('stats') && (
         <Activity mode={profileContentVisible && activeTab === 'stats' ? 'visible' : 'hidden'}>
-          <div className="px-4 pb-2">
+          <div className="moi-panel pb-2">
             <ProfileStatsContent onPersonClick={openPersonModal} />
           </div>
         </Activity>
       )}
-      {mountedProfileTabs.has('library') && (
-        <Activity mode={profileContentVisible && activeTab === 'library' ? 'visible' : 'hidden'}>
-          <div className="flex-1 pb-2 flex flex-col">
-            <LibraryScreen onShowClick={handleLibraryShowClick} isEmbedded={true} />
+      {mountedProfileTabs.has('year') && (
+        <Activity mode={profileContentVisible && activeTab === 'year' ? 'visible' : 'hidden'}>
+          <div className="moi-panel pb-2">
+            <ProfileYearContent />
           </div>
         </Activity>
       )}

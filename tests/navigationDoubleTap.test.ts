@@ -106,10 +106,11 @@ test('SEENIT-UX-005 réinitialise Ma Liste même montée puis masquée', () => {
   );
   assert.match(
     resetBlock,
-    /setMountedProfileTabs\(new Set<'stats' \| 'library'>\(\['stats'\]\)\)/,
-    'le reset Profil doit démonter Ma Liste même si elle était déjà montée puis masquée',
+    /setMountedProfileTabs\(new Set<ProfileTab>\(\['library'\]\)\)/,
+    'le reset Moi doit remonter Ma liste vierge et démonter Chiffres/Mon année même déjà montés puis masqués',
   );
-  assert.match(resetBlock, /setActiveTab\('stats'\)/);
+  assert.match(resetBlock, /setActiveTab\('library'\)/);
+  assert.match(resetBlock, /Moi réinitialisé : retour à Ma liste\./);
   assert.doesNotMatch(resetBlock, /library-reset-all/);
   assert.doesNotMatch(resetBlock, /updateShow|addShow|deleteShow|setShows/);
   assert.doesNotMatch(librarySource, /addEventListener\('library-reset-all'/);

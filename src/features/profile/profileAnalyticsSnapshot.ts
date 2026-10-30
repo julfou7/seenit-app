@@ -154,7 +154,7 @@ const emptyAggregate = (): ProfileAnalyticsAggregate => ({
 export const getProfileAnalyticsMediaKey = (show: Pick<Show, 'mediaType' | 'tmdbId'>): string =>
   `${show.mediaType === 'movie' ? 'movie' : 'tv'}:${Number(show.tmdbId)}`;
 
-const getPlatformName = (show: Show): string => {
+export const getProfilePlatformName = (show: Pick<Show, 'networks'>): string => {
   const network = String(show.networks?.[0]?.name || '');
   if (!network) return 'Autres';
   if (network.includes('Netflix')) return 'Netflix';
@@ -183,7 +183,7 @@ const normalizeMediaState = (
     seenEpisodes,
     completed: show.status === 'completed',
     favorite: show.isFavorite === true,
-    platform: getPlatformName(show),
+    platform: getProfilePlatformName(show),
     title: show.title || 'Aucune',
     status: show.status,
     totalEpisodes: Number(show.totalEpisodes) || 0,
@@ -525,7 +525,7 @@ export const isValidProfileAnalyticsSnapshot = (
     || !Number.isFinite(value.updatedAt)) return false;
 
   return Object.entries(value.media).every(([key, state]) => isValidMediaState(state, key))
-    && Object.values(value.contributions).every((entry: any) => (
+    && Object.values(value.contributions).every((entry: unknown) => (
     isRecord(entry)
       && Number.isFinite(entry.fetchedAt)
       && isFiniteNonNegative(entry.metadataRevision)

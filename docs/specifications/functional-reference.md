@@ -53,6 +53,7 @@ chaîne n'est suggérée comme diffuseur sans preuve gratuite fiable et lancemen
 
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
+Mise à jour ciblée Moi : 30 octobre 2026, refonte de l'onglet selon la maquette « SeenIt Moi » ([intégration](../design/moi-2026-10-30.md)).
 Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : composante obligatoire de la SPEC SeenIt
@@ -188,7 +189,7 @@ La barre basse possède trois destinations toujours visibles, dans cet ordre :
 
 1. **À Voir** : accueil opérationnel ;
 2. **Explorer** : recherche et découverte TMDB ;
-3. **Moi** (`profile`) : statistiques, Ma Liste et accès Réglages.
+3. **Moi** (`profile`) : Ma liste, Chiffres, Mon année et accès Réglages.
 
 La destination **Télécharger** n'apparaît que lorsque le compte courant a explicitement activé la
 fonctionnalité personnelle Téléchargements dans Réglages. Lorsqu'elle est visible, elle s'insère en
@@ -339,22 +340,42 @@ annulation.
 
 ## 6. Profil, statistiques et Ma Liste
 
-Le profil affiche l'identité Google, l'année d'inscription et deux onglets. La photo Google est utilisée lorsqu'elle charge ; si elle est absente ou indisponible, SeenIt affiche des initiales locales déterministes plutôt qu'une seconde image distante ou une image cassée :
+L'onglet **Moi** affiche en tête l'identité Google (photo ou initiales locales déterministes dans un
+cercle or, jamais une seconde image distante ni une image cassée), l'année d'inscription et le nombre de
+titres suivis. Toucher l'avatar ouvre les réglages rapides du compte ; la roue de 44 px à droite ouvre
+Réglages et porte un point or lorsqu'une mise à jour de l'application est disponible. Un sélecteur à trois
+segments, or quand il est actif, donne accès à :
 
-- **Statistiques** : temps de visionnage estimé, volumes, répartitions, personnes fréquentes et badges
-  Centenaire, Oiseau de Nuit, Grand Écran et Binge-Master ;
-- **Ma Liste** : vue exhaustive de la bibliothèque par intention et progression.
+- **Ma liste** (sous-vue initiale) : une rangée de pastilles défilante, une par section non vide avec son
+  nombre de titres, puis la grille trois colonnes des cartes habituelles (note, plateforme, progression,
+  bandeau d'action rapide de suivi/visionnage) de la seule section choisie. Les sections restent Favoris,
+  En cours, À commencer, À venir, Au cinéma, Films à voir, À jour et Films vus ; une même fiche peut
+  apparaître dans les favoris et dans sa section métier. La pastille En cours est choisie par défaut,
+  sinon la première section non vide ; si la section choisie se vide, la sélection retombe sur cette règle.
+- **Chiffres** : pour l'année choisie (année courante par défaut, « Depuis le 1er janvier » ; le bouton
+  année parcourt les années qui ont des visionnages), un grand total « Devant l'écran » en or avec son
+  équivalent en jours pleins, épisodes et films vus, puis « Heures par mois » (une barre par mois écoulé,
+  le record nommé, la valeur d'un mois au toucher), « Quand tu regardes » (jour × heure sur la fenêtre de
+  huit heures la plus regardée, taille = temps, créneau dominant nommé), « Où tu regardes » (Plex pour les
+  visionnages importés de Plex, sinon le diffuseur du titre, quatre au plus puis Autres), les badges
+  Centenaire, Oiseau de nuit, Grand écran et Binge-Master avec leur progression, et les personnes
+  fréquentes, chacune ouvrant sa fiche personne.
+- **Mon année** : un titre qui nomme les deux séries les plus regardées, puis le récit mois par mois, du
+  plus récent au plus ancien (série dominante ou « Mois cinéma », affiche, heures relatives, record de
+  jours consécutifs), et « Et maintenant » : à partir du rythme des quatre dernières semaines, la date
+  estimée de fin de la série en cours la plus regardée.
 
-Ma Liste ordonne les favoris en premier puis expose : Séries en cours, Séries à commencer, Séries à
-venir, Films au cinéma, Films à voir, Séries à jour et Films vus. Une même fiche peut apparaître dans
-les favoris et dans sa section métier. Les grilles sont extensibles et les cartes permettent les
-actions rapides de suivi/visionnage.
+Les durées utilisent la durée réelle connue d'un visionnage, sinon les estimations des statistiques
+(45 min par épisode, 110 min par film). Chaque épisode ou film vu est daté comme dans l'Historique ; les
+visionnages sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les seuils
+des quatre badges restent ceux des statistiques historiques : Centenaire à 100 contenus ou épisodes vus,
+Oiseau de nuit à 10 épisodes ou 500 minutes, Grand écran au premier film vu, Binge-Master à une série
+terminée ou 20 épisodes. Aucun archétype ni répartition par genre n'est affiché dans Moi.
 
-Pour préserver la navigation sur les grandes bibliothèques, seules les rangées proches de la zone
-visible sont matérialisées. Les rangées horizontales recyclent les cartes hors écran dans une fenêtre
-bornée sans masquer les médias restants ; les grilles « Voir tout » progressent par lots bornés.
-Statistiques et Ma Liste conservent leur état après leur première ouverture, tandis que leurs traitements
-sont suspendus lorsqu'elles sont cachées.
+Pour préserver la navigation sur les grandes bibliothèques, Ma liste ne monte que la section choisie :
+douze cartes à l'ouverture puis douze de plus par « Charger plus ». Ma liste, Chiffres et Mon année
+conservent leur état après leur première ouverture, tandis que leurs traitements sont suspendus
+lorsqu'elles sont cachées ; les statistiques avancées ne démarrent qu'à la première ouverture de Chiffres.
 
 Les statistiques avancées conservent par UID une baseline locale versionnée. Elles réaffichent donc le
 dernier résultat complet dès la réouverture de l'application, puis appliquent les changements de la
