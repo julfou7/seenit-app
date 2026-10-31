@@ -5,20 +5,19 @@ import { auth } from '../lib/firebase';
 import { readUserScopedJson, subscribeUserScopedStorageField } from '../lib/userIsolation';
 import { DISCOVER_PLATFORM_ID_MAP, DISCOVER_PLATFORM_PREFERENCE_ID_MAP, MOVIE_RELEASE_YEAR_MIN } from '../features/discover/filterPolicy';
 import { loadPlatformLogos, platformLogoUrl, readPlatformLogos } from '../features/providers/platformLogos';
-import { getFormattedProviderLogo } from '../utils/providerLogos';
 
 export type FilterTab = 'Trier' | 'Plateformes' | 'Genres' | 'Note' | 'Âge' | 'Année';
 const TABS: FilterTab[] = ['Trier', 'Plateformes', 'Genres', 'Note', 'Âge', 'Année'];
 const GENRE_OPTIONS = ['Action', 'Aventure', 'Animation', 'Biopic', 'Comédie', 'Drame', 'Fantastique', 'Horreur', 'Romance', 'Sci-Fi', 'Thriller'];
 const EXTRA_PLATFORM_LABELS: Record<string, string> = { paramount: 'Paramount+', france: 'France TV', arte: 'Arte' };
 const PLATFORMS = [
-  { id: 'netflix', label: 'Netflix', logo: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' },
-  { id: 'hbo', label: 'HBO', logo: getFormattedProviderLogo(null, 'HBO')! },
-  { id: 'disney', label: 'Disney+', logo: '/97yvRBw1GzX7fXprcF80er19ot.jpg' },
-  { id: 'apple', label: 'Apple TV+', logo: '/2E03IAZsX4ZaUqM7tXlctEPMGWS.jpg' },
-  { id: 'prime', label: 'Prime', logo: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg' },
-  { id: 'canal', label: 'Canal+', logo: '/brand/providers/canalplus.svg' },
-  { id: 'max', label: 'Max', logo: '/fksCUZ9QDWZMUwL2LgMtLckROUN.jpg' },
+  { id: 'netflix', label: 'Netflix' },
+  { id: 'hbo', label: 'HBO' },
+  { id: 'disney', label: 'Disney+' },
+  { id: 'apple', label: 'Apple TV+' },
+  { id: 'prime', label: 'Prime' },
+  { id: 'canal', label: 'Canal+' },
+  { id: 'max', label: 'Max' },
 ];
 const AGE_OPTIONS = [
   { id: 'Tous', label: 'Tous les âges' }, { id: 'age:0', label: 'Tous publics' },
@@ -58,9 +57,13 @@ export function FilterModal({ onClose, setActiveCategory, initialSelectedPlatfor
     return () => { current = false; };
   }, []);
   const preferenceId = (id: string) => Number(DISCOVER_PLATFORM_PREFERENCE_ID_MAP[id]);
-  const available = [...PLATFORMS, ...Object.entries(EXTRA_PLATFORM_LABELS)
-    .filter(([id]) => saved.includes(preferenceId(id)) || platforms.includes(id))
-    .map(([id, label]) => ({ id, label, logo: platformLogos[preferenceId(id)] || '' }))];
+  const withCanonicalLogo = ({ id, label }: { id: string; label: string }) => ({ id, label, logo: platformLogos[preferenceId(id)] || '' });
+  const available = [
+    ...PLATFORMS.map(withCanonicalLogo),
+    ...Object.entries(EXTRA_PLATFORM_LABELS)
+      .filter(([id]) => saved.includes(preferenceId(id)) || platforms.includes(id))
+      .map(([id, label]) => withCanonicalLogo({ id, label })),
+  ];
   const preferred = Object.keys(DISCOVER_PLATFORM_ID_MAP).filter(id => saved.includes(preferenceId(id)));
   const mine = preferred.length > 0 && preferred.length === platforms.length && preferred.every(id => platforms.includes(id));
   const toggle = (list: string[], id: string) => list.includes(id) ? list.filter(value => value !== id) : [...list, id];
