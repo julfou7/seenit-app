@@ -28,7 +28,8 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: Resolve exact main merge-base
+      - name: Resolve exact main merge-base and proof identity
+        id: context
         shell: bash
         run: |
           set -euo pipefail
@@ -36,14 +37,22 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git fetch --no-tags origin main:refs/remotes/origin/main
           base_sha="$(git merge-base HEAD refs/remotes/origin/main)"
+          tree_sha="$(git rev-parse 'HEAD^{tree}')"
           test -n "$base_sha"
+          test -n "$tree_sha"
+          artifact_name="SeenIt-Agent-Validated-${GITHUB_SHA}-${base_sha}-${tree_sha}"
           echo "SEENIT_VALIDATE_BASE_SHA=$base_sha" >> "$GITHUB_ENV"
           echo "SEENIT_STAGING_HEAD_SHA=$GITHUB_SHA" >> "$GITHUB_ENV"
+          echo "SEENIT_STAGING_TREE_SHA=$tree_sha" >> "$GITHUB_ENV"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "tree_sha=$tree_sha" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
           {
             echo '## Agent Remote Validate'
             echo
             echo "- staging SHA: \`$GITHUB_SHA\`"
             echo "- main merge-base: \`$base_sha\`"
+            echo "- tree SHA: \`$tree_sha\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up Node.js 22 with npm cache
@@ -69,31 +78,69 @@ jobs:
       - name: Validate change preflight
         run: npm run validate:change -- --preflight
 
+      - name: Resolve strict documentation scope
+        id: scope
+        run: node scripts/validation-scope.cjs
+        env:
+          SEENIT_VALIDATE_BASE_SHA: ${{ steps.context.outputs.base_sha }}
+
       - name: Build canonical devcontainer
+        if: steps.scope.outputs.docs_only != 'true'
         run: docker build --file .devcontainer/Dockerfile .
 
       - name: Resolve Node cache identity
+        if: steps.scope.outputs.docs_only != 'true'
         id: runtime
-        run: echo "node_version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "node_version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
+          echo "deps_hash=$(node scripts/dependency-cache-key.cjs)" >> "$GITHUB_OUTPUT"
 
       - name: Restore exact node_modules cache
+        if: steps.scope.outputs.docs_only != 'true'
         id: node_modules_cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
-          key: seenit-agent-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ hashFiles('package.json', 'package-lock.json', 'scripts/patch-local-notifications.cjs', 'scripts/materialize-android-config.cjs') }}
+          key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ steps.runtime.outputs.deps_hash }}
 
       - name: Install dependencies on cache miss
-        if: steps.node_modules_cache.outputs.cache-hit != 'true'
+        if: steps.scope.outputs.docs_only != 'true' && steps.node_modules_cache.outputs.cache-hit != 'true'
         run: npm ci --prefer-offline --no-audit --no-fund
 
       - name: Validate exact staging change
+        if: steps.scope.outputs.docs_only != 'true'
         run: npm run validate:change -- --postinstall
         env:
           SEENIT_VALIDATE_BASE_SHA: ${{ env.SEENIT_VALIDATE_BASE_SHA }}
 
+      - name: Validate strict documentation change
+        if: steps.scope.outputs.docs_only == 'true'
+        run: |
+          echo "[Validate Change] ✅ Documentation/processus strict : préflight workflows + SPEC + Changelog vert."
+          echo "Aucun runtime, test, script, workflow ou catalogue JSON n'est modifié."
+
       - name: Run PWA Browser Quality Gate
+        if: steps.scope.outputs.docs_only != 'true'
         run: node scripts/pwa-browser-smoke.cjs
+
+      - name: Materialize exact staging proof
+        if: success()
+        shell: bash
+        run: |
+          mkdir -p quality-reports
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const proof = {
+            headSha: process.env.GITHUB_SHA,
+            baseSha: process.env.SEENIT_VALIDATE_BASE_SHA,
+            tree: process.env.SEENIT_STAGING_TREE_SHA,
+            runId: process.env.GITHUB_RUN_ID,
+            scope: process.env.SEENIT_SCOPE || 'full'
+          };
+          fs.writeFileSync('quality-reports/agent-staging-proof.json', `${JSON.stringify(proof, null, 2)}\n`);
+          NODE
+        env:
+          SEENIT_SCOPE: ${{ steps.scope.outputs.scope }}
 
       - name: Publish PWA Quality Evidence
         if: always()
@@ -104,14 +151,16 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-      - name: Save trusted staging node_modules cache
-        if: success() && steps.node_modules_cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: Publish exact staging validation proof
+        if: success()
+        uses: actions/upload-artifact@v7
         with:
-          path: node_modules
-          key: seenit-agent-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ hashFiles('package.json', 'package-lock.json', 'scripts/patch-local-notifications.cjs', 'scripts/materialize-android-config.cjs') }}
+          name: ${{ steps.context.outputs.artifact_name }}
+          path: quality-reports/agent-staging-proof.json
+          if-no-files-found: error
+          retention-days: 14
 
-      - name: Publish exact-SHA validation proof
+      - name: Publish exact-SHA validation summary
         if: success()
         shell: bash
         run: |
@@ -119,6 +168,8 @@ jobs:
           {
             echo
             echo '### Résultat'
-            echo '- `validate:change` vert sur le SHA de staging exact.'
+            echo "- Scope : \`${{ steps.scope.outputs.scope }}\`."
+            echo '- Validation verte sur le SHA de staging exact.'
             echo '- Le SHA peut être promu sans réécriture vers une branche de chantier ; il ne doit jamais être mergé depuis `agent-staging/**`.'
+            echo '- La PR peut réutiliser cette preuve uniquement si head, base et arbre restent strictement identiques et si l’infrastructure de validation n’est pas modifiée.'
           } >> "$GITHUB_STEP_SUMMARY"
