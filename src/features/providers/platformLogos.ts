@@ -1,17 +1,19 @@
 import { authenticatedFetch } from '../../lib/apiAuth';
 import { SEENIT_PLATFORM_IDENTITIES } from './platformIdentity.ts';
+import { PLATFORM_BRAND_ASSETS } from './platformBrandAssets.ts';
 
 /** Logos stables disponibles sans réseau, indexés par ID de préférence SeenIt. */
 const KNOWN_PLATFORM_LOGOS: Record<number, string> = {
-  8: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg',
+  8: PLATFORM_BRAND_ASSETS.netflix,
+  118: PLATFORM_BRAND_ASSETS.hbo,
   119: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg',
+  234: PLATFORM_BRAND_ASSETS.franceTv,
   337: '/97yvRBw1GzX7fXprcF80er19ot.jpg',
   350: '/2E03IAZsX4ZaUqM7tXlctEPMGWS.jpg',
-  381: '/brand/providers/canalplus.svg',
+  381: PLATFORM_BRAND_ASSETS.canal,
   1899: '/fksCUZ9QDWZMUwL2LgMtLckROUN.jpg',
 };
 
-// v2 : le cache est désormais indexé par ID de préférence SeenIt, pas par ID fournisseur brut TMDB.
 const CATALOG_KEY = 'seenit_platform_logos_v2';
 const CATALOG_TTL_MS = 30 * 24 * 60 * 60_000;
 
@@ -25,9 +27,7 @@ function readCatalog(): Record<number, string> {
   try {
     const stored = JSON.parse(localStorage.getItem(CATALOG_KEY) || 'null') as { fetchedAt?: number; logos?: Record<number, string> } | null;
     return stored?.logos && typeof stored.logos === 'object' ? stored.logos : {};
-  } catch {
-    return {};
-  }
+  } catch { return {}; }
 }
 
 function indexCatalogByPreference(rawLogos: Record<number, string>): Record<number, string> {
@@ -39,12 +39,10 @@ function indexCatalogByPreference(rawLogos: Record<number, string>): Record<numb
   return logos;
 }
 
-/** Logos connus puis, s'ils ont déjà été lus, ceux du catalogue TMDB France (données publiques). */
 export function readPlatformLogos(): Record<number, string> {
   return { ...readCatalog(), ...KNOWN_PLATFORM_LOGOS };
 }
 
-/** Catalogue TMDB des plateformes en France, gardé 30 jours sur l'appareil ; un échec garde les logos connus. */
 export async function loadPlatformLogos(ids: readonly number[]): Promise<Record<number, string>> {
   const current = readPlatformLogos();
   let fresh = false;
@@ -64,7 +62,5 @@ export async function loadPlatformLogos(ids: readonly number[]): Promise<Record<
     const logos = indexCatalogByPreference(rawLogos);
     try { localStorage.setItem(CATALOG_KEY, JSON.stringify({ fetchedAt: Date.now(), logos })); } catch {}
     return { ...logos, ...KNOWN_PLATFORM_LOGOS };
-  } catch {
-    return current;
-  }
+  } catch { return current; }
 }
