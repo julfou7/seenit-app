@@ -24,7 +24,8 @@ export function DiscoverView({ model }: DiscoverViewProps) {
   const previewType = previewMedia?.media_type === 'tv' || (!previewMedia?.media_type && previewMedia?.first_air_date !== undefined) ? 'tv' : 'movie';
   const previewShow = previewMedia ? model.shows.find(show => Number(show.tmdbId) === Number(previewMedia.id) && show.mediaType === previewType) : undefined;
   const [selectedCharacter, setSelectedCharacter] = useState<CharacterRecord | null>(null);
-  const characterSearch = useCharacterSearch(model.shows, isSearchMode ? debouncedQuery : '', !selectedCharacter);
+  // L'index des personnages est local : la frappe filtre sans attendre l'anti-rebond de la recherche TMDB.
+  const characterSearch = useCharacterSearch(model.shows, isSearchMode ? query : '', !selectedCharacter, isSearchMode);
   const closeKeyboard = () => { document.querySelector<HTMLInputElement>('[data-navigation-search]')?.blur(); model.setIsSearchFocused(false); };
   const openCharacter = (character: CharacterRecord) => {
     closeKeyboard();
@@ -82,7 +83,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
         </span>)}<button type="button" onClick={clearFilters}>Tout effacer</button></div>}
       </div>
       <div className="explorer-content">
-        {isSearchMode && query.trim() ? <DiscoverSearchResults model={resultModel} characters={characterSearch.results} charactersLoading={characterSearch.loading} onCharacterClick={openCharacter} /> : loading && !visibleProcessedResults.length ? <GridSkeletons /> : activeCategory === 'Personnes' ?
+        {isSearchMode && query.trim() ? <DiscoverSearchResults model={resultModel} characters={characterSearch.results} charactersLoading={characterSearch.loading} charactersPartial={characterSearch.partial} onCharacterClick={openCharacter} /> : loading && !visibleProcessedResults.length ? <GridSkeletons /> : activeCategory === 'Personnes' ?
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">{visibleProcessedResults.map(person => <PersonCard key={person.id} person={person} onClick={model.openPersonModal} />)}</div> :
           <BoundedDiscoverGrid items={visibleProcessedResults} scrollRootRef={containerRef} showsByTmdbId={showsByTmdbId}
             onShowClick={onShowClick} onAddClick={handleAddMedia} onToggleWatched={handleToggleWatched} onLongPress={handleLongPress} />}

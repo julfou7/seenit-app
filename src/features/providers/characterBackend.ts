@@ -14,6 +14,11 @@ export const CHARACTER_CACHE_TTL = 24 * 60 * 60_000;
 export const CHARACTER_BATCH_MAX = 16;
 export const CHARACTER_EPISODE_MAX = 240;
 export const CHARACTER_UPSTREAM_CONCURRENCY = 4;
+export const CHARACTER_INDEX_BATCH_MAX = 24;
+// Distributions compactées (quelques Ko par titre) : une bibliothèque entière tient en mémoire,
+// au lieu des 256 réponses TMDB brutes qui se chassaient à chaque balayage.
+export const CHARACTER_COMPACT_CACHE_MAX = 6000;
+export const CHARACTER_COMPACT_CACHE_BYTES = 48 * 1024 * 1024;
 
 async function boundedJson(response: Response): Promise<Json> {
  if (!response.ok || !response.body) throw Error('SOURCE_UNAVAILABLE');
@@ -50,6 +55,8 @@ function compactMedia(key: string, data: Json): CharacterMedia {
 export function registerCharacterRoutes(app: Application, dependencies: Dependencies) {
  const request = dependencies.fetch || fetch, now = dependencies.now || Date.now;
  const cache = new Map<string, { data: Json; expires: number; bytes: number }>();
+ const compact = new Map<string, { data: CharacterMedia; expires: number; bytes: number }>();
+ let compactBytes = 0;
  const detailed = new Map<string, { data: CharacterRecord; expires: number }>();
  const inFlight = new Map<string, Promise<Json>>();
  const detailsInFlight = new Map<string, Promise<CharacterRecord>>();
@@ -69,10 +76,11 @@ export function registerCharacterRoutes(app: Application, dependencies: Dependen
   if (quota.count + amount > 360) return false;
   quota.count += amount; quotas.set(uid, quota); return true;
  };
- const load = async (path: string, uid: string): Promise<Json> => {
+ const quotaResetMs = (uid: string) => Math.max(1_000, (quotas.get('upstream:' + uid)?.until ?? now() + 60_000) - now());
+ const load = async (path: string, uid: string, retain = true): Promise<Json> => {
   const apiKey = dependencies.secrets?.().TMDB_API_KEY ?? process.env.TMDB_API_KEY;
   if (!apiKey) throw Error('SOURCE_UNAVAILABLE');
-  if (apiKey !== secret) { cache.clear(); detailed.clear(); inFlight.clear(); cacheBytes = 0; secret = apiKey; }
+  if (apiKey !== secret) { cache.clear(); compact.clear(); detailed.clear(); inFlight.clear(); cacheBytes = 0; compactBytes = 0; secret = apiKey; }
   const cached = cache.get(path);
   if (cached && cached.expires > now()) { cache.delete(path); cache.set(path, cached); return cached.data; }
   const running = inFlight.get(path); if (running) return running;
@@ -85,6 +93,7 @@ export function registerCharacterRoutes(app: Application, dependencies: Dependen
    if (data.status_code || data.success === false) throw Error('INVALID_SOURCE');
    const serialized = JSON.stringify(data);
    if (serialized.includes(apiKey)) throw Error('INVALID_SOURCE');
+   if (!retain) return data;
    const old = cache.get(path); if (old) cacheBytes -= old.bytes;
    cache.set(path, { data, expires: now() + CHARACTER_CACHE_TTL, bytes: serialized.length * 2 }); cacheBytes += serialized.length * 2;
    while (cache.size > 256 || cacheBytes > 16 * 1024 * 1024) { const key = cache.keys().next().value; if (!key) break; cacheBytes -= cache.get(key)!.bytes; cache.delete(key); }
@@ -93,10 +102,19 @@ export function registerCharacterRoutes(app: Application, dependencies: Dependen
   inFlight.set(path, pending);
   try { return await pending; } finally { if (inFlight.get(path) === pending) inFlight.delete(path); }
  };
- const media = async (key: string, uid: string) => {
+ const media = async (key: string, uid: string): Promise<CharacterMedia> => {
+  const cached = compact.get(key);
+  if (cached && cached.expires > now()) { compact.delete(key); compact.set(key, cached); return cached.data; }
   const [type, id] = key.split(':');
-  const data = await load(type + '/' + id + '?append_to_response=' + (type === 'tv' ? 'aggregate_credits' : 'credits,release_dates'), uid);
-  return compactMedia(key, data);
+  const data = compactMedia(key, await load(type + '/' + id + '?append_to_response=' + (type === 'tv' ? 'aggregate_credits' : 'credits,release_dates'), uid, false));
+  const bytes = JSON.stringify(data).length * 2;
+  const old = compact.get(key); if (old) compactBytes -= old.bytes;
+  compact.set(key, { data, expires: now() + CHARACTER_CACHE_TTL, bytes }); compactBytes += bytes;
+  while (compact.size > CHARACTER_COMPACT_CACHE_MAX || compactBytes > CHARACTER_COMPACT_CACHE_BYTES) {
+   const oldest = compact.keys().next().value; if (!oldest) break;
+   compactBytes -= compact.get(oldest)!.bytes; compact.delete(oldest);
+  }
+  return data;
  };
  const universeMedia = async (seeds: string[], uid: string) => {
   const keys = new Set(seeds);
@@ -208,6 +226,31 @@ export function registerCharacterRoutes(app: Application, dependencies: Dependen
   const needle=normalizeCharacterName(query);
   const results=buildCharacters(source.media).filter(character=>[character.name,...character.aliases].some(name=>normalizeCharacterName(name).includes(needle))).slice(0,40);
   res.json({results,complete:source.complete});
+ });
+ // Index téléphone : distributions compactées par titre, mises en cache sur l'appareil et filtrées en local.
+ // Les échecs sont signalés titre par titre, jamais avalés en réponse vide.
+ app.get('/api/media/characters/index', dependencies.authenticate, authenticated, async (req,res) => {
+  const raw=typeof req.query.ids==='string'?req.query.ids:'';
+  const keys=[...new Set(raw.split(','))];
+  if(raw.length>600||!keys.length||keys.length>CHARACTER_INDEX_BATCH_MAX||keys.some(key=>!KEY.test(key))){res.status(400).json({error:'Index invalide.'});return;}
+  const uid=(req as Request & { user: { uid: string } }).user.uid;
+  const settled=await Promise.allSettled(keys.map(key=>media(key,uid)));
+  const items:CharacterMedia[]=[], failed:string[]=[];
+  let limitedBy=false;
+  settled.forEach((value,index)=>{
+   if(value.status==='fulfilled'){items.push(value.value);return;}
+   failed.push(keys[index]);
+   if(value.reason instanceof Error&&(value.reason.message==='RATE_LIMIT'||value.reason.message==='SOURCE_BUSY'))limitedBy=true;
+  });
+  const related:Record<string,string[]>={};
+  await Promise.all([...new Set(items.map(item=>item.collectionId).filter(Boolean))].map(async collectionId=>{
+   try{
+    const collection=await load('collection/'+collectionId,uid);
+    const parts=array(collection.parts).flatMap(part=>positive(part.id)?['movie:'+Number(part.id)]:[]).slice(0,CHARACTER_INDEX_BATCH_MAX);
+    for(const item of items)if(item.collectionId===collectionId)related[item.key]=parts.filter(key=>key!==item.key);
+   }catch(error){if(error instanceof Error&&error.message==='RATE_LIMIT')limitedBy=true;}
+  }));
+  res.json({media:items,related,failed,...(limitedBy?{retryAfterMs:quotaResetMs(uid)}:{})});
  });
  app.get('/api/media/characters/detail', dependencies.authenticate, authenticated, async (req,res) => {
   const seed=typeof req.query.seed==='string'?req.query.seed:'', name=typeof req.query.name==='string'?req.query.name:'';

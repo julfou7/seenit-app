@@ -674,18 +674,13 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       setTotalTvCount(null);
       setTotalMovieCount(null);
 
-      const [res1, res2] = await Promise.all([
-        tmdb.smartSearchMulti(debouncedQuery, 1),
-        tmdb.smartSearchMulti(debouncedQuery, 2)
-      ]);
+      // La page 2 part en parallèle mais n'attend plus pour afficher la page 1.
+      const page2 = tmdb.smartSearchMulti(debouncedQuery, 2).catch(() => null);
+      const res1 = await tmdb.smartSearchMulti(debouncedQuery, 1);
       if (!isCurrentRequest()) return;
 
       if (res1?.ok) {
-        const combined = [
-          ...(res1.value.results || []),
-          ...(res2?.ok ? (res2.value.results || []) : [])
-        ];
-        const results = await filterRemoteSearch(combined.slice(0, 30), pegi, selectedPlatforms, {
+        const filter = (items: TMDBMedia[]) => filterRemoteSearch(items, pegi, selectedPlatforms, {
           ratings: resolveParentalRatingBatch,
           ratingOverride: getParentalRatingOverride,
           providerIds: async item => {
@@ -695,12 +690,29 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
             return [...(fr?.flatrate || []), ...(fr?.free || []), ...(fr?.ads || [])].map(provider => Number(provider.provider_id));
           },
         }, controller.signal);
-        if (!isCurrentRequest()) return;
-        setSearchResults(results);
-
         const isShortQuery = debouncedQuery.trim().length <= 3;
-        if (res1.value.total_tv !== undefined) setTotalTvCount(isShortQuery ? results.filter(r => r.media_type === 'tv' || r.media_type === 'series').length : res1.value.total_tv);
-        if (res1.value.total_movie !== undefined) setTotalMovieCount(isShortQuery ? results.filter(r => r.media_type === 'movie').length : res1.value.total_movie);
+        const publish = (results: TMDBMedia[]) => {
+          setSearchResults(results);
+          if (res1.value.total_tv !== undefined) setTotalTvCount(isShortQuery ? results.filter(r => r.media_type === 'tv' || r.media_type === 'series').length : res1.value.total_tv);
+          if (res1.value.total_movie !== undefined) setTotalMovieCount(isShortQuery ? results.filter(r => r.media_type === 'movie').length : res1.value.total_movie);
+        };
+        const firstPage = (res1.value.results || []).slice(0, 30);
+        const first = await filter(firstPage);
+        if (!isCurrentRequest()) return;
+        publish(first);
+        setSearchLoading(false);
+
+        const res2 = firstPage.length < 30 ? await page2 : null;
+        if (!isCurrentRequest()) return;
+        if (res2?.ok) {
+          const seen = new Set(firstPage.map(item => `${item.media_type}:${item.id}`));
+          const rest = (res2.value.results || []).filter(item => !seen.has(`${item.media_type}:${item.id}`)).slice(0, 30 - firstPage.length);
+          if (rest.length) {
+            const extra = await filter(rest);
+            if (!isCurrentRequest()) return;
+            if (extra.length) publish([...first, ...extra]);
+          }
+        }
       } else {
         setSearchResults([]);
       }
@@ -776,7 +788,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     if (minRating !== 'Toutes' && qClean && activeCategory !== 'Personnes') {
       const minimum = parseMinimumRating(minRating);
       if (minimum !== null) {
-        list = list.filter((item: any) => (item.vote_average || 0) >= minimum);
+        list = list.filter(item => (item.vote_average || 0) >= minimum);
       }
     }
 
@@ -793,7 +805,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     }
 
     if (qClean && sortBy === 'popular') {
-      list.sort((a: any, b: any) => {
+      list.sort((a, b) => {
         const titleA = (a.title || a.name || a.original_title || a.original_name || '').toLowerCase();
         const titleB = (b.title || b.name || b.original_title || b.original_name || '').toLowerCase();
 
@@ -804,7 +816,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
         return (b.popularity || 0) - (a.popularity || 0);
       });
     } else if (sortBy !== 'popular') {
-      list.sort((a: any, b: any) => {
+      list.sort((a, b) => {
         let valA = 0;
         let valB = 0;
 
