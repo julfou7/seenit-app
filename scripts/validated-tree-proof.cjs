@@ -1,9 +1,9 @@
 // #85 — une validation complète par arbre Git livré.
-// Une PR verte, ou la validation explicite d'une candidate lancée par le contrôleur #102 (workflow_dispatch,
-// dont la PR ouverte par le bot n'exécute aucun job), publie la preuve de l'arbre réellement validé. Le push sur main ne
-// rejoue la validation complète que s'il ne retrouve pas une preuve de confiance pour exactement le même
-// arbre. Une version seule (8 surfaces) dont le parent est validé ne rejoue pas le smoke navigateur.
-// Toute erreur, ambiguïté ou absence de preuve retombe sur la validation complète.
+// Une PR verte, une validation explicite de candidate ou une preuve staging exacte publie la preuve
+// de l'arbre réellement validé. Le push sur main ne rejoue la validation complète que s'il ne retrouve
+// pas une preuve de confiance pour exactement le même arbre. Une version seule dont le parent est validé
+// et un changement documentaire strict peuvent aussi éviter le smoke navigateur. Toute erreur, ambiguïté
+// ou absence de preuve retombe sur la validation complète.
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -33,10 +33,6 @@ function proofArtifactName(tree) {
 
 const PROOF_EVENTS = new Set(['pull_request', 'workflow_dispatch']);
 
-/**
- * Seul un run de validation de ce dépôt (jamais un fork), sur le workflow canonique, fait foi : une PR, ou
- * un dispatch de validation (le job Validate Change ne tourne en dispatch que sans release_apk).
- */
 function isTrustedValidationRun(run, repository) {
   return PROOF_EVENTS.has(run?.event)
     && run.path === WORKFLOW_PATH
@@ -65,7 +61,6 @@ async function findTreeProof({ tree, repository, request }) {
   return null;
 }
 
-/** Le parent a-t-il une validation verte sur main (complète ou elle-même réutilisée) ? */
 async function findValidatedParent({ baseSha, repository, request }) {
   if (!SHA.test(String(baseSha || ''))) return null;
   const listing = await request(`/repos/${repository}/actions/workflows/build-apk.yml/runs?head_sha=${baseSha}&event=push&per_page=10`);
@@ -80,7 +75,6 @@ async function findValidatedParent({ baseSha, repository, request }) {
 
 function isVersionOnlyRange(baseSha, cwd = root) {
   if (!SHA.test(String(baseSha || ''))) return false;
-  // Chargé tard : le contrat dépend de typescript, installé après le préflight.
   const { isPureVersionAlignment } = require('./validate-change-contract.cjs');
   const changed = git(['diff', '--name-only', `${baseSha}..HEAD`], cwd).split('\n').filter(Boolean);
   const readAt = (sha, file) => { try { return git(['show', `${sha}:${file}`], cwd); } catch { return ''; } };
@@ -102,10 +96,6 @@ function githubRequest({ token, apiUrl = 'https://api.github.com', fetchImpl = f
   };
 }
 
-/**
- * Décide ce que le job doit rejouer. `full` = validation complète ; `tree` = preuve exacte réutilisée ;
- * `version` = version seule, parent validé : validation canonique sans smoke navigateur.
- */
 async function resolveValidationPlan({ event, ref, repository, baseSha, tree, request, versionOnly = isVersionOnlyRange, log = console.log }) {
   const plan = { mode: 'full', tree, proof: null, reason: 'aucune preuve exacte' };
   if (!request || !repository) return { ...plan, reason: 'API GitHub indisponible' };
@@ -128,6 +118,26 @@ async function resolveValidationPlan({ event, ref, repository, baseSha, tree, re
   return plan;
 }
 
+function resolvePrevalidatedPlan({ tree, stagingReused, stagingProofUrl, docsOnly }) {
+  if (String(stagingReused || '') === 'true') {
+    return {
+      mode: 'staging',
+      tree,
+      proof: stagingProofUrl ? { url: stagingProofUrl } : null,
+      reason: 'preuve Agent Remote Validate exacte réutilisée par la PR'
+    };
+  }
+  if (String(docsOnly || '') === 'true') {
+    return {
+      mode: 'docs',
+      tree,
+      proof: null,
+      reason: 'documentation processus stricte : préflight suffisant'
+    };
+  }
+  return null;
+}
+
 function writeOutputs(plan, outputPath = process.env.GITHUB_OUTPUT) {
   if (!outputPath) return;
   const lines = [
@@ -141,7 +151,6 @@ function writeOutputs(plan, outputPath = process.env.GITHUB_OUTPUT) {
   fs.appendFileSync(outputPath, `${lines.join('\n')}\n`, 'utf8');
 }
 
-/** Base d'un dispatch de candidate : le main dont la branche est partie, comme resolveBaseSha de validate:change. */
 function resolveDispatchBase(cwd = root) {
   for (const ref of ['refs/remotes/origin/main', 'refs/remotes/origin/master']) {
     try {
@@ -157,7 +166,13 @@ async function main() {
   const token = process.env.GITHUB_TOKEN;
   const event = process.env.GITHUB_EVENT_NAME;
   const declaredBase = String(process.env.SEENIT_VALIDATE_BASE_SHA || '').trim();
-  const plan = await resolveValidationPlan({
+  const prevalidated = resolvePrevalidatedPlan({
+    tree,
+    stagingReused: process.env.SEENIT_STAGING_PROOF_REUSED,
+    stagingProofUrl: process.env.SEENIT_STAGING_PROOF_URL,
+    docsOnly: process.env.SEENIT_DOCS_ONLY
+  });
+  const plan = prevalidated || await resolveValidationPlan({
     event,
     ref: process.env.GITHUB_REF,
     repository: process.env.GITHUB_REPOSITORY,
@@ -168,12 +183,20 @@ async function main() {
   fs.mkdirSync(path.join(root, 'quality-reports'), { recursive: true });
   fs.writeFileSync(path.join(root, PROOF_FILE), `${JSON.stringify({ tree, sha: git(['rev-parse', 'HEAD']), runId: process.env.GITHUB_RUN_ID || null, mode: plan.mode, reason: plan.reason, proof: plan.proof }, null, 2)}\n`, 'utf8');
   writeOutputs(plan);
-  console.log(`[Preuve] ${plan.mode === 'full' ? 'Validation complète' : plan.mode === 'tree' ? 'Preuve réutilisée' : 'Smoke navigateur réutilisé'} : ${plan.reason}.`);
+  const label = plan.mode === 'full'
+    ? 'Validation complète'
+    : plan.mode === 'tree'
+      ? 'Preuve réutilisée'
+      : plan.mode === 'version'
+        ? 'Smoke navigateur réutilisé'
+        : plan.mode === 'staging'
+          ? 'Preuve staging réutilisée'
+          : 'Fast path documentaire';
+  console.log(`[Preuve] ${label} : ${plan.reason}.`);
 }
 
 if (require.main === module) {
   main().catch(error => {
-    // Une décision impossible ne bloque pas : le job garde la validation complète (sorties absentes).
     console.error(`[Preuve] ⚠️ ${error.message} : validation complète.`);
   });
 }
@@ -191,6 +214,7 @@ module.exports = {
   resolveDispatchBase,
   isVersionOnlyRange,
   proofArtifactName,
+  resolvePrevalidatedPlan,
   resolveValidationPlan,
   validateJobSucceeded,
   writeOutputs,
