@@ -9,8 +9,10 @@ import {
   buildProfileYearStory,
   collectProfileViewings,
   defaultProfileYear,
+  countUndatedProfileViewings,
   formatProfileImportNote,
   formatProfilePunchSlot,
+  formatProfileUndatedNote,
   listProfileYearTotals,
   listProfileYears,
   partitionProfileViewings,
@@ -167,6 +169,20 @@ test('Moi · une journée de plus de 24 h (import TV Time) sort des Chiffres et 
 
   const busy = partitionProfileViewings(collectProfileViewings([show({ id: 'binge', ...episodes(1, 1, 30, () => at(2026, 8, 1, 20)) })]));
   assert.equal(busy.imports.length, 0, '22 h 30 dans la journée reste un vrai marathon');
+});
+
+test('Moi · un film importé sans date de visionnage n’est jamais daté par la synchro des fiches', () => {
+  // Import TV Time : film « vu » sans enregistrement, puis document touché par la synchro des fiches en août.
+  const imported = show({ id: 'tvtime-film', title: 'Film importé', mediaType: 'movie', status: 'completed', seenEpisodes: ['1x1'], episodeRecords: { '1x1': { watchedAt: at(2026, 6, 14, 18) } }, updatedAt: at(2026, 7, 20), createdAt: at(2026, 6, 14) });
+  const undatedEpisode = show({ id: 'undated', title: 'Série sans date', seenEpisodes: ['1x1', '1x2'], episodeRecords: {}, updatedAt: at(2026, 7, 20), lastWatchedAt: at(2026, 7, 20) });
+  const watchedInApp = show({ id: 'app-film', title: 'Film vu dans l’app', mediaType: 'movie', status: 'completed', seenEpisodes: ['movie'], episodeRecords: {}, lastWatchedAt: at(2026, 8, 3, 22), updatedAt: at(2026, 9, 1) });
+  const viewings = collectProfileViewings([imported, undatedEpisode, watchedInApp]);
+  assert.deepEqual(viewings.map(viewing => viewing.showId), ['app-film'], 'seule la dernière action « vu » d’un film date le visionnage');
+  assert.equal(new Date(viewings[0].watchedAt).getMonth(), 8);
+  assert.equal(countUndatedProfileViewings([imported, undatedEpisode, watchedInApp]), 3);
+  assert.equal(formatProfileUndatedNote(3), '3 visionnages sans date ne sont pas comptés (import sans date de visionnage).');
+  assert.equal(formatProfileUndatedNote(0), null);
+  assert.equal(buildProfileYearStory(viewings, 2026)?.months.length, 1, 'plus de « Mois cinéma » fabriqué en août');
 });
 
 test('Moi · badges : mêmes seuils historiques, progression bornée', () => {

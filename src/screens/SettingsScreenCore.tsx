@@ -28,7 +28,7 @@ import {
   PlexAuthError,
   type PlexAuthAttempt
 } from '../services/plex';
-import { performPlexSync, purgeAllPlexSlugsInDb } from '../features/plex/syncPlex';
+import { performPlexSync } from '../features/plex/syncPlex';
 import { isPlexSyncTerminal } from '../features/plex/plexSyncPresentation';
 import { ReleaseHistoryViewer } from '../components/ChangelogViewer';
 import { DownloadFeatureSettingsRow } from '../components/DownloadFeatureSettingsCard';
@@ -43,6 +43,7 @@ import {
   type SettingsTone,
 } from '../components/settings/SettingsUi';
 import { getProfileAvatarUrl, getProfileInitials } from '../features/profile/profileAvatar';
+import { loadPlatformLogos, platformLogoUrl, readPlatformLogos } from '../features/providers/platformLogos';
 import './reglages.css';
 import { downloadAndInstallApk, getUpdateProgressPresentation, UpdateProgress } from '../services/appUpdater';
 import {
@@ -58,7 +59,7 @@ import { readUserScopedJson, subscribeUserScopedStorageField, writeUserScopedJso
 import { resolveNotificationMediaVisual } from '../features/notifications/notificationMedia';
 import { sendMediaReminderNotification } from '../features/notifications/mediaReminderNotification';
 import { buildNotificationTestSample, type NotificationTestType } from '../features/notifications/notificationTestSample';
-const NotificationSettings = registerPlugin<{ open(): Promise<void> }>('SeenItNotificationSettings');
+const NotificationSettings = registerPlugin<{ open(): Promise<void>; openChannel(options: { channelId: string }): Promise<void> }>('SeenItNotificationSettings');
 
 const STREAMING_PLATFORMS = [
   { id: 8, name: 'Netflix', short: 'NF', tile: '#141414', ink: '#ff5a5f' },
@@ -81,6 +82,13 @@ const NOTIFICATION_TESTS: { type: NotificationTestType; label: string; sub: stri
 
 const describeError = (error: unknown) => error instanceof Error ? error.message : String(error);
 
+// Types sans préférence SeenIt : leurs canaux Android (#778) se règlent dans le système.
+const ANDROID_ALERTS = [
+  { channelId: 'seenit_reminders', icon: Bell, label: 'Rappels', sub: 'Les cloches posées sur un épisode ou un film' },
+  { channelId: 'seenit_downloads', icon: Download, label: 'Téléchargements et Plex', sub: 'Import terminé, disponible dans Plex, échec' },
+  { channelId: 'seenit_app', icon: Package, label: 'Mise à jour de SeenIt', sub: 'Nouvelle version disponible ou téléchargée' },
+] as const;
+
 type SettingsPage = 'plats' | 'notifs' | 'plex' | 'devices' | 'compte' | 'app';
 type NotificationPermissionState = 'granted' | 'denied' | 'prompt' | 'unknown';
 const PLEX_FRESH_MS = 24 * 60 * 60 * 1000;
@@ -98,12 +106,14 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('unknown');
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [platformLogos, setPlatformLogos] = useState(() => readPlatformLogos());
+  const [brokenLogos, setBrokenLogos] = useState<ReadonlySet<number>>(() => new Set());
   const plexSyncStatus = useSyncStore(state => state.plexSyncStatus);
   const isQuotaExceeded = useSyncStore(state => state.isQuotaExceeded);
   const { showToast } = useToastStore();
   const syncStatus = useSyncStore(state => state.syncStatus);
   const shows = useShowsStore(state => state.shows);
-  const { logs, clearLogs, getLogsAsText } = useLogStore();
+  const { logs, clearLogs, getLogsAsText, diagnosticsEnabled, setDiagnosticsEnabled } = useLogStore();
   const {
     currentVersion,
     latestRelease,
@@ -282,7 +292,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
         const plexRef = doc(db, 'users', user.uid, 'settings', 'plex');
         await deleteDoc(plexRef);
       } catch (err) {
-        console.error('[Settings] Erreur suppression Plex Firestore:', err);
+        appLogger.error('plex', 'Suppression de la configuration Plex cloud impossible', err);
       }
     }
     showToast("Compte Plex déconnecté.", "info");
@@ -471,7 +481,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
         showToast(`Erreur de synchronisation : ${res.error || 'Erreur inconnue'}`, "error");
       }
     } catch (err) {
-      console.error(err);
+      appLogger.error('tmdb', 'Synchronisation forcée des fiches impossible', err);
       showToast("Erreur lors de la synchronisation.", "error");
     } finally {
       setIsSyncing(false);
@@ -492,7 +502,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
         const prefRef = doc(db, 'users', auth.currentUser.uid, 'settings', 'preferences');
         await setDoc(prefRef, { platforms: newPlatforms }, { merge: true });
       } catch (e) {
-        console.error('[Settings] Error saving streaming platforms to Firestore', e);
+        appLogger.error('system', 'Enregistrement des plateformes impossible', e);
       }
     }
   };
@@ -632,6 +642,13 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
     refresh();
     return subscribeUserScopedStorageField(uid, 'plex_last_sync_report_v1', refresh);
   }, [user?.uid]);
+
+  useEffect(() => {
+    if (page !== 'plats') return;
+    let active = true;
+    void loadPlatformLogos(STREAMING_PLATFORMS.map(platform => platform.id)).then(logos => { if (active) setPlatformLogos(logos); });
+    return () => { active = false; };
+  }, [page]);
 
   // L'état réel de la permission n'est lu qu'à l'ouverture des écrans qui l'affichent.
   useEffect(() => {
@@ -851,7 +868,14 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
               const selected = userPlatforms.includes(platform.id);
               return (
                 <button key={platform.id} type="button" className="reg-plat" aria-pressed={selected} onClick={() => handleTogglePlatform(platform.id)}>
-                  <span className="reg-plat-logo" style={{ background: platform.tile, color: platform.ink }} aria-hidden="true">{platform.short}</span>
+                  {platformLogoUrl(platformLogos[platform.id]) && !brokenLogos.has(platform.id) ? (
+                    <span className="reg-plat-logo" data-logo="true" aria-hidden="true">
+                      <img src={platformLogoUrl(platformLogos[platform.id])!} alt="" loading="lazy" decoding="async"
+                        onError={() => setBrokenLogos(current => new Set(current).add(platform.id))} />
+                    </span>
+                  ) : (
+                    <span className="reg-plat-logo" style={{ background: platform.tile, color: platform.ink }} aria-hidden="true">{platform.short}</span>
+                  )}
                   {platform.name}
                   {selected && <span className="reg-plat-check" aria-hidden="true"><Check size={11} strokeWidth={3.4} /></span>}
                 </button>
@@ -885,6 +909,12 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
           <SettingsGroup title="Films">
             <SettingsRow icon={Film} label="Sortie au cinéma" sub="Le jour J, en France" toggle={notificationPrefs.movie_theater} onClick={() => void handleToggleNotif('movie_theater', !notificationPrefs.movie_theater)} />
             <SettingsRow icon={Film} label="Sortie DVD / VOD" sub="Le jour J, si la date est connue" toggle={notificationPrefs.movie_dvd_vod} onClick={() => void handleToggleNotif('movie_dvd_vod', !notificationPrefs.movie_dvd_vod)} />
+          </SettingsGroup>
+          <SettingsGroup title="Autres alertes" foot={isAndroid ? 'Coupées ou réglées dans Android, type par type.' : 'Réglées par le navigateur.'}>
+            {ANDROID_ALERTS.map(alert => (
+              <SettingsRow key={alert.channelId} icon={alert.icon} label={alert.label} sub={alert.sub}
+                onClick={isAndroid ? () => { void NotificationSettings.openChannel({ channelId: alert.channelId }).catch(() => showToast('Réglages Android indisponibles.', 'error')); } : undefined} />
+            ))}
           </SettingsGroup>
           <SettingsGroup>
             {isAndroid && (
@@ -933,11 +963,6 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
           <SettingsGroup title="Actions">
             <SettingsRow icon={RefreshCw} label="Synchro complète" sub="Relit toute ta bibliothèque Plex, depuis le début" busy={plexSyncMode === 'full'}
               disabled={plexBusy} onClick={() => void handlePlexSync(false)} />
-            <SettingsRow icon={Trash2} label="Vider les liens Plex en cache" sub="Si un lien ouvre le mauvais titre"
-              onClick={async () => {
-                const count = await purgeAllPlexSlugsInDb();
-                showToast(`🧹 ${count} slug(s) Plex nettoyé(s) avec succès !`, "success");
-              }} />
           </SettingsGroup>
           <button type="button" className="reg-danger" onClick={() => setConfirm('plexout')}>Déconnecter Plex</button>
         </>
@@ -1013,7 +1038,10 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
               sub={syncStatus ? `En cours · ${syncStatus.total - syncStatus.pending + 1} / ${syncStatus.total}` : 'Recharge les fiches et les dates'}
               tone={syncStatus ? 'busy' : undefined} busy={isSyncing || Boolean(syncStatus)} disabled={isSyncing || Boolean(syncStatus) || !user}
               chevron={false} onClick={() => void handleForceSync()} />
-            <SettingsRow icon={Terminal} label="Journal de diagnostic" sub="Copier ou vider, pour un rapport de bug" chevron={false}
+            <SettingsRow icon={Terminal} label="Journal de diagnostic"
+              sub={diagnosticsEnabled ? 'Activé · pour un rapport de bug' : 'Désactivé · seules les alertes et erreurs sont gardées'}
+              toggle={diagnosticsEnabled} onClick={() => setDiagnosticsEnabled(!diagnosticsEnabled)} />
+            <SettingsRow icon={FileText} label="Voir le journal" sub="Copier ou vider" chevron={false}
               expanded={showLogsPanel} onClick={() => setShowLogsPanel(value => !value)} />
             {showLogsPanel && <div className="reg-inline">{logsPanel}</div>}
           </SettingsGroup>

@@ -40,12 +40,13 @@ test('Réglages · aucune fonction historique ne disparaît', () => {
     /handleToggleNotif\('movie_theater'/, /handleToggleNotif\('movie_dvd_vod'/,
     /triggerTestNotif\(test\.type\)/, /NotificationSettings\.open\(\)/, /void handleRequestNotifications\(\)/,
     /onClick=\{handlePlexLogin\}/, /onClick=\{handleCancelPlexLogin\}/, /handlePlexSync\(true\)/, /handlePlexSync\(false\)/,
-    /purgeAllPlexSlugsInDb\(\)/, /void handlePlexLogout\(\)/,
+    /void handlePlexLogout\(\)/,
     /void handleBackupToCloud\(\)/, /void handleRestoreFromCloud\(\)/, /onClick=\{handleLogin\}/,
     /onClick=\{handleStartUpdate\}/, /onClick=\{handleCheckUpdates\}/, /onClick=\{openVersionNotes\}/,
     /setAnimatedBadges\(!animatedBadges\)/, /<DownloadFeatureSettingsRow \/>/, /<CsvImporter \/>/,
     /void handleForceSync\(\)/, /\{showLogsPanel && <div className="reg-inline">\{logsPanel\}<\/div>\}/,
   ]) assert.match(core, wiring);
+  assert.doesNotMatch(core, /purgeAllPlexSlugsInDb|Vider les liens Plex/, 'les liens Plex en cache ne servent plus');
   assert.match(downloads, /export function DownloadFeatureSettingsRow\(\)/);
   assert.match(quick, /<DownloadFeatureSettingsCard \/>/, 'les réglages rapides gardent leur carte');
 });
@@ -65,4 +66,45 @@ test('Réglages · un seul en-tête dans Moi et dans les réglages rapides', () 
   assert.match(quick, /<SettingsScreen onClose=\{\(\) => closeTopDialog\(\)\} \/>/);
   assert.doesNotMatch(quick, />Retour<\/button>/);
   assert.doesNotMatch(wrapper, /createPortal|querySelector/);
+});
+
+const logStore = readFileSync('src/store/logStore.ts', 'utf8');
+const plugin = readFileSync('android/app/src/main/java/com/seenit/app/SeenItNotificationSettingsPlugin.java', 'utf8');
+const navCss = readFileSync('src/components/bottomNav.css', 'utf8');
+const logos = readFileSync('src/features/providers/platformLogos.ts', 'utf8');
+
+test('SEENIT-NOTIFICATION-006 les Réglages ouvrent le canal Android exact, limité aux canaux SeenIt', () => {
+  for (const channel of ['seenit_reminders', 'seenit_downloads', 'seenit_app']) assert.match(core, new RegExp(`channelId: '${channel}'`));
+  assert.match(core, /NotificationSettings\.openChannel\(\{ channelId: alert\.channelId \}\)/);
+  assert.match(plugin, /public void openChannel\(PluginCall call\)/);
+  assert.match(plugin, /Settings\.ACTION_CHANNEL_NOTIFICATION_SETTINGS/);
+  assert.match(plugin, /channelId\.matches\("seenit_\[a-z\]\{2,20\}"\)/, 'seuls les canaux SeenIt sont ouverts');
+  assert.match(plugin, /Build\.VERSION\.SDK_INT < Build\.VERSION_CODES\.O/, 'avant Android 8 : écran de l’application');
+});
+
+test('Réglages · retours v1.4.238 : journal désactivable, barre visible, vrais logos', () => {
+  assert.match(core, /toggle=\{diagnosticsEnabled\} onClick=\{\(\) => setDiagnosticsEnabled\(!diagnosticsEnabled\)\}/);
+  assert.match(logStore, /if \(!diagnosticsEnabled && \(actualLevel === 'info' \|\| actualLevel === 'success'\)\) \{/);
+  assert.match(logStore, /recordClientOperationalSignal\(quietCode\)/, 'le signal opérationnel reste calculé');
+
+  assert.match(profile, /blocking=\{false\} data-settings-layer=""/);
+  assert.match(ui, /blocking=\{false\}\s+data-settings-layer=""/);
+  assert.match(navCss, /body:has\(\[data-dialog-layer\]:not\(\[data-settings-layer\]\)\) \.bottom-nav-shell\{display:none\}/);
+  assert.match(profile, /window\.addEventListener\('app-close-modals', handleCloseModals\)/);
+
+  assert.match(core, /loadPlatformLogos\(STREAMING_PLATFORMS\.map\(platform => platform\.id\)\)/);
+  assert.match(logos, /'\/api\/media\/tmdb\/watch\/providers\/tv\?language=fr-FR&watch_region=FR'/);
+  assert.match(core, /onError=\{\(\) => setBrokenLogos/, 'un logo indisponible retombe sur la pastille');
+});
+
+
+test('Accueil · raccourci Plex : rapide ou complète, appui long, point d’état', () => {
+  const home = readFileSync('src/components/HomeSyncIndicator.tsx', 'utf8');
+  assert.match(home, /const plexConnected = Boolean\(getStoredPlexToken\(uid\)\)/);
+  assert.match(home, /if \(!plex && !details && !open && !plexConnected\) return null;/, 'l’icône reste dès que Plex est connecté');
+  assert.match(home, /onClick=\{\(\) => \{ setOpen\(false\); void launch\(true\); \}\}>Synchro rapide<\/button>/);
+  assert.match(home, /onClick=\{\(\) => \{ setOpen\(false\); void launch\(false\); \}\}>Complète<\/button>/);
+  assert.match(home, /const LONG_PRESS_MS = 480;/);
+  assert.match(home, /await import\('\.\.\/features\/plex\/syncPlex'\)/, 'le moteur Plex reste hors du bundle de l’accueil');
+  assert.match(home, /lastSync && Date\.now\(\) - lastSync < PLEX_FRESH_MS \? 'ok' : 'warn'/);
 });

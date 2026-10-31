@@ -1000,7 +1000,7 @@ pour le cache des sagas et univers.
 ## 8. Webhooks et notifications
 
 - **SEENIT-NOTIFICATION-005** — [Refonte #778](notification-refactor-2026-10-27.md) : titre œuvre, type `subText`, compact sans emoji et code épisode unique, détail distinct et actions réelles. L’affiche entière reste en contain, sans bitmap dans AlarmManager.
-- **SEENIT-NOTIFICATION-006** — Sept canaux dédiés et `seenit_downloads` conservé ; création idempotente au démarrage, accès aux réglages système, préférences fusionnées sans écraser les choix et reprogrammation v8.
+- **SEENIT-NOTIFICATION-006** — Sept canaux dédiés et `seenit_downloads` conservé ; création idempotente au démarrage, accès aux réglages système, préférences fusionnées sans écraser les choix et reprogrammation v8. Les Réglages ouvrent aussi le réglage système d'un canal précis (rappels, téléchargements/Plex, mise à jour) ; le plugin natif n'accepte qu'un identifiant `seenit_*` et retombe sur l'écran de notifications de l'application avant Android 8 ou en cas d'échec.
 - **SEENIT-NOTIFICATION-007** — Identité stable par œuvre pour les alertes visibles, alarmes futures distinctes ; mises à jour silencieuses, retrait des alertes vues/archivées et isolation UID. Les téléchargements restent distincts par demande/épisode.
 - **SEENIT-NOTIFICATION-008** — Rappels existants, actualités, versions et téléchargements adoptent la même grammaire. Un Vu de notification ouvre SeenIt sur l’épisode exact et actualise son état. Aucune plateforme, disponibilité, progression ou durée inconnue n’est inventée. Les nouveaux déclencheurs backend restent un lot séparé tant que non opérationnels.
 

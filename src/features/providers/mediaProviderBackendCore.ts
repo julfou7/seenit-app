@@ -47,6 +47,7 @@ const TMDB_PATHS = [
   /^(movie|tv)\/[1-9]\d{0,12}(\/(watch\/providers|keywords|recommendations|similar|external_ids|credits|images|videos|release_dates|content_ratings))?$/,
   /^tv\/[1-9]\d{0,12}\/season\/\d{1,4}(\/episode\/\d{1,5})?$/,
   /^collection\/[1-9]\d{0,12}$/,
+  /^watch\/providers\/(movie|tv)$/,
   /^discover\/(movie|tv)$/,
   /^trending\/(all|movie|tv|person)\/(day|week)$/,
   /^person\/(popular|[1-9]\d{0,12}(\/(combined_credits|images))?)$/,
@@ -382,7 +383,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     } finally { if (inFlight.get(key) === pending) inFlight.delete(key); }
   };
 
-  const tvdbRequest = async (path: string, token: string): Promise<any | null> => {
+  const tvdbRequest = async (path: string, token: string) => {
     const target = new URL(path.replace(/^\/+/, ''), TVDB_ORIGIN);
     const upstream = await request(target, { method: 'GET', headers: { Accept: 'application/json', Authorization: `Bearer ${token}` }, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) });
     if (!upstream.ok) {

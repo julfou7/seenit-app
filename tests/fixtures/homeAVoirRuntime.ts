@@ -94,3 +94,5 @@ export function terrain226CalendarExamples() {
   return {...show,seenEpisodes:['1x1'],status:'watching',totalEpisodes:6,totalAiredEpisodes:2,seasonProgress:buildSeasonProgressEvidence([season],false),seasonsCache:[season],nextEpisodeToWatch:{...episodes[1],episode_count:6}};
  })}));
 }
+// Raccourci Plex de l'accueil : la synchro est simulée, sans moteur Plex ni Firebase.
+export const performPlexSync = async (_options?: unknown) => {};

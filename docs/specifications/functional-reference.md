@@ -247,6 +247,11 @@ en PWA et APK et un toast navigable s'active au clavier avec Entrée/Espace (`SE
 
 Le retour terrain221 impose des titres de section homogènes16–18px non rognés dans les trois panneaux, une réserve basse incluant la zone système, aucun badge dans les anciennes séries et des titres longs lisibles. La frise affiche les heures locales de visionnage réellement connues, jamais « ce soir » à la place d’une heure. Les rappels réagissent immédiatement avec confirmation/échec explicite.
 
+Dans l'en-tête, l'anneau de synchronisation reste visible dès que Plex est connecté ; son point dit l'état de
+la dernière synchro (vert < 24 h, orange au-delà, rouge en échec, aucun pendant une synchro). Le toucher ouvre
+le panneau de synchro : progression, serveurs et pause pendant une synchro, sinon **Synchro rapide** (delta)
+et **Complète** (full). Un appui long de 480 ms lance directement la synchro rapide.
+
 L’écran comporte trois panneaux indépendants **À regarder**, **À venir** et **Historique**. Le scroll
 ne change jamais d’onglet ; aucun swipe ne navigue entre panneaux. Le header `seenit●` conserve l’état
 de synchronisation et ouvre les Notifications avec une cloche et un point or si non lu. La feuille réunit
@@ -366,8 +371,10 @@ segments, or quand il est actif, donne accès à :
   estimée de fin de la série en cours la plus regardée.
 
 Les durées utilisent la durée réelle connue d'un visionnage, sinon les estimations des statistiques
-(45 min par épisode, 110 min par film). Chaque épisode ou film vu est daté comme dans l'Historique ; les
-visionnages sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les seuils
+(45 min par épisode, 110 min par film). Un visionnage n'est daté que sur preuve : date de l'épisode ou du
+film, ou pour un film la dernière action « vu » ; jamais la date de modification du document (synchro des
+fiches, import). Les visionnages sans date (films importés de TV Time) ne sont pas comptés et leur nombre
+est indiqué ; ceux sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les seuils
 des quatre badges restent ceux des statistiques historiques : Centenaire à 100 contenus ou épisodes vus,
 Oiseau de nuit à 10 épisodes ou 500 minutes, Grand écran au premier film vu, Binge-Master à une série
 terminée ou 20 épisodes. Aucun archétype ni répartition par genre n'est affiché dans Moi.
@@ -937,24 +944,28 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
   écran **Compte** : contenu du compte (séries, films, favoris, épisodes vus), « Sauvegarder maintenant »
   et « Recharger depuis le cloud » en secours, déconnexion confirmée ;
 - **Mes plateformes** (noms choisis) → tuiles Netflix, Prime Video, Disney+, Canal+, Apple TV+,
-  Paramount+, Max, France TV et Arte, un toucher par plateforme ;
+  Paramount+, Max, France TV et Arte avec leur vrai logo (logos connus, puis catalogue public TMDB France
+  gardé 30 jours ; pastille de secours si un logo manque), un toucher par plateforme ;
 - **Notifications** (nombre activé, rappels à 09:00) → état réel de l'autorisation sur l'appareil avec
   « Autoriser les notifications », interrupteurs Séries (nouvel épisode, nouvelle saison J-7,
-  actualités) et Films (cinéma, DVD/VOD), réglages Android, et « Envoyer une notification test » qui
-  déplie les quatre tests existants ;
+  actualités) et Films (cinéma, DVD/VOD), puis **Autres alertes** sans préférence SeenIt (Rappels,
+  Téléchargements et Plex, Mise à jour de SeenIt) : chaque ligne ouvre son canal Android, réglages
+  Android, et « Envoyer une notification test » qui déplie les quatre tests existants ;
 - **Connexions → Plex** (point vert si synchro de moins de 24 h, orange sinon) → compte et titres
-  reconnus, « Synchroniser maintenant », serveurs du dernier bilan de synchro, synchro complète, vidage
-  des liens Plex en cache et déconnexion confirmée ; association et annulation inchangées ;
+  reconnus, « Synchroniser maintenant », serveurs du dernier bilan de synchro, synchro complète et
+  déconnexion confirmée ; association et annulation inchangées ;
 - **Connexions → Appareils** → ce téléphone ou ce navigateur et son autorisation de notifications,
   association SeenIt TV par QR code confirmée sur le téléphone ; la dissociation se fait depuis la TV ;
 - **Application** (badge « Mise à jour » si une version est disponible) → version installée ou à
   installer avec progression, « Vérifier les mises à jour », Nouveautés (historique des changelogs),
   Badges animés, **Fonctionnalités → Téléchargements** (interrupteur désactivé par défaut, sans URL ni
-  clé C411/Sonarr/Radarr/qBittorrent), puis Avancé : import TV Time CSV, synchro TMDB forcée et journal
-  de diagnostic filtrable, copiable et effaçable.
+  clé C411/Sonarr/Radarr/qBittorrent), puis Avancé : import TV Time CSV, synchro TMDB forcée, interrupteur
+  **Journal de diagnostic** (par appareil, activé par défaut ; désactivé, seules les alertes et erreurs
+  sont gardées) et « Voir le journal » filtrable, copiable et effaçable.
 
 Chaque écran est un niveau de la pile Retour : Retour, le bouton rond, le bord gauche ou l'appui sur
-l'onglet actif ferme seulement cet écran.
+l'onglet actif ferme seulement cet écran. Les Réglages gardent la barre de navigation : un double appui
+sur Moi les ferme et ramène Ma liste, et changer d'onglet les ferme.
 
 Le changelog présenté dans la fenêtre de mise à jour résume les effets visibles sous un titre unique
 et quelques phrases courtes par version. Lors d'un saut, il affiche dans l'ordre chaque release
