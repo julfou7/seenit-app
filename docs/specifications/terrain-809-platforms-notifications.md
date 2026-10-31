@@ -24,12 +24,12 @@ Les surfaces Réglages, Explorer et les badges de fournisseur sur les cartes doi
 
 Le retour terrain du 31/10 impose quatre assets locaux fournis par le propriétaire et utilisés en priorité sur toute surface qui reconnaît la plateforme :
 
-- Netflix : `/brand/providers/netflix.png` ;
-- Canal+ : `/brand/providers/canalplus.png` ;
-- HBO : `/brand/providers/hbo.png` ;
-- France TV / france.tv : `/brand/providers/francetv.png`.
+- Netflix : `/brand/providers/netflix.webp` ;
+- Canal+ : `/brand/providers/canalplus.webp` ;
+- HBO : `/brand/providers/hbo.webp` ;
+- France TV / france.tv : `/brand/providers/francetv.webp`.
 
-Ces quatre assets remplacent les variantes TMDB, les logos synthétiques et les anciennes variantes locales pour les plateformes reconnues. La résolution centralisée doit être partagée par Réglages, Explorer et les badges affichés sur les cartes afin qu’un même service ne change jamais de logo selon l’écran. Le rendu garde le ratio complet de l’asset (`object-fit: contain`) : aucun crop, étirement ou fallback texte ne doit apparaître tant que l’asset local existe. ARTE reste distinct de France TV et continue d’utiliser son propre logo issu du catalogue.
+Ces quatre assets remplacent les variantes TMDB, les logos synthétiques et les anciennes variantes locales pour les plateformes reconnues. La résolution centralisée doit être partagée par Réglages, Explorer et les badges affichés sur les cartes afin qu’un même service ne change jamais de logo selon l’écran. Les assets sont carrés et conservent entièrement le visuel de marque dans les tuiles et badges ; aucun crop, étirement ou fallback texte ne doit apparaître tant que l’asset local existe. ARTE reste distinct de France TV et continue d’utiliser son propre logo issu du catalogue.
 
 Les requêtes TMDB et les liens directs utilisent l’ID fournisseur courant, jamais l’ID de préférence lorsqu’ils divergent. Les choix déjà stockés `234` (France TV) et `239` (ARTE) restent valides sans migration destructive.
 

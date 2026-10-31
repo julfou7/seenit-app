@@ -3,4 +3,4 @@ Fill colors were set locally; the Amazon Prime and Plex viewBoxes were trimmed t
 Names and logos remain trademarks of their respective owners.
 These assets are preferred artwork for recognized names. Installed app IDs and native fallback icons come from Tizen inventory.
 
-CANAL+ : repère typographique local ; marque appartenant à son titulaire, affichée uniquement pour une app découverte.
+Assets terrain Netflix, CANAL+, HBO et France TV : références raster fournies par le propriétaire le 31/10/2026 depuis Logo.dev, converties localement en WebP lossless 128×128 pour SeenIt. Les marques et logos restent la propriété de leurs titulaires respectifs.

@@ -1,14 +1,18 @@
 import { authenticatedFetch } from '../../lib/apiAuth';
+import { PROVIDER_BRAND_ASSETS } from './providerBrandAssets.ts';
 import { SEENIT_PLATFORM_IDENTITIES } from './platformIdentity.ts';
 
 /** Logos stables disponibles sans réseau, indexés par ID de préférence SeenIt. */
 const KNOWN_PLATFORM_LOGOS: Record<number, string> = {
-  8: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg',
+  8: PROVIDER_BRAND_ASSETS.netflix,
+  118: PROVIDER_BRAND_ASSETS.hbo,
   119: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg',
   337: '/97yvRBw1GzX7fXprcF80er19ot.jpg',
   350: '/2E03IAZsX4ZaUqM7tXlctEPMGWS.jpg',
-  381: '/brand/providers/canalplus.svg',
+  381: PROVIDER_BRAND_ASSETS.canal,
   1899: '/fksCUZ9QDWZMUwL2LgMtLckROUN.jpg',
+  // ID de préférence SeenIt historique de France TV ; le provider TMDB courant reste 236.
+  234: PROVIDER_BRAND_ASSETS.france,
 };
 
 // v2 : le cache est désormais indexé par ID de préférence SeenIt, pas par ID fournisseur brut TMDB.
