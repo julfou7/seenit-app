@@ -1,12 +1,18 @@
 export const PLEX_LOGO_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%231F2326"/><path d="M30 20 L56 50 L30 80 L46 80 L72 50 L46 20 Z" fill="%23E5A00D"/></svg>`;
 
+export const PROVIDER_BRAND_LOGOS = {
+  netflix: '/brand/providers/netflix.png',
+  canal: '/brand/providers/canalplus.png',
+  hbo: '/brand/providers/hbo.png',
+  france: '/brand/providers/france-tv.png',
+} as const;
+
 export function getFormattedProviderLogo(logoPath?: string | null, name?: string | null): string | null {
   if (!logoPath && !name) return null;
 
   const lowerName = (name || '').toLowerCase();
   const lowerPath = (logoPath || '').toLowerCase();
 
-  // Plex detection
   if (
     lowerName === 'plex' ||
     lowerName.includes('plex') ||
@@ -15,20 +21,41 @@ export function getFormattedProviderLogo(logoPath?: string | null, name?: string
     return PLEX_LOGO_SVG;
   }
 
-  // HBO / HBO Max detection only (User requested: "je voulais que corriger HBO !")
+  if (lowerName.includes('netflix') || lowerPath.includes('pbpmk2jmconnqwx5jgpxngfowtp')) {
+    return PROVIDER_BRAND_LOGOS.netflix;
+  }
+
+  if (
+    lowerName === 'canal+' ||
+    lowerName === 'canal plus' ||
+    lowerName.startsWith('canal+ ') ||
+    lowerName.startsWith('canal plus ') ||
+    lowerPath.includes('canalplus.svg')
+  ) {
+    return PROVIDER_BRAND_LOGOS.canal;
+  }
+
   if (
     lowerName === 'hbo' ||
     lowerName.includes('hbo max') ||
     lowerName.startsWith('hbo ') ||
     lowerPath.includes('2me1s9339')
   ) {
-    // HBO Square Logo (Black square with bold white HBO)
-    return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%23000000"/><text x="50" y="63" font-family="Arial, sans-serif" font-weight="900" font-size="34" fill="%23FFFFFF" text-anchor="middle" letter-spacing="-1">HBO</text><circle cx="68.5" cy="52.8" r="4.8" fill="%23000000"/></svg>`;
+    return PROVIDER_BRAND_LOGOS.hbo;
   }
 
-  // Default TMDB image URL for all other providers (Canal+, Max, Netflix, Disney+, etc.)
+  if (
+    lowerName === 'france tv' ||
+    lowerName === 'france.tv' ||
+    lowerName.startsWith('france tv ') ||
+    lowerName.startsWith('france.tv ')
+  ) {
+    return PROVIDER_BRAND_LOGOS.france;
+  }
+
   if (logoPath) {
-    return logoPath.startsWith('http') ? logoPath : `https://image.tmdb.org/t/p/w92${logoPath}`;
+    if (logoPath.startsWith('/brand/') || logoPath.startsWith('data:') || logoPath.startsWith('http')) return logoPath;
+    return `https://image.tmdb.org/t/p/w92${logoPath}`;
   }
 
   return null;

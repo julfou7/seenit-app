@@ -18,7 +18,9 @@ SeenIt conserve les identifiants de préférence historiques déjà enregistrés
 | France TV | 234 | 236 |
 | ARTE | 239 | 234 |
 
-Les surfaces Réglages et Explorer doivent utiliser la même correspondance sémantique. Les logos chargés depuis le catalogue TMDB FR sont réindexés vers les IDs de préférence SeenIt ; un ancien cache ne doit donc jamais transformer France TV en ARTE. Explorer affiche le logo de Paramount+ lorsqu’il est disponible, comme Réglages. Canal+ utilise un asset carré/compact qui garde le wordmark entier dans une tuile carrée.
+Les surfaces Réglages et Explorer doivent utiliser la même correspondance sémantique. Les logos chargés depuis le catalogue TMDB FR sont réindexés vers les IDs de préférence SeenIt ; un ancien cache ne doit donc jamais transformer France TV en ARTE. Explorer affiche le logo de Paramount+ lorsqu’il est disponible, comme Réglages.
+
+Pour **Netflix, CANAL+, HBO et france.tv**, les assets de marque fournis par le propriétaire sont embarqués dans l’application et constituent la source visuelle canonique. Ils sont prioritaires sur les logos TMDB, les anciens assets générés et les caches distants dans **Mes plateformes**, **Explorer > Filtres** et les badges de fournisseurs affichés sur les cartes. Le rendu conserve l’image entière (`contain`) et ne doit ni rogner ni reconstruire le logo en texte.
 
 Les requêtes TMDB et les liens directs utilisent l’ID fournisseur courant, jamais l’ID de préférence lorsqu’ils divergent. Les choix déjà stockés `234` (France TV) et `239` (ARTE) restent valides sans migration destructive.
 
@@ -35,4 +37,4 @@ Dans la feuille Notifications, **Tout marquer lu** est une action de masse :
 
 ## TNR
 
-Le lot doit couvrir : correspondance préférence ↔ fournisseur pour France TV/ARTE, logos Paramount+/Canal+, liens directs France TV/ARTE, sélection de fournisseur de notification avec les IDs de préférence historiques et comportement atomique de `Tout marquer lu`.
+Le lot doit couvrir : correspondance préférence ↔ fournisseur pour France TV/ARTE, présence et priorité des assets embarqués Netflix/CANAL+/HBO/france.tv sur les trois surfaces d’affichage, logo Paramount+, liens directs France TV/ARTE, sélection de fournisseur de notification avec les IDs de préférence historiques et comportement atomique de `Tout marquer lu`.
