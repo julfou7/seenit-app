@@ -27,8 +27,8 @@ function ResultAction({ item, model }: { item: TMDBMedia; model: DiscoverViewMod
   </button>;
 }
 
-export function DiscoverSearchResults({ model, characters = [], charactersLoading = false, onCharacterClick }: { model: DiscoverViewModel; characters?: CharacterRecord[]; charactersLoading?: boolean; onCharacterClick?: (character: CharacterRecord) => void }) {
-  const { query, debouncedQuery, shows, uniqueProcessedResults, loading, searchElapsedMs, onShowClick, openPersonModal } = model;
+export function DiscoverSearchResults({ model, characters = [], charactersLoading = false, charactersPartial = false, onCharacterClick }: { model: DiscoverViewModel; characters?: CharacterRecord[]; charactersLoading?: boolean; charactersPartial?: boolean; onCharacterClick?: (character: CharacterRecord) => void }) {
+  const { query, debouncedQuery, shows, uniqueProcessedResults, loading, onShowClick, openPersonModal } = model;
   const library = useMemo(() => searchLibrary(shows, query), [shows, query]);
   const libraryKeys = useMemo(() => new Set(library.map(show => searchMediaKey(show.tmdbId, show.mediaType))), [library]);
   const current = query.trim() === debouncedQuery.trim();
@@ -38,7 +38,7 @@ export function DiscoverSearchResults({ model, characters = [], charactersLoadin
   const pending = loading || !current;
   return <div className="explorer-results" aria-label="Résultats de recherche">
     {library.length > 0 && <section aria-label="Dans ta bibliothèque">
-      <h2>Dans ta bibliothèque <small>instantané</small></h2>
+      <h2>Dans ta bibliothèque</h2>
       {library.map(show => <button key={show.id} type="button" className="explorer-result-row" onClick={() => onShowClick(show.tmdbId, show.mediaType)}>
         <Thumbnail path={show.posterPath} /><span className="explorer-row-text"><strong><Highlight title={show.title} query={query} /></strong>
           <small>{show.mediaType === 'movie' ? 'Film' : 'Série'}{show.firstAirDate ? ` · ${show.firstAirDate.slice(0, 4)}` : ''}
@@ -46,13 +46,13 @@ export function DiscoverSearchResults({ model, characters = [], charactersLoadin
         <span className="explorer-row-status">{librarySearchStatus(show)}</span>
       </button>)}
     </section>}
-    {(characters.length > 0 || charactersLoading) && <section aria-label="Personnages"><h2>Personnages <small>{charactersLoading ? 'recherche…' : 'Tes univers'}</small></h2>
+    {(characters.length > 0 || charactersLoading) && <section aria-label="Personnages"><h2>Personnages {charactersLoading ? <small>recherche…</small> : charactersPartial ? <small>liste incomplète, nouvel essai bientôt</small> : null}</h2>
       {characters.map(character => <button type="button" className="explorer-result-row" key={character.id} onClick={() => onCharacterClick?.(character)}>
         <span className="explorer-row-photo explorer-character-avatar">{characterInitials(character.name)}</span><span className="explorer-row-text"><strong><Highlight title={character.name} query={query} /></strong><small>{character.universe}{character.actors[0] ? ' · ' + character.actors[0].name : ''}</small></span><ChevronRight size={18} className="text-zinc-500 shrink-0" />
       </button>)}
     </section>}
     {(pending || media.length > 0) && <section aria-label="Films et séries TMDB">
-      <h2>Films et séries <span className="explorer-section-count">{media.length || ''}</span><small>{pending ? 'recherche…' : `TMDB${searchElapsedMs !== null ? ` · ${(searchElapsedMs / 1000).toFixed(1)} s` : ''}`}</small></h2>
+      <h2>Films et séries <span className="explorer-section-count">{media.length || ''}</span>{pending && <small>recherche…</small>}</h2>
       {pending ? <div role="status" aria-label="Recherche en cours" className="explorer-search-skeleton"><i /><i /></div> : media.map(item => {
         const title = item.title || item.name || '';
         return <div key={searchMediaKey(item.id, item.media_type)} className="explorer-result-row">
@@ -63,7 +63,7 @@ export function DiscoverSearchResults({ model, characters = [], charactersLoadin
         </div>;
       })}
     </section>}
-    {people.length > 0 && <section aria-label="Personnes"><h2>Personnes <span className="explorer-section-count">{people.length}</span><small>TMDB</small></h2>
+    {people.length > 0 && <section aria-label="Personnes"><h2>Personnes <span className="explorer-section-count">{people.length}</span></h2>
       {people.map(person => <button type="button" key={person.id} className="explorer-result-row" onClick={() => openPersonModal(person.id)}>
         <Thumbnail path={person.profile_path} person /><span className="explorer-row-text"><strong><Highlight title={person.name || ''} query={query} /></strong><small>{person.known_for_department === 'Acting' ? 'Interprète' : person.known_for_department || 'Personne'}</small></span>
       </button>)}

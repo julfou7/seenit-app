@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { Show } from '../src/types.ts';
 import type { CharacterRecord } from '../src/features/discover/characters.ts';
@@ -126,15 +125,4 @@ test('SEENIT-DISCOVER-004 borne les lots concurrents sans sérialiser toute la b
   );
   assert.equal(maxActive, CHARACTER_SEARCH_CONCURRENCY);
   assert.deepEqual(completed.sort((a, b) => a - b), [0, 1, 2, 3, 4, 5, 6]);
-});
-
-test('le hook Personnages utilise le cache persistant réel avant de retomber sur les lots réseau', () => {
-  const source = readFileSync(new URL('../src/hooks/useCharacterSearch.ts', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /setTimeout\s*\(/);
-  assert.match(source, /readUserScopedJson<ActorIndex>\(uid, 'home_actor_index'/);
-  assert.match(source, /primeMediaRenderSnapshotFromPersistentCache/);
-  assert.match(source, /peekRenderableMediaDetails/);
-  assert.match(source, /buildCachedTrackedCharacterResults/);
-  assert.match(source, /runCharacterSearchBatches/);
-  assert.match(source, /Promise\.allSettled\(\[networkSearch, cachePrime\]\)/);
 });

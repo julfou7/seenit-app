@@ -409,7 +409,8 @@ Le contrat E-01..33 du [handoff Explorer](../design/explorer-refonte-2026-10-28.
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
-- Recherche multi-pages TMDB en listes : bibliothèque locale, films et séries, puis personnes. Les personnages de fiction de la bibliothèque et des univers prouvés sont cherchés côté backend et ouvrent la fiche dédiée P-01..12 ; la section reste masquée sans source.
+- Recherche multi-pages TMDB en listes : bibliothèque locale, films et séries, puis personnes. La page 1 des films et séries s'affiche sans attendre la page 2. Les en-têtes ne montrent ni source (« TMDB »), ni durée, ni « instantané » ; seul « recherche… » signale une attente.
+- Les personnages de fiction de la bibliothèque et des univers prouvés (manifeste, collections TMDB) viennent d'un **index local des distributions** : construit en arrière-plan dès l'ouverture de la recherche, gardé quatorze jours sur l'appareil, puis filtré à chaque frappe sans appel réseau ni anti-rebond. Seuls les titres manquants ou expirés sont lus, par lots, un rôle déjà connu sur l'appareil passant en tête. Un titre non indexé (quota, panne) est signalé « liste incomplète, nouvel essai bientôt » et repris à la réouverture du quota, jamais présenté comme une absence. Un personnage ouvre la fiche dédiée P-01..12 ; la section reste masquée sans source.
 - Filtres par plateformes choisies dans les réglages, genres, **Âge conseillé** maximal et note minimale.
 - Le filtre **Films · sortis après** accepte une année de 1900 à l'année courante. Choisir `Y` force
   le type **Films** et conserve uniquement les films dont `release_date` est strictement postérieure à

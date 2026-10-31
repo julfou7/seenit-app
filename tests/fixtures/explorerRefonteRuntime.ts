@@ -62,6 +62,15 @@ const fixtureCharacter = {
 };
 export async function authenticatedFetch(input: string, _init?: RequestInit) {
  const url=new URL(input,'http://127.0.0.1');
+ if(url.pathname==='/api/media/characters/index') {
+  const universe={universeId:'breaking-bad-universe',universe:'Breaking Bad',seasons:[],coverageComplete:true};
+  const fixtures:Record<string,unknown>={
+   'tv:1396':{key:'tv:1396',id:1396,type:'tv',title:'Breaking Bad',poster:'/bb.svg',releaseDate:'2008-01-20',...universe,cast:[{id:1,name:'Bob Odenkirk',photo:'/bob.svg',roles:[{name:'Saul Goodman',count:43}]},{id:2,name:'Bryan Cranston',photo:null,roles:[{name:'Walter White',count:62}]}]},
+   'tv:60059':{key:'tv:60059',id:60059,type:'tv',title:'Better Call Saul',poster:'/bcs.svg',releaseDate:'2015-01-01',...universe,cast:[{id:1,name:'Bob Odenkirk',photo:'/bob.svg',roles:[{name:'Jimmy McGill / Gene Takavic',count:63}]}]},
+  };
+  const keys=(url.searchParams.get('ids')||'').split(',');
+  return new Response(JSON.stringify({media:keys.flatMap(key=>fixtures[key]?[fixtures[key]]:[]),related:{},failed:[]}),{status:200});
+ }
  if(url.pathname==='/api/media/characters/detail') {
   const walter=url.searchParams.get('name')==='Walter White';
   return new Response(JSON.stringify({character:walter?{...fixtureCharacter,id:'breaking-bad-universe:walter white',name:'Walter White',aliases:['Walter White'],actors:[{id:2,name:'Bryan Cranston',photo:null}],neighbors:[]}:fixtureCharacter}),{status:200});
