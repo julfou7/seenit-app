@@ -41,7 +41,7 @@ test('SEENIT-QUALITY-013 un push sur main réutilise la validation PR de confian
   const result = await plan('push', 'refs/heads/main', api());
   assert.equal(result.mode, 'tree');
   assert.equal(result.proof.runId, 11);
-  assert.match(result.reason, /arbre 17b1daea548f déjà validé par la PR/);
+  assert.match(result.reason, /arbre 17b1daea548f déjà validé avant fusion/);
   assert.equal(proof.proofArtifactName(TREE), `SeenIt-Validated-Tree-${TREE}`);
 });
 
@@ -51,7 +51,8 @@ test('SEENIT-QUALITY-013 sans preuve exacte et de confiance, la validation compl
     ['artefact expiré', api({ artifacts: [{ name: `SeenIt-Validated-Tree-${TREE}`, expired: true, workflow_run: { id: 11, repository_id: REPO_ID, head_repository_id: REPO_ID } }] })],
     ['PR depuis un fork', api({ artifacts: [{ name: `SeenIt-Validated-Tree-${TREE}`, expired: false, workflow_run: { id: 11, repository_id: REPO_ID, head_repository_id: 999 } }] })],
     ['dépôt de tête étranger', api({ run: { head_repository: { full_name: 'intrus/seenit-app' } } })],
-    ['run qui n’est pas une PR', api({ run: { event: 'workflow_dispatch' } })],
+    ['run planifié', api({ run: { event: 'schedule' } })],
+    ['run de push', api({ run: { event: 'push' } })],
     ['autre workflow', api({ run: { path: '.github/workflows/agent-remote-validate.yml' } })],
     ['Validate Change rouge', api({ jobs: [{ name: 'Validate Change', status: 'completed', conclusion: 'failure' }] })],
     ['Validate Change absent', api({ jobs: [] })],
@@ -112,6 +113,38 @@ test('validate:change n’accepte une preuve que pour l’arbre courant exact', 
   assert.ok(proven < script.indexOf("label: 'TypeScript + lint + format'"), 'seuls les contrôles d’arbre sont sautés');
 });
 
+test('SEENIT-QUALITY-013 la validation de candidate du contrôleur #102 sert de preuve et saute le smoke d’une version seule', async () => {
+  // v1.4.240 : la PR ouverte par le bot n’exécute aucun job ; seule la validation dispatchée fait foi.
+  const dispatchProof = await plan('push', 'refs/heads/main', api({ run: { event: 'workflow_dispatch' } }));
+  assert.equal(dispatchProof.mode, 'tree', 'le push main réutilise la validation dispatchée de la candidate');
+  const forkDispatch = await plan('push', 'refs/heads/main', api({ run: { event: 'workflow_dispatch', head_repository: { full_name: 'intrus/seenit-app' } } }));
+  assert.equal(forkDispatch.mode, 'full');
+
+  const versionOnly = (base: string) => base === BASE;
+  const candidate = await plan('workflow_dispatch', 'refs/heads/release/v1.4.240', api(), versionOnly);
+  assert.equal(candidate.mode, 'version', 'version seule sur un parent validé : smoke réutilisé');
+  assert.equal((await plan('workflow_dispatch', 'refs/heads/release/v1.4.240', api(), () => false)).mode, 'full');
+  const redParent = api({ parentRuns: [{ id: 25, head_sha: BASE, status: 'completed', conclusion: 'failure', path: '.github/workflows/build-apk.yml', repository: { full_name: REPO } }] });
+  assert.equal((await plan('workflow_dispatch', 'refs/heads/release/v1.4.240', redParent, versionOnly)).mode, 'full');
+
+  assert.match(proof.resolveDispatchBase(), /^[0-9a-f]{40}$/, 'la base du dispatch est le merge-base avec main');
+});
+
+test('SEENIT-QUALITY-008 la clé du cache node_modules ignore seulement la version de l’application', () => {
+  const { dependencyCacheKey, withoutAppVersion, withoutLockAppVersion } = require('../scripts/dependency-cache-key.cjs');
+  const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+  const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+  assert.deepEqual(withoutAppVersion({ ...pkg, version: '9.9.9' }), withoutAppVersion(pkg));
+  assert.deepEqual(withoutLockAppVersion({ ...lock, version: '9.9.9', packages: { ...lock.packages, '': { ...lock.packages[''], version: '9.9.9' } } }), withoutLockAppVersion(lock));
+  assert.notDeepEqual(withoutAppVersion({ ...pkg, dependencies: { ...pkg.dependencies, 'left-pad': '1.3.0' } }), withoutAppVersion(pkg), 'une dépendance change la clé');
+  const lockWithChangedDependency = { ...lock, packages: { ...lock.packages, 'node_modules/left-pad': { version: '1.3.0' } } };
+  assert.notDeepEqual(withoutLockAppVersion(lockWithChangedDependency), withoutLockAppVersion(lock));
+  assert.match(dependencyCacheKey(), /^[0-9a-f]{64}$/);
+  const script = readFileSync('scripts/dependency-cache-key.cjs', 'utf8');
+  assert.match(script, /scripts\/patch-local-notifications\.cjs/);
+  assert.match(script, /scripts\/materialize-android-config\.cjs/);
+});
+
 test('#85 câblage du workflow : lecture seule, après installation, smoke conditionné, preuve publiée par la PR verte', () => {
   const workflow = readFileSync('.github/workflows/build-apk.yml', 'utf8');
   const job = workflow.slice(workflow.indexOf('  validate:'), workflow.indexOf('\n  build:'));
@@ -121,10 +154,10 @@ test('#85 câblage du workflow : lecture seule, après installation, smoke condi
   assert.ok(at('Install Dependencies on Cache Miss') < at('Resolve Validated Tree Proof'), 'le contrat de version a besoin des dépendances');
   assert.ok(at('Resolve Validated Tree Proof') < at('Validate Change Canonical'));
   assert.ok(at('Run PWA Browser Quality Gate') < at('Publish Validated Tree Proof'), 'la preuve n’est publiée qu’après le smoke');
-  assert.match(job, /if: github\.event_name == 'push' \|\| github\.event_name == 'pull_request'\n {8}run: node scripts\/validated-tree-proof\.cjs/);
+  assert.match(job, /if: github\.event_name == 'push' \|\| github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch'\n {8}run: node scripts\/validated-tree-proof\.cjs/);
   assert.match(job, /SEENIT_VALIDATED_TREE_PROOF: \$\{\{ steps\.proof\.outputs\.reused == 'true' && steps\.proof\.outputs\.tree \|\| '' \}\}/);
   assert.match(job, /- name: Run PWA Browser Quality Gate\n {8}if: steps\.proof\.outputs\.skip_browser != 'true'/);
-  assert.match(job, /- name: Publish Validated Tree Proof\n {8}if: success\(\) && github\.event_name == 'pull_request' && steps\.proof\.outputs\.tree != ''/);
+  assert.match(job, /- name: Publish Validated Tree Proof\n {8}if: success\(\) && \(github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch'\) && steps\.proof\.outputs\.tree != ''/);
   assert.match(job, /name: \$\{\{ steps\.proof\.outputs\.artifact_name \}\}/);
 });
 

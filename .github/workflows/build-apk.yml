@@ -89,14 +89,17 @@ jobs:
 
       - name: Resolve Node Cache Identity
         id: runtime
-        run: echo "node_version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "node_version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
+          # Dépendances, lockfile et scripts de patch, hors champs de version : une release ne vide pas le cache.
+          echo "deps_hash=$(node scripts/dependency-cache-key.cjs)" >> "$GITHUB_OUTPUT"
 
       - name: Restore Exact node_modules Cache
         id: node_modules_cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
-          key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ hashFiles('package.json', 'package-lock.json', 'scripts/patch-local-notifications.cjs', 'scripts/materialize-android-config.cjs') }}
+          key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ steps.runtime.outputs.deps_hash }}
 
       - name: Install Dependencies on Cache Miss
         if: steps.node_modules_cache.outputs.cache-hit != 'true'
@@ -112,7 +115,7 @@ jobs:
 
       - name: Resolve Validated Tree Proof
         id: proof
-        if: github.event_name == 'push' || github.event_name == 'pull_request'
+        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         run: node scripts/validated-tree-proof.cjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -131,7 +134,7 @@ jobs:
         run: node scripts/pwa-browser-smoke.cjs
 
       - name: Publish Validated Tree Proof
-        if: success() && github.event_name == 'pull_request' && steps.proof.outputs.tree != ''
+        if: success() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && steps.proof.outputs.tree != ''
         uses: actions/upload-artifact@v7
         with:
           name: ${{ steps.proof.outputs.artifact_name }}
@@ -157,7 +160,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules
-          key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ hashFiles('package.json', 'package-lock.json', 'scripts/patch-local-notifications.cjs', 'scripts/materialize-android-config.cjs') }}
+          key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ steps.runtime.outputs.deps_hash }}
 
       - name: Publish Validation Summary
         if: always()
