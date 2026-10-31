@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      # Lecture seule des runs et artefacts : retrouver la preuve d'un arbre déjà validé (#85).
+      # Lecture seule des runs et artefacts : retrouver les preuves d'un arbre déjà validé (#85).
       actions: read
     outputs:
       delivery_mode: ${{ steps.delivery.outputs.DELIVERY_MODE }}
@@ -64,7 +64,24 @@ jobs:
           cache: npm
           cache-dependency-path: package-lock.json
 
+      - name: Resolve Trusted Staging Proof
+        id: staging_proof
+        if: github.event_name == 'pull_request'
+        run: node scripts/staging-validation-proof.cjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SEENIT_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+      - name: Resolve strict documentation scope
+        id: scope
+        if: steps.staging_proof.outputs.reused != 'true'
+        run: node scripts/validation-scope.cjs
+        env:
+          SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+
       - name: Install pinned actionlint
+        if: steps.staging_proof.outputs.reused != 'true'
         run: |
           set -euo pipefail
           version='1.7.12'
@@ -77,10 +94,11 @@ jobs:
           "$RUNNER_TEMP/actionlint" -version
 
       - name: Validate Change Preflight
+        if: steps.staging_proof.outputs.reused != 'true'
         run: npm run validate:change -- --preflight
 
       - name: Complete Preflight Metrics
-        if: always()
+        if: always() && steps.staging_proof.outputs.reused != 'true'
         run: |
           if [ -n "${SEENIT_PREFLIGHT_STARTED:-}" ]; then
             now=$(date +%s)
@@ -88,6 +106,7 @@ jobs:
           fi
 
       - name: Resolve Node Cache Identity
+        if: steps.staging_proof.outputs.reused != 'true' && steps.scope.outputs.docs_only != 'true'
         id: runtime
         run: |
           echo "node_version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
@@ -95,6 +114,7 @@ jobs:
           echo "deps_hash=$(node scripts/dependency-cache-key.cjs)" >> "$GITHUB_OUTPUT"
 
       - name: Restore Exact node_modules Cache
+        if: steps.staging_proof.outputs.reused != 'true' && steps.scope.outputs.docs_only != 'true'
         id: node_modules_cache
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -102,7 +122,7 @@ jobs:
           key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ steps.runtime.outputs.deps_hash }}
 
       - name: Install Dependencies on Cache Miss
-        if: steps.node_modules_cache.outputs.cache-hit != 'true'
+        if: steps.staging_proof.outputs.reused != 'true' && steps.scope.outputs.docs_only != 'true' && steps.node_modules_cache.outputs.cache-hit != 'true'
         run: |
           started=$(date +%s)
           set +e
@@ -120,14 +140,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          SEENIT_STAGING_PROOF_REUSED: ${{ steps.staging_proof.outputs.reused }}
+          SEENIT_STAGING_PROOF_URL: ${{ steps.staging_proof.outputs.proof_url }}
+          SEENIT_DOCS_ONLY: ${{ steps.scope.outputs.docs_only }}
 
       - name: Validate Change Canonical
+        if: steps.staging_proof.outputs.reused != 'true' && steps.scope.outputs.docs_only != 'true'
         id: delivery
         run: npm run validate:change -- --postinstall
         env:
           SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           SEENIT_FORCE_DEPENDENCY_AUDIT: ${{ github.event_name == 'schedule' }}
           SEENIT_VALIDATED_TREE_PROOF: ${{ steps.proof.outputs.reused == 'true' && steps.proof.outputs.tree || '' }}
+
+      - name: Validate strict documentation change
+        if: steps.staging_proof.outputs.reused != 'true' && steps.scope.outputs.docs_only == 'true'
+        run: |
+          echo "[Validate Change] ✅ Documentation/processus stricte : workflows, SPEC et Changelog vérifiés."
+          echo "Aucun code runtime, script, workflow, catalogue JSON ou dépendance n'est modifié."
 
       - name: Run PWA Browser Quality Gate
         if: steps.proof.outputs.skip_browser != 'true'
@@ -154,6 +184,8 @@ jobs:
       - name: Save Trusted node_modules Cache
         if: >-
           success() &&
+          steps.staging_proof.outputs.reused != 'true' &&
+          steps.scope.outputs.docs_only != 'true' &&
           steps.node_modules_cache.outputs.cache-hit != 'true' &&
           github.event_name == 'push' &&
           (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
@@ -172,21 +204,34 @@ jobs:
             total_seconds='n/a'
           fi
           delivery_mode='${{ steps.delivery.outputs.DELIVERY_MODE }}'
+          validation_scope='${{ steps.scope.outputs.scope }}'
+          staging_reused='${{ steps.staging_proof.outputs.reused }}'
+          docs_only='${{ steps.scope.outputs.docs_only }}'
           cache_hit='${{ steps.node_modules_cache.outputs.cache-hit }}'
           PROOF_MODE='${{ steps.proof.outputs.mode }}'
           PROOF_URL='${{ steps.proof.outputs.proof_url }}'
-          if [ -z "$delivery_mode" ]; then delivery_mode='inconnu'; fi
-          if [ "$cache_hit" = 'true' ]; then
+          if [ "$staging_reused" = 'true' ]; then
+            delivery_mode='prouvé'
+            validation_scope='preuve staging exacte'
+            cache_status='non requis (preuve staging)'
+          elif [ "$docs_only" = 'true' ]; then
+            delivery_mode='light'
+            validation_scope='docs-only strict'
+            cache_status='non requis (docs-only)'
+          elif [ "$cache_hit" = 'true' ]; then
             cache_status='hit'
           else
             cache_status='miss'
           fi
+          if [ -z "$delivery_mode" ]; then delivery_mode='inconnu'; fi
+          if [ -z "$validation_scope" ]; then validation_scope='full'; fi
           {
             echo "## Validate Change"
             echo
             echo "| Mesure | Valeur |"
             echo "|---|---:|"
             echo "| Mode de livraison | $delivery_mode |"
+            echo "| Scope de validation | $validation_scope |"
             echo "| Cache node_modules | $cache_status |"
             echo "| Préflight workflows + SPEC | ${SEENIT_PREFLIGHT_SECONDS:-n/a} s |"
             echo "| actionlint + politique workflows | ${SEENIT_WORKFLOWS_SECONDS:-n/a} s |"
