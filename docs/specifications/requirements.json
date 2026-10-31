@@ -1938,6 +1938,14 @@
         },
         {
           "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 une seule grammaire Changelog pour le générateur et le validateur"
+        },
+        {
+          "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 vérifie le message prévu avant toute écriture distante"
+        },
+        {
+          "file": "tests/releaseNotes.test.ts",
           "contains": "SEENIT-RELEASE-003 sépare le changelog public des détails techniques"
         },
         {

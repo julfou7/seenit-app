@@ -234,6 +234,14 @@ GitHub est canonique. AI Studio est un mécanisme de transport : une modificatio
 - Réponses, commits, changelog et release notes : **français**.
 - Commits : Conventional Commits (`fix:`, `feat:`, `perf:`, `style:`, `chore:`, `refactor:`, `docs:`, `build:`, `ci:`, `test:`…), avec un corps court en puces lorsque plusieurs changements sont inclus.
 - Lorsqu'un commit apporte un changement visible, son corps contient une section `Changelog:` avec **une à deux phrases destinées à l'utilisateur**, puis, si nécessaire, une section séparée `Détails techniques:`. Un commit sans effet visible porte `Changelog: aucun`. Le générateur ne doit jamais confondre ces détails internes avec les notes publiques.
+- **Grammaire exacte du bloc `Changelog:`**, identique pour le générateur et le validateur :
+  - visible, forme courte : `Changelog: Les filtres de plateformes affichent les bons logos.`
+  - visible, plusieurs éléments : `Changelog:` puis une puce `- …` par élément ;
+  - visible, phrase sous l'en-tête : `Changelog:` puis une à deux phrases, jusqu'à la ligne vide (les puces qui suivent ne sont jamais publiées) ;
+  - sans effet utilisateur : `Changelog: aucun`.
+
+  Sont refusés : un bloc absent, un `Changelog:` vide (ligne vide ou en-tête suivant) et une note anglaise, vague ou citant un fichier, une issue ou une PR.
+- **Préflight du message avant toute écriture distante.** Avant de créer ou de pousser un commit, exécuter `node scripts/validate-changelog-coverage.cjs --message <fichier>` (ou `-` pour l'entrée standard) sur le message prévu. Une erreur de syntaxe de message est déterministe : la CI ne doit jamais servir à la découvrir, et `validate:change` reste le filet final sur la plage de commits. En mode connector-only, sans shell, utiliser exclusivement la forme courte, la liste de puces ou `Changelog: aucun`.
 - Le changelog public conserve exactement le titre `### 🛠️ Ce qui a été fait` et vise **deux à cinq puces courtes** pour l'ensemble d'une version. Chaque puce commence par une majuscule, se termine par une ponctuation et décrit un résultat concret avec les mots de l'interface. Regroupez les changements liés au lieu d'énumérer leur implémentation. Sauf nécessité pour comprendre l'usage, n'y exposez ni nom de fichier, fonction, variable, `ratingKey`, UID, cache/baseline, test, CI, commit, PR ou issue.
 - Évitez les formulations vagues (« améliorations générales », « diverses corrections ») lorsqu'un bénéfice précis peut être nommé. Les preuves techniques restent dans le commit, la PR ou l'issue.
 - Une release agrège les commits du lot ; ne créez pas un commit artificiel par garde-fou administratif.

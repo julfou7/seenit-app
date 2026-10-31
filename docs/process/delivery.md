@@ -642,7 +642,20 @@ Détails techniques:
 ```
 
 `Changelog: aucun` signale explicitement un commit sans effet visible. Le générateur n'utilise que cette
-section explicite et ignore les détails techniques. Le préflight canonique `validate:change` vérifie en plus,
+section explicite et ignore les détails techniques. Quatre formes sont acceptées, avec la même grammaire pour
+le générateur et le validateur (`readChangelogBlock`) :
+
+| Forme | Exemple | Résultat |
+|---|---|---|
+| Courte | `Changelog: Les filtres affichent les bons logos.` | une note |
+| Liste | `Changelog:` puis `- …` par ligne | une note par puce |
+| Phrase sous l'en-tête | `Changelog:` puis une à deux phrases jusqu'à la ligne vide | une note ; les puces qui suivent ne sont jamais publiées |
+| Sans effet | `Changelog: aucun` (ou `aucun` sous l'en-tête) | aucune note |
+
+Un `Changelog:` vide (ligne vide ou en-tête suivant) reste refusé. Avant tout commit ou push distant, le
+message prévu passe par `node scripts/validate-changelog-coverage.cjs --message <fichier>` : une erreur de
+syntaxe est déterministe et ne doit jamais coûter un cycle CI (retour #195 du 31/10/2026, deux cycles perdus
+sur #812 et un sur #805). En mode connector-only, s'en tenir aux formes courte, liste ou `aucun`. Le préflight canonique `validate:change` vérifie en plus,
 sur chaque commit non-merge entre la baseline et `HEAD`, qu'un bloc `Changelog:` existe avant toute PR/merge ;
 une note non vide est soumise immédiatement aux mêmes contrôles de langue et de qualité que la publication.
 Le résultat utilise un seul titre `### 🛠️ Ce qui a été fait`, avec des phrases françaises courtes, ponctuées et
