@@ -1,4 +1,5 @@
 import { readWatchProviderCache } from '../providers/watchProviderCache.ts';
+import { providerIdForPreferenceId } from '../providers/platformIdentity.ts';
 import type { Show } from '../../types.ts';
 
 export function getNotificationProvider(show: Show, selected: readonly number[]): { id: number; name: string } | undefined {
@@ -6,10 +7,11 @@ export function getNotificationProvider(show: Show, selected: readonly number[])
   const payload = readWatchProviderCache(show.tmdbId, show.mediaType)?.data;
   const providers: unknown = payload?.results?.FR?.flatrate;
   if (!Array.isArray(providers)) return undefined;
-  for (const id of selected) {
-    const provider = providers.find(item => Number(item?.provider_id) === id);
+  for (const preferenceId of selected) {
+    const providerId = providerIdForPreferenceId(preferenceId);
+    const provider = providers.find(item => Number(item?.provider_id) === providerId);
     if (provider && typeof provider.provider_name === 'string' && provider.provider_name.trim()) {
-      return { id, name: provider.provider_name.trim().slice(0, 50) };
+      return { id: providerId, name: provider.provider_name.trim().slice(0, 50) };
     }
   }
   return undefined;

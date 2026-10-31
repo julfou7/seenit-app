@@ -10,8 +10,8 @@ export const getProviderDirectLink = (providerId: number, title: string, fallbac
     case 350: return `https://tv.apple.com/fr/search?q=${query}`;
     case 531: return `https://www.paramountplus.com/search/?q=${query}`;
     case 1899: return `https://www.max.com/search?q=${query}`;
-    case 234: return `https://www.france.tv/recherche/?q=${query}`;
-    case 239: return `https://www.arte.tv/fr/search/?q=${query}`;
+    case 236: return `https://www.france.tv/recherche/?q=${query}`;
+    case 234: return `https://www.arte.tv/fr/search/?q=${query}`;
     default: return fallbackLink || '#';
   }
 };
