@@ -45,6 +45,9 @@ Milo/Invité ne peuvent pas modifier ce choix global. Le test du clic sur la tui
 la cible choisie, et les TNR refusent cible système, autre nom, retrait et cache invalide.
 La variante Netflix terrain reste une configuration locale, jamais une table d'IDs du WGT.
 Cette confirmation porte sur la TV en cours d'utilisation, pas sur un redémarrage à froid.
+La finition0.4.5 corrige l'héritage `text-align:left` des boutons : noms et sous-titre
+Invité sont centrés sous les avatars. Le TNR navigateur mesure le centre du texte rendu
+par rapport au centre de chaque carte à1920 et1280, plutôt que vérifier seulement la CSS.
 
 ## Validation
 

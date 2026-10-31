@@ -10,7 +10,7 @@ test('SEENIT-TV-001 garde ES5, identité Samsung et absence de runtime lourd', (
     assert.doesNotMatch(source, /\b(?:const|let|async|await)\b|=>|\?\.|\?\?|\bclass\s+\w+|\x60/, name);
     new vm.Script(source, { filename: name });
   }
-  assert.match(config, /version="0\.4\.4"/);
+  assert.match(config, /version="0\.4\.5"/);
   assert.match(config, /id="SeenItTV01.SeenItTV" package="SeenItTV01" required_version="3\.0"/);
   assert.doesNotMatch(html, /react|babel|iframe/i);
   assert.doesNotMatch(css, /display\s*:\s*grid|backdrop-filter|filter\s*:\s*blur|animation\s*:/i);
