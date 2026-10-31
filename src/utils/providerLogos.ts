@@ -64,7 +64,9 @@ export function getFormattedProviderLogo(logoPath?: string | null, name?: string
 /**
  * Resolves genuine streaming providers (SVOD / flatrate / free / ads).
  * Strictly ignores 'buy' (Achat VOD) and 'rent' (Location VOD) to avoid displaying Apple TV/Prime on movies not streaming.
- * When the user configured "Mes plateformes", an actually available matching provider wins before the generic TMDB order.
+ * When "Mes plateformes" is explicitly known, a configured list only allows an actually available matching provider.
+ * An explicit empty list keeps the historical public fallback for users who configured no platform at all.
+ * Callers that do not know the user's preferences must not guess a public subscription badge.
  */
 export interface StreamingProvider {
   provider_id?: number;
@@ -82,7 +84,7 @@ export type WatchProviderResults = Record<string, {
 
 export function extractOfficialStreamingProvider(
   results: WatchProviderResults | null | undefined,
-  preferredProviderIds: readonly number[] = [],
+  preferredProviderIds?: readonly number[],
 ): { logo_path: string; provider_name: string; provider_id?: number } | null {
   const fr = results?.FR;
   if (!fr) return null;
@@ -95,12 +97,21 @@ export function extractOfficialStreamingProvider(
 
   if (candidates.length === 0) return null;
 
+  // `undefined` means the caller has no preference context. In that case,
+  // showing an arbitrary public subscription could falsely imply that it is
+  // included in the user's subscriptions, so fail closed.
+  if (preferredProviderIds === undefined) return null;
+
   const preferredIds = new Set(
     preferredProviderIds
       .map(Number)
       .filter((id) => Number.isFinite(id) && id > 0),
   );
-  const stream = candidates.find(provider => preferredIds.has(Number(provider?.provider_id))) || candidates[0];
+  const stream = preferredIds.size > 0
+    ? candidates.find(provider => preferredIds.has(Number(provider?.provider_id)))
+    : candidates[0];
+
+  if (!stream) return null;
 
   return {
     logo_path: stream.logo_path,

@@ -16,6 +16,17 @@ const lionessProviders = {
   },
 };
 
+const monsterHouseProviders = {
+  FR: {
+    flatrate: [
+      { provider_id: 99991, provider_name: 'Sony Pictures Core Amazon Channel', logo_path: '/sony-core.jpg' },
+    ],
+    rent: [
+      { provider_id: 10, provider_name: 'Amazon Video', logo_path: '/amazon-video.jpg' },
+    ],
+  },
+};
+
 test('#337 Mes plateformes choisit Paramount+ parmi les diffuseurs FR réellement disponibles', () => {
   const provider = extractOfficialStreamingProvider(lionessProviders, [531]);
 
@@ -65,11 +76,10 @@ test('#337 une réponse publique autoritative vide autorise ensuite le fallback 
   assert.match(state.logo, /^data:image\/svg\+xml/i);
 });
 
-test('#337 une plateforme cochée mais absente du média n’est jamais inventée', () => {
+test('#337 une plateforme cochée mais absente du média n’est jamais remplacée par un abonnement tiers', () => {
   const provider = extractOfficialStreamingProvider(lionessProviders, [337]);
 
-  assert.equal(provider?.provider_id, 8);
-  assert.equal(provider?.provider_name, 'Netflix');
+  assert.equal(provider, null);
 });
 
 test('#337 une préférence hydratée après le premier rendu re-sélectionne le payload TMDB connu', () => {
@@ -92,6 +102,33 @@ test('#337 achat et location restent exclus du choix des diffuseurs', () => {
   assert.equal(provider, null);
 });
 
+test('#337 Monster House ne présente pas Sony Pictures Core comme inclus dans Prime Video', () => {
+  const provider = extractOfficialStreamingProvider(monsterHouseProviders, [119]);
+  const withoutPlex = resolvePassiveProviderState(
+    'movie:9297:prefs:119',
+    provider,
+    { available: false },
+    true,
+    [119],
+  );
+  const withPlex = resolvePassiveProviderState(
+    'movie:9297:prefs:119',
+    provider,
+    { available: true, serverName: 'Maison' },
+    true,
+    [119],
+  );
+
+  assert.equal(provider, null);
+  assert.equal(withoutPlex.name, null);
+  assert.equal(withoutPlex.logo, null);
+  assert.equal(withPlex.name, 'Plex (Maison)');
+});
+
+test('#337 un appel sans contexte Mes plateformes échoue de façon conservatrice', () => {
+  assert.equal(extractOfficialStreamingProvider(lionessProviders), null);
+});
+
 test('SEENIT-PROVIDER-001 applique Mes plateformes > Plex > fallback public', () => {
   const plex = { available: true, serverName: 'Maison' };
   for (const preferred of [[531], [], [531], [99]]) {
@@ -99,7 +136,7 @@ test('SEENIT-PROVIDER-001 applique Mes plateformes > Plex > fallback public', ()
     const state = resolvePassiveProviderState('tv:125359', provider, plex, true, preferred);
     assert.equal(state.name, preferred.includes(531) ? 'Paramount Plus' : 'Plex (Maison)');
   }
-  assert.equal(resolvePassiveProviderState('tv:125359', extractOfficialStreamingProvider(lionessProviders), { available: false }, true, []).name, 'Netflix');
+  assert.equal(resolvePassiveProviderState('tv:125359', extractOfficialStreamingProvider(lionessProviders, []), { available: false }, true, []).name, 'Netflix');
   assert.equal(resolvePassiveProviderState('tv:125359', null, plex, false, []).name, null);
 });
 
