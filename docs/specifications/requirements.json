@@ -2588,6 +2588,10 @@
         {
           "file": "tests/ciValidationPerformance.test.ts",
           "contains": "SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-008 la clé du cache node_modules ignore seulement la version de l’application"
         }
       ]
     },
@@ -2699,6 +2703,10 @@
         {
           "file": "tests/validatedTreeProof.test.ts",
           "contains": "SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés dans l’ordre historique"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-013 la validation de candidate du contrôleur #102 sert de preuve et saute le smoke d’une version seule"
         }
       ]
     },

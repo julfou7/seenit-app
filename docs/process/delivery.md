@@ -106,11 +106,12 @@ qui doit être rejoué :
 | Contexte | Décision |
 |---|---|
 | PR verte | Validation complète. Après le smoke, l'artefact `SeenIt-Validated-Tree-<arbre>` publie l'arbre réellement validé (merge ref). |
+| Validation de candidate dispatchée par le contrôleur #102 (`release_apk=false`) | Même traitement qu'une PR : la PR ouverte par le bot n'exécute aucun job (0 job, marquée en échec au merge), c'est donc ce run qui publie la preuve. Base = merge-base avec `main`. |
 | Push `main` dont l'arbre a une preuve de confiance | Préflight (workflows, SPEC, Changelog de la plage poussée), classification et contrat rejoués ; TypeScript, tests, build et smoke non rejoués. Le run reste vert et lisible par le contrôleur #102 et le déploiement backend. |
 | Version seule (surfaces de `SEENIT-RELEASE-001`) dont le parent est validé | Validation canonique complète ; seul le smoke navigateur est réutilisé depuis le parent. |
 | Aucune preuve, preuve ambiguë, API en erreur, fork, audit planifié ou dispatch | Validation complète, sans exception. |
 
-Une preuve n'est de confiance que si elle vient d'un run `pull_request` du même dépôt, sur
+Une preuve n'est de confiance que si elle vient d'un run `pull_request` ou de validation dispatchée du même dépôt, sur
 `.github/workflows/build-apk.yml`, avec un job `Validate Change` vert. L'arbre comparé inclut les workflows
 eux-mêmes. Un merge commit dont la base a avancé produit un autre arbre et rejoue donc tout. `main`
 n'a pas de protection de branche (`protected=false`) : un push direct n'a aucune preuve et reste
@@ -158,7 +159,9 @@ contrôle sans le supprimer ni l'assouplir.
 
 Le cache `node_modules` est strictement exact. Sa clé comprend le système, l'architecture, la version
 Node réellement résolue, `package.json`, `package-lock.json`, le patch des notifications locales et
-le matérialiseur Android. Aucun préfixe de restauration approximatif n'est autorisé. Les PR peuvent
+le matérialiseur Android. `scripts/dependency-cache-key.cjs` en retire seulement les champs de version
+de l'application : node_modules n'en dépend pas, et une préparation de release ne force plus une
+installation (19 s, deux fois, sur la v1.4.240). Aucun préfixe de restauration approximatif n'est autorisé. Les PR peuvent
 lire le cache de la branche par défaut selon les règles de portée GitHub Actions, mais ne le sauvegardent
 jamais. Seul un push vert sur `main` ou `master` peut créer le cache de référence, après tous les
 tests et le build, rejoués sur ce push ou prouvés par la PR sur le même arbre exact. Le fichier `android/app/google-services.json` reste hors cache et est régénéré à

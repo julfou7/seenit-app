@@ -143,7 +143,7 @@ function validatePostinstall() {
     // propres à la plage de commits poussée (Changelog, classification, contrat) restent rejoués.
     const provenTree = resolveProvenTree();
     if (provenTree) {
-      console.log(`\n[Validate Change] ✅ Validation ${classification.mode} : arbre ${provenTree.slice(0, 12)} déjà validé par sa PR, contrôles d’arbre non rejoués.`);
+      console.log(`\n[Validate Change] ✅ Validation ${classification.mode} : arbre ${provenTree.slice(0, 12)} déjà validé avant fusion, contrôles d’arbre non rejoués.`);
       return { ...classification, provenTree };
     }
     runNpm(['run', 'lint'], {

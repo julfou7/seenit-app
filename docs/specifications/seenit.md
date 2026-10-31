@@ -1659,7 +1659,8 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
 - **SEENIT-QUALITY-008** — La validation continue échoue vite sans retirer de contrôle :
   l’intégrité de la SPEC s’exécute avant tout accès aux dépendances, puis un cache `node_modules` exact
   est restauré avant l’installation conditionnelle. Sa clé dépend du système, de l'architecture, de la
-  version Node, du lockfile et des scripts de patch ; seul `main` alimente le cache de référence et une
+  version Node, du lockfile et des scripts de patch, hors champs de version de l'application (une
+  préparation de release ne vide donc pas le cache) ; seul `main` alimente le cache de référence et une
   PR ne peut pas l'empoisonner. Sur cache trouvé, aucune installation n'a lieu et la classification
   comme le contrat de changement s'exécutent directement. Un cache absent déclenche une installation
   npm déterministe sans audit implicite avant ces contrôles dépendants de TypeScript. La configuration
@@ -1720,11 +1721,13 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   d'émulateur reste bloquant. Les deux AVD API36 utilisent le mode logiciel actuel
   `-gpu swiftshader -feature -Vulkan`, après le segfault RenderThread hôte du25/10/2026
   sous le mode déprécié `swiftshader_indirect`. Le changement de renderer ne retire aucune assertion.
-- **SEENIT-QUALITY-013** — Un arbre Git livré n'est validé complètement qu'une fois (#85). Une PR verte
-  publie, après le smoke navigateur, la preuve de l'arbre qu'elle a réellement validé (merge ref). Le push
+- **SEENIT-QUALITY-013** — Un arbre Git livré n'est validé complètement qu'une fois (#85). Une PR verte,
+  ou la validation explicite d'une candidate lancée par le contrôleur #102 (`workflow_dispatch` sans
+  release, car la PR ouverte par le bot n'exécute aucun job), publie après le smoke navigateur la preuve
+  de l'arbre qu'elle a réellement validé. Le push
   sur `main` ne rejoue TypeScript, tests, build et smoke que s'il ne retrouve pas une preuve de confiance
-  pour exactement le même arbre : run `pull_request` du même dépôt (jamais un fork), workflow canonique et
-  job `Validate Change` vert. Le préflight (workflows, SPEC, Changelog de la plage poussée), la
+  pour exactement le même arbre : run `pull_request` ou de validation dispatchée du même dépôt (jamais un
+  fork), workflow canonique et job `Validate Change` vert. Le préflight (workflows, SPEC, Changelog de la plage poussée), la
   classification et le contrat de changement restent rejoués. Une version seule (surfaces de
   `SEENIT-RELEASE-001` uniquement) dont le parent porte une validation verte garde la validation
   canonique et réutilise le smoke navigateur du parent. Toute erreur, absence ou ambiguïté de preuve,
