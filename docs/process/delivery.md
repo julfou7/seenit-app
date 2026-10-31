@@ -94,6 +94,37 @@ sont les deux segments du même script `scripts/validate-change.cjs`. L'exécuti
 successivement les deux segments. La CI confirme donc un contrat local identique au lieu de devenir une
 boucle de mise au point distante.
 
+### Une validation complète par arbre livré (`SEENIT-QUALITY-013`, #85)
+
+Mesure du 31/10/2026 (v1.4.239) : la candidate de version a été validée deux fois à l'identique, une fois en
+PR et une fois sur `main` (6 min 20 s puis 6 min 25 s). Sur ces 6 min 25 s, le smoke navigateur prenait
+4 min 55 s. La publication elle-même ne prend que 2 min 30 s.
+
+`scripts/validated-tree-proof.cjs` décide désormais, entre l'installation et la validation canonique, de ce
+qui doit être rejoué :
+
+| Contexte | Décision |
+|---|---|
+| PR verte | Validation complète. Après le smoke, l'artefact `SeenIt-Validated-Tree-<arbre>` publie l'arbre réellement validé (merge ref). |
+| Push `main` dont l'arbre a une preuve de confiance | Préflight (workflows, SPEC, Changelog de la plage poussée), classification et contrat rejoués ; TypeScript, tests, build et smoke non rejoués. Le run reste vert et lisible par le contrôleur #102 et le déploiement backend. |
+| Version seule (surfaces de `SEENIT-RELEASE-001`) dont le parent est validé | Validation canonique complète ; seul le smoke navigateur est réutilisé depuis le parent. |
+| Aucune preuve, preuve ambiguë, API en erreur, fork, audit planifié ou dispatch | Validation complète, sans exception. |
+
+Une preuve n'est de confiance que si elle vient d'un run `pull_request` du même dépôt, sur
+`.github/workflows/build-apk.yml`, avec un job `Validate Change` vert. L'arbre comparé inclut les workflows
+eux-mêmes. Un merge commit dont la base a avancé produit un autre arbre et rejoue donc tout. `main`
+n'a pas de protection de branche (`protected=false`) : un push direct n'a aucune preuve et reste
+intégralement validé. Le job n'obtient que `actions: read` en plus de `contents: read`.
+
+Le smoke navigateur s'exécute en **quatre couloirs** Chromium isolés : un profil et un stockage par couloir,
+avec focus émulé. Chaque couloir suit l'ordre historique : rendu → clavier → actions #180 → dialogues,
+diffuseurs, cartes, historique, navigation ; TV → recherche → minuterie 18c (horloge virtuelle en
+dernier) ; terrains Accueil 220–223 ; terrains 224–227 → À voir → performance → jamais commencées. `SEENIT_PWA_LANES=1` rejoue la
+séquence d'origine sur un seul client pour diagnostiquer. Le rapport `pwa-browser.json` publie la durée
+de chaque harnais (`timings`). Une condition attendue n'échoue qu'à l'expiration de son délai : pendant
+l'attente, une exception (élément pas encore rendu) vaut « pas encore ». Sans cette règle, deux courses
+latentes (terrain221, recherche) se révélaient dès que le rythme changeait.
+
 ### Politique et syntaxe des workflows
 
 `npm run validate:workflows` est inclus dans le préflight. Il impose une allowlist exacte des workflows
@@ -130,7 +161,7 @@ Node réellement résolue, `package.json`, `package-lock.json`, le patch des not
 le matérialiseur Android. Aucun préfixe de restauration approximatif n'est autorisé. Les PR peuvent
 lire le cache de la branche par défaut selon les règles de portée GitHub Actions, mais ne le sauvegardent
 jamais. Seul un push vert sur `main` ou `master` peut créer le cache de référence, après tous les
-tests et le build. Le fichier `android/app/google-services.json` reste hors cache et est régénéré à
+tests et le build, rejoués sur ce push ou prouvés par la PR sur le même arbre exact. Le fichier `android/app/google-services.json` reste hors cache et est régénéré à
 chaque validation depuis le contrat suivi.
 
 Le cache npm de téléchargement de `actions/setup-node` reste actif comme secours d'une installation
@@ -463,6 +494,15 @@ seconde branche parallèle. Le fast path n'effectue ni audit global, ni recherch
 recherche Web/plugin.
 
 ### 2. Préparer la version si nécessaire
+
+**Correctif destiné au téléphone : préparer la version dans la PR du correctif.** Quand la demande prévoit
+dès le départ une APK terrain, l'agent aligne la prochaine version dans la PR du correctif lui-même. Il
+exécute `node scripts/prepare-release-files.cjs X.Y.Z`, puis crée un commit séparé
+`chore(release): préparer SeenIt X.Y.Z` avec `Changelog: aucun`. Une seule PR est validée. Le push `main`
+réutilise sa preuve d'arbre et le dispatch terrain suit immédiatement le merge. Le second cycle
+candidate (PR + `main`, environ 13 min au 31/10/2026) disparaît. Si la publication n'est décidée qu'après
+le merge, la candidate dédiée ci-dessous reste le chemin normal. Une version seule réutilise alors le
+smoke navigateur de son parent.
 
 Depuis un workspace **propre**, sur la branche locale `main` exactement égale à `origin/main` :
 

@@ -2674,6 +2674,27 @@
       ]
     },
     {
+      "id": "SEENIT-QUALITY-013",
+      "title": "Une seule validation complète par arbre livré et smoke navigateur parallèle",
+      "targets": [
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-013 un push sur main réutilise la validation PR de confiance du même arbre exact"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-013 sans preuve exacte et de confiance, la validation complète est rejouée"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés dans l’ordre historique"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-AUTH-001",
       "title": "Connexion Google Android native via Credential Manager sans changer le Firebase UID",
       "targets": [

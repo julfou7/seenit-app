@@ -23,8 +23,10 @@ async function evaluate(client, expression) {
   if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || 'Erreur accueil');
   return response.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, label) {
-  for (let attempt=0;attempt<50;attempt++) { if (await evaluate(client,`Boolean(${expression})`)) return; await delay(60); }
+  for (let attempt=0;attempt<50;attempt++) { if (await poll(client,`Boolean(${expression})`)) return; await delay(60); }
   throw new Error(`#729 ${label}: ${JSON.stringify(await evaluate(client,'({errors:window.__homeErrors,text:document.body.innerText})'))}`);
 }
 async function click(client, selector) {

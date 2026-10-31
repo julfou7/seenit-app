@@ -6,8 +6,10 @@ async function evaluate(client, expression) {
   if(result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || 'Erreur terrain220');
   return result.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, label) {
-  for(let i=0;i<70;i++) { if(await evaluate(client,`Boolean(${expression})`)) return; await delay(50); }
+  for(let i=0;i<70;i++) { if(await poll(client,`Boolean(${expression})`)) return; await delay(50); }
   throw new Error(`Terrain220 ${label}: ${JSON.stringify(await evaluate(client,'({errors:window.__watch18cErrors||window.__homeErrors,renders:window.__homeListRenders,before:window.__renderCount,firstY:window.__firstTitleY,active:document.querySelector("[aria-selected=true]")?.id,titles:[...document.querySelectorAll("[role=tabpanel]:not([hidden]) h2")].slice(0,2).map(el=>{const r=document.createRange();r.selectNodeContents(el.querySelector(".home-section-name")||el);return {text:el.textContent,top:r.getBoundingClientRect().top,height:el.getBoundingClientRect().height,lineHeight:getComputedStyle(el).lineHeight};}),text:document.body.innerText,telemetry:window.__watch18c?.telemetry||window.__homeAVoir?.telemetry})'))}`);
 }
 async function click(client, selector) {

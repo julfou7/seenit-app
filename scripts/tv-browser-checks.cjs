@@ -51,8 +51,10 @@ async function evaluate(client, expression) {
   if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
   return result.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, message) {
-  for (let i = 0; i < 35; i++) { if (await evaluate(client, expression)) return; await delay(40); }
+  for (let i = 0; i < 35; i++) { if (await poll(client,expression)) return; await delay(40); }
   throw new Error('SEENIT-TV-001 ' + message + ': ' + JSON.stringify(await evaluate(client, '({appHeight:document.querySelector("#appRow .app-card")?.getBoundingClientRect().height,headingFont:document.querySelector("#screenHome h2")&&getComputedStyle(document.querySelector("#screenHome h2")).fontSize,gear:!!document.querySelector(".header-settings svg"),errors:window.__tv.errors,clicks:window.__tv.clicks,storage:JSON.stringify(localStorage),screen:document.querySelector(".screen.active").id,focus:document.activeElement.outerHTML,toast:document.getElementById("toast").textContent})')));
 }
 async function key(client, code) {

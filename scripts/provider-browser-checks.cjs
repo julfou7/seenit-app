@@ -27,9 +27,11 @@ async function evaluate(client, expression) {
   if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || 'Erreur fixture #337');
   return response.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, message) {
   for (let attempt = 0; attempt < 50; attempt++) {
-    if (await evaluate(client, `Boolean(${expression})`)) return;
+    if (await poll(client,`Boolean(${expression})`)) return;
     await delay(60);
   }
   const telemetry = await evaluate(client, 'window.__provider337?.telemetry');

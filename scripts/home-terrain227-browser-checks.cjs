@@ -3,7 +3,9 @@ const pause=ms=>new Promise(r=>setTimeout(r,ms));
 function assertPosterBounds(posters){if(!posters.length||posters.some(p=>p.top<p.clip-.5))throw Error('Terrain227 affiche rognée sous le titre '+JSON.stringify(posters));}
 function assertLoadMoreSpacing(spacing){if(spacing.above<8||spacing.above>16||spacing.below<24||spacing.below>32||spacing.below<=spacing.above)throw Error('Terrain227 espaces Afficher plus '+JSON.stringify(spacing));}
 async function evaluate(c,expression){const r=await c.send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result?.value;}
-async function check(c,expression,label){for(let i=0;i<100;i++){if(await evaluate(c,`Boolean(${expression})`))return;await pause(40);}throw Error('Terrain227 '+label);}
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
+async function check(c,expression,label){for(let i=0;i<100;i++){if(await poll(c,`Boolean(${expression})`))return;await pause(40);}throw Error('Terrain227 '+label);}
 async function testTerrain227Harness(client,root){const reports=[];for(const width of [360,412,1280]){
  await client.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
  await client.send('Emulation.setDeviceMetricsOverride',{width,height:915,deviceScaleFactor:1,mobile:width<640});

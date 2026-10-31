@@ -14,7 +14,7 @@ test('SEENIT-UX-009 terrain224 annule une transaction visuelle démontée sans b
 
 test('SEENIT-UX-014 terrain224 exécute le vrai shell et les transitions dans le smoke navigateur', () => {
   const smoke = readFileSync('scripts/pwa-browser-smoke.cjs','utf8');
-  assert.match(smoke,/homeTerrain224: await testTerrain224Harness/);
+  assert.match(smoke,/\['homeTerrain224', client => testTerrain224Harness\(client, root\)\]/);
   const harness = readFileSync('scripts/home-terrain224-browser-checks.cjs','utf8');
   for (const requirement of ['slow-save','button-first','stamp-before-name','last-available','undo','refresh','bottom-band','ticket-action','splash-complete','reduced-motion']) assert.ok(harness.includes(requirement),requirement);
 });
