@@ -1,13 +1,16 @@
 import { authenticatedFetch } from '../../lib/apiAuth';
 import { SEENIT_PLATFORM_IDENTITIES } from './platformIdentity.ts';
+import { PLATFORM_BRAND_ASSETS } from './platformBrandAssets.ts';
 
 /** Logos stables disponibles sans réseau, indexés par ID de préférence SeenIt. */
 const KNOWN_PLATFORM_LOGOS: Record<number, string> = {
-  8: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg',
+  8: PLATFORM_BRAND_ASSETS.netflix,
+  118: PLATFORM_BRAND_ASSETS.hbo,
   119: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg',
+  234: PLATFORM_BRAND_ASSETS.franceTv,
   337: '/97yvRBw1GzX7fXprcF80er19ot.jpg',
   350: '/2E03IAZsX4ZaUqM7tXlctEPMGWS.jpg',
-  381: '/brand/providers/canalplus.svg',
+  381: PLATFORM_BRAND_ASSETS.canal,
   1899: '/fksCUZ9QDWZMUwL2LgMtLckROUN.jpg',
 };
 
