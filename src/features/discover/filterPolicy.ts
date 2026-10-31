@@ -1,3 +1,5 @@
+import { SEENIT_PLATFORM_IDENTITIES } from '../providers/platformIdentity.ts';
+
 export type DiscoverMediaType = 'tv' | 'movie';
 
 export interface DiscoverFilterItem {
@@ -24,18 +26,15 @@ export const DISCOVER_GENRE_MAP: Record<string, Record<DiscoverMediaType, number
   Thriller: { movie: [53, 80], tv: [80, 9648] },
 };
 
-export const DISCOVER_PLATFORM_ID_MAP: Record<string, string> = {
-  netflix: '8',
-  hbo: '118',
-  disney: '337',
-  apple: '350',
-  prime: '119',
-  canal: '381',
-  max: '1899',
-  paramount: '531',
-  france: '234',
-  arte: '239',
-};
+/** IDs réels envoyés à TMDB. Ils ne sont pas forcément ceux conservés dans les préférences SeenIt. */
+export const DISCOVER_PLATFORM_ID_MAP: Record<string, string> = Object.fromEntries(
+  SEENIT_PLATFORM_IDENTITIES.map(platform => [platform.key, String(platform.providerId)]),
+);
+
+/** IDs historiques de préférence : utilisés pour relire « Mes plateformes » sans migration destructive. */
+export const DISCOVER_PLATFORM_PREFERENCE_ID_MAP: Record<string, string> = Object.fromEntries(
+  SEENIT_PLATFORM_IDENTITIES.map(platform => [platform.key, String(platform.preferenceId)]),
+);
 
 export const SEARCH_COMPATIBLE_CATEGORIES = new Set(['Tout', 'Séries', 'Films', 'Personnes']);
 

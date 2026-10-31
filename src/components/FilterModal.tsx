@@ -1,9 +1,10 @@
-import { useCallback, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { Check, X } from 'lucide-react';
 import { DialogLayer } from './ui/DialogLayer';
 import { auth } from '../lib/firebase';
 import { readUserScopedJson, subscribeUserScopedStorageField } from '../lib/userIsolation';
-import { DISCOVER_PLATFORM_ID_MAP, MOVIE_RELEASE_YEAR_MIN } from '../features/discover/filterPolicy';
+import { DISCOVER_PLATFORM_ID_MAP, DISCOVER_PLATFORM_PREFERENCE_ID_MAP, MOVIE_RELEASE_YEAR_MIN } from '../features/discover/filterPolicy';
+import { loadPlatformLogos, platformLogoUrl, readPlatformLogos } from '../features/providers/platformLogos';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 
 export type FilterTab = 'Trier' | 'Plateformes' | 'Genres' | 'Note' | 'Âge' | 'Année';
@@ -49,8 +50,18 @@ export function FilterModal({ onClose, setActiveCategory, initialSelectedPlatfor
   const subscribe = useCallback((listener: () => void) => subscribeUserScopedStorageField(uid, 'platforms', listener), [uid]);
   const snapshot = useCallback(() => JSON.stringify(readUserScopedJson<number[]>(uid, 'platforms', [])), [uid]);
   const saved: number[] = JSON.parse(useSyncExternalStore(subscribe, snapshot, () => '[]'));
-  const available = [...PLATFORMS, ...Object.entries(EXTRA_PLATFORM_LABELS).filter(([id]) => saved.includes(Number(DISCOVER_PLATFORM_ID_MAP[id])) || platforms.includes(id)).map(([id, label]) => ({ id, label, logo: '' }))];
-  const preferred = Object.keys(DISCOVER_PLATFORM_ID_MAP).filter(id => saved.includes(Number(DISCOVER_PLATFORM_ID_MAP[id])) || (id === 'max' && saved.includes(1899)));
+  const [platformLogos, setPlatformLogos] = useState<Record<number, string>>(() => readPlatformLogos());
+  useEffect(() => {
+    let current = true;
+    const preferenceIds = Object.values(DISCOVER_PLATFORM_PREFERENCE_ID_MAP).map(Number).filter(Number.isFinite);
+    void loadPlatformLogos(preferenceIds).then(logos => { if (current) setPlatformLogos(logos); });
+    return () => { current = false; };
+  }, []);
+  const preferenceId = (id: string) => Number(DISCOVER_PLATFORM_PREFERENCE_ID_MAP[id]);
+  const available = [...PLATFORMS, ...Object.entries(EXTRA_PLATFORM_LABELS)
+    .filter(([id]) => saved.includes(preferenceId(id)) || platforms.includes(id))
+    .map(([id, label]) => ({ id, label, logo: platformLogos[preferenceId(id)] || '' }))];
+  const preferred = Object.keys(DISCOVER_PLATFORM_ID_MAP).filter(id => saved.includes(preferenceId(id)));
   const mine = preferred.length > 0 && preferred.length === platforms.length && preferred.every(id => platforms.includes(id));
   const toggle = (list: string[], id: string) => list.includes(id) ? list.filter(value => value !== id) : [...list, id];
   const counts = { Trier: sortBy !== 'popular' ? 1 : 0, Plateformes: platforms.length, Genres: genres.length, Note: rating !== 'Toutes' ? 1 : 0, Âge: age !== 'Tous' ? 1 : 0, Année: year !== 'Toutes' ? 1 : 0 };
@@ -86,7 +97,7 @@ export function FilterModal({ onClose, setActiveCategory, initialSelectedPlatfor
           </button>
           <div className="explorer-platform-grid">{available.map(platform => <button type="button" key={platform.id}
             aria-pressed={platforms.includes(platform.id)} onClick={() => onApply(toggle(platforms, platform.id), genres, age, rating, year)}>
-            {platform.logo && <img src={platform.logo.startsWith('data:') || platform.logo.startsWith('/brand/') ? platform.logo : `https://image.tmdb.org/t/p/w92${platform.logo}`} alt="" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}
+            {platform.logo && <img src={platformLogoUrl(platform.logo)!} alt="" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}
             <span>{platform.label}</span>{platforms.includes(platform.id) && <Check size={14} className="explorer-selected-check" />}
           </button>)}</div>
         </>}
