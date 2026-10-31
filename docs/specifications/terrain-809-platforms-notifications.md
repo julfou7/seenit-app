@@ -18,7 +18,18 @@ SeenIt conserve les identifiants de préférence historiques déjà enregistrés
 | France TV | 234 | 236 |
 | ARTE | 239 | 234 |
 
-Les surfaces Réglages et Explorer doivent utiliser la même correspondance sémantique. Les logos chargés depuis le catalogue TMDB FR sont réindexés vers les IDs de préférence SeenIt ; un ancien cache ne doit donc jamais transformer France TV en ARTE. Explorer affiche le logo de Paramount+ lorsqu’il est disponible, comme Réglages. Canal+ utilise un asset carré/compact qui garde le wordmark entier dans une tuile carrée.
+Les surfaces Réglages, Explorer et les badges de fournisseur sur les cartes doivent utiliser la même correspondance sémantique. Les logos chargés depuis le catalogue TMDB FR sont réindexés vers les IDs de préférence SeenIt ; un ancien cache ne doit donc jamais transformer France TV en ARTE. Explorer affiche le logo de Paramount+ lorsqu’il est disponible, comme Réglages.
+
+### Identité visuelle canonique terrain
+
+Le retour terrain du 31/10 impose quatre assets locaux fournis par le propriétaire et utilisés en priorité sur toute surface qui reconnaît la plateforme :
+
+- Netflix : `/brand/providers/netflix.png` ;
+- Canal+ : `/brand/providers/canalplus.png` ;
+- HBO : `/brand/providers/hbo.png` ;
+- France TV / france.tv : `/brand/providers/francetv.png`.
+
+Ces quatre assets remplacent les variantes TMDB, les logos synthétiques et les anciennes variantes locales pour les plateformes reconnues. La résolution centralisée doit être partagée par Réglages, Explorer et les badges affichés sur les cartes afin qu’un même service ne change jamais de logo selon l’écran. Le rendu garde le ratio complet de l’asset (`object-fit: contain`) : aucun crop, étirement ou fallback texte ne doit apparaître tant que l’asset local existe. ARTE reste distinct de France TV et continue d’utiliser son propre logo issu du catalogue.
 
 Les requêtes TMDB et les liens directs utilisent l’ID fournisseur courant, jamais l’ID de préférence lorsqu’ils divergent. Les choix déjà stockés `234` (France TV) et `239` (ARTE) restent valides sans migration destructive.
 
@@ -35,4 +46,4 @@ Dans la feuille Notifications, **Tout marquer lu** est une action de masse :
 
 ## TNR
 
-Le lot doit couvrir : correspondance préférence ↔ fournisseur pour France TV/ARTE, logos Paramount+/Canal+, liens directs France TV/ARTE, sélection de fournisseur de notification avec les IDs de préférence historiques et comportement atomique de `Tout marquer lu`.
+Le lot doit couvrir : correspondance préférence ↔ fournisseur pour France TV/ARTE, identité visuelle canonique Netflix/Canal+/HBO/france.tv partagée entre Réglages/Explorer/badges, logo Paramount+, liens directs France TV/ARTE, sélection de fournisseur de notification avec les IDs de préférence historiques et comportement atomique de `Tout marquer lu`.
