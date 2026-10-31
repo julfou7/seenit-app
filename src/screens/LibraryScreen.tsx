@@ -2,7 +2,9 @@ import { removeTrackedMedia } from '../features/shows/removeTrackedMedia';
 import React, { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
+import { HomeLoadMore } from '../components/cards/HomeLoadMore';
 import { type TMDBMedia, isMovieAtCinema } from '../features/shows/tmdb';
+import { orderWatchMovies } from '../features/watchlist/watchNext18c';
 import { Inbox } from 'lucide-react';
 import { checkIsUpToDate, getTodayStr } from '../lib/utils';
 import { useShowsStore } from '../store/showsStore';
@@ -11,6 +13,7 @@ import { Show } from '../types';
 import { SeenItLogo } from '../components/SeenItLogo';
 import { cn } from '../lib/utils';
 import { buildLibraryMedia } from './libraryPresentation';
+import './watchListHome.css';
 
 interface Props {
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
@@ -92,15 +95,15 @@ const LibrarySectionGrid = React.memo(function LibrarySectionGrid(props: Library
         />
       ))}
       {visibleCount < data.length && (
-        <button
-          type="button"
-          onClick={() => startTransition(() => {
-            setVisibleCount(current => Math.min(data.length, current + LIBRARY_GRID_BATCH_SIZE));
-          })}
-          className="moi-more"
-        >
-          Charger plus
-        </button>
+        <div className="col-span-full">
+          <HomeLoadMore
+            items={data.slice(visibleCount).map(item => item.show)}
+            step={LIBRARY_GRID_BATCH_SIZE}
+            onLoad={() => startTransition(() => {
+              setVisibleCount(current => Math.min(data.length, current + LIBRARY_GRID_BATCH_SIZE));
+            })}
+          />
+        </div>
       )}
     </div>
   );
@@ -293,12 +296,12 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
 
     const toWatchCinema = shows.filter(isCinemaMovie);
 
-    const toWatchMovie = shows.filter(
+    const toWatchMovie = orderWatchMovies(shows.filter(
       s => s.mediaType === 'movie' &&
       s.status !== 'completed' &&
       !(s.seenEpisodes?.includes('movie')) &&
       !isCinemaMovie(s)
-    );
+    ));
 
     const upToDate = shows.filter(
       s => s.mediaType === 'tv' &&
