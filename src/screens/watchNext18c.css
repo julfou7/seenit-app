@@ -94,7 +94,7 @@
 .movie-ticket__info p { flex-shrink:0; margin:0; height:18px; font-weight:600; }
 .movie-ticket__main { gap:12px; padding-right:10px; }
 .movie-ticket--horizontal .movie-ticket__info { max-height:120px; }
-.movie-actor-slot { height:34px; position:relative; margin-top:0; }
+.movie-actor-slot { height:34px; position:relative; margin-top:0; min-width:0; }
 .movie-ticket--poster > .movie-actor-slot { margin-top:-10px; height:44px; }
 .movie-actor-line { position:relative; min-height:44px; width:100%; display:flex; align-items:center; gap:7px; text-align:left; z-index:4; pointer-events:auto; cursor:pointer; }
 .movie-actor-line > span:last-child { display:flex; flex-direction:column; gap:1px; min-width:0; }
@@ -137,7 +137,7 @@
 .movie-ticket--poster .movie-ticket__stub strong { font-size:15px;line-height:1.1; }
 .movie-ticket--poster .movie-ticket__stub .movie-ticket__late strong { color:#FDBA74; }
 .movie-ticket-rail { display:grid;grid-auto-flow:column;grid-auto-columns:max-content;grid-template-rows:262px auto auto auto;column-gap:12px;row-gap:0;align-items:start; }
-.movie-ticket-rail > .movie-ticket--poster { display:grid;grid-template-rows:subgrid;grid-row:span 4;row-gap:0; }
+.movie-ticket-rail > .movie-ticket--poster { display:grid;grid-template-rows:subgrid;grid-row:span 4;row-gap:0;grid-template-columns:minmax(0,1fr); }
 .movie-ticket-rail > .home-load-more,.movie-ticket-rail::after { grid-row:1 / span 4;align-self:start; }
 .movie-ticket-rail::after { width:var(--layout-anchor-tail,0px); height:1px; }
 .movie-ticket--horizontal .movie-ticket__info h3 { min-height:36px; }

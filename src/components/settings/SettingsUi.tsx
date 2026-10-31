@@ -29,6 +29,8 @@ export function SettingsSubscreen({ title, onClose, children }: { title: string;
       onDismiss={onClose}
       historyMode="local"
       role="dialog"
+      blocking={false}
+      data-settings-layer=""
       className="reg-root fixed inset-0 z-[60] max-w-md mx-auto flex flex-col"
       onTouchStart={event => {
         event.stopPropagation();

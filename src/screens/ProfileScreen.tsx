@@ -120,13 +120,17 @@ export const ProfileScreen = React.memo(function ProfileScreen({
       });
       showToast('Moi réinitialisé : retour à Ma liste.', 'info');
     };
+    // La barre reste visible dans les Réglages : changer d'onglet les ferme comme toute superposition.
+    const handleCloseModals = () => setShowSettings(false);
     window.addEventListener('popstate', handlePopState);
     window.addEventListener('profile-back-one-level', handleBackOneLevel);
     window.addEventListener('profile-reset-all', handleResetAll);
+    window.addEventListener('app-close-modals', handleCloseModals);
     return () => {
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('profile-back-one-level', handleBackOneLevel);
       window.removeEventListener('profile-reset-all', handleResetAll);
+      window.removeEventListener('app-close-modals', handleCloseModals);
     };
   }, [activeTab, selectedPersonId, showSettings, showToast]);
 
@@ -310,7 +314,7 @@ export const ProfileScreen = React.memo(function ProfileScreen({
 
       {/* SETTINGS OVERLAY MODAL */}
       {showSettings && isProfileVisible && (
-        <DialogLayer onDismiss={handleAnimatedBackSettings} label="Réglages" historyMode="local" role="dialog"
+        <DialogLayer onDismiss={handleAnimatedBackSettings} label="Réglages" historyMode="local" role="dialog" blocking={false} data-settings-layer=""
           className={cn(
             "reg-root fixed inset-0 max-w-md mx-auto z-50 flex flex-col transition-transform duration-300 ease-out",
             isExitingSettings ? "translate-x-full" : "translate-x-0"

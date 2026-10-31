@@ -1,4 +1,6 @@
 .reg-root{background:#0B0B0D;color:#fff}
+/* Les Réglages gardent la barre de navigation : le contenu réserve sa hauteur, même dans un dialogue. */
+.seenit-dialog-layer[data-settings-layer] .pb-nav{padding-bottom:calc(5.25rem + var(--seenit-safe-area-bottom,env(safe-area-inset-bottom,0px)))}
 .reg-page{display:flex;flex-direction:column;gap:18px;padding:10px 16px 0;animation:regIn .18s ease-out}
 .reg-head{display:flex;align-items:center;gap:10px;margin-left:-4px}
 .reg-back{flex-shrink:0;width:44px;height:44px;border-radius:22px;border:1px solid rgba(255,255,255,.10);background:#1C1C1F;display:flex;align-items:center;justify-content:center;color:#fff}
@@ -41,6 +43,8 @@
 .reg-plat{position:relative;height:92px;border-radius:18px;border:1.5px solid rgba(255,255,255,.08);background:#1C1C1F;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#e4e4e7;font-size:12.5px;font-weight:700}
 .reg-plat[aria-pressed=true]{border-color:#E5A93D;background:rgba(229,169,61,.12);color:#F2C36B}
 .reg-plat-logo{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;box-shadow:0 0 0 1px rgba(255,255,255,.08)}
+.reg-plat-logo[data-logo=true]{overflow:hidden;background:#1C1C1F}
+.reg-plat-logo img{width:100%;height:100%;object-fit:cover;display:block}
 .reg-plat-check{position:absolute;top:7px;right:7px;width:18px;height:18px;border-radius:9px;background:#E5A93D;color:#000;display:flex;align-items:center;justify-content:center}
 .reg-group{display:flex;flex-direction:column;gap:8px}
 .reg-group-title{margin:0;padding-left:4px;font-size:12px;font-weight:800;color:#71717a;letter-spacing:.06em;text-transform:uppercase}

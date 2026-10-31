@@ -28,4 +28,23 @@ public class SeenItNotificationSettingsPlugin extends Plugin {
             call.reject("Impossible d’ouvrir les réglages Android des notifications.");
         }
     }
+
+    /** Ouvre le canal SeenIt demandé (Android 8+), sinon les réglages de notification de l’app. */
+    @PluginMethod
+    public void openChannel(PluginCall call) {
+        String channelId = call.getString("channelId");
+        if (channelId == null || !channelId.matches("seenit_[a-z]{2,20}") || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            open(call);
+            return;
+        }
+        try {
+            Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS);
+            intent.putExtra(Settings.EXTRA_APP_PACKAGE, getContext().getPackageName());
+            intent.putExtra(Settings.EXTRA_CHANNEL_ID, channelId);
+            getActivity().startActivity(intent);
+            call.resolve();
+        } catch (Exception error) {
+            open(call);
+        }
+    }
 }

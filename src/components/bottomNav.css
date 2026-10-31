@@ -15,6 +15,6 @@
 .navigation-download-dot[data-kind=attention]{background:#F87171}
 .navigation-download-dot[data-kind=ready]{background:#34D399}
 @keyframes nvPulse{0%{box-shadow:0 0 0 2px rgba(18,18,22,.95),0 0 0 2px rgba(229,169,61,.7);transform:scale(1)}50%{transform:scale(1.15)}75%,100%{box-shadow:0 0 0 2px rgba(18,18,22,.95),0 0 0 9px rgba(229,169,61,0)}100%{transform:scale(1)}}
-body:has([data-dialog-layer]) .bottom-nav-shell{display:none}
+body:has([data-dialog-layer]:not([data-settings-layer])) .bottom-nav-shell{display:none}
 body:has([data-app-tab=discover]:not([aria-hidden=true]) [data-discover-search-mode=true]) .bottom-nav-shell{display:none}
 @media(prefers-reduced-motion:reduce){.navigation-tab,.navigation-download-dot{animation:none!important;transition:none!important}}

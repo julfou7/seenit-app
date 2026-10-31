@@ -47,6 +47,9 @@ test('#229 conserve un premier lot borné puis rend les quatre carrousels progre
 test('#712 remplace les rails séries par la liste 18c et donne un snap aux tickets films', () => {
   assert.match(mainSource, /import '\.\/styles\/watchlistCarouselUx\.css';/);
   assert.match(nextCss, /scroll-snap-type:x proximity/);
+  // Terrain v1.4.238 : une ligne acteur longue élargissait la colonne et posait le Vu sur le billet voisin.
+  assert.match(nextCss, /\.movie-ticket-rail > \.movie-ticket--poster \{[^}]*grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(nextCss, /\.movie-actor-slot \{[^}]*min-width:0/);
   assert.match(nextCss, /\.watch-next-18c__series\s*\{[^}]*flex-direction:column/);
   assert.match(seriesCardCss, /\.series-8f-host\s*\{[^}]*scroll-snap-align:start;[^}]*scroll-snap-stop:always;/);
   assert.match(seriesCardCss, /\.series-8f--rail\s*\{[^}]*width:88vw;/);

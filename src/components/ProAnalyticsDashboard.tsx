@@ -8,10 +8,12 @@ import {
   buildProfileBadges,
   buildProfileYearStats,
   collectProfileViewings,
+  countUndatedProfileViewings,
   defaultProfileYear,
   formatProfileHours,
   formatProfileImportNote,
   formatProfilePunchSlot,
+  formatProfileUndatedNote,
   listProfileYearTotals,
   partitionProfileViewings,
 } from '../features/profile/profileYearStats';
@@ -81,6 +83,7 @@ export function ProAnalyticsDashboard({
   const maxShare = Math.max(1, ...stats.platforms.map(platform => platform.share));
   const unlockedBadges = badges.filter(badge => badge.unlocked).length;
   const importNote = formatProfileImportNote(imports, year);
+  const undatedNote = useMemo(() => formatProfileUndatedNote(countUndatedProfileViewings(shows)), [shows]);
 
   const pickYear = (next: number) => {
     setPickedYear(next);
@@ -188,6 +191,7 @@ export function ProAnalyticsDashboard({
           })}
         </div>
         {importNote && <p className="moi-import">{importNote}</p>}
+        {undatedNote && <p className="moi-import">{undatedNote}</p>}
       </section>
 
       <section className="moi-card">

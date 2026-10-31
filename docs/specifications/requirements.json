@@ -2982,6 +2982,10 @@
         {
           "file": "tests/notificationRefactor.test.ts",
           "contains": "SEENIT-NOTIFICATION-006 fusionne les préférences sans écraser les choix"
+        },
+        {
+          "file": "tests/reglagesMoi.test.ts",
+          "contains": "SEENIT-NOTIFICATION-006 les Réglages ouvrent le canal Android exact, limité aux canaux SeenIt"
         }
       ]
     },

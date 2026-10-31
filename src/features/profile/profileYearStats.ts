@@ -39,13 +39,40 @@ const asPositiveNumber = (value: unknown): number | null =>
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
 
+/**
+ * Seule une preuve de visionnage date un visionnage : la date de l'épisode ou du film, ou pour un film
+ * la dernière action « vu ». `updatedAt`/`createdAt` datent le document (synchro des fiches, import),
+ * pas le visionnage : les utiliser plaçait des dizaines de films importés au mois d'une synchro.
+ */
 function resolveViewingTime(show: Show, record: Record<string, unknown> | null) {
-  const resolved = resolveHistoryTimestamp(record?.watchedAt, show.lastWatchedAt, show.updatedAt, show.createdAt);
+  const resolved = show.mediaType === 'movie'
+    ? resolveHistoryTimestamp(record?.watchedAt, show.lastWatchedAt)
+    : resolveHistoryTimestamp(record?.watchedAt);
   if (!resolved) return null;
   return { watchedAt: resolved.watchedAt, timeKnown: record?.watchedTimeKnown === false ? false : resolved.timeKnown };
 }
 
-/** Un visionnage daté par épisode ou film vu, avec les mêmes replis que l'Historique. */
+/** Films et épisodes vus sans date de visionnage prouvée (typiquement l'import TV Time des films). */
+export function countUndatedProfileViewings(shows: readonly Show[]): number {
+  let undated = 0;
+  for (const show of shows) {
+    if (!show?.id) continue;
+    if (show.mediaType === 'movie') {
+      if (!show.seenEpisodes?.includes('movie') && show.status !== 'completed') continue;
+      if (!resolveViewingTime(show, asRecord(show.episodeRecords?.movie))) undated++;
+      continue;
+    }
+    for (const { record } of historyEpisodeEntries(show)) if (!resolveViewingTime(show, record)) undated++;
+  }
+  return undated;
+}
+
+export function formatProfileUndatedNote(undated: number): string | null {
+  if (undated <= 0) return null;
+  return `${undated.toLocaleString('fr-FR')} ${undated > 1 ? 'visionnages sans date ne sont pas comptés' : 'visionnage sans date n’est pas compté'} (import sans date de visionnage).`;
+}
+
+/** Un visionnage daté par épisode ou film vu, uniquement sur preuve de date. */
 export function collectProfileViewings(shows: readonly Show[]): ProfileViewing[] {
   const viewings: ProfileViewing[] = [];
   for (const show of shows) {
