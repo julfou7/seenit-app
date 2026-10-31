@@ -46,6 +46,19 @@ Le fallback distant est autorisé uniquement lorsque l'exécution locale nécess
 
 L'absence seule de `gh`, d'un PAT shell ou d'un clone local n'est pas suffisante si le connecteur GitHub et un workspace sain permettent le chemin normal. Inversement, un refus réseau du sandbox n'est pas un blocage utilisateur tant que le connecteur GitHub et GitHub Actions permettent le chemin ci-dessous.
 
+### Runtime ChatGPT avec connecteur GitHub : no-egress nominal
+
+Pour les conversations ChatGPT utilisant ce connecteur GitHub, l'historique réel de #195 montre de façon répétée que le shell du sandbox ne résout pas `github.com`/npm alors que le connecteur et GitHub Actions restent disponibles. **En l'absence d'un workspace SeenIt déjà monté ou d'une capacité locale explicitement exposée par le runtime, traiter ce mode connector-only/no-egress comme le cas nominal**, pas comme une panne à redécouvrir à chaque conversation.
+
+Conséquences opérationnelles :
+
+- ne pas retester l'egress avec `git clone`, `git fetch`, `curl` ou une commande équivalente à chaque nouveau chat ;
+- ne pas publier un reçu pré-acquisition uniquement pour constater encore une fois l'absence d'egress lorsqu'aucune acquisition locale n'est réellement envisagée ;
+- commencer directement par le connecteur/API GitHub ; lorsqu'une validation locale est indispensable et qu'aucun workspace/cache exact n'est disponible, utiliser directement la quarantaine `agent-staging/**` ;
+- si un futur runtime expose positivement un workspace sain ou un egress Git/npm fonctionnel, le chemin local redevient prioritaire pour cette session, sans modifier la règle générale.
+
+Le statut no-egress connu n'est ni un blocage utilisateur ni une difficulté à remonter dans le rapport final. Seul un changement de capacité effectivement observé justifie de requalifier le chemin d'exécution.
+
 ## Quarantaine `agent-staging/**`
 
 1. Relire le bail de l'issue et le `main` courant immédiatement avant l'écriture.
