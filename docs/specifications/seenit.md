@@ -1717,6 +1717,19 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   d'émulateur reste bloquant. Les deux AVD API36 utilisent le mode logiciel actuel
   `-gpu swiftshader -feature -Vulkan`, après le segfault RenderThread hôte du25/10/2026
   sous le mode déprécié `swiftshader_indirect`. Le changement de renderer ne retire aucune assertion.
+- **SEENIT-QUALITY-013** — Un arbre Git livré n'est validé complètement qu'une fois (#85). Une PR verte
+  publie, après le smoke navigateur, la preuve de l'arbre qu'elle a réellement validé (merge ref). Le push
+  sur `main` ne rejoue TypeScript, tests, build et smoke que s'il ne retrouve pas une preuve de confiance
+  pour exactement le même arbre : run `pull_request` du même dépôt (jamais un fork), workflow canonique et
+  job `Validate Change` vert. Le préflight (workflows, SPEC, Changelog de la plage poussée), la
+  classification et le contrat de changement restent rejoués. Une version seule (surfaces de
+  `SEENIT-RELEASE-001` uniquement) dont le parent porte une validation verte garde la validation
+  canonique et réutilise le smoke navigateur du parent. Toute erreur, absence ou ambiguïté de preuve,
+  l'audit planifié et un dispatch rejouent la validation complète : l'absence de protection de branche
+  n'ouvre aucun chemin non validé. Le smoke navigateur s'exécute en quatre couloirs Chromium isolés
+  (profil et stockage propres), chacun dans l'ordre historique, et une condition attendue n'échoue qu'à
+  l'expiration de son délai, jamais sur un élément pas encore rendu. Quand une APK terrain est prévue dès
+  la demande, la version est préparée dans la PR du correctif pour ne pas rejouer un second cycle.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et

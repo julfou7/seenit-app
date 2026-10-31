@@ -1,7 +1,9 @@
 const fs=require('node:fs'),path=require('node:path');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function evaluate(client,expression){const r=await client.send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result?.value;}
-async function check(client,expression,label){for(let i=0;i<80;i++){if(await evaluate(client,`Boolean(${expression})`))return;await pause(50);}throw Error(`Terrain222 ${label}: `+JSON.stringify(await evaluate(client,'({text:document.body.innerText,errors:window.__homeErrors,measure:window.__terrain222})')));}
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
+async function check(client,expression,label){for(let i=0;i<80;i++){if(await poll(client,`Boolean(${expression})`))return;await pause(50);}throw Error(`Terrain222 ${label}: `+JSON.stringify(await evaluate(client,'({text:document.body.innerText,errors:window.__homeErrors,measure:window.__terrain222})')));}
 async function testTerrain222Harness(client,root){const reports=[];for(const width of [360,412,1280]){
  await client.send('Emulation.setDeviceMetricsOverride',{width,height:915,deviceScaleFactor:1,mobile:width<640});
  await client.send('Page.navigate',{url:'http://127.0.0.1:4173/__seenit-watch-next.html'});

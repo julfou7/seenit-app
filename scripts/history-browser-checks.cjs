@@ -19,8 +19,10 @@ async function evaluate(client, expression) {
   if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || 'Erreur historique');
   return result.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, label) {
-  for (let index = 0; index < 50; index++) { if (await evaluate(client, `Boolean(${expression})`)) return; await delay(50); }
+  for (let index = 0; index < 50; index++) { if (await poll(client,`Boolean(${expression})`)) return; await delay(50); }
   throw new Error(`#708 ${label}: ${JSON.stringify(await evaluate(client, '({telemetry:window.__history16d,text:document.body.innerText})'))}`);
 }
 async function testHistoryHarness(client, root) {

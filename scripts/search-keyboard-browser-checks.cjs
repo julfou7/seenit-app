@@ -15,9 +15,11 @@ async function evaluate(client, expression) {
  if(result.exceptionDetails) throw Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);
  return result.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, label) {
  for(let attempt=0;attempt<100;attempt++){
-  if(await evaluate(client, expression))return;
+  if(await poll(client,expression))return;
   await new Promise(resolve=>setTimeout(resolve,40));
  }
  throw Error('#787 '+label+' '+JSON.stringify(await evaluate(client,'({text:document.body.innerText.slice(0,1000),input:document.querySelector("input")?.getBoundingClientRect().toJSON(),scroll:document.querySelector(".explorer-scroll")?.scrollTop,editing:document.querySelector("[data-discover-search-editing]")?.getAttribute("data-discover-search-editing"),viewport:visualViewport.height,dock:document.querySelector(".explorer-search-dock")?.getAttribute("style"),active:document.activeElement?.id,homePages:window.__explorer?.telemetry.homePages,mode:document.querySelector("[data-discover-search-mode]")?.getAttribute("data-discover-search-mode"),sentinel:{text:document.querySelector(".explorer-page-sentinel")?.textContent,rect:document.querySelector(".explorer-page-sentinel")?.getBoundingClientRect().toJSON()},buttons:[...document.querySelectorAll("button")].map(b=>b.getAttribute("aria-label")).filter(Boolean),geometry:[...document.querySelectorAll("main,[data-app-tab],.explorer-root,.explorer-scroll,.explorer-content")].map(n=>({class:n.className,rect:n.getBoundingClientRect().toJSON(),height:n.scrollHeight}))})')));
@@ -25,7 +27,14 @@ async function check(client, expression, label) {
 async function testSearchKeyboardHarness(client, root) {
  await client.send('Emulation.setFocusEmulationEnabled',{enabled:true});
  const reports=[];
- const click = expression => evaluate(client, `(${expression}).click()`);
+ // La liste se recompose (bibliothèque puis TMDB) : le clic attend sa cible au lieu d'échouer au premier essai.
+ const click = async expression => {
+  for(let attempt=0;attempt<50;attempt++){
+   if(await poll(client,`(()=>{const target=(${expression});if(!target)return false;target.click();return true})()`))return;
+   await new Promise(resolve=>setTimeout(resolve,40));
+  }
+  throw Error('#787 cible absente : '+expression);
+ };
  const find = text => `[...document.querySelectorAll("button")].find(b=>b.textContent.trim()===${JSON.stringify(text)})`;
  const shot = async name => fs.writeFileSync(path.join(root,'quality-reports',name+'.png'), Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  for(const width of [360,390,412]){

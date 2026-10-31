@@ -16,9 +16,11 @@ async function evaluate(client, expression) {
   if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || 'Erreur fixture 8f');
   return response.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, message) {
   for (let attempt = 0; attempt < 40; attempt++) {
-    if (await evaluate(client, `Boolean(${expression})`)) return;
+    if (await poll(client,`Boolean(${expression})`)) return;
     await delay(50);
   }
   const state = await evaluate(client, '({telemetry:window.__series8f,focus:document.activeElement?.outerHTML.slice(0,250),dialogs:document.querySelectorAll("[role=dialog]").length})');
