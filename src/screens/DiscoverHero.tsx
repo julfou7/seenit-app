@@ -16,13 +16,13 @@ import {
   type TMDBMedia,
 } from '../features/shows/tmdb';
 import { type Show } from '../types';
+import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
 import { cn } from '../lib/utils';
 import { useToastStore } from '../store/toastStore';
 import { auth, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useShowsStore } from '../store/showsStore';
 import {
-  buildHeroOverviewPreview,
   formatHeroEpisode,
   resolveHeroResumeState,
 } from '../features/discover/heroPresentation';
@@ -57,7 +57,6 @@ export const HeroCard = React.memo(function HeroCard({
   addShow?: (showData: Omit<Show, 'id' | 'userId'>) => Promise<string>;
   deleteShow?: (id: string) => Promise<void>;
 }) {
-  const [isExpanded, setIsExpanded] = React.useState(false);
   const { showToast } = useToastStore();
 
   const isTv = media.media_type === 'tv' || (!media.media_type && activeCategory !== 'Films');
@@ -71,14 +70,7 @@ export const HeroCard = React.memo(function HeroCard({
       ? details.vote_average.toFixed(1)
       : null;
   const genres = details?.genres?.slice(0, 2).map(genre => genre.name).join(' · ');
-  const providerName = isTv
-    ? details?.networks?.[0]?.name
-    : details?.production_companies?.[0]?.name;
-  const overview = media.overview || details?.overview || '';
-  const overviewPreview = React.useMemo(
-    () => buildHeroOverviewPreview(overview),
-    [overview],
-  );
+  const { cardRef, providerName } = usePassiveWatchProvider({ tmdbId: media.id, mediaType: isTv ? 'tv' : 'movie' });
 
   const handleFollowToggle = async (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -112,7 +104,7 @@ export const HeroCard = React.memo(function HeroCard({
       mediaType: isTv ? 'tv' : 'movie' as 'tv' | 'movie',
       seasonRecords: {},
       episodeRecords: {},
-      status: 'watching' as const,
+      status: 'plan_to_watch' as const,
       updatedAt: Date.now(),
       createdAt: Date.now(),
       seenEpisodes: [],
@@ -132,7 +124,7 @@ export const HeroCard = React.memo(function HeroCard({
     );
   };
 
-  let mainActionText = isTv ? 'Suivre la série' : 'Ajouter aux films';
+  let mainActionText = 'Ajouter';
   let MainActionIcon = Plus;
   let isTracked = false;
   let buttonStyleClass = 'bg-[#E5A93D] text-black hover:bg-[#f3b94c] shadow-[0_4px_15px_rgba(229,169,61,0.25)]';
@@ -149,7 +141,7 @@ export const HeroCard = React.memo(function HeroCard({
         mainActionText = `À venir · ${formatHeroEpisode(upcomingEpisode)}`;
         MainActionIcon = Calendar;
       } else if (isCompleted) {
-        mainActionText = 'À jour sur la diffusion';
+        mainActionText = 'Dans À voir';
         buttonStyleClass = 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_4px_15px_rgba(16,185,129,0.25)]';
       } else {
         const episodeCode = formatHeroEpisode(nextEpisode || { season: 1, episode: 1 });
@@ -161,16 +153,15 @@ export const HeroCard = React.memo(function HeroCard({
       mainActionText = 'Film vu';
       buttonStyleClass = 'bg-emerald-500 text-black hover:bg-emerald-400 shadow-[0_4px_15px_rgba(16,185,129,0.25)]';
     } else {
-      mainActionText = 'Marquer comme vu';
+      mainActionText = 'Dans À voir';
     }
   }
 
-  const displayedOverview = isExpanded ? overview.trim() : overviewPreview.text;
-
   return (
     <div
+      ref={cardRef}
       onClick={() => onShowClick(media.id, isTv ? 'tv' : 'movie')}
-      className="relative w-full aspect-[4/3] sm:aspect-video overflow-hidden cursor-pointer group snap-center shrink-0 bg-zinc-900"
+      className="relative w-full h-[368px] overflow-hidden cursor-pointer group snap-center shrink-0 bg-zinc-900"
     >
       <img
         src={`https://image.tmdb.org/t/p/w780${media.backdrop_path || media.poster_path}`}
@@ -183,7 +174,7 @@ export const HeroCard = React.memo(function HeroCard({
         <span className="text-xl sm:text-2xl font-black leading-none tracking-tighter">#{rank}</span>
       </div>
 
-      <div className="absolute bottom-0 inset-x-0 px-5 pb-2 flex flex-col justify-end z-10 w-full">
+      <div className="absolute bottom-0 inset-x-0 px-5 pb-10 flex flex-col justify-end z-10 w-full">
         <div className="flex flex-wrap items-center gap-2 mb-1.5">
           <span
             className={cn(
@@ -216,29 +207,9 @@ export const HeroCard = React.memo(function HeroCard({
           )}
         </div>
 
-        <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight leading-[1.05] mb-1 line-clamp-2 drop-shadow-xl">
+        <h2 className="text-[38px] font-extrabold text-white uppercase tracking-tight leading-[1.05] mb-1 line-clamp-2 drop-shadow-xl">
           {title}
         </h2>
-
-        {overview && (
-          <div
-            onClick={(event) => {
-              event.stopPropagation();
-              setIsExpanded((expanded) => !expanded);
-            }}
-            className="mb-2 cursor-pointer group/synopsis"
-          >
-            <p className="text-[11.5px] text-zinc-300 leading-snug drop-shadow-md w-full">
-              {displayedOverview}
-              {!isExpanded && overviewPreview.truncated && '… '}
-              {overviewPreview.truncated && (
-                <span className="text-[#E5A93D] text-[10px] font-bold uppercase tracking-wide opacity-90 group-hover/synopsis:opacity-100 ml-1 whitespace-nowrap">
-                  {isExpanded ? 'VOIR MOINS' : 'VOIR PLUS'}
-                </span>
-              )}
-            </p>
-          </div>
-        )}
 
         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-zinc-400 mb-2 w-full overflow-hidden">
           {rating && (
@@ -291,7 +262,7 @@ export const HeroCard = React.memo(function HeroCard({
             className="flex-[0.84] min-h-[44px] min-w-0 flex items-center justify-center gap-2 py-3 px-2 rounded-xl font-extrabold text-[11px] sm:text-xs uppercase tracking-wide text-white bg-white/10 backdrop-blur-md border border-white/10 hover:bg-white/20 transition-transform active:scale-95 shadow-lg cursor-pointer"
           >
             <Play size={16} className="fill-white shrink-0" />
-            <span className="whitespace-nowrap">Trailer</span>
+            <span className="whitespace-nowrap">Bande-annonce</span>
           </button>
         </div>
       </div>
@@ -302,7 +273,7 @@ export const HeroCard = React.memo(function HeroCard({
 export function HeroSkeleton() {
   return (
     <div aria-hidden="true">
-      <div className="relative w-full aspect-[4/3] sm:aspect-video overflow-hidden bg-zinc-900 animate-pulse">
+      <div className="relative w-full h-[368px] overflow-hidden bg-zinc-900 animate-pulse">
         <div className="absolute inset-0 bg-zinc-900" />
         <div className="absolute bottom-0 inset-x-0 px-5 pb-4 space-y-3">
           <div className="h-5 w-16 rounded-md bg-zinc-800" />
@@ -314,7 +285,6 @@ export function HeroSkeleton() {
           </div>
         </div>
       </div>
-      <HeroProgressSkeleton />
     </div>
   );
 }

@@ -10,7 +10,7 @@ async function buildHomeHarness(root) {
       builder.onLoad({filter:/[\\/]components[\\/]HistoryFeed\.tsx$/}, args => ({contents:fs.readFileSync(args.path,'utf8'),loader:'tsx',resolveDir:path.dirname(args.path)}));
       builder.onLoad({filter:/[\\/]screens[\\/]WatchNextSection\.tsx$/}, args => ({contents:fs.readFileSync(args.path,'utf8').replace(/(export function WatchNextSection[^\n]+\{)\r?\n/,'$1\n  window.__homeListRenders = (window.__homeListRenders || 0) + 1;\n'),loader:'tsx',resolveDir:path.dirname(args.path)}));
       builder.onLoad({filter:/[\\/]cards[\\/]ContinueWatchingCard\.tsx$/}, args => ({contents:fs.readFileSync(args.path,'utf8').replace(/(function ContinueWatchingCardContent[^\n]+\{)\r?\n/,'$1\n  window.__cardRenders ||= {}; window.__cardRenders[show.id] = (window.__cardRenders[show.id] || 0) + 1;\n'),loader:'tsx',resolveDir:path.dirname(args.path)}));
-      builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:favoritePeopleStore|useShows|firebase|tmdb|showsStore|logStore|plexAvailability|plexLinks|useShows|downloadConfigStore|updateStore|liveDownloadStore|EpisodeDetailModal|PersonDetailModal)$/ }, () => ({ path: runtime }));
+      builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:favoritePeopleStore|useShows|firebase|tmdb|showsStore|logStore|plexAvailability|plexLinks|useShows|downloadConfigStore|updateStore|liveDownloadStore|EpisodeDetailModal|PersonDetailModal|syncPlex)$/ }, () => ({ path: runtime }));
     } }],
   });
   const fonts = fs.readFileSync(path.join(root,'index.html'),'utf8').match(/<link[^>]+fonts.googleapis.com\/css[^>]*>/)?.[0] || '';
@@ -23,8 +23,10 @@ async function evaluate(client, expression) {
   if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || 'Erreur accueil');
   return response.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, label) {
-  for (let attempt=0;attempt<50;attempt++) { if (await evaluate(client,`Boolean(${expression})`)) return; await delay(60); }
+  for (let attempt=0;attempt<50;attempt++) { if (await poll(client,`Boolean(${expression})`)) return; await delay(60); }
   throw new Error(`#729 ${label}: ${JSON.stringify(await evaluate(client,'({errors:window.__homeErrors,text:document.body.innerText})'))}`);
 }
 async function click(client, selector) {

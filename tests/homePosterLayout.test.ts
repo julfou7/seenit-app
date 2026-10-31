@@ -17,5 +17,5 @@ test('le contrôle de rendu refuse Afficher plus éloigné des cartes et collé 
 });
 test('la validation navigateur canonique exécute ces contrôles sur les composants réels', () => {
   const smoke = readFileSync(new URL('../scripts/pwa-browser-smoke.cjs', import.meta.url), 'utf8');
-  assert.match(smoke, /homeTerrain227: await testTerrain227Harness\(client, root\)/);
+  assert.match(smoke, /\['homeTerrain227', client => testTerrain227Harness\(client, root\)\]/);
 });

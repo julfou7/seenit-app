@@ -47,7 +47,8 @@ test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exac
   assert.match(validateJob, /runner\.os/);
   assert.match(validateJob, /runner\.arch/);
   assert.match(validateJob, /steps\.runtime\.outputs\.node_version/);
-  assert.match(validateJob, /hashFiles\('package\.json', 'package-lock\.json', 'scripts\/patch-local-notifications\.cjs', 'scripts\/materialize-android-config\.cjs'\)/);
+  assert.match(validateJob, /echo "deps_hash=\$\(node scripts\/dependency-cache-key\.cjs\)" >> "\$GITHUB_OUTPUT"/);
+  assert.equal((validateJob.match(/-node-\$\{\{ steps\.runtime\.outputs\.node_version \}\}-\$\{\{ steps\.runtime\.outputs\.deps_hash \}\}/g) || []).length, 2, 'restauration et sauvegarde partagent la même clé exacte');
   assert.doesNotMatch(validateJob, /restore-keys:/, 'aucune restauration approximative n’est autorisée');
   assert.match(validateJob, /steps\.node_modules_cache\.outputs\.cache-hit != 'true'/);
   assert.match(validateJob, /npm ci --prefer-offline --no-audit --no-fund/);

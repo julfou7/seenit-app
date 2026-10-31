@@ -60,9 +60,12 @@ test('SEENIT-SECURITY-001 authentifie la façade et refuse les routes hors contr
   assert.equal((await send('tvdb/franchise?mediaTitle=Example')).status, 400);
   assert.equal((await send('tmdb/movie/42', 'a', { method: 'POST' })).status, 404);
   assert.equal(calls.length, 0);
-  for (const unsafe of ['//example.org/a', '../movie/42', 'movie/42/../../account/1', 'movie%2f42']) {
+  for (const unsafe of ['//example.org/a', '../movie/42', 'movie/42/../../account/1', 'movie%2f42', 'watch/providers/regions', 'watch/providers/tv/8']) {
     assert.equal(buildProviderRequest('tmdb', unsafe, {}), null);
   }
+  const catalog = buildProviderRequest('tmdb', 'watch/providers/tv', { language: 'fr-FR', watch_region: 'FR' });
+  assert.equal(catalog?.pathname, '/3/watch/providers/tv', 'le catalogue public des plateformes alimente les logos de Mes plateformes');
+  assert.equal(buildProviderRequest('tmdb', 'watch/providers/movie', { api_key: 'x' }), null);
 });
 
 test('SEENIT-SECURITY-001 exige uniquement les secrets TMDB et TVDB', () => {

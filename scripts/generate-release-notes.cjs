@@ -222,6 +222,44 @@ function isEmptyChangelogMarker(value) {
   return /^(?:aucun(?:e|s|es)?|néant|none|n\/?a)$/i.test(normalized);
 }
 
+/**
+ * Contenu d'un bloc `Changelog:` sans texte en ligne. La première ligne non vide fixe la forme :
+ * - une puce → liste de puces (les lignes vides entre puces sont tolérées) ;
+ * - une phrase → un paragraphe (lignes jointes jusqu'à une ligne vide), forme naturelle de
+ *   « une section Changelog: avec une à deux phrases » ; les puces qui suivent ce paragraphe ne sont
+ *   jamais publiées ;
+ * - un autre en-tête (`Détails techniques:`) → bloc vide.
+ */
+function readChangelogBlock(lines, start) {
+  const bulletPattern = /^\s*(?:[-*•]|\d+[.)])\s+(.+)$/;
+  const isHeader = text => /^\s*changelog\s*:/i.test(text) || /^[^:]{1,80}:\s*$/.test(text);
+  const items = [];
+  const paragraph = [];
+  let mode = null;
+  for (let index = start; index < lines.length; index += 1) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    const bullet = line.match(bulletPattern);
+    if (mode === 'paragraph') {
+      if (!trimmed || bullet || isHeader(trimmed)) break;
+      paragraph.push(trimmed);
+      continue;
+    }
+    if (!trimmed) continue;
+    if (isHeader(trimmed)) break;
+    if (bullet) {
+      mode = 'bullets';
+      items.push(bullet[1].trim());
+      continue;
+    }
+    if (mode === 'bullets') break;
+    mode = 'paragraph';
+    paragraph.push(trimmed);
+  }
+  if (paragraph.length) items.push(paragraph.join(' '));
+  return items;
+}
+
 function extractExplicitChangelog(lines) {
   const items = [];
   let foundHeader = false;
@@ -235,19 +273,7 @@ function extractExplicitChangelog(lines) {
     if (inline && !isEmptyChangelogMarker(inline)) items.push(inline);
     if (inline) continue;
 
-    for (let index = headerIndex + 1; index < lines.length; index += 1) {
-      const line = lines[index];
-      if (/^\s*changelog\s*:/i.test(line)) break;
-      const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/);
-      if (bullet) {
-        items.push(bullet[1].trim());
-        continue;
-      }
-
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      if (/^[^:]{1,80}:\s*$/.test(trimmed) || items.length > 0) break;
-    }
+    items.push(...readChangelogBlock(lines, headerIndex + 1));
   }
 
   if (!foundHeader) return null;
@@ -321,6 +347,7 @@ function main() {
 
 module.exports = {
   assertPublicNoteQuality,
+  readChangelogBlock,
   buildReleaseBody,
   collectReleaseCommits,
   extractCommitNotes,

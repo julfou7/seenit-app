@@ -7,8 +7,10 @@ async function evaluate(client, expression) {
   if(result.exceptionDetails)throw new Error(result.exceptionDetails.exception?.description||'Erreur navbar');
   return result.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, message) {
-  for(let i=0;i<50;i++){if(await evaluate(client,`Boolean(${expression})`))return;await delay(40);}
+  for(let i=0;i<50;i++){if(await poll(client,`Boolean(${expression})`))return;await delay(40);}
   throw new Error('#721 '+message+': '+JSON.stringify(await evaluate(client,'({text:document.body?.innerText,telemetry:window.__nav13j?.telemetry})')));
 }
 async function point(client, selector) {

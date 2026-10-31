@@ -73,8 +73,13 @@ html, body {
 #toast-notification-wrapper {
   bottom: calc(80px + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
 }
-body:has([data-dialog-layer]) #toast-notification-wrapper {
+body:has([data-dialog-layer]:not([data-settings-layer])) #toast-notification-wrapper {
   bottom: calc(24px + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px))) !important;
+}
+
+/* E-18 : le toast suit le dock réel, y compris Android adjustResize. */
+body:has([data-app-tab="discover"]:not([aria-hidden="true"]) [data-discover-search-mode="true"]):not(:has([data-dialog-layer])) #toast-notification-wrapper {
+  bottom: var(--seenit-explorer-toast-bottom, 96px) !important;
 }
 
 /* Le bandeau Film/Série des cartes Téléchargements est un élément sous l'affiche,

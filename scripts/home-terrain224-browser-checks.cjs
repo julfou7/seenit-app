@@ -5,8 +5,10 @@ async function evaluate(client, expression) {
  if(result.exceptionDetails) throw Error(result.exceptionDetails.exception?.description || result.exceptionDetails.text);
  return result.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, label) {
- for(let index=0;index<140;index++) { if(await evaluate(client,`Boolean(${expression})`))return; await pause(30); }
+ for(let index=0;index<140;index++) { if(await poll(client,`Boolean(${expression})`))return; await pause(30); }
  throw Error('Terrain224 '+label+': '+JSON.stringify(await evaluate(client,'({errors:window.__homeErrors,text:document.body.innerText})')));
 }
 async function testTerrain224Harness(client,root) {

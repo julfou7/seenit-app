@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.232**
+Version applicative : **1.4.240**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -279,14 +279,9 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 
 ### 5.2 Explorer « Au cinéma » — preuve théâtrale France
 
-- **SEENIT-DISCOVER-003** — Pendant la saisie dans Explorer, la recherche se place à 8 px du clavier visible,
-  sans réserver l'espace de la navigation basse ; celle-ci et son fondu sont masqués. Le viewport visuel
-  et le redimensionnement Android sont pris en compte sans double compensation. Fermer le clavier ou
-  quitter le champ restaure la navigation et la position habituelle sans effacer la requête ni les filtres.
-  Dans Explorer, une loupe explicite à gauche de l'îlot de navigation permet de rouvrir et focaliser
-  la recherche repliée sans défilement des résultats ni réinitialisation. Elle possède une cible de
-  44 px minimum et une activation clavier ; elle est masquée avec la navigation pendant la saisie.
-  Un clavier matériel reste utilisable ; aucune recherche réseau n'est provoquée par le déplacement.
+- **SEENIT-DISCOVER-003** — Refonte mobile Explorer E-01 à E-33 ([handoff](../design/explorer-refonte-2026-10-28.md), #787). Hero 368 px uniquement sur Tout sans filtre ; commandes et catégories collantes. Recherche dédiée en liste : bibliothèque locale instantanée sans filtres, puis TMDB et personnes ; identités type+ID, surlignage insensible aux accents et ajout plan_to_watch. Clavier à 8 px ; après fermeture avec texte, champ à 30 px + safe area et nav cachée ; sans texte, sortie et restauration exacte du scroll. Navigation identique sur les onglets, sans loupe annexe. Filtres directs par onglets et pastilles, préférences plateformes isolées par UID. Aperçu vidéo muet, trois actions verticales. Les personnages sans source restent masqués ; commandes YouTube natives conservées, aucune progression fictive. Choix ouverts validés par le propriétaire le29/10 : bouton +, hero masqué avec filtres, retrait du synopsis et du bouton Remonter. E-18 : toasts au-dessus du dock réel ; E-19 : ouverture clavier fermé et retour à la requête. Aucun APK demandé pour ce lot.
+
+- **SEENIT-DISCOVER-004** — Recherche et fiche de personnages de fiction E-40..49 / P-01..12 : [complément4c](../design/explorer-personnage-2026-10-29.md), #398/#787. Source validée : bibliothèque et univers reliés prouvés, index public borné côté backend, cache et quotas ; personnages distincts des acteurs. La recherche filtre un index local des distributions publiques par titre (14 j, IndexedDB, sans donnée privée) alimenté par `/api/media/characters/index` (24 titres par lot, cache serveur compact partagé, échecs et délai de reprise signalés) : une frappe ne relance aucun balayage de la bibliothèque et un quota atteint produit une couverture partielle signalée puis reprise, jamais une liste vide silencieuse. La route historique `/api/media/characters` reste servie pour les APK installées. Progression privée et favoris locaux par UID. Les ratios vus et co-crédits exigent les identités exactes des épisodes ; les calculs incomplets sont signalés, jamais fabriqués depuis aggregate_credits seul.
 
 - **SEENIT-DISCOVER-001** — La catégorie Explorer **« Au cinéma »** et tout badge portant ce libellé
   exigent une preuve TMDB de sortie théâtrale en France : une entrée `release_dates` de pays `FR` et de
@@ -710,9 +705,11 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   d'UI parent sans rapport. Explorer matérialise trente cartes au premier rendu puis uniquement les lignes
   visibles avec trois lignes de débord de chaque côté ; des espaceurs conservent la hauteur et la position
   exactes du scroll infini sans garder tout son DOM, ses images décodées et ses Effects.
-- Les sous-vues Statistiques et Ma Liste sont chargées à leur première ouverture puis conservent leur
-  état ; lorsqu'elles sont masquées par l'autre sous-vue, Réglages ou un autre onglet, leurs Effects sont
-  suspendus. Leur réouverture ne remonte pas en rafale les cartes déjà visitées.
+- Les sous-vues Ma liste, Chiffres et Mon année de l'onglet Moi sont chargées à leur première ouverture
+  puis conservent leur état ; lorsqu'elles sont masquées par une autre sous-vue, Réglages ou un autre onglet,
+  leurs Effects sont suspendus. Leur réouverture ne remonte pas en rafale les cartes déjà visitées. Ma liste
+  est la sous-vue initiale : les statistiques avancées et leurs enrichissements TMDB ne démarrent qu'à la
+  première ouverture de Chiffres.
 - Les statistiques avancées du Profil conservent une baseline locale versionnée et cloisonnée par UID,
   composée du résultat affichable, des compteurs agrégés et des contributions TMDB indexées par
   `mediaType + tmdbId`. Après redémarrage, cette baseline est restituée immédiatement puis réconciliée
@@ -725,11 +722,11 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   de travail plus volumineux (médias, agrégats et contributions) réside dans IndexedDB : une limite de quota
   `localStorage`, une interruption de lot ou un échec TMDB ne peuvent donc jamais remplacer la dernière
   baseline d'affichage complète par un classement partiel. La baseline historique v1 est migrée puis retirée.
-- Ma Liste ne monte que les rangées proches du viewport vertical. Une rangée réduite matérialise une
-  fenêtre d'au moins six cartes, complétée seulement par les cartes visibles et trois cartes de débord de
-  chaque côté ; À Regarder applique la même règle avec un minimum de huit cartes. Les cartes sorties de la
-  fenêtre sont démontées et remplacées par des espaceurs qui préservent la largeur, l'inertie et la position
-  du rail. Une grille « Voir tout » monte au plus douze cartes supplémentaires par action. Les objets de
+- Ma liste ne monte qu'une section à la fois, choisie par une pastille qui affiche son nombre de titres.
+  Sa grille monte au plus douze cartes à l'ouverture de la section puis douze de plus par « Charger plus » ;
+  changer de pastille repart d'un lot borné. À Regarder conserve ses rails fenêtrés : au moins huit cartes,
+  complétées seulement par les cartes visibles et trois cartes de débord de chaque côté, les cartes sorties
+  de la fenêtre étant remplacées par des espaceurs qui préservent la largeur, l'inertie et la position du rail. Les objets de
   carte issus d'un média inchangé restent référentiellement stables, y compris après une synchronisation
   distante, afin qu'une mise à jour isolée de la bibliothèque ne rerende pas toutes les sections.
 - Les réponses asynchrones sont rattachées à la clé typée demandée. Une réponse de `movie:42` ne peut
@@ -1003,7 +1000,7 @@ pour le cache des sagas et univers.
 ## 8. Webhooks et notifications
 
 - **SEENIT-NOTIFICATION-005** — [Refonte #778](notification-refactor-2026-10-27.md) : titre œuvre, type `subText`, compact sans emoji et code épisode unique, détail distinct et actions réelles. L’affiche entière reste en contain, sans bitmap dans AlarmManager.
-- **SEENIT-NOTIFICATION-006** — Sept canaux dédiés et `seenit_downloads` conservé ; création idempotente au démarrage, accès aux réglages système, préférences fusionnées sans écraser les choix et reprogrammation v8.
+- **SEENIT-NOTIFICATION-006** — Sept canaux dédiés et `seenit_downloads` conservé ; création idempotente au démarrage, accès aux réglages système, préférences fusionnées sans écraser les choix et reprogrammation v8. Les Réglages ouvrent aussi le réglage système d'un canal précis (rappels, téléchargements/Plex, mise à jour) ; le plugin natif n'accepte qu'un identifiant `seenit_*` et retombe sur l'écran de notifications de l'application avant Android 8 ou en cas d'échec.
 - **SEENIT-NOTIFICATION-007** — Identité stable par œuvre pour les alertes visibles, alarmes futures distinctes ; mises à jour silencieuses, retrait des alertes vues/archivées et isolation UID. Les téléchargements restent distincts par demande/épisode.
 - **SEENIT-NOTIFICATION-008** — Rappels existants, actualités, versions et téléchargements adoptent la même grammaire. Un Vu de notification ouvre SeenIt sur l’épisode exact et actualise son état. Aucune plateforme, disponibilité, progression ou durée inconnue n’est inventée. Les nouveaux déclencheurs backend restent un lot séparé tant que non opérationnels.
 
@@ -1108,7 +1105,7 @@ pour le cache des sagas et univers.
   fenêtre agrège, dans l'ordre croissant, les notes de chaque release officielle strictement supérieure
   à la version installée et inférieure ou égale à la cible. Une pagination ou une source d'historique
   indisponible ne bloque jamais l'installation et retombe sur les seules notes de la cible.
-- **SEENIT-UPDATE-005** — Depuis Réglages → À propos & Avancé, la fiche Version ouvre l'historique
+- **SEENIT-UPDATE-005** — Depuis Réglages → Application, la ligne Nouveautés ouvre l’historique
   complet des releases SeenIt officielles disposant de leur APK canonique. Les versions sont présentées
   de la plus récente à la plus ancienne par pagination bornée. Une page distante indisponible conserve les
   entrées officielles déjà chargées ou, à défaut, la dernière release connue ; elle ne bloque pas l'écran.
@@ -1474,7 +1471,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Les changements liés sont regroupés ; les identifiants internes, fichiers, fonctions, caches,
   baselines, tests, CI, commits, PR et issues restent dans les preuves techniques. Chaque commit peut
   isoler ses phrases publiques dans `Changelog:` et ses détails dans `Détails techniques:` ; la valeur
-  `Changelog: aucun` exclut explicitement un changement sans effet utilisateur.
+  `Changelog: aucun` exclut explicitement un changement sans effet utilisateur. Le générateur et le
+  validateur partagent une seule grammaire : texte sur la ligne `Changelog:`, puces, ou phrase sous
+  l'en-tête jusqu'à la ligne vide, sans jamais publier les puces qui suivent cette phrase. Un bloc vide
+  reste refusé, et le message prévu se vérifie avant toute écriture distante (`--message`).
 - **SEENIT-RELEASE-004** — Une release APK publiée est immuable. Le garde compare la candidate à la
   dernière release officielle strictement antérieure et refuse une version régressive, incohérente ou
   dont le tag/release existe déjà. Une candidate **non publiée** peut recevoir plusieurs commits
@@ -1659,7 +1659,8 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
 - **SEENIT-QUALITY-008** — La validation continue échoue vite sans retirer de contrôle :
   l’intégrité de la SPEC s’exécute avant tout accès aux dépendances, puis un cache `node_modules` exact
   est restauré avant l’installation conditionnelle. Sa clé dépend du système, de l'architecture, de la
-  version Node, du lockfile et des scripts de patch ; seul `main` alimente le cache de référence et une
+  version Node, du lockfile et des scripts de patch, hors champs de version de l'application (une
+  préparation de release ne vide donc pas le cache) ; seul `main` alimente le cache de référence et une
   PR ne peut pas l'empoisonner. Sur cache trouvé, aucune installation n'a lieu et la classification
   comme le contrat de changement s'exécutent directement. Un cache absent déclenche une installation
   npm déterministe sans audit implicite avant ces contrôles dépendants de TypeScript. La configuration
@@ -1720,6 +1721,21 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   d'émulateur reste bloquant. Les deux AVD API36 utilisent le mode logiciel actuel
   `-gpu swiftshader -feature -Vulkan`, après le segfault RenderThread hôte du25/10/2026
   sous le mode déprécié `swiftshader_indirect`. Le changement de renderer ne retire aucune assertion.
+- **SEENIT-QUALITY-013** — Un arbre Git livré n'est validé complètement qu'une fois (#85). Une PR verte,
+  ou la validation explicite d'une candidate lancée par le contrôleur #102 (`workflow_dispatch` sans
+  release, car la PR ouverte par le bot n'exécute aucun job), publie après le smoke navigateur la preuve
+  de l'arbre qu'elle a réellement validé. Le push
+  sur `main` ne rejoue TypeScript, tests, build et smoke que s'il ne retrouve pas une preuve de confiance
+  pour exactement le même arbre : run `pull_request` ou de validation dispatchée du même dépôt (jamais un
+  fork), workflow canonique et job `Validate Change` vert. Le préflight (workflows, SPEC, Changelog de la plage poussée), la
+  classification et le contrat de changement restent rejoués. Une version seule (surfaces de
+  `SEENIT-RELEASE-001` uniquement) dont le parent porte une validation verte garde la validation
+  canonique et réutilise le smoke navigateur du parent. Toute erreur, absence ou ambiguïté de preuve,
+  l'audit planifié et un dispatch rejouent la validation complète : l'absence de protection de branche
+  n'ouvre aucun chemin non validé. Le smoke navigateur s'exécute en quatre couloirs Chromium isolés
+  (profil et stockage propres), chacun dans l'ordre historique, et une condition attendue n'échoue qu'à
+  l'expiration de son délai, jamais sur un élément pas encore rendu. Quand une APK terrain est prévue dès
+  la demande, la version est préparée dans la PR du correctif pour ne pas rejouer un second cycle.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et

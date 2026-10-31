@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.232",
+  "applicationVersion": "1.4.240",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -57,7 +57,7 @@
     },
     {
       "id": "SEENIT-DISCOVER-003",
-      "title": "Recherche Explorer ancrée au clavier, navigation masquée en saisie et loupe de réouverture",
+      "title": "Explorer E-01..33 : hero compact, recherche en liste, filtres directs et aperçu",
       "targets": [
         "pwa",
         "apk"
@@ -74,6 +74,10 @@
         {
           "file": "tests/navbar13j.test.ts",
           "contains": "SEENIT-UX-017 les raccourcis actifs et les réglages évitent les entrées historiques identiques"
+        },
+        {
+          "file": "tests/explorerRefonte.test.ts",
+          "contains": "SEENIT-DISCOVER-003"
         }
       ]
     },
@@ -1934,6 +1938,14 @@
         },
         {
           "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 une seule grammaire Changelog pour le générateur et le validateur"
+        },
+        {
+          "file": "tests/releaseNotes.test.ts",
+          "contains": "SEENIT-RELEASE-003 vérifie le message prévu avant toute écriture distante"
+        },
+        {
+          "file": "tests/releaseNotes.test.ts",
           "contains": "SEENIT-RELEASE-003 sépare le changelog public des détails techniques"
         },
         {
@@ -2576,6 +2588,10 @@
         {
           "file": "tests/ciValidationPerformance.test.ts",
           "contains": "SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-008 la clé du cache node_modules ignore seulement la version de l’application"
         }
       ]
     },
@@ -2666,6 +2682,31 @@
         {
           "file": "tests/androidEmulatorCache.test.ts",
           "contains": "SEENIT-QUALITY-012 utilise le renderer logiciel actuel sans Vulkan"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-013",
+      "title": "Une seule validation complète par arbre livré et smoke navigateur parallèle",
+      "targets": [
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-013 un push sur main réutilise la validation PR de confiance du même arbre exact"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-013 sans preuve exacte et de confiance, la validation complète est rejouée"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés dans l’ordre historique"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
+          "contains": "SEENIT-QUALITY-013 la validation de candidate du contrôleur #102 sert de preuve et saute le smoke d’une version seule"
         }
       ]
     },
@@ -2978,6 +3019,10 @@
         {
           "file": "tests/notificationRefactor.test.ts",
           "contains": "SEENIT-NOTIFICATION-006 fusionne les préférences sans écraser les choix"
+        },
+        {
+          "file": "tests/reglagesMoi.test.ts",
+          "contains": "SEENIT-NOTIFICATION-006 les Réglages ouvrent le canal Android exact, limité aux canaux SeenIt"
         }
       ]
     },
@@ -3008,6 +3053,20 @@
         {
           "file": "tests/notificationRefactor.test.ts",
           "contains": "SEENIT-NOTIFICATION-008 actualise la reprise sans inventer de disponibilité"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DISCOVER-004",
+      "title": "Personnages P-01..12 : bibliothèque, univers prouvés, crédits et progression exacts",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/characters.test.ts",
+          "contains": "SEENIT-DISCOVER-004"
         }
       ]
     }

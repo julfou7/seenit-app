@@ -23,6 +23,8 @@ export interface AppLogEntry {
 
 interface LogState {
   logs: AppLogEntry[];
+  diagnosticsEnabled: boolean;
+  setDiagnosticsEnabled: (enabled: boolean) => void;
   addLog: (categoryOrMsg: unknown, messageOrLevel?: unknown, details?: unknown, level?: LogLevel) => void;
   clearLogs: () => void;
   getLogsAsText: () => string;
@@ -34,6 +36,13 @@ const LOG_FLUSH_DELAY_MS = 250;
 let activeLogUid: string | null = null;
 let pendingLogEntries: AppLogEntry[] = [];
 let pendingLogFlushTimer: ReturnType<typeof setTimeout> | null = null;
+// Réglage par appareil. Désactivé, le journal ne garde que les alertes et les erreurs :
+// les informations ne sont plus nettoyées, stockées ni recopiées en console.
+const DIAGNOSTIC_LOGS_KEY = 'seenit_diagnostic_logs_v1';
+const readDiagnosticsEnabled = () => {
+  try { return globalThis.localStorage?.getItem(DIAGNOSTIC_LOGS_KEY) !== 'off'; } catch { return true; }
+};
+let diagnosticsEnabled = readDiagnosticsEnabled();
 
 function normalizeVisibleLogMessage(category: LogCategory, message: unknown): string {
   const value = String(message || '');
@@ -94,6 +103,13 @@ function scheduleLogFlush() {
 
 export const useLogStore = create<LogState>((set, get) => ({
   logs: [],
+  diagnosticsEnabled,
+
+  setDiagnosticsEnabled: (enabled: boolean) => {
+    diagnosticsEnabled = enabled;
+    try { localStorage.setItem(DIAGNOSTIC_LOGS_KEY, enabled ? 'on' : 'off'); } catch {}
+    set({ diagnosticsEnabled: enabled });
+  },
 
   addLog: (categoryOrMsg: unknown, messageOrLevel?: unknown, details?: unknown, level: LogLevel = 'info') => {
     let category: LogCategory = 'sync';
@@ -113,6 +129,12 @@ export const useLogStore = create<LogState>((set, get) => ({
       if (typeof messageOrLevel === 'string' && validLevels.includes(messageOrLevel)) {
         actualLevel = messageOrLevel as LogLevel;
       }
+    }
+
+    if (!diagnosticsEnabled && (actualLevel === 'info' || actualLevel === 'success')) {
+      const quietCode = classifyClientOperationalLog(category, actualLevel, message);
+      if (quietCode) recordClientOperationalSignal(quietCode);
+      return;
     }
 
     const newEntry: AppLogEntry = {

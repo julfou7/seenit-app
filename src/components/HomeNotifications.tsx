@@ -140,11 +140,21 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
       catch { useToastStore.getState().showToast('Lecture enregistrée sur cet appareil. Synchronisation à réessayer.', 'info'); }
     }
   };
+  const markAllRead = () => {
+    if (!uid || auth.currentUser?.uid !== uid || !visibleNotices.length) return;
+    const nextDismissed = [...new Set([
+      ...readUserScopedJson<string[]>(uid, 'home_dismissed_notifications', []),
+      ...visibleNotices.map(notice => notice.id),
+    ])].slice(-500);
+    setDismissed(nextDismissed);
+    writeUserScopedJson(uid, 'home_dismissed_notifications', nextDismissed);
+    void markRead(visibleNotices);
+  };
   return <>
     <button type="button" className="home-notification-bell" aria-label={`Notifications${unread.length ? `, ${unread.length} non lues` : ''}`} aria-haspopup="dialog" onClick={() => setOpen(true)}><Bell size={22} />{unread.length > 0 && <span>{unread.length > 99 ? '99+' : unread.length}</span>}</button>
     {open && <DialogLayer label="Notifications" onDismiss={() => setOpen(false)} className="fixed inset-0 bg-black/65 flex items-end sm:items-center justify-center p-3">
       <section className="home-notifications"><header><h2>Notifications</h2><button type="button" aria-label="Fermer les notifications" data-dialog-initial-focus onClick={() => setOpen(false)}><X size={20} /></button></header>
-        {unread.length > 0 && <button type="button" className="home-notifications__read" onClick={() => { void markRead(notices); }}><CheckCheck size={16} />Tout marquer lu</button>}
+        {unread.length > 0 && <button type="button" className="home-notifications__read" onClick={markAllRead}><CheckCheck size={16} />Tout marquer lu</button>}
         {loading && <p role="status">Chargement des notifications…</p>}
         {!loading && !visibleNotices.length && <p>Aucune notification pour le moment.</p>}
         <div className="home-notifications__list">{visibleNotices.map(notice => <HomeNoticeSwipe key={notice.id} onDismiss={() => dismiss(notice)}><div data-notice-id={notice.id} className={`home-notice${isRead(notice) ? ' home-notice--read' : ''}`}>

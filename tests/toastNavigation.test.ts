@@ -60,4 +60,10 @@ test('SEENIT-UX-006 le conteneur protège navigation clavier, actions secondaire
   assert.match(toastSource, /e\.target !== e\.currentTarget/);
   assert.match(toastSource, /didDragRef\.current = true/);
   assert.match(toastSource, /e\.stopPropagation\(\)/);
+  assert.match(toastSource, /drag="y"/);
+  assert.match(toastSource, /info\.offset\.y > 20 \|\| info\.velocity\.y > 200/);
+  assert.match(toastSource, /touch-pan-x/);
+  assert.doesNotMatch(toastSource, /touch-pan-y/);
+  assert.match(toastSource, /if \(diff > 25\)/);
+  assert.match(toastSource, /flex items-center gap-1\.5 shrink-0 ml-auto/);
 });

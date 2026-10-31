@@ -53,6 +53,7 @@ chaîne n'est suggérée comme diffuseur sans preuve gratuite fiable et lancemen
 
 Dernière vérification : 14 septembre 2026
 Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
+Mise à jour ciblée Moi : 30 octobre 2026, refonte de l'onglet selon la maquette « SeenIt Moi » ([intégration](../design/moi-2026-10-30.md)).
 Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : composante obligatoire de la SPEC SeenIt
@@ -188,7 +189,7 @@ La barre basse possède trois destinations toujours visibles, dans cet ordre :
 
 1. **À Voir** : accueil opérationnel ;
 2. **Explorer** : recherche et découverte TMDB ;
-3. **Moi** (`profile`) : statistiques, Ma Liste et accès Réglages.
+3. **Moi** (`profile`) : Ma liste, Chiffres, Mon année et accès Réglages.
 
 La destination **Télécharger** n'apparaît que lorsque le compte courant a explicitement activé la
 fonctionnalité personnelle Téléchargements dans Réglages. Lorsqu'elle est visible, elle s'insère en
@@ -245,6 +246,11 @@ en PWA et APK et un toast navigable s'active au clavier avec Entrée/Espace (`SE
 ## 5. Écran « À Voir »
 
 Le retour terrain221 impose des titres de section homogènes16–18px non rognés dans les trois panneaux, une réserve basse incluant la zone système, aucun badge dans les anciennes séries et des titres longs lisibles. La frise affiche les heures locales de visionnage réellement connues, jamais « ce soir » à la place d’une heure. Les rappels réagissent immédiatement avec confirmation/échec explicite.
+
+Dans l'en-tête, l'anneau de synchronisation reste visible dès que Plex est connecté ; son point dit l'état de
+la dernière synchro (vert < 24 h, orange au-delà, rouge en échec, aucun pendant une synchro). Le toucher ouvre
+le panneau de synchro : progression, serveurs et pause pendant une synchro, sinon **Synchro rapide** (delta)
+et **Complète** (full). Un appui long de 480 ms lance directement la synchro rapide.
 
 L’écran comporte trois panneaux indépendants **À regarder**, **À venir** et **Historique**. Le scroll
 ne change jamais d’onglet ; aucun swipe ne navigue entre panneaux. Le header `seenit●` conserve l’état
@@ -339,22 +345,44 @@ annulation.
 
 ## 6. Profil, statistiques et Ma Liste
 
-Le profil affiche l'identité Google, l'année d'inscription et deux onglets. La photo Google est utilisée lorsqu'elle charge ; si elle est absente ou indisponible, SeenIt affiche des initiales locales déterministes plutôt qu'une seconde image distante ou une image cassée :
+L'onglet **Moi** affiche en tête l'identité Google (photo ou initiales locales déterministes dans un
+cercle or, jamais une seconde image distante ni une image cassée), l'année d'inscription et le nombre de
+titres suivis. Toucher l'avatar ouvre les réglages rapides du compte ; la roue de 44 px à droite ouvre
+Réglages et porte un point or lorsqu'une mise à jour de l'application est disponible. Un sélecteur à trois
+segments, or quand il est actif, donne accès à :
 
-- **Statistiques** : temps de visionnage estimé, volumes, répartitions, personnes fréquentes et badges
-  Centenaire, Oiseau de Nuit, Grand Écran et Binge-Master ;
-- **Ma Liste** : vue exhaustive de la bibliothèque par intention et progression.
+- **Ma liste** (sous-vue initiale) : une rangée de pastilles défilante, une par section non vide avec son
+  nombre de titres, puis la grille trois colonnes des cartes habituelles (note, plateforme, progression,
+  bandeau d'action rapide de suivi/visionnage) de la seule section choisie. Les sections restent Favoris,
+  En cours, À commencer, À venir, Au cinéma, Films à voir, À jour et Films vus ; une même fiche peut
+  apparaître dans les favoris et dans sa section métier. La pastille En cours est choisie par défaut,
+  sinon la première section non vide ; si la section choisie se vide, la sélection retombe sur cette règle.
+- **Chiffres** : pour l'année choisie (année courante par défaut, « Depuis le 1er janvier » ; le bouton
+  année parcourt les années qui ont des visionnages), un grand total « Devant l'écran » en or avec son
+  équivalent en jours pleins, épisodes et films vus, puis « Heures par mois » (une barre par mois écoulé,
+  le record nommé, la valeur d'un mois au toucher), « Quand tu regardes » (jour × heure sur la fenêtre de
+  huit heures la plus regardée, taille = temps, créneau dominant nommé), « Où tu regardes » (Plex pour les
+  visionnages importés de Plex, sinon le diffuseur du titre, quatre au plus puis Autres), les badges
+  Centenaire, Oiseau de nuit, Grand écran et Binge-Master avec leur progression, et les personnes
+  fréquentes, chacune ouvrant sa fiche personne.
+- **Mon année** : un titre qui nomme les deux séries les plus regardées, puis le récit mois par mois, du
+  plus récent au plus ancien (série dominante ou « Mois cinéma », affiche, heures relatives, record de
+  jours consécutifs), et « Et maintenant » : à partir du rythme des quatre dernières semaines, la date
+  estimée de fin de la série en cours la plus regardée.
 
-Ma Liste ordonne les favoris en premier puis expose : Séries en cours, Séries à commencer, Séries à
-venir, Films au cinéma, Films à voir, Séries à jour et Films vus. Une même fiche peut apparaître dans
-les favoris et dans sa section métier. Les grilles sont extensibles et les cartes permettent les
-actions rapides de suivi/visionnage.
+Les durées utilisent la durée réelle connue d'un visionnage, sinon les estimations des statistiques
+(45 min par épisode, 110 min par film). Un visionnage n'est daté que sur preuve : date de l'épisode ou du
+film, ou pour un film la dernière action « vu » ; jamais la date de modification du document (synchro des
+fiches, import). Les visionnages sans date (films importés de TV Time) ne sont pas comptés et leur nombre
+est indiqué ; ceux sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les seuils
+des quatre badges restent ceux des statistiques historiques : Centenaire à 100 contenus ou épisodes vus,
+Oiseau de nuit à 10 épisodes ou 500 minutes, Grand écran au premier film vu, Binge-Master à une série
+terminée ou 20 épisodes. Aucun archétype ni répartition par genre n'est affiché dans Moi.
 
-Pour préserver la navigation sur les grandes bibliothèques, seules les rangées proches de la zone
-visible sont matérialisées. Les rangées horizontales recyclent les cartes hors écran dans une fenêtre
-bornée sans masquer les médias restants ; les grilles « Voir tout » progressent par lots bornés.
-Statistiques et Ma Liste conservent leur état après leur première ouverture, tandis que leurs traitements
-sont suspendus lorsqu'elles sont cachées.
+Pour préserver la navigation sur les grandes bibliothèques, Ma liste ne monte que la section choisie :
+douze cartes à l'ouverture puis douze de plus par « Charger plus ». Ma liste, Chiffres et Mon année
+conservent leur état après leur première ouverture, tandis que leurs traitements sont suspendus
+lorsqu'elles sont cachées ; les statistiques avancées ne démarrent qu'à la première ouverture de Chiffres.
 
 Les statistiques avancées conservent par UID une baseline locale versionnée. Elles réaffichent donc le
 dernier résultat complet dès la réouverture de l'application, puis appliquent les changements de la
@@ -384,15 +412,12 @@ Firestore privé.
 
 ## 7. Explorer
 
-Pendant la saisie dans Explorer, le champ reste à 8 px du clavier et l'îlot de navigation est masqué.
-La fermeture du clavier ou la sortie du champ restaure le placement habituel, la requête et les filtres
-restent conservés (`SEENIT-DISCOVER-003`, #774).
-Dans Explorer, la loupe à gauche de la navigation rouvre et focalise la barre à tout moment,
-y compris après son repli au défilement. La position des résultats, la requête et les filtres sont conservés.
+Le contrat E-01..33 du [handoff Explorer](../design/explorer-refonte-2026-10-28.md) (#787) remplace les commandes flottantes : loupe et filtres dans la rangée collante, navigation commune inchangée. La recherche est un mode dédié qui masque la nav, y compris clavier fermé avec texte. La sortie restaure la position Explorer. La bibliothèque locale instantanée précède les listes TMDB/personnes ; les filtres ne concernent que TMDB. Le panneau applique chaque choix immédiatement et les pastilles rouvrent le bon onglet. L’aperçu propose trois actions et garde les commandes YouTube natives.
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
-- Recherche multi-pages TMDB, regroupée en personnes, séries et films.
+- Recherche multi-pages TMDB en listes : bibliothèque locale, films et séries, puis personnes. La page 1 des films et séries s'affiche sans attendre la page 2. Les en-têtes ne montrent ni source (« TMDB »), ni durée, ni « instantané » ; seul « recherche… » signale une attente.
+- Les personnages de fiction de la bibliothèque et des univers prouvés (manifeste, collections TMDB) viennent d'un **index local des distributions** : construit en arrière-plan dès l'ouverture de la recherche, gardé quatorze jours sur l'appareil, puis filtré à chaque frappe sans appel réseau ni anti-rebond. Seuls les titres manquants ou expirés sont lus, par lots, un rôle déjà connu sur l'appareil passant en tête. Un titre non indexé (quota, panne) est signalé « liste incomplète, nouvel essai bientôt » et repris à la réouverture du quota, jamais présenté comme une absence. Un personnage ouvre la fiche dédiée P-01..12 ; la section reste masquée sans source.
 - Filtres par plateformes choisies dans les réglages, genres, **Âge conseillé** maximal et note minimale.
 - Le filtre **Films · sortis après** accepte une année de 1900 à l'année courante. Choisir `Y` force
   le type **Films** et conserve uniquement les films dont `release_date` est strictement postérieure à
@@ -411,7 +436,7 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
   pagination ; le backend garde une concurrence fournisseur bornée et peut admettre la queue d'une page
   après une courte attente anti-stall, sans attendre le timeout fournisseur de 10 s. Elle ne charge pas
   les fiches TMDB complètes des résultats Explorer.
-- Le panneau « Type de contenu » permet notamment de choisir **Top 100** ; ce choix change de catégorie et ne constitue pas un tri.
+- **Top 100** reste une catégorie de la rangée collante, distincte du tri ; le panneau ne duplique plus les types de contenu.
 - Tri Populaires, Mieux notés, Plus récents ou Ordre alphabétique.
 - Hero Top 10, chargement infini, aperçu long-press et cache utilisable lors d'une panne réseau.
 - Le bouton Reprendre du Hero suit les épisodes vus persistés : un ancien pointeur de reprise ne
@@ -421,15 +446,14 @@ Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, 
   Un épisode annoncé avec une date future ne devient pas une reprise avant sa diffusion ; une série
   terminée sans pointeur de prochain épisode n'en invente pas en attendant sa synchronisation.
   Si la série n'a pas été commencée, un prochain épisode futur affiche À venir avec son numéro exact.
-  Le synopsis compact se coupe sur une fin de mot et Voir plus permet de lire le texte entier.
+  Le synopsis et Voir plus quittent le hero compact ; le synopsis reste dans l’aperçu et la fiche.
   Les pages Discover récemment obtenues sont réutilisées directement sur l'appareil pour un retour écran,
   une combinaison identique ou une page déjà parcourue. Cela inclut le flux par défaut **Tout**
   (tendances + populaires) ainsi que Top 100, Pépites et Documentaires ; les personnes restent hors
   persistance client. Ces listes expirent rapidement afin de laisser TMDB reprendre la main sur les
   données volatiles.
-- Le chargement du Hero réserve immédiatement la rangée de progression ; son remplacement par les
-  indicateurs interactifs ne décale ni les catégories, ni le titre Explorer, ni la grille.
-- La barre de recherche se masque pendant la descente et ne se réaffiche que lorsque le défilement repart réellement vers le haut ; le geste tactile et le `scrollTop` utilisent la même sémantique de direction.
+- Le hero réserve 368 px, avec ses indicateurs à l’intérieur ; les catégories et la grille restent stables au chargement.
+- La loupe reste accessible dans la rangée collante à toute profondeur ; aucune recherche ne dépend d’un geste de défilement caché.
 - Le scroll infini conserve des clés de cartes stables, évite de rerendre les cartes déjà chargées pour
   un simple changement d'en-tête et ne matérialise que les lignes visibles avec un débord borné. Des
   espaceurs conservent la hauteur logique des pages déjà chargées. La fin de pagination suit les
@@ -912,19 +936,36 @@ d'un webhook réel.
 L'autorisation « notifications sur cet appareil » couvre aussi l'alerte de nouvelle version sur
 Android ; aucun réglage séparé n'est ajouté initialement.
 
-Les réglages généraux contiennent :
+Les Réglages s'ouvrent par la roue de Moi (ou « Tous les réglages » des réglages rapides) avec un
+seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq lignes, chacune avec son
+état réel, puis la déconnexion confirmée et la version installée :
 
-- compte Google, sauvegarde/rechargement Cloud et déconnexion ;
-- plateformes Netflix, Prime Video, Disney+, Canal+/MyCanal, Apple TV+, Paramount+, Max, France TV,
-  Arte ;
-- préférences et autorisation de notifications ;
-- association/déconnexion Plex, synchro Rapide/Complète et purge des slugs Plex ;
-- **Fonctionnalité personnelle → Téléchargements**, simple interrupteur désactivé par défaut ; aucune
-  URL ni clé C411/Sonarr/Radarr/qBittorrent n'est exposée dans les Réglages généraux ;
-- import TV Time CSV avec progression, correction des échecs et reprise ;
-- actualisation forcée des détails TMDB ;
-- version, historique complet des changelogs officiels, recherche et installation d'une mise à jour APK ;
-- logs techniques filtrables, copiables/exportables et effaçables.
+- **carte du compte** (avatar, nom, e-mail, « Synchronisation automatique » ou quota cloud atteint) →
+  écran **Compte** : contenu du compte (séries, films, favoris, épisodes vus), « Sauvegarder maintenant »
+  et « Recharger depuis le cloud » en secours, déconnexion confirmée ;
+- **Mes plateformes** (noms choisis) → tuiles Netflix, Prime Video, Disney+, Canal+, Apple TV+,
+  Paramount+, Max, France TV et Arte avec leur vrai logo (logos connus, puis catalogue public TMDB France
+  gardé 30 jours ; pastille de secours si un logo manque), un toucher par plateforme ;
+- **Notifications** (nombre activé, rappels à 09:00) → état réel de l'autorisation sur l'appareil avec
+  « Autoriser les notifications », interrupteurs Séries (nouvel épisode, nouvelle saison J-7,
+  actualités) et Films (cinéma, DVD/VOD), puis **Autres alertes** sans préférence SeenIt (Rappels,
+  Téléchargements et Plex, Mise à jour de SeenIt) : chaque ligne ouvre son canal Android, réglages
+  Android, et « Envoyer une notification test » qui déplie les quatre tests existants ;
+- **Connexions → Plex** (point vert si synchro de moins de 24 h, orange sinon) → compte et titres
+  reconnus, « Synchroniser maintenant », serveurs du dernier bilan de synchro, synchro complète et
+  déconnexion confirmée ; association et annulation inchangées ;
+- **Connexions → Appareils** → ce téléphone ou ce navigateur et son autorisation de notifications,
+  association SeenIt TV par QR code confirmée sur le téléphone ; la dissociation se fait depuis la TV ;
+- **Application** (badge « Mise à jour » si une version est disponible) → version installée ou à
+  installer avec progression, « Vérifier les mises à jour », Nouveautés (historique des changelogs),
+  Badges animés, **Fonctionnalités → Téléchargements** (interrupteur désactivé par défaut, sans URL ni
+  clé C411/Sonarr/Radarr/qBittorrent), puis Avancé : import TV Time CSV, synchro TMDB forcée, interrupteur
+  **Journal de diagnostic** (par appareil, activé par défaut ; désactivé, seules les alertes et erreurs
+  sont gardées) et « Voir le journal » filtrable, copiable et effaçable.
+
+Chaque écran est un niveau de la pile Retour : Retour, le bouton rond, le bord gauche ou l'appui sur
+l'onglet actif ferme seulement cet écran. Les Réglages gardent la barre de navigation : un double appui
+sur Moi les ferme et ramène Ma liste, et changer d'onglet les ferme.
 
 Le changelog présenté dans la fenêtre de mise à jour résume les effets visibles sous un titre unique
 et quelques phrases courtes par version. Lors d'un saut, il affiche dans l'ordre chaque release
@@ -934,7 +975,7 @@ restent disponibles et l'installation n'est pas bloquée. Les textes emploient l
 l'interface et ne montrent pas les identifiants Plex, UID, noms de cache, fichiers, tests ou détails
 de CI réservés aux preuves techniques.
 
-La fiche Version de « À propos & Avancé » charge indépendamment toutes les releases officielles
+La ligne Nouveautés de l'écran Application charge indépendamment toutes les releases officielles
 disponibles, de la plus récente à la plus ancienne. Cette consultation reste paginée et bornée ; une panne
 partielle conserve l'historique officiel déjà obtenu ou la dernière version connue.
 
@@ -1086,3 +1127,5 @@ Terrain229 : une réouverture de panneau ne suffit pas à prouver sa fluidité. 
 ### Notifications unifiées #778
 
 Le titre nomme l’œuvre ; le type est dans l’en-tête Android (`subText`), le compact donne un fait et le développé ajoute du contexte. Les téléchargements distinguent envoi au client, import et preuve Plex exacte. Les sept canaux dédiés sont créés au démarrage sans recréer Téléchargements ni écraser les choix Android. Les réglages exposent Actualités et l’accès au panneau système ; la migration v8 reprogramme les rappels. Les images gardent le cache privé borné, contain et l’hydratation à la livraison. Les alertes vues/archivées sont retirées ; une notification Vu peut afficher la reprise suivante avec la même identité sans son. Voir SEENIT-NOTIFICATION-005 à 008 et [contrat](notification-refactor-2026-10-27.md).
+
+Complément Explorer29/10 (#398/#787) : [fiche personnage](../design/explorer-personnage-2026-10-29.md), reprise exacte sur crédits par épisode, cache public borné, calcul au premier accès uniquement ; progression/favoris isolés par UID. Toasts au-dessus du champ et retour aux résultats avec la même requête, clavier fermé.

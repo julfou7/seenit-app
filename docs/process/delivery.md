@@ -94,6 +94,47 @@ sont les deux segments du même script `scripts/validate-change.cjs`. L'exécuti
 successivement les deux segments. La CI confirme donc un contrat local identique au lieu de devenir une
 boucle de mise au point distante.
 
+### Une validation complète par arbre livré (`SEENIT-QUALITY-013`, #85)
+
+Mesure du 31/10/2026 (v1.4.239) : la candidate de version a été validée deux fois à l'identique, une fois en
+PR et une fois sur `main` (6 min 20 s puis 6 min 25 s). Sur ces 6 min 25 s, le smoke navigateur prenait
+4 min 55 s. La publication elle-même ne prend que 2 min 30 s.
+
+`scripts/validated-tree-proof.cjs` décide désormais, entre l'installation et la validation canonique, de ce
+qui doit être rejoué :
+
+| Contexte | Décision |
+|---|---|
+| PR verte | Validation complète. Après le smoke, l'artefact `SeenIt-Validated-Tree-<arbre>` publie l'arbre réellement validé (merge ref). |
+| Validation de candidate dispatchée par le contrôleur #102 (`release_apk=false`) | Même traitement qu'une PR : la PR ouverte par le bot n'exécute aucun job (0 job, marquée en échec au merge), c'est donc ce run qui publie la preuve. Base = merge-base avec `main`. |
+| Push `main` dont l'arbre a une preuve de confiance | Préflight (workflows, SPEC, Changelog de la plage poussée), classification et contrat rejoués ; TypeScript, tests, build et smoke non rejoués. Le run reste vert et lisible par le contrôleur #102 et le déploiement backend. |
+| Version seule (surfaces de `SEENIT-RELEASE-001`) dont le parent est validé | Validation canonique complète ; seul le smoke navigateur est réutilisé depuis le parent. |
+| Aucune preuve, preuve ambiguë, API en erreur, fork, audit planifié ou dispatch | Validation complète, sans exception. |
+
+Une preuve n'est de confiance que si elle vient d'un run `pull_request` ou de validation dispatchée du même dépôt, sur
+`.github/workflows/build-apk.yml`, avec un job `Validate Change` vert. L'arbre comparé inclut les workflows
+eux-mêmes. Un merge commit dont la base a avancé produit un autre arbre et rejoue donc tout.
+
+Depuis le 31/10/2026, la protection serveur de `main` est effective via le ruleset actif **`Protect main`**,
+ciblé sur la branche par défaut. GitHub expose `main` avec `protected=true`. Toute mise à jour normale de
+`main` doit passer par une pull request ; le check GitHub Actions **`Validate Change`** est requis, la branche
+de la PR doit être à jour avec `main` avant fusion, aucun acteur n'a de bypass, et la suppression comme les
+force-push/non-fast-forward sont interdits. Une tentative d'écriture directe est donc refusée par GitHub au
+lieu de reposer uniquement sur la discipline de l'agent. Cette protection est une précondition du mécanisme
+de preuve réutilisée : si le ruleset disparaît, cesse d'être actif, perd `Validate Change`, l'exigence de
+branche à jour ou si `main` n'est plus protégée, aucun merge ne doit contourner cette dégradation et un arbre
+sans preuve exacte repasse par la validation complète. Le job n'obtient que `actions: read` en plus de
+`contents: read`.
+
+Le smoke navigateur s'exécute en **quatre couloirs** Chromium isolés : un profil et un stockage par couloir,
+avec focus émulé. Chaque couloir suit l'ordre historique : rendu → clavier → actions #180 → dialogues,
+diffuseurs, cartes, historique, navigation ; TV → recherche → minuterie 18c (horloge virtuelle en
+dernier) ; terrains Accueil 220–223 ; terrains 224–227 → À voir → performance → jamais commencées. `SEENIT_PWA_LANES=1` rejoue la
+séquence d'origine sur un seul client pour diagnostiquer. Le rapport `pwa-browser.json` publie la durée
+de chaque harnais (`timings`). Une condition attendue n'échoue qu'à l'expiration de son délai : pendant
+l'attente, une exception (élément pas encore rendu) vaut « pas encore ». Sans cette règle, deux courses
+latentes (terrain221, recherche) se révélaient dès que le rythme changeait.
+
 ### Politique et syntaxe des workflows
 
 `npm run validate:workflows` est inclus dans le préflight. Il impose une allowlist exacte des workflows
@@ -127,10 +168,12 @@ contrôle sans le supprimer ni l'assouplir.
 
 Le cache `node_modules` est strictement exact. Sa clé comprend le système, l'architecture, la version
 Node réellement résolue, `package.json`, `package-lock.json`, le patch des notifications locales et
-le matérialiseur Android. Aucun préfixe de restauration approximatif n'est autorisé. Les PR peuvent
+le matérialiseur Android. `scripts/dependency-cache-key.cjs` en retire seulement les champs de version
+de l'application : node_modules n'en dépend pas, et une préparation de release ne force plus une
+installation (19 s, deux fois, sur la v1.4.240). Aucun préfixe de restauration approximatif n'est autorisé. Les PR peuvent
 lire le cache de la branche par défaut selon les règles de portée GitHub Actions, mais ne le sauvegardent
 jamais. Seul un push vert sur `main` ou `master` peut créer le cache de référence, après tous les
-tests et le build. Le fichier `android/app/google-services.json` reste hors cache et est régénéré à
+tests et le build, rejoués sur ce push ou prouvés par la PR sur le même arbre exact. Le fichier `android/app/google-services.json` reste hors cache et est régénéré à
 chaque validation depuis le contrat suivi.
 
 Le cache npm de téléchargement de `actions/setup-node` reste actif comme secours d'une installation
@@ -464,6 +507,15 @@ recherche Web/plugin.
 
 ### 2. Préparer la version si nécessaire
 
+**Correctif destiné au téléphone : préparer la version dans la PR du correctif.** Quand la demande prévoit
+dès le départ une APK terrain, l'agent aligne la prochaine version dans la PR du correctif lui-même. Il
+exécute `node scripts/prepare-release-files.cjs X.Y.Z`, puis crée un commit séparé
+`chore(release): préparer SeenIt X.Y.Z` avec `Changelog: aucun`. Une seule PR est validée. Le push `main`
+réutilise sa preuve d'arbre et le dispatch terrain suit immédiatement le merge. Le second cycle
+candidate (PR + `main`, environ 13 min au 31/10/2026) disparaît. Si la publication n'est décidée qu'après
+le merge, la candidate dédiée ci-dessous reste le chemin normal. Une version seule réutilise alors le
+smoke navigateur de son parent.
+
 Depuis un workspace **propre**, sur la branche locale `main` exactement égale à `origin/main` :
 
 ```bash
@@ -602,7 +654,20 @@ Détails techniques:
 ```
 
 `Changelog: aucun` signale explicitement un commit sans effet visible. Le générateur n'utilise que cette
-section explicite et ignore les détails techniques. Le préflight canonique `validate:change` vérifie en plus,
+section explicite et ignore les détails techniques. Quatre formes sont acceptées, avec la même grammaire pour
+le générateur et le validateur (`readChangelogBlock`) :
+
+| Forme | Exemple | Résultat |
+|---|---|---|
+| Courte | `Changelog: Les filtres affichent les bons logos.` | une note |
+| Liste | `Changelog:` puis `- …` par ligne | une note par puce |
+| Phrase sous l'en-tête | `Changelog:` puis une à deux phrases jusqu'à la ligne vide | une note ; les puces qui suivent ne sont jamais publiées |
+| Sans effet | `Changelog: aucun` (ou `aucun` sous l'en-tête) | aucune note |
+
+Un `Changelog:` vide (ligne vide ou en-tête suivant) reste refusé. Avant tout commit ou push distant, le
+message prévu passe par `node scripts/validate-changelog-coverage.cjs --message <fichier>` : une erreur de
+syntaxe est déterministe et ne doit jamais coûter un cycle CI (retour #195 du 31/10/2026, deux cycles perdus
+sur #812 et un sur #805). En mode connector-only, s'en tenir aux formes courte, liste ou `aucun`. Le préflight canonique `validate:change` vérifie en plus,
 sur chaque commit non-merge entre la baseline et `HEAD`, qu'un bloc `Changelog:` existe avant toute PR/merge ;
 une note non vide est soumise immédiatement aux mêmes contrôles de langue et de qualité que la publication.
 Le résultat utilise un seul titre `### 🛠️ Ce qui a été fait`, avec des phrases françaises courtes, ponctuées et

@@ -490,14 +490,130 @@ async function runKeyboardAndAccessibilityChecks(client, minTouchTargetCssPx) {
   };
 }
 
+/**
+ * Couloirs indépendants, chacun dans l'ordre historique. Les dépendances d'état restent dans un même
+ * couloir : rendu → clavier → actions #180 ; minuterie 18c (horloge virtuelle) en dernier de son client ;
+ * terrains Accueil 220–223 ; terrains 224–227 puis À voir, performance et jamais commencées.
+ */
+function buildLaneGroups(config) {
+  const minTouch = config.pwa.minTouchTargetCssPx;
+  return [
+    [
+      ['viewports', async client => {
+        const viewports = [];
+        for (const viewport of config.pwa.viewports) viewports.push({ id: viewport.id, ...(await testViewport(client, viewport, minTouch)) });
+        return viewports;
+      }],
+      ['accessibility', client => runKeyboardAndAccessibilityChecks(client, minTouch)],
+      ['componentActions', async client => {
+        const componentActions = [];
+        for (const viewport of config.pwa.viewports.filter(item => item.width === 360 || item.width === 412)) {
+          componentActions.push(await testComponentActionHarness(client, viewport, minTouch));
+        }
+        return componentActions;
+      }],
+      ['dialogs', client => testDialogHarness(client, root)],
+      ['providers', client => testProviderHarness(client, root)],
+      ['seriesCards', client => testSeriesCardHarness(client, root)],
+      ['history', client => testHistoryHarness(client, root)],
+      ['navbar', client => testNavbarHarness(client, root)],
+    ],
+    [
+      ['tv', client => testTvHarness(client, root)],
+      ['searchKeyboard', client => testSearchKeyboardHarness(client, root)],
+      // L'horloge virtuelle de la minuterie 18c reste la dernière vérification de son client CDP.
+      ['watchNext', client => testWatchNextHarness(client, root)],
+    ],
+    [
+      ['homeV4', client => testTerrain220Harness(client, root)],
+      ['homeTerrain221', client => testTerrain221Harness(client, root)],
+      ['homeTerrain222', client => testTerrain222Harness(client, root)],
+      ['homeTerrain223', client => testTerrain223Harness(client, root)],
+    ],
+    [
+      ['homeTerrain224', client => testTerrain224Harness(client, root)],
+      ['homeTerrain226', client => testTerrain226Harness(client, root)],
+      ['homeTerrain227', client => testTerrain227Harness(client, root)],
+      ['home', client => testHomeHarness(client, root)],
+      ['homePerformance', client => testHomePerformanceHarness(root, client)],
+      ['homeUnseen', client => testHomeUnseenHarness(root, client)],
+    ],
+  ];
+}
+
+function resolveLaneCount(value, max) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return max;
+  return Math.min(max, Math.max(1, parsed));
+}
+
+async function runLane(client, tasks, timings, label) {
+  const results = {};
+  for (const [key, task] of tasks) {
+    const started = Date.now();
+    try {
+      results[key] = await task(client);
+    } catch (error) {
+      error.message = `${key} (${label}) : ${error.message}`;
+      throw error;
+    } finally {
+      timings[key] = Math.round((Date.now() - started) / 100) / 10;
+    }
+  }
+  return results;
+}
+
+async function launchBrowser() {
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'seenit-chrome-'));
+  const chrome = spawn(findChrome(), [
+    '--headless=new',
+    '--no-sandbox',
+    '--disable-gpu',
+    '--disable-dev-shm-usage',
+    '--remote-debugging-port=0',
+    `--user-data-dir=${userDataDir}`,
+    'about:blank',
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  const close = () => { client?.close(); if (!chrome.killed) chrome.kill('SIGTERM'); };
+  let client;
+  try {
+    const browserWs = await listenForDevtools(chrome);
+    const pageWs = await createPageWebSocket(devtoolsPort(browserWs));
+    client = new CdpClient(pageWs);
+    await client.connect();
+    await Promise.all([
+      client.send('Page.enable'),
+      client.send('Runtime.enable'),
+      client.send('Network.enable'),
+      client.send('Accessibility.enable'),
+      client.send('Fetch.enable', { patterns: [{ urlPattern: '*' }] }),
+      // Un onglet d'un navigateur parallèle garde le focus clavier comme un onglet seul.
+      client.send('Emulation.setFocusEmulationEnabled', { enabled: true }),
+    ]);
+    client.on('Fetch.requestPaused', async event => {
+      if (await fulfillTvFixtureImage(client, event, root)) return;
+      const url = new URL(event.request.url);
+      const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && url.port === '4173';
+      if (local || url.protocol === 'data:' || url.protocol === 'blob:') {
+        await client.send('Fetch.continueRequest', { requestId: event.requestId });
+      } else {
+        await client.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' });
+      }
+    });
+  } catch (error) {
+    close();
+    throw error;
+  }
+  return { client, close };
+}
+
 async function main() {
   const started = Date.now();
   const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
   fs.mkdirSync(reportDir, { recursive: true });
   const diagnostics = [];
   let preview;
-  let chrome;
-  let client;
+  let browsers = [];
   try {
     await buildComponentActionHarness();
     await buildDialogHarness(root);
@@ -520,79 +636,45 @@ async function main() {
     preview.stderr.on('data', chunk => diagnostics.push(`[vite] ${chunk.toString().trim()}`));
     await waitForHttp(previewUrl);
 
-    const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'seenit-chrome-'));
-    chrome = spawn(findChrome(), [
-      '--headless=new',
-      '--no-sandbox',
-      '--disable-gpu',
-      '--disable-dev-shm-usage',
-      '--remote-debugging-port=0',
-      `--user-data-dir=${userDataDir}`,
-      'about:blank',
-    ], { stdio: ['ignore', 'ignore', 'pipe'] });
-    const browserWs = await listenForDevtools(chrome);
-    const pageWs = await createPageWebSocket(devtoolsPort(browserWs));
-    client = new CdpClient(pageWs);
-    await client.connect();
-    await Promise.all([
-      client.send('Page.enable'),
-      client.send('Runtime.enable'),
-      client.send('Network.enable'),
-      client.send('Accessibility.enable'),
-      client.send('Fetch.enable', { patterns: [{ urlPattern: '*' }] }),
-    ]);
-    client.on('Fetch.requestPaused', async event => {
-      if (await fulfillTvFixtureImage(client, event, root)) return;
-      const url = new URL(event.request.url);
-      const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && url.port === '4173';
-      if (local || url.protocol === 'data:' || url.protocol === 'blob:') {
-        await client.send('Fetch.continueRequest', { requestId: event.requestId });
-      } else {
-        await client.send('Fetch.failRequest', { requestId: event.requestId, errorReason: 'BlockedByClient' });
-      }
-    });
-
-    const viewports = [];
-    for (const viewport of config.pwa.viewports) {
-      viewports.push({
-        id: viewport.id,
-        ...(await testViewport(client, viewport, config.pwa.minTouchTargetCssPx)),
-      });
-    }
-    const accessibility = await runKeyboardAndAccessibilityChecks(client, config.pwa.minTouchTargetCssPx);
-    const componentActions = [];
-    for (const viewport of config.pwa.viewports.filter(item => item.width === 360 || item.width === 412)) {
-      componentActions.push(await testComponentActionHarness(client, viewport, config.pwa.minTouchTargetCssPx));
-    }
+    // Quatre navigateurs isolés (profil, stockage, horloge virtuelle) exécutent chacun un couloir dans
+    // l'ordre historique ; SEENIT_PWA_LANES=1 rejoue exactement la séquence d'origine sur un seul client.
+    const groups = buildLaneGroups(config);
+    const lanes = resolveLaneCount(process.env.SEENIT_PWA_LANES, groups.length);
+    const plan = lanes === 1 ? [groups.flat()] : groups;
+    browsers = await Promise.all(plan.map(() => launchBrowser()));
+    const timings = {};
+    const results = await Promise.all(plan.map((tasks, index) => runLane(browsers[index].client, tasks, timings, `couloir ${index + 1}`)));
+    const merged = Object.assign({}, ...results);
     const report = {
-      dialogs: await testDialogHarness(client, root),
-      providers: await testProviderHarness(client, root),
-      seriesCards: await testSeriesCardHarness(client, root),
-      history: await testHistoryHarness(client, root),
-      navbar: await testNavbarHarness(client, root),
-      tv: await testTvHarness(client, root),
+      dialogs: merged.dialogs,
+      providers: merged.providers,
+      seriesCards: merged.seriesCards,
+      history: merged.history,
+      navbar: merged.navbar,
+      tv: merged.tv,
 
-      searchKeyboard: await testSearchKeyboardHarness(client, root),
-      // L'horloge virtuelle de la minuterie 18c reste la dernière vérification du client CDP.
-      watchNext: await testWatchNextHarness(client, root),
-      homeV4: await testTerrain220Harness(client, root),
-      homeTerrain221: await testTerrain221Harness(client, root),
-      homeTerrain222: await testTerrain222Harness(client, root),
-      homeTerrain223: await testTerrain223Harness(client, root),
-      homeTerrain224: await testTerrain224Harness(client, root),
-      homeTerrain226: await testTerrain226Harness(client, root),
-      homeTerrain227: await testTerrain227Harness(client, root),
+      searchKeyboard: merged.searchKeyboard,
+      watchNext: merged.watchNext,
+      homeV4: merged.homeV4,
+      homeTerrain221: merged.homeTerrain221,
+      homeTerrain222: merged.homeTerrain222,
+      homeTerrain223: merged.homeTerrain223,
+      homeTerrain224: merged.homeTerrain224,
+      homeTerrain226: merged.homeTerrain226,
+      homeTerrain227: merged.homeTerrain227,
       generatedAt: new Date().toISOString(),
       issue: config.issue,
       status: 'pass',
       networkIsolation: 'Les requêtes hors http://127.0.0.1:4173 sont bloquées par CDP.',
-      viewports,
-      accessibility,
-      componentActions,
+      viewports: merged.viewports,
+      accessibility: merged.accessibility,
+      componentActions: merged.componentActions,
+      homePerformance: merged.homePerformance,
+      homeUnseen: merged.homeUnseen,
+      lanes,
+      timings,
     };
-    const homeReport = await testHomeHarness(client, root);
-    report.homePerformance = await testHomePerformanceHarness(root, client);
-    report.homeUnseen = await testHomeUnseenHarness(root, client);
+    const homeReport = merged.home;
     fs.writeFileSync(path.join(reportDir, 'home-a-voir.json'), JSON.stringify(homeReport, null, 2));
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.md'), [
@@ -616,8 +698,7 @@ async function main() {
     fs.writeFileSync(path.join(reportDir, 'pwa-browser-failure.txt'), `${error.stack || error.message}\n\n${diagnostics.join('\n')}\n`, 'utf8');
     throw error;
   } finally {
-    client?.close();
-    if (chrome && !chrome.killed) chrome.kill('SIGTERM');
+    for (const browser of browsers) browser?.close();
     if (preview && !preview.killed) preview.kill('SIGTERM');
     appendGithubMetric('SEENIT_PWA_QUALITY_SECONDS', Math.ceil((Date.now() - started) / 1000));
   }
@@ -631,6 +712,8 @@ if (require.main === module) {
 }
 
 module.exports = {
+  buildLaneGroups,
+  resolveLaneCount,
   CdpClient,
   findNamedButton,
   findChrome,

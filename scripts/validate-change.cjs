@@ -82,6 +82,17 @@ function writeGithubOutput(classification, outputPath = process.env.GITHUB_OUTPU
   fs.appendFileSync(outputPath, `DEPENDENCIES_CHANGED=${classification.dependenciesChanged ? 'true' : 'false'}\n`, 'utf8');
 }
 
+/** Arbre prouvé par une PR de confiance, seulement s'il est exactement l'arbre courant. */
+function resolveProvenTree(declared = process.env.SEENIT_VALIDATED_TREE_PROOF) {
+  const tree = String(declared || '').trim();
+  if (!tree) return null;
+  const current = git(['rev-parse', 'HEAD^{tree}']);
+  if (!/^[0-9a-f]{40}$/.test(tree) || tree !== current) {
+    throw new Error(`Preuve d’arbre ${tree} différente de l’arbre courant ${current} : validation refusée.`);
+  }
+  return tree;
+}
+
 function validatePreflight() {
   runNpm(['run', 'validate:workflows'], {
     label: 'Politique et syntaxe workflows',
@@ -127,6 +138,14 @@ function validatePostinstall() {
       label: 'Contrat de changement',
       env: { SPEC_BASE_SHA: baseSha, DELIVERY_MODE: classification.mode }
     });
+
+    // #85 : la PR a déjà validé exactement cet arbre (TypeScript, tests, build, smoke). Les contrôles
+    // propres à la plage de commits poussée (Changelog, classification, contrat) restent rejoués.
+    const provenTree = resolveProvenTree();
+    if (provenTree) {
+      console.log(`\n[Validate Change] ✅ Validation ${classification.mode} : arbre ${provenTree.slice(0, 12)} déjà validé avant fusion, contrôles d’arbre non rejoués.`);
+      return { ...classification, provenTree };
+    }
     runNpm(['run', 'lint'], {
       label: 'TypeScript + lint + format',
       metric: 'SEENIT_TYPESCRIPT_SECONDS',
@@ -184,6 +203,7 @@ module.exports = {
   readClassification,
   resolveNpmInvocation,
   resolveBaseSha,
+  resolveProvenTree,
   validateChange,
   validatePostinstall,
   validatePreflight,

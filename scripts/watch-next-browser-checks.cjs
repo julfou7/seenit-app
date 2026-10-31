@@ -20,8 +20,10 @@ async function evaluate(client, expression) {
   if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description || 'Erreur 18c');
   return result.result?.value;
 }
+// Pendant l'attente, une exception (élément pas encore rendu) vaut « pas encore » : seul le délai fait échouer.
+const poll = (client, expression) => evaluate(client, expression).catch(() => false);
 async function check(client, expression, label) {
-  for (let index = 0; index < 60; index++) { if (await evaluate(client, `Boolean(${expression})`)) return; await delay(50); }
+  for (let index = 0; index < 60; index++) { if (await poll(client,`Boolean(${expression})`)) return; await delay(50); }
   throw new Error(`#712 ${label}: ${JSON.stringify(await evaluate(client, '({telemetry:window.__watch18c?.telemetry,errors:window.__watch18cErrors,anchor:window.__layoutAnchor,card:window.__layoutAnchor&&document.querySelector("[data-movie-ticket=\\""+window.__layoutAnchor.id+"\\"]")?.getBoundingClientRect().toJSON(),scroll:document.scrollingElement.scrollTop,text:document.body.innerText})'))}`);
 }
 async function click(client, selector) {

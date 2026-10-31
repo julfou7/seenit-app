@@ -292,8 +292,8 @@ function MainApp() {
     openShow(id, 'local', mediaType);
   }, [openShow]);
 
-  const openTmdbMedia = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
-    openShowSmooth(id, 'tmdb', mediaType);
+  const openTmdbMedia = useCallback((id: string | number, mediaType?: 'tv' | 'movie', season?: number, episode?: number) => {
+    openShowSmooth(id, 'tmdb', mediaType, Number(id), season, episode);
   }, [openShowSmooth]);
 
   useEffect(() => {
