@@ -113,9 +113,18 @@ qui doit être rejoué :
 
 Une preuve n'est de confiance que si elle vient d'un run `pull_request` ou de validation dispatchée du même dépôt, sur
 `.github/workflows/build-apk.yml`, avec un job `Validate Change` vert. L'arbre comparé inclut les workflows
-eux-mêmes. Un merge commit dont la base a avancé produit un autre arbre et rejoue donc tout. `main`
-n'a pas de protection de branche (`protected=false`) : un push direct n'a aucune preuve et reste
-intégralement validé. Le job n'obtient que `actions: read` en plus de `contents: read`.
+eux-mêmes. Un merge commit dont la base a avancé produit un autre arbre et rejoue donc tout.
+
+Depuis le 31/10/2026, la protection serveur de `main` est effective via le ruleset actif **`Protect main`**,
+ciblé sur la branche par défaut. GitHub expose `main` avec `protected=true`. Toute mise à jour normale de
+`main` doit passer par une pull request ; le check GitHub Actions **`Validate Change`** est requis, la branche
+de la PR doit être à jour avec `main` avant fusion, aucun acteur n'a de bypass, et la suppression comme les
+force-push/non-fast-forward sont interdits. Une tentative d'écriture directe est donc refusée par GitHub au
+lieu de reposer uniquement sur la discipline de l'agent. Cette protection est une précondition du mécanisme
+de preuve réutilisée : si le ruleset disparaît, cesse d'être actif, perd `Validate Change`, l'exigence de
+branche à jour ou si `main` n'est plus protégée, aucun merge ne doit contourner cette dégradation et un arbre
+sans preuve exacte repasse par la validation complète. Le job n'obtient que `actions: read` en plus de
+`contents: read`.
 
 Le smoke navigateur s'exécute en **quatre couloirs** Chromium isolés : un profil et un stockage par couloir,
 avec focus émulé. Chaque couloir suit l'ordre historique : rendu → clavier → actions #180 → dialogues,
