@@ -1,13 +1,16 @@
 import { authenticatedFetch } from '../../lib/apiAuth';
+import { PROVIDER_BRAND_LOGOS } from '../../utils/providerLogos';
 import { SEENIT_PLATFORM_IDENTITIES } from './platformIdentity.ts';
 
 /** Logos stables disponibles sans réseau, indexés par ID de préférence SeenIt. */
 const KNOWN_PLATFORM_LOGOS: Record<number, string> = {
-  8: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg',
+  8: PROVIDER_BRAND_LOGOS.netflix,
+  118: PROVIDER_BRAND_LOGOS.hbo,
   119: '/emthp39XA2YScoYL1p0sdbAH2WA.jpg',
+  234: PROVIDER_BRAND_LOGOS.france,
   337: '/97yvRBw1GzX7fXprcF80er19ot.jpg',
   350: '/2E03IAZsX4ZaUqM7tXlctEPMGWS.jpg',
-  381: '/brand/providers/canalplus.svg',
+  381: PROVIDER_BRAND_LOGOS.canal,
   1899: '/fksCUZ9QDWZMUwL2LgMtLckROUN.jpg',
 };
 
@@ -17,6 +20,8 @@ const CATALOG_TTL_MS = 30 * 24 * 60 * 60_000;
 
 export function platformLogoUrl(path: string | undefined): string | null {
   if (!path) return null;
+  if (path === '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg') return PROVIDER_BRAND_LOGOS.netflix;
+  if (path === '/brand/providers/canalplus.svg') return PROVIDER_BRAND_LOGOS.canal;
   if (path.startsWith('/brand/') || path.startsWith('http') || path.startsWith('data:')) return path;
   return `https://image.tmdb.org/t/p/w92${path}`;
 }
