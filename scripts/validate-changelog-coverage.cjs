@@ -1,6 +1,7 @@
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
-const { extractCommitNotes } = require('./generate-release-notes.cjs');
+const fs = require('node:fs');
+const { extractCommitNotes, readChangelogBlock } = require('./generate-release-notes.cjs');
 
 const root = path.resolve(__dirname, '..');
 
@@ -35,17 +36,10 @@ function validateCommitMessage(message, label = 'commit') {
   const notes = extractCommitNotes(normalized);
   if (notes.length > 0) return notes;
 
-  for (let index = headerIndex + 1; index < lines.length; index += 1) {
-    const line = lines[index];
-    const bullet = line.match(/^\s*(?:[-*•]|\d+[.)])\s+(.+)$/);
-    if (bullet && isEmptyMarker(bullet[1])) return [];
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-    if (/^[^:]{1,80}:\s*$/.test(trimmed)) break;
-    if (!bullet) break;
-  }
+  // Même grammaire que le générateur : « aucun » est accepté en puce ou en phrase.
+  if (readChangelogBlock(lines, headerIndex + 1).some(isEmptyMarker)) return [];
 
-  throw new Error(`${label} possède un bloc Changelog: vide ou invalide.`);
+  throw new Error(`${label} possède un bloc Changelog: vide ou invalide. Formes acceptées : « Changelog: Une phrase. », « Changelog: » suivi de puces « - … » ou d'une phrase, ou « Changelog: aucun ».`);
 }
 
 function collectCommits(baseSha, head = 'HEAD', cwd = root) {
@@ -81,8 +75,20 @@ function validateChangelogRange({ baseSha, head = 'HEAD', cwd = root } = {}) {
   return checked;
 }
 
+/** Préflight d'un message préparé (fichier ou `-` pour l'entrée standard), avant toute écriture distante. */
+function validateMessageFile(file) {
+  const message = fs.readFileSync(file === '-' ? 0 : file, 'utf8');
+  const notes = validateCommitMessage(message, 'Message');
+  console.log(`[Changelog] ✅ message valide : ${notes.length ? notes.join(' ') : 'Changelog: aucun'}`);
+  return notes;
+}
+
 function main() {
   try {
+    if (process.argv[2] === '--message') {
+      validateMessageFile(process.argv[3] || '-');
+      return;
+    }
     const baseSha = process.argv[2]
       || process.env.SEENIT_VALIDATE_BASE_SHA
       || process.env.SPEC_BASE_SHA;
@@ -97,7 +103,8 @@ function main() {
 module.exports = {
   collectCommits,
   validateChangelogRange,
-  validateCommitMessage
+  validateCommitMessage,
+  validateMessageFile
 };
 
 if (require.main === module) main();

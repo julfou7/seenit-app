@@ -1471,7 +1471,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Les changements liés sont regroupés ; les identifiants internes, fichiers, fonctions, caches,
   baselines, tests, CI, commits, PR et issues restent dans les preuves techniques. Chaque commit peut
   isoler ses phrases publiques dans `Changelog:` et ses détails dans `Détails techniques:` ; la valeur
-  `Changelog: aucun` exclut explicitement un changement sans effet utilisateur.
+  `Changelog: aucun` exclut explicitement un changement sans effet utilisateur. Le générateur et le
+  validateur partagent une seule grammaire : texte sur la ligne `Changelog:`, puces, ou phrase sous
+  l'en-tête jusqu'à la ligne vide, sans jamais publier les puces qui suivent cette phrase. Un bloc vide
+  reste refusé, et le message prévu se vérifie avant toute écriture distante (`--message`).
 - **SEENIT-RELEASE-004** — Une release APK publiée est immuable. Le garde compare la candidate à la
   dernière release officielle strictement antérieure et refuse une version régressive, incohérente ou
   dont le tag/release existe déjà. Une candidate **non publiée** peut recevoir plusieurs commits

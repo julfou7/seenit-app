@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -292,4 +292,48 @@ test('SEENIT-RELEASE-003 documente un format public court et homogène', () => {
 
   assert.doesNotMatch(viewer, /\\bs\\s\+\(\[aáàâ/);
   assert.match(viewer, /\(\^\|\[\\s\(«“\]\)/);
+});
+
+test('SEENIT-RELEASE-003 une seule grammaire Changelog pour le générateur et le validateur', () => {
+  // Retours #195 du 31/10/2026 : « Changelog: » suivi d’une phrase nue était ignoré puis refusé.
+  const paragraph = 'fix(ui): corriger les plateformes\n\nChangelog:\nLes filtres de plateformes affichent désormais\nles bons logos.\n- détail interne du store\n\nDétails techniques:\n- recalcule les logos';
+  assert.deepEqual(extractCommitNotes(paragraph), ['- Les filtres de plateformes affichent désormais les bons logos.']);
+  assert.deepEqual(validateCommitMessage(paragraph), ['- Les filtres de plateformes affichent désormais les bons logos.']);
+  assert.deepEqual(
+    extractCommitNotes('fix: x\n\nChangelog:\nTout marquer lu retire toutes les notifications visibles.\n\n- détail interne'),
+    ['- Tout marquer lu retire toutes les notifications visibles.'],
+    'une puce après la phrase n’est jamais publiée',
+  );
+  assert.deepEqual(validateCommitMessage('fix: x\n\nChangelog: Les filtres de plateformes affichent les bons logos.'), ['- Les filtres de plateformes affichent les bons logos.']);
+  assert.deepEqual(
+    validateCommitMessage('fix: x\n\nChangelog:\n- Les filtres affichent les bons logos.\n\n- Tout marquer lu retire toutes les notifications.'),
+    ['- Les filtres affichent les bons logos.', '- Tout marquer lu retire toutes les notifications.'],
+  );
+  assert.deepEqual(validateCommitMessage('docs: x\n\nChangelog:\naucun\n\nDétails techniques:\n- foo'), []);
+  assert.throws(() => validateCommitMessage('fix: x\n\nChangelog:\n\nDétails techniques:\n- foo'), /vide ou invalide\. Formes acceptées/);
+  assert.throws(() => validateCommitMessage('fix: x\n\nChangelog:\nFix platform logos in filters.'), /français/);
+});
+
+test('SEENIT-RELEASE-003 vérifie le message prévu avant toute écriture distante', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'seenit-message-'));
+  try {
+    const ok = join(dir, 'ok.txt');
+    const bad = join(dir, 'bad.txt');
+    writeFileSync(ok, 'fix: x\n\nChangelog:\nLes filtres de plateformes affichent les bons logos.\n');
+    writeFileSync(bad, 'fix: x\n\n- détail interne\n');
+    const run = (file: string) => spawnSync(process.execPath, ['scripts/validate-changelog-coverage.cjs', '--message', file], { encoding: 'utf8' });
+    assert.equal(run(ok).status, 0);
+    assert.match(run(ok).stdout, /message valide/);
+    assert.equal(run(bad).status, 1);
+    assert.match(run(bad).stderr, /sans bloc Changelog: explicite/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  const agents = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
+  for (const form of ['`Changelog: Les filtres de plateformes affichent les bons logos.`', '`Changelog:` puis une puce `- …`', '`Changelog:` puis une à deux phrases', '`Changelog: aucun`']) {
+    assert.ok(agents.includes(form), `AGENTS documente la forme ${form}`);
+  }
+  assert.match(agents, /node scripts\/validate-changelog-coverage\.cjs --message <fichier>/);
+  assert.match(agents, /la CI ne doit jamais servir à la découvrir/);
+  assert.match(agents, /En mode connector-only, sans shell, utiliser exclusivement/);
 });
