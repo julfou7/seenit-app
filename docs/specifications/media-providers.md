@@ -30,16 +30,24 @@ La disponibilité publique affichée par les cartes SeenIt reste fondée exclusi
 providers **France** renvoyés par TMDB. Seules les offres de streaming `flatrate`, `free` et `ads` sont
 des preuves éligibles ; `buy` et `rent` ne doivent jamais créer un badge de diffuseur.
 
-Lorsque l'utilisateur a configuré **Profil > Mes plateformes**, SeenIt choisit en priorité, parmi les
-diffuseurs réellement disponibles pour le média, un provider dont l'ID TMDB figure dans cette liste.
+Lorsque l'utilisateur a configuré **Profil > Mes plateformes**, SeenIt choisit, parmi les diffuseurs
+réellement disponibles pour le média, uniquement un provider dont l'ID TMDB figure dans cette liste.
 La préférence ne fabrique jamais une disponibilité : une plateforme cochée mais absente du payload
-TMDB du média est ignorée. Si aucune plateforme utilisateur ne correspond, Plex gagne lorsqu'une
-disponibilité personnelle est prouvée ; sinon le premier diffuseur public éligible reste le fallback.
+TMDB du média est ignorée. Si aucune plateforme sélectionnée ne correspond, Plex gagne lorsqu'une
+disponibilité personnelle est prouvée ; sinon la carte n'affiche aucun badge de diffuseur public.
+Un abonnement ou add-on tiers non sélectionné ne doit jamais être présenté comme « inclus dans ton
+abonnement ». Lorsque **Mes plateformes** est vide, le premier diffuseur public éligible reste un
+fallback informatif historique.
 
-L'ordre est **Mes plateformes > Plex > diffuseur public non sélectionné**. **Plex ne doit jamais
-masquer une plateforme de « Mes plateformes » réellement disponible.** Exemple TNR : si *Lioness* est
-disponible sur Paramount+ (`provider_id=531`) et dans Plex, et que 531 appartient à « Mes plateformes »,
-le badge attendu est Paramount+, pas Plex.
+L'ordre est donc **Mes plateformes réellement disponible > Plex > aucun badge** dès qu'au moins une
+plateforme est configurée. Le fallback **diffuseur public non sélectionné** n'est autorisé que lorsque
+l'utilisateur n'a configuré aucune plateforme. **Plex ne doit jamais masquer une plateforme de « Mes
+plateformes » réellement disponible.** Exemple TNR : si *Lioness* est disponible sur Paramount+
+(`provider_id=531`) et dans Plex, et que 531 appartient à « Mes plateformes », le badge attendu est
+Paramount+, pas Plex. Exemple terrain complémentaire : si *Monster House* n'est disponible en abonnement
+que via un add-on Sony Pictures Core Amazon Channel non sélectionné alors que Prime Video est sélectionné,
+la carte n'affiche pas ce canal comme s'il était inclus dans Prime ; elle affiche Plex s'il est prouvé,
+sinon aucun badge.
 
 Cette priorité s'applique aussi pendant l'enrichissement asynchrone des cartes. L'absence momentanée
 d'un provider public avant la fin de la résolution TMDB n'est **pas** une preuve d'absence : Plex ne doit
@@ -132,14 +140,16 @@ caches bornés/déduplication et séparation des UID. Les TNR TVDB couvrent l'IM
 type movie/tv, l'absence de recherche par titre, l'unicité d'une liste officielle et le remapping TMDB
 exact. Les tests client vérifient que PWA/APK n'appellent que SeenIt et que le runtime ne contient plus
 aucune route ou clé OMDb. Le TNR `tests/watchProviderPreference.test.ts` couvre en plus la priorité
-« Mes plateformes » sur le fallback public générique et sur Plex, sans accepter achat/location, ainsi
-que la séquence réelle où Plex est connu avant la fin de la résolution publique : aucun badge Plex
-provisoire n'est alors autorisé, puis le provider préféré doit apparaître dès que le payload TMDB ou la
-préférence de compte devient autoritatif.
+« Mes plateformes » sur Plex, l'absence de badge pour un provider public non sélectionné quand une liste
+de plateformes est configurée, le fallback public informatif lorsque cette liste est vide, et l'exclusion
+d'achat/location. Il couvre notamment la fixture terrain *Monster House* / add-on Sony Pictures Core
+Amazon Channel ainsi que la séquence réelle où Plex est connu avant la fin de la résolution publique :
+aucun badge Plex provisoire n'est alors autorisé, puis le provider préféré doit apparaître dès que le
+payload TMDB ou la préférence de compte devient autoritatif.
 Le smoke Chromium #337 utilise les cartes `ContinueWatchingCard`, `MovieWatchCard` et `GridMediaCard`, le hook et la
 façade TMDB de production. Seuls les services externes sont simulés. Il couvre le cache hérité, la
 bascule ON/OFF/ON, une réponse cloud retardée, la déduplication effective des appels réseau et le
-fallback public lorsque Plex n'est pas disponible, sans remontage des cartes.
+fallback public uniquement lorsque **Mes plateformes** est vide, sans remontage des cartes.
 
 Tous les fichiers JS/sourcemaps du build Web embarqué dans Capacitor sont scannés. Ils ne doivent
 contenir ni `VITE_TMDB_API_KEY`, ni `VITE_OMDB_API_KEY`, ni `VITE_TVDB_API_KEY`, ni les hôtes API
