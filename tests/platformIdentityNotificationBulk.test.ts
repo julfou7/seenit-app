@@ -62,10 +62,7 @@ function assertDecodablePng(assetPath: string): void {
   assert.ok(width >= 64 && height >= 64, `${assetPath}: dimensions trop petites pour une tuile`);
   assert.ok(idatChunks.length > 0, `${assetPath}: aucun IDAT`);
   assert.ok(sawIend, `${assetPath}: IEND manquant`);
-  assert.doesNotThrow(
-    () => inflateSync(Buffer.concat(idatChunks)),
-    `${assetPath}: flux IDAT non décodable`,
-  );
+  assert.doesNotThrow(() => inflateSync(Buffer.concat(idatChunks)), `${assetPath}: flux IDAT non décodable`);
 }
 
 test('#809 conserve les préférences historiques tout en utilisant les fournisseurs TMDB FR corrects', () => {
@@ -96,8 +93,6 @@ test('#809 Réglages, Explorer et les cartes partagent les logos de marque embar
   assert.equal(getFormattedProviderLogo(null, 'HBO'), PROVIDER_BRAND_LOGOS.hbo);
   assert.equal(getFormattedProviderLogo(null, 'France TV'), PROVIDER_BRAND_LOGOS.france);
 
-  // Passe par le résolveur réellement consommé par Mes plateformes : les assets
-  // embarqués doivent gagner sur le cache TMDB et rester directement affichables.
   const resolved = readPlatformLogos();
   assert.equal(resolved[8], PROVIDER_BRAND_LOGOS.netflix);
   assert.equal(resolved[234], PROVIDER_BRAND_LOGOS.france);
@@ -111,9 +106,7 @@ test('#809 Réglages, Explorer et les cartes partagent les logos de marque embar
   assert.match(filters, /platformLogoUrl\(platform\.logo\)/);
   assert.match(filters, /getFormattedProviderLogo\(null, 'HBO'\)/);
 
-  for (const asset of Object.values(PROVIDER_BRAND_LOGOS)) {
-    assertDecodablePng(`public${asset}`);
-  }
+  for (const asset of Object.values(PROVIDER_BRAND_LOGOS)) assertDecodablePng(`public${asset}`);
 });
 
 test('#809 le catalogue reste réindexé par préférence sans mélanger France TV et ARTE', () => {
