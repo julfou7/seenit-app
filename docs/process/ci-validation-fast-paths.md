@@ -57,7 +57,32 @@ Le lint complet conserve son propre `format:check` plus tard dans le parcours. C
 
 TNR terrain à conserver : l'échec du run `41217908650` / job `124586192577` sur la PR #829 provenait uniquement de `src/components/FilterModal.tsx: fin de ligne finale manquante`. Ce type d'erreur ne doit plus attendre le devcontainer puis TypeScript pour être remonté.
 
-## 5. Invariants non négociables
+## 5. Candidate release-only créée par GitHub Actions
+
+Le contrôleur #102 valide déjà chaque candidate `release/vX.Y.Z` avec un `workflow_dispatch` explicite de `build-apk.yml` sur le **SHA exact**, `release_apk=false`. Ce run produit le check GitHub Actions `Validate Change` requis par le ruleset `Protect main`.
+
+Le déclencheur `pull_request` du même workflow ignore donc les huit surfaces canoniques de version. Une PR qui ne contient **que** ces fichiers ne crée plus le run PR redondant que GitHub plaçait en `action_required`/0 job pour `github-actions[bot]`. La candidate conserve son run explicite et son check requis ; aucune validation n'est supprimée.
+
+La liste `paths-ignore` doit rester exactement synchronisée avec `RELEASE_VERSION_FILES` :
+
+- `android/app/build.gradle` ;
+- `src/store/updateStore.ts` ;
+- `server.ts` ;
+- `package.json` ;
+- `package-lock.json` ;
+- `docs/specifications/requirements.json` ;
+- `docs/specifications/android-contract.json` ;
+- `docs/specifications/seenit.md`.
+
+La sémantique GitHub est volontairement fail-closed :
+
+- un diff release-only canonique est validé par le dispatch explicite du contrôleur ;
+- dès qu'un fichier métier, workflow, script, test ou autre fichier s'ajoute, `paths-ignore` ne couvre plus tout le diff et la CI `pull_request` normale se déclenche ;
+- une PR manuelle qui ne modifie qu'une partie des surfaces de version n'obtient pas automatiquement de `Validate Change` : en l'absence du dispatch #102, la protection de `main` bloque sa fusion.
+
+Preuve terrain à l'origine du garde : pour v1.4.242, la PR bot #833 a créé le run PR `41224969341` en échec avec **0 job**, alors que le dispatch candidat `41224967652` avait déjà un `Validate Change` vert sur le même SHA. La PR de reprise #834 ne doit plus être nécessaire pour ce motif.
+
+## 6. Invariants non négociables
 
 - `main` reste protégée : PR obligatoire, branche à jour et `Validate Change` requis ;
 - une release manuelle conserve son contrat de release et ses contrôles propres ;
@@ -65,4 +90,4 @@ TNR terrain à conserver : l'échec du run `41217908650` / job `124586192577` su
 - aucune preuve rouge, expirée, issue d'un fork ou d'un autre workflow n'est réutilisée ;
 - les fallbacks vont toujours vers davantage de validation, jamais vers moins.
 
-Référence : #85, implémentation initiale PR #818.
+Référence : #85, implémentation initiale PR #818 ; orchestration release #102.

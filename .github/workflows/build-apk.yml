@@ -5,6 +5,15 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
+    paths-ignore:
+      - 'android/app/build.gradle'
+      - 'src/store/updateStore.ts'
+      - 'server.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'docs/specifications/requirements.json'
+      - 'docs/specifications/android-contract.json'
+      - 'docs/specifications/seenit.md'
   schedule:
     - cron: '17 5 * * 1'
   workflow_dispatch:
