@@ -44,7 +44,45 @@ Toute ambiguïté de classification retombe sur le scope `full`.
 
 Le staging peut restaurer ce cache de confiance, mais ne l'alimente jamais. Seul le chemin de confiance de `main` sauvegarde un cache manquant. Cela permet de sauter `npm ci` sans permettre à une branche de quarantaine d'empoisonner le cache canonique.
 
-## 4. Invariants non négociables
+## 4. Fail-fast du formatage minimal
+
+Le contrôle `npm run format:check` fait partie du `--preflight`. Il utilise uniquement Node, Git et les fichiers du dépôt : aucune dépendance applicative n'est nécessaire.
+
+Il doit donc échouer **avant** le devcontainer, la restauration/installation de `node_modules`, TypeScript, les tests et le build lorsqu'un diff contient une erreur triviale déjà détectable, notamment :
+
+- espaces ou tabulations résiduels signalés par `git diff --check` ;
+- absence de saut de ligne final sur un fichier source/configuration suivi par le formatteur minimal.
+
+Le lint complet conserve son propre `format:check` plus tard dans le parcours. Cette répétition très peu coûteuse est volontaire : le préflight sert au fail-fast, le lint reste le garde canonique de défense en profondeur et continue de fonctionner indépendamment.
+
+TNR terrain à conserver : l'échec du run `41217908650` / job `124586192577` sur la PR #829 provenait uniquement de `src/components/FilterModal.tsx: fin de ligne finale manquante`. Ce type d'erreur ne doit plus attendre le devcontainer puis TypeScript pour être remonté.
+
+## 5. Candidate release-only créée par GitHub Actions
+
+Le contrôleur #102 valide déjà chaque candidate `release/vX.Y.Z` avec un `workflow_dispatch` explicite de `build-apk.yml` sur le **SHA exact**, `release_apk=false`. Ce run produit le check GitHub Actions `Validate Change` requis par le ruleset `Protect main`.
+
+Le déclencheur `pull_request` du même workflow ignore donc les huit surfaces canoniques de version. Une PR qui ne contient **que** ces fichiers ne crée plus le run PR redondant que GitHub plaçait en `action_required`/0 job pour `github-actions[bot]`. La candidate conserve son run explicite et son check requis ; aucune validation n'est supprimée.
+
+La liste `paths-ignore` doit rester exactement synchronisée avec `RELEASE_VERSION_FILES` :
+
+- `android/app/build.gradle` ;
+- `src/store/updateStore.ts` ;
+- `server.ts` ;
+- `package.json` ;
+- `package-lock.json` ;
+- `docs/specifications/requirements.json` ;
+- `docs/specifications/android-contract.json` ;
+- `docs/specifications/seenit.md`.
+
+La sémantique GitHub est volontairement fail-closed :
+
+- un diff release-only canonique est validé par le dispatch explicite du contrôleur ;
+- dès qu'un fichier métier, workflow, script, test ou autre fichier s'ajoute, `paths-ignore` ne couvre plus tout le diff et la CI `pull_request` normale se déclenche ;
+- une PR manuelle qui ne modifie qu'une partie des surfaces de version n'obtient pas automatiquement de `Validate Change` : en l'absence du dispatch #102, la protection de `main` bloque sa fusion.
+
+Preuve terrain à l'origine du garde : pour v1.4.242, la PR bot #833 a créé le run PR `41224969341` en échec avec **0 job**, alors que le dispatch candidat `41224967652` avait déjà un `Validate Change` vert sur le même SHA. La PR de reprise #834 ne doit plus être nécessaire pour ce motif.
+
+## 6. Invariants non négociables
 
 - `main` reste protégée : PR obligatoire, branche à jour et `Validate Change` requis ;
 - une release manuelle conserve son contrat de release et ses contrôles propres ;
@@ -52,4 +90,4 @@ Le staging peut restaurer ce cache de confiance, mais ne l'alimente jamais. Seul
 - aucune preuve rouge, expirée, issue d'un fork ou d'un autre workflow n'est réutilisée ;
 - les fallbacks vont toujours vers davantage de validation, jamais vers moins.
 
-Référence : #85, implémentation initiale PR #818.
+Référence : #85, implémentation initiale PR #818 ; orchestration release #102.
