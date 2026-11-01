@@ -44,7 +44,20 @@ Toute ambiguïté de classification retombe sur le scope `full`.
 
 Le staging peut restaurer ce cache de confiance, mais ne l'alimente jamais. Seul le chemin de confiance de `main` sauvegarde un cache manquant. Cela permet de sauter `npm ci` sans permettre à une branche de quarantaine d'empoisonner le cache canonique.
 
-## 4. Invariants non négociables
+## 4. Fail-fast du formatage minimal
+
+Le contrôle `npm run format:check` fait partie du `--preflight`. Il utilise uniquement Node, Git et les fichiers du dépôt : aucune dépendance applicative n'est nécessaire.
+
+Il doit donc échouer **avant** le devcontainer, la restauration/installation de `node_modules`, TypeScript, les tests et le build lorsqu'un diff contient une erreur triviale déjà détectable, notamment :
+
+- espaces ou tabulations résiduels signalés par `git diff --check` ;
+- absence de saut de ligne final sur un fichier source/configuration suivi par le formatteur minimal.
+
+Le lint complet conserve son propre `format:check` plus tard dans le parcours. Cette répétition très peu coûteuse est volontaire : le préflight sert au fail-fast, le lint reste le garde canonique de défense en profondeur et continue de fonctionner indépendamment.
+
+TNR terrain à conserver : l'échec du run `41217908650` / job `124586192577` sur la PR #829 provenait uniquement de `src/components/FilterModal.tsx: fin de ligne finale manquante`. Ce type d'erreur ne doit plus attendre le devcontainer puis TypeScript pour être remonté.
+
+## 5. Invariants non négociables
 
 - `main` reste protégée : PR obligatoire, branche à jour et `Validate Change` requis ;
 - une release manuelle conserve son contrat de release et ses contrôles propres ;

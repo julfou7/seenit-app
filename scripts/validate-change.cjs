@@ -94,6 +94,12 @@ function resolveProvenTree(declared = process.env.SEENIT_VALIDATED_TREE_PROOF) {
 }
 
 function validatePreflight() {
+  const baseSha = resolveBaseSha();
+  runNpm(['run', 'format:check'], {
+    label: 'Formatage minimal du diff',
+    metric: 'SEENIT_FORMAT_SECONDS',
+    env: { SEENIT_LINT_BASE_SHA: baseSha }
+  });
   runNpm(['run', 'validate:workflows'], {
     label: 'Politique et syntaxe workflows',
     metric: 'SEENIT_WORKFLOWS_SECONDS'
@@ -102,7 +108,6 @@ function validatePreflight() {
     label: 'Intégrité SPEC',
     metric: 'SEENIT_SPEC_SECONDS'
   });
-  const baseSha = resolveBaseSha();
   run('node', ['scripts/validate-changelog-coverage.cjs', baseSha], {
     label: 'Couverture Changelog des commits',
     metric: 'SEENIT_CHANGELOG_SECONDS'
