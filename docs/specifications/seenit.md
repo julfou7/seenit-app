@@ -796,6 +796,8 @@ pour le cache des sagas et univers.
   les autres serveurs continuent et leur résultat est importé. Les serveurs ignorés restent visibles
   dans les logs techniques, mais le bilan utilisateur de fin n'affiche que le nombre de serveurs
   effectivement scannés ainsi que le nombre de vus et de non vus appliqués, sans exposer URL ou jeton.
+  Le panneau de synchro et Réglages > Plex peuvent montrer une ligne par serveur (nom, état court),
+  jamais d'URL ni de jeton (`SEENIT-PLEX-012`).
   Une panne DNS entre l'APK et le backend SeenIt n'est pas confondue avec un serveur Plex hors ligne :
   la synchro rapide, la synchro complète et la disponibilité essaient les origines SeenIt approuvées
   selon `SEENIT-PLATFORM-001`, en conservant strictement la même requête authentifiée. Les affichages
@@ -913,6 +915,29 @@ pour le cache des sagas et univers.
   delta, ajout, retrait, titre sans fiche ou non résolu), le traitement complet s'applique inchangé.
   Côté backend, la Watchlist, l'activité cloud et la découverte des serveurs partent ensemble ; leurs
   résultats sont fusionnés dans l'ordre d'origine.
+- **SEENIT-PLEX-012** — Une synchro Plex est bornée, unique et observable :
+  - **Une seule collecte par demande.** L'app ne relance jamais automatiquement une collecte expirée
+    (seules une panne DNS ou une connexion refusée essaient l'origine ou le transport suivant). Si l'app
+    se déconnecte, le backend arrête la collecte en cours. La collecte complète dispose de 12 min côté
+    app ; le backend s'arrête de lui-même à 10 min et renvoie alors un résultat **incomplet** : le
+    curseur n'avance pas et le cache des disponibilités n'est pas remplacé (`SEENIT-PLEX-003`). En PWA,
+    une collecte complète continue quand l'onglet passe en arrière-plan.
+  - **En parallèle, dans l'ordre d'origine.** Jusqu'à trois serveurs, et dans chacun jusqu'à trois
+    bibliothèques, sont lus en même temps ; leurs résultats sont fusionnés dans l'ordre des serveurs et
+    des bibliothèques, si bien que le résultat est identique à une lecture séquentielle. L'historique du
+    compte Plex est lu en même temps que la Watchlist et l'activité cloud. Les connexions locales,
+    `*.plex.direct` comprises, sont écartées quand une connexion distante existe, et les relais passent
+    en dernier. L'inventaire complet est lu par pages de 300.
+  - **Un vrai pourcentage.** Le backend publie l'avancement de la collecte dans
+    `users/{uid}/settings/plexSyncProgress` (identifiant de synchro, état et éléments lus/attendus par
+    serveur), au plus toutes les 1,5 s et seulement au-delà de 2 s de collecte. L'app combine cette
+    collecte (70 %) et ses propres étapes (30 %) en un pourcentage qui ne recule jamais, en delta comme
+    en complète. Une collecte sans total connu n'affiche pas de faux pourcentage.
+  - **Affichage compact.** Le panneau de synchro tient en un écran : titre et pourcentage, une ligne
+    d'état, la barre, puis **une ligne par serveur** (pastille, nom tronqué, « 1,2 k vus », « 42 % »,
+    « hors ligne » ou « inaccessible »), sans URL ni jeton ; au repos, le dernier bilan en une ligne et
+    les actions. Après une synchro, au-delà de trois titres synchronisés, un seul toast de bilan
+    remplace la série de toasts par titre.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou

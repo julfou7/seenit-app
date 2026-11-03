@@ -41,7 +41,15 @@ export function isRetryableBackendNetworkError(error: unknown): boolean {
   return /unable to resolve host|no address associated with hostname|unknownhost|err_name_not_resolved|failed to fetch|network(?: request)? failed|network error|load failed|timed? ?out|timeout|connection (?:reset|refused)|software caused connection abort/i.test(message);
 }
 
+/** Délai de réponse dépassé : le serveur a reçu la requête, la relancer referait tout le travail. */
+export function isBackendTimeoutError(error: unknown): boolean {
+  return /timed? ?out|timeout|délai/i.test(readUnknownErrorMessage(error));
+}
+
 export function describeBackendNetworkFailure(error: unknown): string {
+  if (isBackendTimeoutError(error)) {
+    return 'Le service SeenIt a mis trop de temps à répondre. Réessaie dans quelques minutes.';
+  }
   if (isRetryableBackendNetworkError(error)) {
     return 'Connexion au backend SeenIt impossible. Vérifiez la connexion réseau ou le DNS privé de cet appareil, puis réessayez.';
   }
@@ -51,6 +59,8 @@ export function describeBackendNetworkFailure(error: unknown): string {
 export async function executeBackendAttempts<T>(params: {
   attempts: NativeBackendAttempt<T>[];
   delaysMs?: number[];
+  /** Par défaut toute panne réseau est retentée ; une collecte Plex exclut les délais dépassés (SEENIT-PLEX-012). */
+  isRetryable?: (error: unknown) => boolean;
   onRetry?: (details: {
     failedTransport: NativeBackendTransport;
     nextTransport: NativeBackendTransport;
@@ -73,7 +83,7 @@ export async function executeBackendAttempts<T>(params: {
     } catch (error) {
       lastError = error;
       const nextAttempt = params.attempts[index + 1];
-      if (!nextAttempt || !isRetryableBackendNetworkError(error)) throw error;
+      if (!nextAttempt || !(params.isRetryable || isRetryableBackendNetworkError)(error)) throw error;
 
       params.onRetry?.({
         failedTransport: attempt.transport,

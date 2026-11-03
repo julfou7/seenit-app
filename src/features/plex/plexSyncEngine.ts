@@ -7,6 +7,7 @@ import { collection, doc, writeBatch, getDocs, getDocFromServer, runTransaction,
 import { tmdb } from '../shows/tmdb';
 import { fetchAuthoritativeShowsForUser, useShowsStore } from '../../store/showsStore';
 import { yieldToFrame } from './plexFrameBudget'; import { isUnchangedPlexDelta, plexWatchlistFingerprint } from './plexDeltaShortcut';
+import { announcePlexSyncedItems } from './plexSyncToasts'; import { createPlexSyncId, describePlexCollect, watchPlexCollectProgress } from './plexSyncLiveProgress';
 import { type PlexSyncProgress, useSyncStore } from '../../store/syncStore';
 import { useToastStore } from '../../store/toastStore';
 import { openExternalUrl } from '../../lib/utils';
@@ -190,7 +191,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     };
 
     try {
-      const plexData = await fetchPlexHistoryData(user.uid, plexToken, clientId, delta, delta ? lastSyncTimestamp : undefined);
+      const syncId = createPlexSyncId(); // SEENIT-PLEX-012 : vrai % de collecte publié par le backend
+      const stopLiveProgress = watchPlexCollectProgress(user.uid, syncId, live => { if (progress.phase !== 'collect') return; progress.collectPercent = Math.max(progress.collectPercent || 0, live.percent); progress.servers = live.servers; if (!silent) publishStatus({ message: describePlexCollect(live) }); });
+      const plexData = await fetchPlexHistoryData(user.uid, plexToken, clientId, delta, delta ? lastSyncTimestamp : undefined, syncId).finally(stopLiveProgress);
       if (auth.currentUser?.uid !== user.uid) {
         throw new Error('Compte SeenIt modifié pendant la synchronisation Plex');
       }
@@ -1031,27 +1034,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         // même état final sur PWA et APK, sans fusion locale implicite.
         await useShowsStore.getState().fetchShows();
 
-        // Queue sequential toasts for each synced item (5s each)
-        syncedItems.forEach((item) => {
-          const actionText = item.isWatchlistRemoval
-            ? 'Watchlist Plex • Retiré du suivi'
-            : item.isWatchlist
-              ? 'Watchlist Plex • Ajouté à voir'
-              : 'Vu sur Plex • Synchronisé';
-
-          useToastStore.getState().showToast(
-            {
-              title: item.title,
-              subtitle: item.subtitle,
-              action: actionText,
-              posterPath: item.posterPath
-            },
-            'success',
-            item.show,
-            undefined,
-            5000
-          );
-        });
+        announcePlexSyncedItems(syncedItems); // au-delà de 3 titres : un seul toast de bilan (SEENIT-PLEX-012)
 
 
       } else {

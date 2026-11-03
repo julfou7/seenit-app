@@ -30,6 +30,7 @@ import {
 } from '../services/plex';
 import { performPlexSync } from '../features/plex/syncPlex';
 import { isPlexSyncTerminal } from '../features/plex/plexSyncPresentation';
+import { serverStatusLabel } from '../features/plex/plexSyncProgressModel';
 import { ReleaseHistoryViewer } from '../components/ChangelogViewer';
 import { DownloadFeatureSettingsRow } from '../components/DownloadFeatureSettingsCard';
 import {
@@ -955,7 +956,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
             <SettingsGroup title="État" foot="Un point vert : tout va bien. Orange : à vérifier.">
               {plexServers.map((server, index) => (
                 <SettingsRow key={server.id || index} icon={Server} label={server.name}
-                  sub={`${server.owned === undefined ? '' : server.owned ? 'Ton serveur · ' : 'Partagé · '}${server.reason || `${server.watchedItems ?? 0} vus · ${server.inventoryItems ?? 0} indexés`}`}
+                  sub={`${server.owned === undefined ? '' : server.owned ? 'Ton serveur · ' : 'Partagé · '}${serverStatusLabel(server)}`}
                   tone={server.reason ? 'warn' : 'ok'} dot />
               ))}
             </SettingsGroup>

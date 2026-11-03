@@ -6,6 +6,12 @@ import { createServer as createViteServer } from "vite";
 import cron from "node-cron";
 import { getMessaging } from "firebase-admin/messaging";
 import { adminAuth, adminDb } from "./src/lib/firebase-admin.ts";
+import { createPlexSyncProgressReporter } from "./src/features/runtime/plexSyncProgressReporter.ts";
+import { mapOrderedWithConcurrency } from "./src/features/runtime/orderedConcurrency.ts";
+
+// SEENIT-PLEX-012 : délais de collecte sous le timeout Cloud Run (900 s) et sous ceux de l'app (12 min / 45 s).
+const PLEX_FULL_COLLECT_DEADLINE_MS = 10 * 60_000;
+const PLEX_DELTA_COLLECT_DEADLINE_MS = 40_000;
 import { registerTvPairingRoutes } from './src/features/tv/tvPairingRoutes.ts';
 import { registerTvSportRoutes } from './src/features/tv/tvSport.ts';
 import { createFirestoreTvLinkStore, readTvLibrary } from './src/features/tv/tvPairingFirestore.ts';
@@ -1073,6 +1079,15 @@ async function startServer() {
 
       const plexClientIdentifier = clientId || 'tv-time-ai-studio';
       const syncCursor = Date.now();
+      // SEENIT-PLEX-012 : une seule collecte, arrêtée si l'app se déconnecte et bornée sous le délai Cloud Run.
+      const requestAbort = new AbortController();
+      res.on('close', () => { if (!res.writableFinished) requestAbort.abort(); });
+      const collectDeadline = AbortSignal.timeout(delta ? PLEX_DELTA_COLLECT_DEADLINE_MS : PLEX_FULL_COLLECT_DEADLINE_MS);
+      const routeSignal = (timeoutMs: number) => AbortSignal.any([AbortSignal.timeout(timeoutMs), requestAbort.signal, collectDeadline]);
+      const progressUid = (req as AuthRequest).user?.uid;
+      const requestedSyncId = typeof req.body?.syncId === 'string' && /^[A-Za-z0-9-]{8,64}$/.test(req.body.syncId) ? req.body.syncId : null;
+      const syncProgress = createPlexSyncProgressReporter({ syncId: progressUid ? requestedSyncId : null, mode: delta ? 'delta' : 'full', write: progressDoc => adminDb.doc(`users/${progressUid}/settings/plexSyncProgress`).set(progressDoc) });
+      res.once('close', () => syncProgress.finish());
       console.log(`[Plex Sync] Starting sync for user (${delta ? 'DELTA MODE' : 'FULL SCAN'})...`);
 
       const allRawItems: any[] = [];
@@ -1097,9 +1112,10 @@ async function startServer() {
         timeoutMs: number,
         maxPages: number,
         stopAtTimestamp?: number,
-        validatePage?: (payload: unknown) => boolean
+        validatePage?: (payload: unknown) => boolean,
+        pageOptions: { pageSize?: number; onPage?: (count: number, totalSize?: number) => void } = {}
       ): Promise<any[]> => {
-        const pageSize = 100;
+        const pageSize = pageOptions.pageSize || 100;
         const collected: any[] = [];
         let previousFingerprint = '';
 
@@ -1111,7 +1127,7 @@ async function startServer() {
 
           const response = await fetch(pageUrl, {
             headers,
-            signal: AbortSignal.timeout(timeoutMs)
+            signal: routeSignal(timeoutMs)
           });
           if (!response.ok) {
             throw new Error(`Pagination Plex incomplète (${pageUrl.pathname}, HTTP ${response.status}, page ${page + 1})`);
@@ -1134,6 +1150,9 @@ async function startServer() {
           }
           previousFingerprint = fingerprint;
           collected.push(...items);
+          const pageContainer = data?.MediaContainer || {};
+          const pageTotal = Number(pageContainer.totalSize ?? pageContainer.total_size);
+          pageOptions.onPage?.(items.length, page === 0 && Number.isFinite(pageTotal) ? pageTotal : undefined);
 
           if (stopAtTimestamp) {
             const reachedCursor = items.some((item: any) => {
@@ -1188,7 +1207,7 @@ async function startServer() {
               'X-Plex-Client-Identifier': plexClientIdentifier,
               'X-Plex-Product': 'SeenIt'
             },
-            signal: AbortSignal.timeout(7000)
+            signal: routeSignal(7000)
           });
           if (!response.ok) return null;
           const userData = await response.json();
@@ -1225,7 +1244,7 @@ async function startServer() {
                 operationName: 'GetWatchHistoryHub',
                 variables: { uuid, first: 100, ...(after ? { after } : {}) }
               }),
-              signal: AbortSignal.timeout(10000)
+              signal: routeSignal(10000)
             });
 
             if (!response.ok) {
@@ -1292,6 +1311,10 @@ async function startServer() {
       const seenItUserId = (req as AuthRequest).user?.uid || 'anonymous';
       const serversTask = getPlexServers(token, plexClientIdentifier, delta ? 6000 : 9000, seenItUserId);
       serversTask.catch(() => undefined); // l'erreur est relevée par l'await plus bas, pas en rejet orphelin
+      // L'historique du compte (full) ne dépend ni de la Watchlist ni du cloud : il part avec eux (SEENIT-PLEX-012).
+      const accountHistoryTask = delta ? null : fetchPlexAccountWatchHistory()
+        .catch(() => ({ available: false, items: [] as any[], queryMode: 'none' }))
+        .finally(() => syncProgress.accountStep());
       let watchlistCollectionSucceeded = false;
       let watchlistCollectionComplete = false;
       let watchlistVisited = '';
@@ -1321,7 +1344,7 @@ async function startServer() {
       if (!watchlistCollectionSucceeded) {
         console.warn('[Plex Sync] Watchlist indisponible pour ce passage ; elle sera retentée indépendamment du curseur.');
       }
-      })();
+      })().finally(() => syncProgress.accountStep());
 
       const cloudEndpoints = delta
         ? [
@@ -1354,7 +1377,7 @@ async function startServer() {
           const e = caught as { message?: unknown } | null;
           console.log(`[Plex Sync] Cloud endpoint skipped (${endpoint}): ${e?.message || e}`);
         }
-      } })();
+      } })().finally(() => syncProgress.accountStep());
       await Promise.all([watchlistTask, cloudTask]);
       if (watchlistVisited) visitedSources.unshift(watchlistVisited);
 
@@ -1362,7 +1385,7 @@ async function startServer() {
       // au PMS /status/sessions/history, metadataItem.guid est une identité globale Plex.
       let accountHistoryAvailable = delta;
       if (!delta) {
-        const accountHistory = await fetchPlexAccountWatchHistory();
+        const accountHistory = await accountHistoryTask!;
         accountHistoryAvailable = accountHistory.available;
         if (accountHistory.available && accountHistory.items.length > 0) {
           for (const item of accountHistory.items) {
@@ -1380,6 +1403,7 @@ async function startServer() {
 
       // 2. Fetch user's servers from Plex.tv (Both owned servers & shared servers from friends)
       const servers = await serversTask;
+      syncProgress.setServers(servers.map((server: any) => ({ id: String(server.clientIdentifier || server.name || 'Serveur Plex'), name: server.name || 'Serveur Plex', owned: server.owned === true || server.owned === 1 || server.owned === '1' })));
 
       console.log(`[Plex Sync] Found ${servers.length} Plex server(s) (personal & shared)`);
 
@@ -1400,49 +1424,151 @@ async function startServer() {
         return 'inaccessible';
       };
 
-      for (const server of servers) {
+      // SEENIT-PLEX-012 : jusqu'à trois serveurs (et trois bibliothèques par serveur) en parallèle, fusionnés
+      // ensuite dans l'ordre d'origine pour un résultat identique à une lecture séquentielle.
+      const fullInventoryPageTimeout = 12_000;
+      const isPrivateOrLocalUri = (uriStr: string): boolean => {
+        try {
+          const url = new URL(uriStr);
+          const host = url.hostname;
+          if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) return true;
+          if (host.startsWith('172.')) {
+            const parts = host.split('.');
+            if (parts.length >= 2) {
+              const second = parseInt(parts[1], 10);
+              if (second >= 16 && second <= 31) return true;
+            }
+          }
+          // Adresses locales publiées par Plex sous forme 192-168-1-10.<hash>.plex.direct.
+          if (host.endsWith('.plex.direct') && /^(?:10|127)-\d+-\d+-\d+\.|^192-168-|^172-(?:1[6-9]|2\d|3[01])-/.test(host)) return true;
+          return false;
+        } catch {
+          return false;
+        }
+      };
+      const connectionRank = (conn: any): number => {
+        const remoteHttps = !conn.local && (conn.uri || '').startsWith('https://');
+        if (remoteHttps && !conn.relay) return 0;
+        if (remoteHttps) return 1;
+        return conn.relay ? 3 : 2;
+      };
+
+      interface SectionScan { guids: string[]; availability: any[]; watchStates: any[]; rawItems: any[]; count: number; ok: boolean; failure?: unknown }
+      const scanSection = async (sec: any, ctx: { uri: string; serverName: string; serverId: string; serverAccessToken: string }): Promise<SectionScan> => {
+        const out: SectionScan = { guids: [], availability: [], watchStates: [], rawItems: [], count: 0, ok: true };
+        const { uri, serverName, serverId, serverAccessToken } = ctx;
+        const secKey = sec.key;
+        const secType = String(sec.type || '').toLowerCase();
+        if (!secKey || !['movie', 'show'].includes(secType)) return out;
+        const sourceName = `${serverName} - ${sec.title || 'Section'}`;
+        const headers = { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken };
+        const onPage = (count: number, totalSize?: number) => syncProgress.serverItems(serverId, count, totalSize);
+
+        if (secType === 'movie') {
+          try {
+            const movies = await fetchPlexPages(`${uri}/library/sections/${secKey}/all?sort=lastViewedAt:desc&includeGuids=1`, headers, fullInventoryPageTimeout, 100, undefined, undefined, { pageSize: 300, onPage });
+            for (const movie of movies) {
+              if (typeof movie?.guid === 'string' && movie.guid) out.guids.push(movie.guid);
+              out.availability.push({ raw: movie, serverName, serverId });
+              const watchState = buildPlexLibraryWatchState(movie, { mediaType: 'movie', serverName, serverId });
+              if (watchState) out.watchStates.push(watchState);
+            }
+            out.count += movies.length;
+            for (const movie of movies.filter(isPlexLibraryItemWatched)) {
+              out.rawItems.push({ raw: movie, source: sourceName, sourceKind: 'library-watched', availableOnServer: true, serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
+            }
+          } catch (error: any) {
+            out.ok = false;
+            out.failure = error?.message || error;
+            console.log(`[Plex Sync] Movie section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
+          }
+        }
+
+        if (secType === 'show') {
+          const showTmdbByRatingKey = new Map<string, number>();
+          const showTmdbByGuid = new Map<string, number>();
+          // 1) Liste des séries = index de disponibilité Plex pour les fiches SeenIt.
+          try {
+            const shows = await fetchPlexPages(`${uri}/library/sections/${secKey}/all?includeGuids=1`, headers, fullInventoryPageTimeout, 100, undefined, undefined, { pageSize: 300, onPage });
+            for (const show of shows) {
+              if (typeof show?.guid === 'string' && show.guid) out.guids.push(show.guid);
+              out.availability.push({ raw: show, serverName, serverId });
+              const ids = extractPlexExternalIds(show);
+              const tmdbId = Number(ids.tmdbId);
+              if (Number.isInteger(tmdbId) && tmdbId > 0) {
+                const ratingKey = getPlexMetadataLookupKey(show);
+                if (ratingKey) showTmdbByRatingKey.set(String(ratingKey), tmdbId);
+                const guidCandidates = [show?.guid, ...(Array.isArray(show?.Guid) ? show.Guid.map((g: any) => typeof g === 'string' ? g : g?.id) : [])];
+                for (const guid of guidCandidates) if (typeof guid === 'string' && guid) showTmdbByGuid.set(guid, tmdbId);
+              }
+            }
+            out.count += shows.length;
+          } catch (error: any) {
+            out.ok = false;
+            out.failure = error?.message || error;
+            console.log(`[Plex Sync] Show inventory section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
+          }
+
+          // 2) allLeaves = TOUS les épisodes. On filtre viewCount côté SeenIt,
+          // sans dépendre d'une syntaxe de filtre URL non garantie.
+          try {
+            const episodes = await fetchPlexPages(`${uri}/library/sections/${secKey}/allLeaves?sort=lastViewedAt:desc&includeGuids=1`, headers, fullInventoryPageTimeout, 200, undefined, undefined, { pageSize: 300, onPage });
+            for (const episode of episodes) {
+              if (typeof episode?.guid === 'string' && episode.guid) out.guids.push(episode.guid);
+              const parentIdentity = buildPlexParentShowIdentityItem(episode);
+              const directTmdb = Number(extractPlexExternalIds(parentIdentity).tmdbId);
+              const parentRatingKey = getPlexParentShowMetadataLookupKey(episode);
+              const parentGuidCandidates = [episode?.grandparentGuid, ...(Array.isArray(episode?.grandparentGuids) ? episode.grandparentGuids.map((g: any) => typeof g === 'string' ? g : g?.id) : [])];
+              let parentTmdbId = Number.isInteger(directTmdb) && directTmdb > 0 ? directTmdb : null;
+              if (!parentTmdbId && parentRatingKey) parentTmdbId = showTmdbByRatingKey.get(String(parentRatingKey)) || null;
+              if (!parentTmdbId) {
+                for (const guid of parentGuidCandidates) {
+                  if (typeof guid === 'string' && showTmdbByGuid.has(guid)) {
+                    parentTmdbId = showTmdbByGuid.get(guid) || null;
+                    break;
+                  }
+                }
+              }
+              const watchState = buildPlexLibraryWatchState(episode, { mediaType: 'episode', parentTmdbId, serverName, serverId });
+              if (watchState) out.watchStates.push(watchState);
+            }
+            for (const episode of episodes.filter(isPlexLibraryItemWatched)) {
+              out.rawItems.push({ raw: episode, source: sourceName, sourceKind: 'library-watched', availableOnServer: true, serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
+            }
+          } catch (error: any) {
+            out.ok = false;
+            out.failure = error?.message || error;
+            console.log(`[Plex Sync] Episode inventory section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
+          }
+        }
+        return out;
+      };
+
+      interface ServerScan {
+        accepted: boolean; historyItems: any[]; libraryItems: any[]; availabilityItems: any[]; watchStateItems: any[]; libraryGuids: Set<string>;
+        inventoryCount: number; pmsHistoryCount: number; visited: string; serverHistoryComplete: boolean; serverInventoryComplete: boolean;
+        synced?: { id: string; name: string; watchedItems: number; inventoryItems: number; owned: boolean }; skipped?: { id: string; name: string; reason: string; owned: boolean };
+      }
+      const scanServer = async (server: any): Promise<ServerScan> => {
         const serverName = server.name || 'Serveur Plex';
         const serverId = String(server.clientIdentifier || serverName);
         const serverAccessToken = server.accessToken || token;
-        const connections = server.connections || [];
-        let serverItemCount = 0;
-        let serverInventoryCount = 0;
-        let serverHistoryComplete = false;
-        let serverInventoryComplete = false;
+        const owned = server.owned === true || server.owned === 1 || server.owned === '1';
+        const result: ServerScan = { accepted: false, historyItems: [], libraryItems: [], availabilityItems: [], watchStateItems: [], libraryGuids: new Set<string>(), inventoryCount: 0, pmsHistoryCount: 0, visited: '', serverHistoryComplete: false, serverInventoryComplete: false };
         let lastFailure: unknown = 'aucune connexion disponible';
+        syncProgress.serverScanning(serverId);
 
-        const sortedConnections = [...connections].sort((a: any, b: any) => {
-          const aIsRemote = !a.local && (a.uri || '').startsWith('https://');
-          const bIsRemote = !b.local && (b.uri || '').startsWith('https://');
-          if (aIsRemote && !bIsRemote) return -1;
-          if (!aIsRemote && bIsRemote) return 1;
-          return 0;
-        });
-
-        const isPrivateOrLocalUri = (uriStr: string): boolean => {
-          try {
-            const url = new URL(uriStr);
-            const host = url.hostname;
-            if (host === 'localhost' || host === '127.0.0.1' || host.startsWith('192.168.') || host.startsWith('10.')) return true;
-            if (host.startsWith('172.')) {
-              const parts = host.split('.');
-              if (parts.length >= 2) {
-                const second = parseInt(parts[1], 10);
-                if (second >= 16 && second <= 31) return true;
-              }
-            }
-            return false;
-          } catch {
-            return false;
-          }
-        };
-
+        const sortedConnections = [...(server.connections || [])].sort((a: any, b: any) => connectionRank(a) - connectionRank(b));
         const hasRemoteConnection = sortedConnections.some((c: any) => c.uri && !isPrivateOrLocalUri(c.uri));
+        let attemptedConnection = false;
 
         for (const conn of sortedConnections) {
           const uri = conn.uri;
           if (!uri) continue;
           if (isPrivateOrLocalUri(uri) && hasRemoteConnection) continue;
+          if (requestAbort.signal.aborted || collectDeadline.aborted) { lastFailure = 'délai de collecte dépassé'; break; }
+          if (attemptedConnection) syncProgress.serverRestart(serverId);
+          attemptedConnection = true;
 
           const connectionRawItems: any[] = [];
           const connectionAvailabilityItems: any[] = [];
@@ -1452,31 +1578,15 @@ async function startServer() {
           let connectionInventoryComplete = delta;
           let connectionInventoryCount = 0;
           let historyFoundOnConnection = 0;
+          const historyHeaders = { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken };
+          const onHistoryPage = (count: number) => syncProgress.serverItems(serverId, count);
 
           if (delta || usePmsHistoryInFull) {
             try {
-              const items = await fetchPlexPages(
-                `${uri}/status/sessions/history/all?sort=viewedAt:desc`,
-                { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                serverTimeout,
-                50,
-                delta ? Number(since) || undefined : undefined
-              );
+              const items = await fetchPlexPages(`${uri}/status/sessions/history/all?sort=viewedAt:desc`, historyHeaders, serverTimeout, 50, delta ? Number(since) || undefined : undefined, undefined, { onPage: onHistoryPage });
               connectionHistoryComplete = true;
-              if (items.length > 0) {
-                for (const it of items) {
-                  connectionRawItems.push({
-                    raw: it,
-                    source: serverName,
-                    sourceKind: 'pms-history',
-                    serverName,
-                    serverId,
-                    serverUri: uri,
-                    serverToken: serverAccessToken
-                  });
-                }
-                historyFoundOnConnection = items.length;
-              }
+              for (const it of items) connectionRawItems.push({ raw: it, source: serverName, sourceKind: 'pms-history', serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
+              historyFoundOnConnection = items.length;
             } catch (error: any) {
               lastFailure = error?.message || error;
               console.log(`[Plex Sync] Historique PMS inaccessible sur ${serverName}: ${error?.message || error}`);
@@ -1487,27 +1597,9 @@ async function startServer() {
           // pas accessible (cas de certains serveurs partagés). Il ne sert plus au FULL.
           if (delta && historyFoundOnConnection === 0) {
             try {
-              const items = await fetchPlexPages(
-                `${uri}/library/recentlyViewed?includeGuids=1`,
-                { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                serverTimeout,
-                10,
-                Number(since) || undefined
-              );
+              const items = await fetchPlexPages(`${uri}/library/recentlyViewed?includeGuids=1`, historyHeaders, serverTimeout, 10, Number(since) || undefined, undefined, { onPage: onHistoryPage });
               connectionHistoryComplete = true;
-              if (items.length > 0) {
-                for (const it of items) {
-                  connectionRawItems.push({
-                    raw: it,
-                    source: serverName,
-                    sourceKind: 'pms-recent-fallback',
-                    serverName,
-                    serverId,
-                    serverUri: uri,
-                    serverToken: serverAccessToken
-                  });
-                }
-              }
+              for (const it of items) connectionRawItems.push({ raw: it, source: serverName, sourceKind: 'pms-recent-fallback', serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
             } catch (error: any) {
               lastFailure = error?.message || error;
               console.log(`[Plex Sync] Recently viewed inaccessible sur ${serverName}: ${error?.message || error}`);
@@ -1517,145 +1609,18 @@ async function startServer() {
           if (!delta) {
             connectionInventoryComplete = true;
             try {
-              const sectionsRes = await fetch(`${uri}/library/sections`, {
-                headers: { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                signal: AbortSignal.timeout(serverTimeout)
-              });
-
-              if (!sectionsRes.ok) {
-                throw new Error(`HTTP ${sectionsRes.status}`);
-              }
-
-              if (sectionsRes.ok) {
-                const sectionsData = await sectionsRes.json();
-                const sections = (sectionsData.MediaContainer && sectionsData.MediaContainer.Directory) || [];
-
-                for (const sec of sections) {
-                  const secKey = sec.key;
-                  const secType = String(sec.type || '').toLowerCase();
-                  if (!secKey || !['movie', 'show'].includes(secType)) continue;
-                  const sourceName = `${serverName} - ${sec.title || 'Section'}`;
-
-                  if (secType === 'movie') {
-                    try {
-                      const movies = await fetchPlexPages(
-                        `${uri}/library/sections/${secKey}/all?sort=lastViewedAt:desc&includeGuids=1`,
-                        { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                        serverTimeout,
-                        100
-                      );
-
-                      for (const movie of movies) {
-                        if (typeof movie?.guid === 'string' && movie.guid) connectionLibraryGuids.add(movie.guid);
-                        connectionAvailabilityItems.push({ raw: movie, serverName, serverId });
-                        const watchState = buildPlexLibraryWatchState(movie, { mediaType: 'movie', serverName, serverId });
-                        if (watchState) connectionWatchStateItems.push(watchState);
-                      }
-                      connectionInventoryCount += movies.length;
-
-                      const watchedMovies = movies.filter(isPlexLibraryItemWatched);
-                      for (const movie of watchedMovies) {
-                        connectionRawItems.push({
-                          raw: movie,
-                          source: sourceName,
-                          sourceKind: 'library-watched',
-                          availableOnServer: true,
-                          serverName,
-                          serverId,
-                          serverUri: uri,
-                          serverToken: serverAccessToken
-                        });
-                      }
-                    } catch (error: any) {
-                      connectionInventoryComplete = false;
-                      lastFailure = error?.message || error;
-                      console.log(`[Plex Sync] Movie section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
-                    }
-                  }
-
-                  if (secType === 'show') {
-                    const showTmdbByRatingKey = new Map<string, number>();
-                    const showTmdbByGuid = new Map<string, number>();
-                    // 1) Liste des séries = index de disponibilité Plex pour les fiches SeenIt.
-                    try {
-                      const shows = await fetchPlexPages(
-                        `${uri}/library/sections/${secKey}/all?includeGuids=1`,
-                        { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                        serverTimeout,
-                        100
-                      );
-                      for (const show of shows) {
-                        if (typeof show?.guid === 'string' && show.guid) connectionLibraryGuids.add(show.guid);
-                        connectionAvailabilityItems.push({ raw: show, serverName, serverId });
-                        const ids = extractPlexExternalIds(show);
-                        const tmdbId = Number(ids.tmdbId);
-                        if (Number.isInteger(tmdbId) && tmdbId > 0) {
-                          const ratingKey = getPlexMetadataLookupKey(show);
-                          if (ratingKey) showTmdbByRatingKey.set(String(ratingKey), tmdbId);
-                          const guidCandidates = [show?.guid, ...(Array.isArray(show?.Guid) ? show.Guid.map((g: any) => typeof g === 'string' ? g : g?.id) : [])];
-                          for (const guid of guidCandidates) if (typeof guid === 'string' && guid) showTmdbByGuid.set(guid, tmdbId);
-                        }
-                      }
-                      connectionInventoryCount += shows.length;
-                    } catch (error: any) {
-                      connectionInventoryComplete = false;
-                      lastFailure = error?.message || error;
-                      console.log(`[Plex Sync] Show inventory section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
-                    }
-
-                    // 2) allLeaves = TOUS les épisodes. On filtre viewCount côté SeenIt,
-                    // sans dépendre d'une syntaxe de filtre URL non garantie.
-                    try {
-                      const episodes = await fetchPlexPages(
-                        `${uri}/library/sections/${secKey}/allLeaves?sort=lastViewedAt:desc&includeGuids=1`,
-                        { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken },
-                        serverTimeout,
-                        200
-                      );
-                      for (const episode of episodes) {
-                        if (typeof episode?.guid === 'string' && episode.guid) connectionLibraryGuids.add(episode.guid);
-                        const parentIdentity = buildPlexParentShowIdentityItem(episode);
-                        const directTmdb = Number(extractPlexExternalIds(parentIdentity).tmdbId);
-                        const parentRatingKey = getPlexParentShowMetadataLookupKey(episode);
-                        const parentGuidCandidates = [episode?.grandparentGuid, ...(Array.isArray(episode?.grandparentGuids) ? episode.grandparentGuids.map((g: any) => typeof g === 'string' ? g : g?.id) : [])];
-                        let parentTmdbId = Number.isInteger(directTmdb) && directTmdb > 0 ? directTmdb : null;
-                        if (!parentTmdbId && parentRatingKey) parentTmdbId = showTmdbByRatingKey.get(String(parentRatingKey)) || null;
-                        if (!parentTmdbId) {
-                          for (const guid of parentGuidCandidates) {
-                            if (typeof guid === 'string' && showTmdbByGuid.has(guid)) {
-                              parentTmdbId = showTmdbByGuid.get(guid) || null;
-                              break;
-                            }
-                          }
-                        }
-                        const watchState = buildPlexLibraryWatchState(episode, { mediaType: 'episode', parentTmdbId, serverName, serverId });
-                        if (watchState) connectionWatchStateItems.push(watchState);
-                      }
-
-                      const watchedEpisodes = episodes.filter(isPlexLibraryItemWatched);
-                      for (const episode of watchedEpisodes) {
-                        connectionRawItems.push({
-                          raw: episode,
-                          source: sourceName,
-                          sourceKind: 'library-watched',
-                          availableOnServer: true,
-                          serverName,
-                          serverId,
-                          serverUri: uri,
-                          serverToken: serverAccessToken
-                        });
-                      }
-                    } catch (error: any) {
-                      connectionInventoryComplete = false;
-                      lastFailure = error?.message || error;
-                      console.log(`[Plex Sync] Episode inventory section ${secKey} skipped on ${serverName}: ${error?.message || error}`);
-                    }
-                  }
-                }
-
-                if (connectionInventoryComplete) {
-                  connectionInventoryComplete = true;
-                }
+              const sectionsRes = await fetch(`${uri}/library/sections`, { headers: historyHeaders, signal: routeSignal(serverTimeout) });
+              if (!sectionsRes.ok) throw new Error(`HTTP ${sectionsRes.status}`);
+              const sectionsData = await sectionsRes.json();
+              const sections = (sectionsData.MediaContainer && sectionsData.MediaContainer.Directory) || [];
+              const sectionScans = await mapOrderedWithConcurrency(sections, 3, sec => scanSection(sec, { uri, serverName, serverId, serverAccessToken }));
+              for (const scan of sectionScans) {
+                scan.guids.forEach(guid => connectionLibraryGuids.add(guid));
+                connectionAvailabilityItems.push(...scan.availability);
+                connectionWatchStateItems.push(...scan.watchStates);
+                connectionRawItems.push(...scan.rawItems);
+                connectionInventoryCount += scan.count;
+                if (!scan.ok) { connectionInventoryComplete = false; lastFailure = scan.failure; }
               }
             } catch (error: any) {
               connectionInventoryComplete = false;
@@ -1668,55 +1633,55 @@ async function startServer() {
             ? connectionHistoryComplete
             : connectionInventoryComplete && connectionHistoryComplete;
           if (requiredConnectionComplete) {
-            serverHistoryComplete = connectionHistoryComplete;
-            serverInventoryComplete = connectionInventoryComplete;
-            const historyItems = connectionRawItems.filter((entry) => (
-              entry.sourceKind === 'pms-history' || entry.sourceKind === 'pms-recent-fallback'
-            ));
-            const libraryItems = connectionRawItems.filter((entry) => entry.sourceKind === 'library-watched');
-
-            allRawItems.push(...historyItems);
-            sourceStats.pmsHistoryItems += historyItems.filter((entry) => entry.sourceKind === 'pms-history').length;
-
-            if (!delta) {
-              allRawItems.push(...libraryItems);
-              libraryAvailabilityItems.push(...connectionAvailabilityItems);
-              libraryWatchStateItems.push(...connectionWatchStateItems);
-              connectionLibraryGuids.forEach((guid) => currentLibraryGuids.add(guid));
-              sourceStats.libraryInventoryItems += connectionInventoryCount;
-              sourceStats.libraryWatchedItems += libraryItems.length;
-            }
-
-            serverItemCount = historyItems.length + libraryItems.length;
-            serverInventoryCount = connectionInventoryCount;
-            visitedSources.push(`${serverName} (${serverItemCount} vu(s), ${serverInventoryCount} média(s) indexé(s))`);
+            result.serverHistoryComplete = connectionHistoryComplete;
+            result.serverInventoryComplete = connectionInventoryComplete;
+            result.historyItems = connectionRawItems.filter((entry) => entry.sourceKind === 'pms-history' || entry.sourceKind === 'pms-recent-fallback');
+            result.libraryItems = connectionRawItems.filter((entry) => entry.sourceKind === 'library-watched');
+            result.pmsHistoryCount = result.historyItems.filter((entry) => entry.sourceKind === 'pms-history').length;
+            result.availabilityItems = connectionAvailabilityItems;
+            result.watchStateItems = connectionWatchStateItems;
+            result.libraryGuids = connectionLibraryGuids;
+            result.inventoryCount = connectionInventoryCount;
+            result.accepted = true;
+            const serverItemCount = result.historyItems.length + result.libraryItems.length;
+            result.visited = `${serverName} (${serverItemCount} vu(s), ${connectionInventoryCount} média(s) indexé(s))`;
             break;
           }
         }
 
-        if (serverHistoryComplete) completeHistoryServers++;
-        if (!delta && serverInventoryComplete) {
-          completeInventoryServers++;
-        }
-
-        const serverSucceeded = delta ? serverHistoryComplete : serverInventoryComplete && serverHistoryComplete;
+        const serverSucceeded = delta ? result.serverHistoryComplete : result.serverInventoryComplete && result.serverHistoryComplete;
         if (serverSucceeded) {
-          syncedServers.push({
-            id: serverId,
-            name: serverName,
-            owned: server.owned === true || server.owned === 1 || server.owned === '1',
-            watchedItems: serverItemCount,
-            inventoryItems: serverInventoryCount
-          });
+          const watchedItems = result.historyItems.length + result.libraryItems.length;
+          result.synced = { id: serverId, name: serverName, owned, watchedItems, inventoryItems: result.inventoryCount };
+          syncProgress.serverDone(serverId, watchedItems);
         } else {
-          skippedServers.push({
-            id: serverId,
-            name: serverName,
-            owned: server.owned === true || server.owned === 1 || server.owned === '1',
-            reason: describeServerFailure(lastFailure)
-          });
+          result.skipped = { id: serverId, name: serverName, owned, reason: describeServerFailure(lastFailure) };
+          syncProgress.serverSkipped(serverId, result.skipped.reason);
         }
+        return result;
+      };
+
+      const serverScans = await mapOrderedWithConcurrency(servers, 3, scanServer);
+      for (const scan of serverScans) {
+        if (scan.accepted) {
+          allRawItems.push(...scan.historyItems);
+          sourceStats.pmsHistoryItems += scan.pmsHistoryCount;
+          if (!delta) {
+            allRawItems.push(...scan.libraryItems);
+            libraryAvailabilityItems.push(...scan.availabilityItems);
+            libraryWatchStateItems.push(...scan.watchStateItems);
+            scan.libraryGuids.forEach((guid) => currentLibraryGuids.add(guid));
+            sourceStats.libraryInventoryItems += scan.inventoryCount;
+            sourceStats.libraryWatchedItems += scan.libraryItems.length;
+          }
+          visitedSources.push(scan.visited);
+        }
+        if (scan.serverHistoryComplete) completeHistoryServers++;
+        if (!delta && scan.serverInventoryComplete) completeInventoryServers++;
+        if (scan.synced) syncedServers.push(scan.synced);
+        if (scan.skipped) skippedServers.push(scan.skipped);
       }
+      if (collectDeadline.aborted) incompleteSources.add('délai de collecte dépassé');
 
       const sourceCompletion = evaluatePlexSourceCompletion({
         delta,
@@ -1779,7 +1744,7 @@ async function startServer() {
               'X-Plex-Client-Identifier': plexClientIdentifier,
               'X-Plex-Product': 'SeenIt'
             },
-            signal: AbortSignal.timeout(6000)
+            signal: routeSignal(6000)
           });
           if (!response.ok) return null;
           const payload = await response.json();
@@ -1804,7 +1769,7 @@ async function startServer() {
               'X-Plex-Client-Identifier': plexClientIdentifier,
               'X-Plex-Product': 'SeenIt'
             },
-            signal: AbortSignal.timeout(4000)
+            signal: routeSignal(4000)
           });
           if (!response.ok) return null;
           return await response.json();
@@ -1825,7 +1790,7 @@ async function startServer() {
           const metadataUrl = `${entry.serverUri}/library/metadata/${encodeURIComponent(metadataKey)}?includeGuids=1`;
           const metadataResponse = await fetch(metadataUrl, {
             headers: { 'Accept': 'application/json', 'X-Plex-Token': entry.serverToken },
-            signal: AbortSignal.timeout(2500)
+            signal: routeSignal(2500)
           });
           if (!metadataResponse.ok) return null;
 
@@ -1976,12 +1941,14 @@ async function startServer() {
         };
       };
 
-      const enrichedEntries: any[] = [];
-      const ENRICH_CONCURRENCY = 6;
-      for (let index = 0; index < allRawItems.length; index += ENRICH_CONCURRENCY) {
-        const chunk = allRawItems.slice(index, index + ENRICH_CONCURRENCY);
-        enrichedEntries.push(...await Promise.all(chunk.map(enrichEntry)));
-      }
+      // File continue de 8 enrichissements, résultats dans l'ordre d'origine (SEENIT-PLEX-012).
+      let enrichedCount = 0;
+      syncProgress.setEnrich(0, allRawItems.length);
+      const enrichedEntries: any[] = await mapOrderedWithConcurrency(allRawItems, 8, async (entry) => {
+        const enriched = await enrichEntry(entry);
+        syncProgress.setEnrich(++enrichedCount, allRawItems.length);
+        return enriched;
+      });
 
       // 5. Normaliser sans aucune déduplication par titre ou année.
       // La déduplication fiable a lieu côté client après résolution du TMDB ID.
