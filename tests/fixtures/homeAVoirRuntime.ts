@@ -51,6 +51,7 @@ export const requestNotificationPermission = async () => { reminderControl.permi
 export const sendNativeNotification = async () => { reminderControl.nativeNotifications++; };
 export const EpisodeDetailModal = () => createElement('div', null, 'Fiche épisode');
 export const PersonDetailModal = () => null;
+export const PersonProfile = PersonDetailModal;
 const motionSeasons = new Map<number, {season_number:number;episode_count:number;episodes:Array<{season_number:number;episode_number:number;name:string;air_date:string;runtime:number}>}>();
 export const historyUnseenControl = { holdDetails: false, detailCalls: 0 };
 export const tmdb = { ...base.tmdb,

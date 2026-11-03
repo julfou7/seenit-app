@@ -261,7 +261,10 @@ Le retour terrain221 impose des titres de section homogènes16–18px non rogné
 Dans l'en-tête, l'anneau de synchronisation reste visible dès que Plex est connecté ; son point dit l'état de
 la dernière synchro (vert < 24 h, orange au-delà, rouge en échec, aucun pendant une synchro). Le toucher ouvre
 le panneau de synchro : progression, serveurs et pause pendant une synchro, sinon **Synchro rapide** (delta)
-et **Complète** (full). Un appui long de 480 ms lance directement la synchro rapide.
+et **Complète** (full). Un appui long de 480 ms lance directement la synchro rapide. Depuis le 03/11/2026
+(`SEENIT-PLEX-012`), le panneau affiche un vrai pourcentage en delta comme en complète, une ligne par serveur
+(nom, « 1,2 k vus », « 42 % », « hors ligne ») et tient en un écran ; la synchro complète lit les serveurs et
+leurs bibliothèques en parallèle, ne se relance plus d'elle-même et s'arrête proprement au bout de 10 min.
 
 L’écran comporte trois panneaux indépendants **À regarder**, **À venir** et **Historique**. Le scroll
 ne change jamais d’onglet ; aucun swipe ne navigue entre panneaux. Le header `seenit●` conserve l’état
@@ -506,7 +509,10 @@ diffuseur/Plex, **Moyenne par saison**, pastilles de saison, barres de notes et 
 sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L'épisode ajoute la soirée de
 trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
 et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮ ;
-aucun bouton de téléchargement n'est plus affiché dans les fiches.
+aucun bouton de téléchargement n'est plus affiché dans les fiches. Depuis les retours de la v1.4.247, le bouton
+or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, genres et thèmes sont sous le synopsis, tout est
+traduit (genres, « Self »), Où regarder n'affiche qu'un Netflix, la barre de navigation reste visible sur la
+fiche et une seule fiche acteur est utilisée partout (fiches, Explorer, Moi, À voir).
 
 Les bandes-annonces Film, Série, saisons, Explorer et actualités utilisent le même lecteur. Le nom courant
 et une seule ligne nature/langue restent lisibles dans l'en-tête ; lorsqu'il existe plusieurs vidéos, leur

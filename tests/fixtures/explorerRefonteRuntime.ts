@@ -30,6 +30,7 @@ export const isMovieUpcoming = () => false;
 const details = (id: number) => Promise.resolve({ ok: true, value: { ...media.find(item => item.id === id), id, overview: 'Un récit à découvrir.', genres: [{ id: 28, name: 'Action' }], videos: { results: [] } } });
 const list = async (_type: unknown = 'all', page = 1) => { telemetry.homePages.push(page); return { ok: true, value: { results: media.map(item=>({...item,id:item.id+(page-1)*100,title:'Page '+page+' | '+item.title,name:'Page '+page+' | '+item.name})), total_pages: 3 } }; };
 export const tmdb = {
+  peekRenderableMediaDetails: () => null,
   getPersonDetails: async (id: number) => ({ ok: true, value: { id, name: 'Bob Odenkirk', biography: 'Bob est un acteur.', profile_path: '/bob.svg', known_for_department: 'Acting' } }),
   getPersonCredits: async () => ({ ok: true, value: { cast: [{...media[1],id:7778,title:undefined,name:'Game of Thrones',media_type:'tv',character:'Personnage',episode_count:10}], crew: [] } }),
   getPersonImages: async () => ({ ok: true, value: { profiles: [] } }),
@@ -78,3 +79,7 @@ export async function authenticatedFetch(input: string, _init?: RequestInit) {
  return new Response(JSON.stringify({results:url.searchParams.get('q')?.toLowerCase().includes('saul')?[fixtureCharacter]:[],complete:true}),{status:200});
 }
 export const useShowActions = () => { const { shows: _shows, ...actions } = useShows(); return actions; };
+
+// Fiche acteur unique (SEENIT-UX-019) : ses dépendances réseau restent neutres dans ce harnais.
+export const requestNotificationPermission = async () => 'fixture-token';
+export const getAuthenticatedHeaders = async (headers: Record<string, string> = {}) => headers;

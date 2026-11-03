@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.247",
+  "applicationVersion": "1.4.248",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -100,6 +100,14 @@
         {
           "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 le smoke monte les vraies fiches et vérifie leurs parcours"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 parle français : genres TMDB, rôles génériques et plateformes dédoublonnées"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 une seule fiche acteur, la barre visible sur la fiche et un squelette au même gabarit"
         }
       ]
     },
@@ -1113,6 +1121,41 @@
         {
           "file": "tests/plexDeltaShortcut.test.ts",
           "contains": "SEENIT-PLEX-011 le backend lance Watchlist, activité cloud et serveurs ensemble"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-012",
+      "title": "Synchro Plex bornée, parallèle dans l'ordre d'origine, avec vrai pourcentage et panneau compact",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexSyncProgress.test.ts",
+          "contains": "SEENIT-PLEX-012 calcule un vrai pourcentage, jamais inventé, qui ne recule pas"
+        },
+        {
+          "file": "tests/plexSyncProgress.test.ts",
+          "contains": "SEENIT-PLEX-012 publie l’avancement au plus toutes les 1,5 s, après 2 s, sans jamais reculer"
+        },
+        {
+          "file": "tests/plexSyncProgress.test.ts",
+          "contains": "SEENIT-PLEX-012 exécute en parallèle borné et rend les résultats dans l’ordre d’origine"
+        },
+        {
+          "file": "tests/plexSyncProgress.test.ts",
+          "contains": "SEENIT-PLEX-012 ne relance jamais une collecte expirée et le dit clairement"
+        },
+        {
+          "file": "tests/plexSyncProgress.test.ts",
+          "contains": "SEENIT-PLEX-012 le backend lit les serveurs en parallèle, s’arrête à la déconnexion et à 10 min"
+        },
+        {
+          "file": "tests/plexSyncProgress.test.ts",
+          "contains": "SEENIT-PLEX-012 regroupe les toasts et compacte le panneau de synchro"
         }
       ]
     },

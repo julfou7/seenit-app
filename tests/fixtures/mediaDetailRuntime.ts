@@ -8,6 +8,7 @@ export const useShowsStore = create<{ shows: Show[] }>(() => ({ shows: [] }));
 export const openPlexWatchUrl = async () => { telemetry.opens.push('plex'); };
 export const DownloadModal = () => { telemetry.downloads++; return createElement('div', { 'data-fixture-download': 'true' }, 'Téléchargement'); };
 export const PersonDetailModal = () => createElement('div', { 'data-fixture-person': 'true' }, 'Fiche personne');
+export const PersonProfile = PersonDetailModal;
 export const EpisodeDetailModal = () => createElement('div', { 'data-fixture-episode': 'true' }, 'Fiche épisode');
 export const TrailerModal = () => { telemetry.trailers++; return createElement('div', { 'data-fixture-trailer': 'true' }, 'Bande-annonce'); };
 export const isMovieAtCinema = (media: { seenitAtCinema?: boolean } | null | undefined) => Boolean(media?.seenitAtCinema);
@@ -18,7 +19,7 @@ const names = ['Live Free or Die', 'Madrigal', 'Hazard Pay', 'Fifty-One', 'Dead 
 export const seriesSeason = (season: number) => ({
   season_number: season,
   episodes: Array.from({ length: season === 5 ? 16 : 13 }, (_, index) => ({ id: season * 100 + index, episode_number: index + 1, name: season === 5 ? names[index] : `Épisode ${index + 1}`, overview: season === 5 && index === 15 ? 'Fin de Walt : il revient une dernière fois au Nouveau-Mexique.' : `Résumé de l’épisode ${index + 1}.`, still_path: '/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg', air_date: `${2007 + season}-0${1 + (index % 8)}-1${index % 9}`, runtime: 47, vote_average: season === 5 ? ratings[index] : 8 + (index % 5) / 10 })),
-  videos: { results: season === 5 ? [{ site: 'YouTube', key: 'season5' }] : [] },
+  videos: { results: season === 5 ? [{ site: 'YouTube', key: 'season5', name: 'Saison 5' }] : [] },
 });
 
 export const recommendationControl = { results: [] as unknown[], directorCredits: null as unknown, actorCredits: {} as Record<number, unknown> };
@@ -41,7 +42,7 @@ export const syncSingleItem = async () => {};
 export const useMediaPresence = () => ({ plexInfo: { available: true, serverName: 'Julien-NAS' }, episodesHasFile: {}, seasonsHasFile: {}, hasFile: false, sonarrHasFile: false });
 Object.assign(tmdb, {
   getEpisodeDetails: async () => ({ ok: false }),
-  peekWatchProviders: () => ({ results: { FR: { flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' }] } } }),
+  peekWatchProviders: () => ({ results: { FR: { flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' }], ads: [{ provider_id: 1796, provider_name: 'Netflix Standard with Ads', logo_path: '/kICQccvOh8AIBMHGkBXJ047xeHN.jpg' }] } } }),
   getWatchProviders: async () => ({ ok: true, value: { results: {} } }),
 });
 // downloadConfigStore (fonction Téléchargements désactivée par défaut) et Firestore neutres.

@@ -75,7 +75,7 @@ La [navigation 13j](../design/navbar-13j.md) remplace la barre pleine largeur :
   acquitté à l'ouverture sans modifier les transferts ; aucun polling supplémentaire ;
 - appui long 480 ms/clic droit/Maj+F10 : Ce soir/À Regarder, recherche Explorer avec focus,
   réglages rapides Moi, Recherche C411 ; le mouvement/cancel/démontage annule le geste et son clic final ;
-- fiches/dialogues plein écran masquent la barre ; contenu à 84 px plus safe area et toasts à
+- les dialogues plein écran masquent la barre ; la fiche média et les Réglages la gardent (`SEENIT-UX-019`) ; contenu à 84 px plus safe area et toasts à
   80 px avec barre, 24 px sans barre. L'avatar de l'accueil disparaît, les informations de sync restent ;
 - l'onglet actif est annoncé par `aria-current` en plus de son état visuel or.
 

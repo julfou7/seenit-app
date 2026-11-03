@@ -6,7 +6,6 @@ import { Capacitor } from '@capacitor/core';
 import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { MediaDetailColdShell } from './MediaDetailColdShell';
-import { PersonDetailModal } from './PersonDetailModal';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
 import { EpisodeRatingsChart } from '../components/EpisodeRatingsChart';
 import { useShows } from '../hooks/useShows';
@@ -36,7 +35,7 @@ import { buildMediaShareUrl } from '../features/navigation/mediaShareUrl';
 import { getParentalRatingColorClass, resolveParentalRating } from '../features/shows/parentalRating';
 import {
   type ShowDetailScreenProps,
-  getCleanProviderName,
+  dedupeProvidersByName,
   getEpisodeAirDateLabel,
   getKeywordsFromDetails,
   getProviderDirectLink,
@@ -377,17 +376,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  const uniqueProviders = useMemo(() => {
-    if (!providers) return [];
-    const allList = [...(providers.flatrate || []), ...(providers.ads || []), ...(providers.free || [])];
-    const uniqueMap = new Map();
-    allList.forEach((p: any) => {
-      const cleanName = getCleanProviderName(p);
-      const key = cleanName.toLowerCase().trim();
-      if (!uniqueMap.has(key)) uniqueMap.set(key, { ...p, provider_name: cleanName });
-    });
-    return Array.from(uniqueMap.values());
-  }, [providers]);
+  const uniqueProviders = useMemo(() => providers ? dedupeProvidersByName([...(providers.flatrate || []), ...(providers.ads || []), ...(providers.free || [])]) : [], [providers]);
 
   const sortedProviders = useMemo(() => {
     const list: any[] = [...uniqueProviders];

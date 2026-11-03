@@ -184,16 +184,11 @@ async function testCharacterJourney(client,root,width,shot) {
  await click('[...document.querySelectorAll("[aria-label=Personnages] button")].find(b=>b.textContent.includes("Saul Goodman"))');
  await check(client,'document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman"','réouverture personnage après retours successifs');
  await click(q('[aria-label="Joué par Bob Odenkirk"]'));
- await check(client,'[...document.querySelectorAll("[data-dialog-layer]")].some(n=>n.getAttribute("aria-label")==="Fiche personne" && n.textContent.includes("Bob Odenkirk"))','P-04 ouvre la fiche acteur réelle');
- await check(client,'[...document.querySelectorAll("[aria-label=\\\"Fiche personne\\\"] .media-grid-card")].some(n=>n.textContent.includes("Game of Thrones"))','filmographie acteur chargée');
- await evaluate(client,'[...document.querySelectorAll("[aria-label=\\\"Fiche personne\\\"] .media-grid-card")].find(n=>n.textContent.includes("Game of Thrones")).querySelector("button").dispatchEvent(new MouseEvent("contextmenu",{bubbles:true,cancelable:true}))');
- await check(client,'[...document.querySelectorAll("[aria-label=\\\"Aperçu du média\\\"] button")].some(b=>b.textContent===\"Retirer d’À voir\" && !b.disabled)','retrait actif depuis la fiche acteur');
- await click('[...document.querySelectorAll("[aria-label=\\\"Aperçu du média\\\"] button")].find(b=>b.textContent===\"Retirer d’À voir\")');
- await check(client,'!window.__explorer.shows().some(show=>show.id==="local-got")','aperçu acteur retire sans réinitialiser');
- await evaluate(client,'window.__explorer.undoToast()');
- await check(client,'window.__explorer.shows().find(show=>show.id==="local-got")?.episodeRecords["1x1"]?.watchedAt===123','annuler acteur conserve les données de visionnage');
+ await check(client,'[...document.querySelectorAll("[data-dialog-layer]")].some(n=>/^Acteur : /.test(n.getAttribute("aria-label")||"") && n.textContent.includes("Bob Odenkirk"))','P-04 ouvre la fiche acteur réelle');
+ // SEENIT-UX-019 : la fiche acteur unique (celle des billets) remplace l'ancienne fiche personne.
+ await check(client,'[...document.querySelectorAll("[data-dialog-layer]")].some(n=>/^Acteur : /.test(n.getAttribute("aria-label")||"") && n.textContent.includes("Game of Thrones") && n.textContent.includes("Ton lien avec"))','filmographie acteur chargée dans la fiche unique');
  await evaluate(client,'history.back()');
- await check(client,'![...document.querySelectorAll("[data-dialog-layer]")].some(n=>n.getAttribute("aria-label")==="Fiche personne") && document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman"','retour acteur vers personnage');
+ await check(client,'![...document.querySelectorAll("[data-dialog-layer]")].some(n=>/^Acteur : /.test(n.getAttribute("aria-label")||"")) && document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman"','retour acteur vers personnage');
  await click(q('.character-works>button'));
  await check(client,'Boolean(document.querySelector("#media-target")) && history.state.selectedShow?.id===1396 && history.state.selectedShow?.episode===2','P-06 épisode propre au personnage');
  await click(q('#mark-character-seen'));

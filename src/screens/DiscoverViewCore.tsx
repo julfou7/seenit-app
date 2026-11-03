@@ -5,7 +5,7 @@ import { DiscoverSearchDock } from '../components/DiscoverSearchDock';
 import { DiscoverSearchResults } from '../components/DiscoverSearchResults';
 import { PreviewModal } from '../components/GridMediaCard';
 import { PersonCard } from '../components/cards/PersonCard';
-import { PersonDetailModal } from './PersonDetailModal';
+import { PersonProfile as PersonDetailModal } from '../components/PersonProfile';
 import { FilterModal, type FilterTab } from '../components/FilterModal';
 import { TrailerModal } from '../components/TrailerModal';
 import { isSearchCompatibleCategory } from '../features/discover/filterPolicy';

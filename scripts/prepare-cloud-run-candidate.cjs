@@ -112,6 +112,22 @@ function applySeenItFinOpsBounds(lines) {
   forceTemplateAnnotation(lines, 'run.googleapis.com/cpu-throttling', "'true'");
 }
 
+// SEENIT-PLEX-012 : une synchro Plex complète peut durer jusqu'à 10 min ; Cloud Run coupe à 300 s par défaut.
+const SEENIT_REQUEST_TIMEOUT_SECONDS = 900;
+
+function forceTemplateRequestTimeout(lines, seconds = SEENIT_REQUEST_TIMEOUT_SECONDS) {
+  const templateIndex = lines.findIndex(line => /^  template:\s*$/.test(line));
+  const specIndex = lines.findIndex((line, index) => index > templateIndex && /^    spec:\s*$/.test(line));
+  if (templateIndex < 0 || specIndex < 0) throw new Error('Bloc spec.template.spec introuvable dans l’export Cloud Run.');
+  const specEndCandidate = lines.findIndex((line, index) => index > specIndex && /^ {0,4}[A-Za-z0-9_-]+:\s*/.test(line));
+  const specEnd = specEndCandidate < 0 ? lines.length : specEndCandidate;
+  const matches = [];
+  for (let index = specIndex + 1; index < specEnd; index += 1) if (/^      timeoutSeconds:\s*/.test(lines[index])) matches.push(index);
+  if (matches.length > 1) throw new Error('timeoutSeconds Cloud Run dupliqué.');
+  if (matches.length === 1) lines[matches[0]] = `      timeoutSeconds: ${seconds}`;
+  else lines.splice(specIndex + 1, 0, `      timeoutSeconds: ${seconds}`);
+}
+
 function getSingleContainerBounds(lines, imageIndex) {
   let containerStart = imageIndex;
   while (containerStart >= 0 && !/^      - [A-Za-z0-9_-]+:\s*/.test(lines[containerStart] || '')) {
@@ -421,6 +437,7 @@ function prepareCandidateService(source, { image, service, previousRevision, can
     return true;
   });
   applySeenItFinOpsBounds(lines);
+  forceTemplateRequestTimeout(lines);
 
 
   let imageIndexes = [];

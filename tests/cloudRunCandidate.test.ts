@@ -65,6 +65,12 @@ test('SEENIT-RUNTIME-001 prépare une candidate image en conservant la configura
   assert.match(prepared, /autoscaling\.knative\.dev\/maxScale: '2'/);
   assert.match(prepared, /run\.googleapis\.com\/cpu-throttling: 'true'/);
   assert.doesNotMatch(prepared, /run\.googleapis\.com\/(?:vpc-access-connector|vpc-access-egress|network-interfaces)/);
+  // SEENIT-PLEX-012 : délai de requête porté à 900 s pour la synchro Plex complète (bornée à 10 min).
+  assert.match(prepared, /\n    spec:\n      timeoutSeconds: 900\n      containerConcurrency: 80/);
+  assert.equal((prepared.match(/timeoutSeconds:/g) || []).length, 1);
+  const withTimeout = prepareCandidateService(exportedService.replace('      containerConcurrency: 80', '      timeoutSeconds: 300\n      containerConcurrency: 80'), baseOptions);
+  assert.match(withTimeout, /timeoutSeconds: 900/);
+  assert.doesNotMatch(withTimeout, /timeoutSeconds: 300/);
   assert.match(prepared, /client\.knative\.dev\/nonce: keep-me/);
   assert.match(prepared, /KEEP_ENV/);
   assert.match(prepared, /keep-value/);

@@ -7,7 +7,7 @@ import { UpcomingShowCard, getUpcomingEpisodeInfo } from '../components/cards/Up
 import { HistoryFeed } from '../components/HistoryFeed';
 import { HomeNotifications } from '../components/HomeNotifications';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
-import { PersonDetailModal } from './PersonDetailModal';
+import { PersonProfile as PersonDetailModal } from '../components/PersonProfile';
 import { useSyncStore } from '../store/syncStore';
 import { HomeSyncIndicator } from '../components/HomeSyncIndicator';
 import { auth } from '../lib/firebase';

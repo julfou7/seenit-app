@@ -9,7 +9,6 @@ import { UpToDateShowCard, getUpToDateOrNewSeasonCategory } from '../components/
 import { UpcomingShowCard, getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
 import { HistoryFeed } from '../components/HistoryFeed';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
-import { PersonDetailModal } from './PersonDetailModal';
 import { tmdb } from '../features/shows/tmdb';
 import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
@@ -225,11 +224,12 @@ function ExpandedLegacyItemCard({ show, sectionType, onShowClick, onEpisodeClick
     }
   };
 
+  const legacyShow = show as Show & { release_date?: string; releaseDate?: string; year?: number | string; genres?: Array<string | { name?: string }> };
   const movieYear = show.firstAirDate?.slice(0, 4)
     || movieDetails?.release_date?.slice(0, 4)
-    || (show as any).release_date?.slice(0, 4)
-    || (show as any).releaseDate?.slice(0, 4)
-    || ((show as any).year ? String((show as any).year) : null);
+    || legacyShow.release_date?.slice(0, 4)
+    || legacyShow.releaseDate?.slice(0, 4)
+    || (legacyShow.year ? String(legacyShow.year) : null);
 
   const movieMetaParts: string[] = [];
   if (movieYear) movieMetaParts.push(movieYear);
@@ -240,11 +240,11 @@ function ExpandedLegacyItemCard({ show, sectionType, onShowClick, onEpisodeClick
   // Genre / Thème du film (un seul style au lieu de deux)
   const movieGenres: string[] = [];
   if (movieDetails?.genres && Array.isArray(movieDetails.genres)) {
-    movieDetails.genres.forEach((g: any) => {
+    movieDetails.genres.forEach((g: { name?: string } | null) => {
       if (g?.name) movieGenres.push(g.name);
     });
-  } else if ((show as any).genres && Array.isArray((show as any).genres)) {
-    (show as any).genres.forEach((g: any) => {
+  } else if (Array.isArray(legacyShow.genres)) {
+    legacyShow.genres.forEach(g => {
       if (typeof g === 'string') movieGenres.push(g);
       else if (g?.name) movieGenres.push(g.name);
     });

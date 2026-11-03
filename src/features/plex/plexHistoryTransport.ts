@@ -2,7 +2,7 @@ import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import { auth } from '../../lib/firebase';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
-import { buildNativeBackendAttempts, executeBackendAttempts } from '../../lib/nativeBackendRetry';
+import { buildNativeBackendAttempts, executeBackendAttempts, isBackendTimeoutError, isRetryableBackendNetworkError } from '../../lib/nativeBackendRetry';
 import { resolveSeenItApiCandidates } from '../../lib/seenitApi';
 import { appLogger } from '../../store/logStore';
 import { getPlexSyncRetryAt, rememberPlexSyncRetry, PlexSyncHttpError, plexRetryAfter } from './plexSyncRetry';
@@ -70,7 +70,13 @@ function normalizeUnexpectedAbort(error: unknown): unknown {
     : error;
 }
 
-async function createRequestLifecycle(isNative: boolean): Promise<PlexRequestLifecycle | null> {
+/** SEENIT-PLEX-012 : 12 min pour une collecte complète (le backend s'arrête à 10 min), 45 s pour une delta. */
+export const PLEX_FULL_REQUEST_TIMEOUT_MS = 12 * 60_000;
+export const PLEX_DELTA_REQUEST_TIMEOUT_MS = 45_000;
+/** Une collecte expirée n'est jamais relancée : seule une panne DNS ou de connexion essaie l'origine suivante. */
+export const isRetryablePlexCollectError = (error: unknown) => isRetryableBackendNetworkError(error) && !isBackendTimeoutError(error);
+
+async function createRequestLifecycle(isNative: boolean, abortOnBackground = true): Promise<PlexRequestLifecycle | null> {
   const pageDocument = typeof document === 'undefined' ? null : document;
   if (!pageDocument && !isNative) return null;
 
@@ -86,7 +92,8 @@ async function createRequestLifecycle(isNative: boolean): Promise<PlexRequestLif
     waiters.clear();
   };
   const markBackground = () => {
-    if (!active) return;
+    // Une collecte complète continue en arrière-plan : l'interrompre referait tout le scan (SEENIT-PLEX-012).
+    if (!active || !abortOnBackground) return;
     active = false;
     lifecycleEpoch += 1;
     activeController?.abort();
@@ -112,16 +119,16 @@ async function createRequestLifecycle(isNative: boolean): Promise<PlexRequestLif
   };
 }
 
-export async function fetchPlexHistoryData(uid: string, token: string, clientId: string, delta: boolean, since?: number): Promise<PlexHistoryPayload> {
+export async function fetchPlexHistoryData(uid: string, token: string, clientId: string, delta: boolean, since?: number, syncId?: string): Promise<PlexHistoryPayload> {
   assertCurrentUser(uid);
   const retryAt = getPlexSyncRetryAt(uid);
   if (retryAt) throw new PlexSyncHttpError(429, retryAt);
   const isNative = Capacitor.isNativePlatform();
   const urls = resolveSeenItApiCandidates('/api/plex/history', isNative);
-  const timeoutMs = delta ? 45_000 : 120_000;
-  const payload = { clientId, delta, since };
+  const timeoutMs = delta ? PLEX_DELTA_REQUEST_TIMEOUT_MS : PLEX_FULL_REQUEST_TIMEOUT_MS;
+  const payload = { clientId, delta, since, syncId };
   const headers = { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Plex-Token': token };
-  const lifecycle = await createRequestLifecycle(isNative);
+  const lifecycle = await createRequestLifecycle(isNative, delta);
 
   const webRequest = async (url: string): Promise<PlexHistoryPayload> => {
     for (;;) {
@@ -140,7 +147,7 @@ export async function fetchPlexHistoryData(uid: string, token: string, clientId:
       } catch (error) {
         lifecycleInterrupted = Boolean(lifecycle && lifecycle.epoch() !== requestEpoch);
         if (!lifecycleInterrupted) {
-          if (timedOut && isAbortLikeError(error)) throw new Error(`Plex history request timeout after ${Math.round(timeoutMs / 1000)}s`);
+          if (timedOut && isAbortLikeError(error)) throw new Error(`Délai de synchronisation Plex dépassé (timeout ${Math.round(timeoutMs / 1000)} s)`);
           throw normalizeUnexpectedAbort(error);
         }
       } finally {
@@ -190,6 +197,7 @@ export async function fetchPlexHistoryData(uid: string, token: string, clientId:
     const data = isNative ? await executeBackendAttempts({
       attempts: buildNativeBackendAttempts({ urls, nativeRequest, webViewRequest: webRequest }),
       delaysMs: [250, 500, 1000],
+      isRetryable: isRetryablePlexCollectError,
       onRetry: ({ nextTransport, attempt }) => appLogger.warn('plex', `Connexion Plex indisponible, tentative ${attempt + 1} via ${nextTransport}.`),
     }) : await webRequest(urls[0]);
     appLogger.success('plex', `Données Plex reçues : ${data.history?.length || 0} visionnage(s), ${data.watchlist?.length || 0} watchlist`);
