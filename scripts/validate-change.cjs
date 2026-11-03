@@ -9,19 +9,59 @@ function writeMetric(name, seconds) {
   fs.appendFileSync(process.env.GITHUB_ENV, `${name}=${seconds}\n`, 'utf8');
 }
 
+const FAILURE_LINE = /❌|^\s*not ok \d|AssertionError|ERR_[A-Z_]+|error TS\d+|^\s*(?:Error|TypeError|SyntaxError|ReferenceError)\b|^\s*(?:expected|actual):/;
+
+/** Lignes qui disent pourquoi une étape a échoué, sans le bruit des étapes vertes (bornées, dédupliquées). */
+function extractFailureLines(output, limit = 20) {
+  const lines = [];
+  for (const raw of String(output || '').split(/\r?\n/)) {
+    const line = raw.replace(/\u001b\[[0-9;]*m/g, '').trimEnd();
+    if (!FAILURE_LINE.test(line) || lines.includes(line.trim())) continue;
+    lines.push(line.trim());
+    if (lines.length >= limit) break;
+  }
+  return lines;
+}
+
+/**
+ * Annotation GitHub `::error` : la cause exacte devient lisible par l'API des check-runs
+ * (`GET /repos/{owner}/{repo}/check-runs/{job_id}/annotations`), sans télécharger les logs (AGENTS §0.3b).
+ */
+function formatFailureAnnotation(label, lines) {
+  const escape = text => String(text).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  const body = lines.length ? lines.join('\n') : 'Aucune ligne de diagnostic reconnue : lire le log du job.';
+  return `::error title=${escape(`Validate Change — ${label}`).replace(/[:,]/g, ' ')}::${escape(body)}`;
+}
+
+function reportFailure(label, output) {
+  const lines = extractFailureLines(output);
+  console.log(formatFailureAnnotation(label, lines));
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n### ❌ ${label}\n\n\`\`\`text\n${lines.join('\n') || 'voir le log du job'}\n\`\`\`\n`, 'utf8');
+  }
+}
+
 function run(command, args, options = {}) {
   const label = options.label || [command, ...args].join(' ');
   const started = Date.now();
   console.log(`\n[Validate Change] ${label}`);
+  // En CI, la sortie est capturée puis réémise pour annoter la cause exacte ; en local, rien ne change.
+  const annotate = process.env.GITHUB_ACTIONS === 'true';
   const result = spawnSync(command, args, {
     cwd: root,
-    stdio: 'inherit',
+    stdio: annotate ? ['inherit', 'pipe', 'pipe'] : 'inherit',
+    maxBuffer: 256 * 1024 * 1024,
     env: { ...process.env, ...(options.env || {}) }
   });
+  if (annotate) {
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+  }
   const seconds = Math.ceil((Date.now() - started) / 1000);
   if (options.metric) writeMetric(options.metric, seconds);
   if (result.error) throw result.error;
   if (result.status !== 0) {
+    if (annotate) reportFailure(label, `${result.stdout || ''}\n${result.stderr || ''}`);
     const error = new Error(`${label} a échoué avec le code ${result.status}.`);
     error.exitCode = result.status || 1;
     throw error;
@@ -204,6 +244,8 @@ function main() {
 }
 
 module.exports = {
+  extractFailureLines,
+  formatFailureAnnotation,
   parsePhase,
   readClassification,
   resolveNpmInvocation,

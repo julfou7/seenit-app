@@ -707,6 +707,8 @@ async function main() {
 if (require.main === module) {
   main().catch(error => {
     console.error(`[PWA Browser] ❌ ${error.message}`);
+    // Cause exacte lisible par l'API des check-runs, sans télécharger les logs (AGENTS §0.3b).
+    if (process.env.GITHUB_ACTIONS === 'true') console.log(`::error title=PWA Browser Quality Gate::${String(error.message).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')}`);
     process.exitCode = 1;
   });
 }

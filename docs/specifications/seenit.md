@@ -1668,6 +1668,9 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   applicable et build restent distincts et obligatoires. Le résumé expose le mode, le cache et les
   durées. La cible nominale est une médiane de 45 s et un p95 de 90 s sur 20 validations consécutives ;
   un plafond dur de 10 minutes transforme toute dérive d'infrastructure prolongée en échec explicite.
+  En CI, une étape rouge publie sa cause exacte en annotation `::error` (lignes `❌`, `not ok`, `ERR_…`,
+  `error TS…`), lisible sans log par `GET …/check-runs/<job_id>/annotations` ; la procédure de lecture est
+  AGENTS §0.3b.
 - **SEENIT-QUALITY-009** — Un correctif ciblé dont l'issue, la cause racine et le périmètre sont déjà
   établis suit une intervention bornée : l'agent lit la carte fonctionnelle et les sections canoniques
   directement concernées, conserve l'accès aux index complets sans reconstruire l'historique global,
