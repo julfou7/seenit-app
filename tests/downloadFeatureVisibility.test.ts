@@ -60,28 +60,18 @@ test('SEENIT-DOWNLOAD-VISIBILITY-001 verrouille toutes les mentions de télécha
   const liveStoreSource = readFileSync(new URL('../src/store/liveDownloadStore.ts', import.meta.url), 'utf8');
   const presenceSource = readFileSync(new URL('../src/store/mediaPresenceStore.ts', import.meta.url), 'utf8');
 
-  // Fiche Film/Série : bouton principal, fallback « Où regarder », saisons/épisodes et action du menu « … ».
-  assert.match(showCoreSource, /\{\/\* Action Téléchargement \*\//);
-  assert.match(showCoreSource, /<span>Téléchargement<\/span>/);
-  assert.match(showCoreSource, /Télécharger la série \(1080p \/ 4K\)|Télécharger le film \(1080p \/ 4K\)/);
-  assert.match(showCoreSource, /Télécharger le film \(1 Clic\)/);
-  assert.match(showCoreSource, /Téléchargement 1-Clic/);
-  assert.match(showCoreSource, /Télécharger la saison/);
-  assert.match(showCoreSource, /Télécharger en 1 clic dans Sonarr/);
+  // SEENIT-UX-019 : les fiches refaites n'exposent plus de surface de téléchargement en ligne. Le seul
+  // accès est l'entrée existante « Téléchargement » du menu ⋮ (icône lucide-download, donc masquée par le gate).
+  const view = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
+  assert.equal((view.match(/<Download size=\{18\}[^>]*\/>Téléchargement<\/button>/g) || []).length, 1, 'une seule entrée Téléchargement, dans le menu ⋮');
+  for (const inline of [/Télécharger le film \(1 Clic\)/, /Téléchargement 1-Clic/, /Télécharger la saison/, /Télécharger en 1 clic dans Sonarr/, /LiveDownloadBanner/, /handle1ClickDownload/, /Téléchargement en cours/]) {
+    assert.doesNotMatch(showCoreSource.replace(readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8'), '').replace(readFileSync(new URL('../src/screens/showDetailPresentation.ts', import.meta.url), 'utf8'), ''), inline);
+  }
   assert.match(showWrapperSource, /button:has\(svg\.lucide-download\)/);
-
-  // Les statuts de la fiche ne peuvent pas survivre au gate car l'état download est vidé.
-  assert.match(showCoreSource, /Téléchargement en cours/);
-  assert.match(showCoreSource, /Téléchargement terminé/);
-  assert.match(showCoreSource, /Téléchargement annulé/);
-  assert.match(showCoreSource, /Téléchargement interrompu/);
   assert.match(liveStoreSource, /downloads:\s*\[\]/);
 
-  // Détail épisode : bouton Télécharger, re-téléchargement, badge Téléchargé et bannière live.
-  assert.match(episodeCoreSource, /Télécharger S\{String\(currentSeason\)/);
-  assert.match(episodeCoreSource, /Télécharger à nouveau/);
-  assert.match(episodeCoreSource, /<span>Téléchargé<\/span>/);
-  assert.match(episodeCoreSource, /<LiveDownloadBanner items=\{\[epDownload\]\}/);
+  // Détail épisode : plus de bouton Télécharger ni de bannière live ; le gate reste en place.
+  for (const inline of [/DownloadModal/, /Télécharger à nouveau/, /<span>Téléchargé<\/span>/, /LiveDownloadBanner/, /Télécharger S\{/]) assert.doesNotMatch(episodeCoreSource, inline);
   assert.match(episodeWrapperSource, /button:has\(svg\.lucide-download\)/);
 
   // Le badge « Téléchargé » et la bannière deviennent impossibles quand le gate coupe Sonarr et vide le runtime.

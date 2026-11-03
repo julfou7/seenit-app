@@ -132,3 +132,13 @@ Cette décision remplace explicitement :
 Elle conserve les garde-fous d'identité exacte et d'absence de rustine nominative de `USR-2026-09-06-003`.
 
 Cette architecture est la cible canonique. Elle ne doit pas être remise en débat lors de l'implémentation sauf nouvelle décision produit explicite du propriétaire.
+
+## 10. Révision du 3 novembre 2026 — « Similaires, et pourquoi » (USR-2026-11-03-005)
+
+Décision explicite du propriétaire lors de la refonte des fiches (prototype du 24/10/2026) : la fiche
+**Film** retrouve une section **Similaires, et pourquoi**, à une condition stricte. Chaque titre doit porter
+une raison prouvée par TMDB et rapprochée par identifiant — même réalisateur (crédit `Director`), même
+acteur principal ou même genre principal. Sans raison prouvée, pas de carte. Les recommandations et
+similaires bruts ne remplissent toujours pas le bas d'une fiche, la section n'est jamais un repli d'une
+relation TVDB manquante, et aucun titre ni année ne sert à rapprocher deux œuvres. La fiche **Série** reste
+sans similaires ; l'ordre de visionnage TMDB et la franchise TVDB sont inchangés.

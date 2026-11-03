@@ -6,7 +6,7 @@ import { CANAL_ANDROID_PACKAGE, CANAL_WEB_URL, isCanalWebUrl } from '../src/lib/
 import { getProviderLinkPresentation } from '../src/features/providers/providerLink.ts';
 
 const presentationSource = readFileSync(new URL('../src/screens/showDetailPresentation.ts', import.meta.url), 'utf8');
-const viewSource = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
+const viewSource = ['../src/screens/ShowDetailView.tsx', '../src/screens/mediaDetail/detailUi.tsx'].map(path => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n');
 const utilsSource = readFileSync(new URL('../src/lib/utils.ts', import.meta.url), 'utf8');
 const manifestSource = readFileSync(new URL('../android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
 

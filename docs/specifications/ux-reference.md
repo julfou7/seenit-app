@@ -115,6 +115,10 @@ Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais 
   affiche un message de reprise.
 - Consulter l'épisode précédent/suivant ne modifie ni progression, ni Vu/Non vu, ni Plex, ni transfert.
 
+- Depuis `SEENIT-UX-019`, Précédent / Suivant sont en bas de la fiche (libellés `E13` / `E15`, 44 px) et
+  les cases de la courbe de saison ouvrent directement un épisode, avec une cible de 44 px de haut. Une
+  touche pendant une transition (300 ms) est ignorée, comme le swipe.
+
 La reconnaissance tactile réelle et le conflit avec les gestes système Android restent à valider au doigt
 sur appareil ; la CI couvre la logique, les surfaces accessibles et les garde-fous déterministes.
 
@@ -276,8 +280,9 @@ pas les pixels d'une capture particulière.
 - **Où regarder** conserve son titre stable. L'actualisation Plex est une icône attenante au titre,
   avec pictogramme discret mais cible de **44 × 44 CSS px**, nom accessible, `title`, état désactivé
   et rotation pendant l'actualisation. Le comportement réseau reste celui de #214/#206.
-- L'en-tête d'une saison est lui-même le contrôle d'ouverture/fermeture. La flèche dédiée disparaît
-  afin de libérer la largeur ; l'état reste annoncé par `aria-expanded`.
+- Depuis `SEENIT-UX-019` (03/11/2026), les saisons sont des **pastilles** : toucher une pastille
+  sélectionne sa saison (état annoncé par `aria-pressed`) et ne la referme jamais ; la carte de la saison
+  et ses lignes d'épisode s'affichent dessous.
 - L'action de masse emploie **Tout marquer vu** ou **Tout marquer non vu** selon l'intention réelle.
   Elle reste secondaire et compacte visuellement sans réduire sa compréhension.
 - Les portraits du casting gardent `object-fit: cover` avec un cadrage vertical orienté vers le haut
@@ -289,9 +294,9 @@ pas les pixels d'une capture particulière.
   conservée pour audit, elle est affichée en information secondaire et reste disponible au lecteur
   d'écran ; elle n'est jamais présentée comme une certification française.
 - Les notes visibles utilisent **TMDB uniquement** conformément à `SEENIT-RATING-001`. La fiche ne
-  préchauffe plus IMDb/OMDb et n'affiche plus de badge IMDb. Le graphique détaillé des épisodes vit dans
-  l'onglet **Épisodes**, utilise `vote_average` TMDB, se parcourt horizontalement pour les longues saisons
-  et conserve des cibles de 44 px. L'onglet **À propos** n'affiche pas un second résumé de ces notes.
+  préchauffe plus IMDb/OMDb et n'affiche plus de badge IMDb. **Moyenne par saison** et les barres de la
+  saison utilisent `vote_average` TMDB ; il n'y a plus d'onglets (un seul défilement, `SEENIT-UX-019`)
+  et chaque épisode garde une cible de 44 px (ligne et coche).
 
 Ces règles décrivent le runtime commun PWA/APK. Les captures 360/412 px, le clavier, le texte agrandi
 et TalkBack restent des preuves à produire sur la candidate de release, pas des règles alternatives.

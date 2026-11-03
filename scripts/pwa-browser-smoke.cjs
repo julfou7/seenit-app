@@ -16,6 +16,7 @@ const { buildWatchNextHarness, testWatchNextHarness } = require('./watch-next-br
 const { testTerrain220Harness } = require('./home-terrain220-browser-checks.cjs');
 const { testTerrain221Harness } = require('./home-terrain221-browser-checks.cjs');
 const { buildHomeHarness, testHomeHarness } = require('./home-a-voir-browser-checks.cjs');
+const { buildMediaDetailHarness, testMediaDetailHarness } = require('./media-detail-browser-checks.cjs');
 const { testHomePerformanceHarness } = require('./home-performance-browser-checks.cjs');
 const { testHomeUnseenHarness } = require('./home-unseen-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
@@ -529,6 +530,7 @@ function buildLaneGroups(config) {
       ['homeTerrain221', client => testTerrain221Harness(client, root)],
       ['homeTerrain222', client => testTerrain222Harness(client, root)],
       ['homeTerrain223', client => testTerrain223Harness(client, root)],
+      ['mediaDetail', client => testMediaDetailHarness(client)],
     ],
     [
       ['homeTerrain224', client => testTerrain224Harness(client, root)],
@@ -626,6 +628,7 @@ async function main() {
 
     await buildSearchKeyboardHarness(root);
     await buildHomeHarness(root);
+    await buildMediaDetailHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -638,7 +641,10 @@ async function main() {
 
     // Quatre navigateurs isolés (profil, stockage, horloge virtuelle) exécutent chacun un couloir dans
     // l'ordre historique ; SEENIT_PWA_LANES=1 rejoue exactement la séquence d'origine sur un seul client.
-    const groups = buildLaneGroups(config);
+    // SEENIT_PWA_ONLY=mediaDetail,home : rejoue localement quelques harnais seulement (jamais en CI).
+    const only = String(process.env.SEENIT_PWA_ONLY || '').split(',').map(key => key.trim()).filter(Boolean);
+    const groups = buildLaneGroups(config).map(tasks => only.length ? tasks.filter(([key]) => only.includes(key)) : tasks).filter(tasks => tasks.length > 0);
+    if (only.length && process.env.CI) throw new Error('SEENIT_PWA_ONLY est réservé au diagnostic local.');
     const lanes = resolveLaneCount(process.env.SEENIT_PWA_LANES, groups.length);
     const plan = lanes === 1 ? [groups.flat()] : groups;
     browsers = await Promise.all(plan.map(() => launchBrowser()));
@@ -659,6 +665,7 @@ async function main() {
       homeTerrain221: merged.homeTerrain221,
       homeTerrain222: merged.homeTerrain222,
       homeTerrain223: merged.homeTerrain223,
+      mediaDetail: merged.mediaDetail,
       homeTerrain224: merged.homeTerrain224,
       homeTerrain226: merged.homeTerrain226,
       homeTerrain227: merged.homeTerrain227,
@@ -675,7 +682,7 @@ async function main() {
       timings,
     };
     const homeReport = merged.home;
-    fs.writeFileSync(path.join(reportDir, 'home-a-voir.json'), JSON.stringify(homeReport, null, 2));
+    fs.writeFileSync(path.join(reportDir, 'home-a-voir.json'), JSON.stringify(homeReport ?? null, null, 2));
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.json'), `${JSON.stringify(report, null, 2)}\n`, 'utf8');
     fs.writeFileSync(path.join(reportDir, 'pwa-browser.md'), [
       '# Smoke navigateur PWA SeenIt',

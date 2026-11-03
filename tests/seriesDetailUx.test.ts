@@ -8,24 +8,26 @@ const core = readFeatureSource('showDetail');
 const episodeDetail = readFileSync(new URL('../src/screens/EpisodeDetailModalCore.tsx', import.meta.url), 'utf8');
 
 test('issue #216 garde le refresh Plex compact et accessible à côté du titre', () => {
-  assert.match(core, /<h3[^>]*>Où regarder<\/h3><button/);
+  assert.match(core, /<h3[^>]*>Où regarder<\/h3>\{onRefreshPlex && <button/);
   assert.match(core, /aria-label="Actualiser Plex"/);
   assert.match(core, /w-11 h-11/);
   assert.match(core, /RefreshCw size=\{16\}/);
-  assert.match(core, /isRefreshingPlex && "animate-spin"/);
+  assert.match(core, /refreshing=\{isRefreshingPlex\}/);
+  assert.match(core, /cn\(refreshing && 'animate-spin'\)/);
   assert.match(core, /refreshPlexServers: true/);
 });
 
 test('issue #216 simplifie saisons, thèmes et casting sans modifier leurs actions métier', () => {
   assert.doesNotMatch(core, /ChevronUp|ChevronDown/);
-  assert.match(core, /aria-expanded=\{expandedSeason === seasonNum\}/);
+  assert.match(core, /aria-pressed=\{on\}/, 'SEENIT-UX-019 : les saisons sont des pastilles sélectionnables');
+  assert.match(core, /if \(season !== expandedSeason\) void loadSeason\(season\)/, 'une pastille ne referme jamais sa saison');
   assert.match(core, /Tout marquer vu/);
   assert.match(core, /Tout marquer non vu/);
   assert.match(core, /object-\[50%_25%\]/);
-  assert.match(core, /line-clamp-2 min-h-\[2\.2em\]/);
-  assert.match(core, /areThemesExpanded && keywords\.map/);
+  assert.match(core, /line-clamp-2/);
+  assert.match(core, /expanded && keywords\.map/);
   assert.match(core, /`\+\$\{keywords\.length\} thèmes`/);
-  assert.match(core, /title=\{isFullyWatched \? "Marquer toute la saison comme non vue" : "Marquer toute la saison comme vue"\}/);
+  assert.match(core, /aria-label=\{fullyWatched \? 'Marquer toute la saison comme non vue' : 'Marquer toute la saison comme vue'\}/);
 });
 
 test('issue #216 hiérarchise la classification US sans perdre sa provenance', () => {
@@ -35,17 +37,21 @@ test('issue #216 hiérarchise la classification US sans perdre sa provenance', (
   assert.match(core, /<small[^>]*>\{ratingInfo\.provenance\}<\/small>/);
 });
 
-test('SEENIT-RATING-001 affiche le graphe uniquement dans Épisodes et uniquement depuis TMDB', () => {
-  assert.doesNotMatch(ratings, /createPortal|document\.getElementById|MutationObserver/);
-  const episodesSection = core.slice(core.indexOf('id="section-episodes"'), core.indexOf('id="section-casting"'));
-  assert.match(episodesSection, /<EpisodeRatingsChart/);
-  assert.doesNotMatch(core.slice(core.indexOf('id="section-about"'), core.indexOf('id="section-episodes"')), /<EpisodeRatingsChart/);
-  assert.match(ratings, /Source TMDB/);
-  assert.match(ratings, /episode\?\.vote_average/);
-  assert.doesNotMatch(ratings, /getSeasonImdbRatings|getEpisodeImdbVotes|omdbService|activeEpisodeVotes|hasFullImdbRatings/);
-  assert.doesNotMatch(episodeDetail, /getSeasonImdbRatings|getEpisodeImdbVotes|omdbService|episodeImdbRating|episodeImdbVotes/);
+test('SEENIT-RATING-001 affiche les notes de saison et d’épisode uniquement depuis TMDB', () => {
+  const seriesSections = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
+  const episodeSections = readFileSync(new URL('../src/screens/mediaDetail/episodeSections.tsx', import.meta.url), 'utf8');
+  const planning = readFileSync(new URL('../src/features/shows/detailPlanning.ts', import.meta.url), 'utf8');
+  // Moyenne par saison : seasons[].vote_average TMDB ; barres de saison : episode.vote_average TMDB.
+  assert.match(core, /seasonAverages\(tmdbDetails\?\.seasons\)/);
+  assert.match(planning, /vote_average/);
+  assert.match(seriesSections, /episode\.vote_average/);
+  assert.match(core, /★ \{tmdbRating\} TMDB/);
   assert.match(episodeDetail, /currentEpisode\?\.vote_average/);
-  assert.match(episodeDetail, />TMDB</);
-  assert.match(ratings, /w-11 min-w-11/);
-  assert.match(ratings, /overflow-x-auto/);
+  for (const source of [core, seriesSections, episodeSections, episodeDetail, planning]) assert.doesNotMatch(source, /getSeasonImdbRatings|getEpisodeImdbVotes|omdbService|episodeImdbRating|episodeImdbVotes|imdbRating/);
+  // Chaque épisode garde une cible de 44 px : ligne et coche dans la fiche série, case de la fiche épisode.
+  assert.match(seriesSections, /min-h-\[62px\]/);
+  assert.match(seriesSections, /w-11 h-11 shrink-0/);
+  assert.match(episodeSections, /className="flex-1 min-w-0 h-11 flex items-center"/);
+  assert.match(seriesSections, /overflow-x-auto/);
+  assert.doesNotMatch(ratings, /createPortal|document\.getElementById|MutationObserver/);
 });

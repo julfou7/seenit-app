@@ -58,6 +58,11 @@ test('SEENIT-RELATION-001 fige la décision durable après migration runtime', (
 
   const requirement = requirements.requirements.find((entry: { id: string }) => entry.id === 'SEENIT-RELATION-001');
   assert.ok(requirement, 'SEENIT-RELATION-001 doit rester déclarée dans requirements.json');
-  assert.equal(requirement.tests.length, 6);
-  assert.ok(requirement.tests.every((expected: { file: string }) => expected.file === 'tests/mediaRelationsSpecification.test.ts'));
+  assert.equal(requirement.tests.length, 8);
+  assert.ok(requirement.tests.every((expected: { file: string }) => ['tests/mediaRelationsSpecification.test.ts', 'tests/mediaDetailPrototype.test.ts'].includes(expected.file)));
+  // Révision explicite du propriétaire : « Similaires, et pourquoi » sur le film, raisons prouvées seulement.
+  assert.match(registry, /USR-2026-11-03-005[\s\S]*SEENIT-RELATION-001[\s\S]*active/);
+  assert.match(specification, /Similaires, et pourquoi[\s\S]*raison prouvée par TMDB[\s\S]*jamais un repli d'une\s+relation TVDB/);
+  assert.match(decision, /Révision du 3 novembre 2026[\s\S]*Sans raison prouvée, pas de carte/);
+  assert.match(agentInstructions, /Similaires, et pourquoi\*\* sur la fiche Film/);
 });

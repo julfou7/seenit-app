@@ -7,7 +7,7 @@ import {
   resolveLoadedAdjacentEpisode,
 } from '../src/features/navigation/episodeNavigation.ts';
 
-const coreSource = readFileSync(
+const coreSource = readFileSync(new URL('../src/screens/mediaDetail/episodeSections.tsx', import.meta.url), 'utf8') + readFileSync(
   new URL('../src/screens/EpisodeDetailModalCore.tsx', import.meta.url),
   'utf8',
 );

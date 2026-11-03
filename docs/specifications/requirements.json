@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.246",
+  "applicationVersion": "1.4.247",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -78,6 +78,28 @@
         {
           "file": "tests/explorerRefonte.test.ts",
           "contains": "SEENIT-DISCOVER-003"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-019",
+      "title": "Fiches série, film et épisode au style du prototype, en un seul défilement",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules notes TMDB connues"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 le smoke monte les vraies fiches et vérifie leurs parcours"
         }
       ]
     },
@@ -522,7 +544,7 @@
         },
         {
           "file": "tests/seriesDetailUx.test.ts",
-          "contains": "SEENIT-RATING-001 affiche le graphe uniquement dans Épisodes et uniquement depuis TMDB"
+          "contains": "SEENIT-RATING-001 affiche les notes de saison et d’épisode uniquement depuis TMDB"
         }
       ]
     },
@@ -2812,7 +2834,7 @@
     },
     {
       "id": "SEENIT-RELATION-001",
-      "title": "Relations de fiche simplifiées : TMDB pour l’ordre, TVDB pour les franchises, sans similaires",
+      "title": "Relations de fiche : TMDB pour l’ordre, TVDB pour les franchises, similaires film seulement avec raison prouvée",
       "targets": [
         "pwa",
         "apk",
@@ -2842,6 +2864,14 @@
         {
           "file": "tests/mediaRelationsSpecification.test.ts",
           "contains": "SEENIT-RELATION-001 fige la décision durable après migration runtime"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-RELATION-001 ne propose un similaire qu’avec une raison prouvée par TMDB"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-RELATION-001 rapproche par identifiant TMDB seulement, jamais par titre ou année"
         }
       ]
     },

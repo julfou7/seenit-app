@@ -779,6 +779,40 @@ export class TMDBClient {
     return snapshot;
   }
 
+  private movieRecommendationsCache = new BoundedCache<number, TmdbRecommendation[]>(40);
+  private personCreditsCache = new BoundedCache<number, unknown>(60);
+
+  /**
+   * Recommandations TMDB d'un film, pour « Similaires, et pourquoi » (SEENIT-RELATION-001). Ce n'est
+   * qu'un réservoir de candidats : chaque carte affichée doit ensuite porter une raison prouvée.
+   */
+  async getMovieRecommendations(movieId: number): Promise<Result<TmdbRecommendation[]>> {
+    const normalizedId = Number(movieId);
+    if (!Number.isSafeInteger(normalizedId) || normalizedId <= 0) return err(new Error('TMDB movie id invalide'));
+    const cached = this.movieRecommendationsCache.get(normalizedId);
+    if (cached) return ok(cached);
+    const url = new URL(`${this.baseUrl}/movie/${normalizedId}/recommendations?language=fr-FR&page=1`);
+    const res = await tryCatch(authenticatedFetch(url.toString()));
+    if (res.ok === false) return err(res.error);
+    if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
+    const data = await tryCatch(res.value.json() as Promise<{ results?: unknown }>);
+    if (data.ok === false) return err(data.error);
+    const raw = Array.isArray(data.value?.results) ? data.value.results as TmdbRecommendation[] : [];
+    const results = raw.filter(media => !isAdultOrParodyMedia(media));
+    this.movieRecommendationsCache.set(normalizedId, results);
+    return ok(results);
+  }
+
+  /** Crédits d'une personne mis en cache pour les raisons des similaires (réalisateur, acteur principal). */
+  async getCachedPersonCredits(personId: number): Promise<Result<unknown>> {
+    const normalizedId = Number(personId);
+    const cached = this.personCreditsCache.get(normalizedId);
+    if (cached) return ok(cached);
+    const result = await this.getPersonCredits(normalizedId);
+    if (result.ok && result.value) this.personCreditsCache.set(normalizedId, result.value);
+    return result;
+  }
+
   async getCollectionDetails(collectionId: number): Promise<Result<any>> {
     const normalizedId = Number(collectionId);
     const cached = this.collectionCache.get(normalizedId);
@@ -794,10 +828,10 @@ export class TMDBClient {
       const timeout = setTimeout(() => controller.abort(), 4000);
       try {
         const res = await tryCatch(authenticatedFetch(url.toString(), { signal: controller.signal }));
-        if (!res.ok) return err((res as any).error);
+        if (res.ok === false) return err(res.error);
         if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
         const data = await tryCatch(res.value.json());
-        if (!data.ok) return err((data as any).error);
+        if (data.ok === false) return err(data.error);
         if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
         if (data.value) this.collectionCache.set(normalizedId, data.value);
         return data;
@@ -1649,5 +1683,8 @@ export class TMDBClient {
     return data;
   }
 }
+
+/** Recommandation TMDB brute (candidat de « Similaires, et pourquoi »). */
+export interface TmdbRecommendation { id: number; title?: string; poster_path?: string | null; genre_ids?: number[]; media_type?: string; adult?: boolean; [key: string]: unknown }
 
 export const tmdb = new TMDBClient();

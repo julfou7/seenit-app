@@ -19,6 +19,10 @@ const featureFiles = {
     'src/screens/ShowDetailScreenCore.tsx',
     'src/screens/ShowDetailView.tsx',
     'src/screens/showDetailPresentation.ts',
+    'src/screens/mediaDetail/detailUi.tsx',
+    'src/screens/mediaDetail/detailSections.tsx',
+    'src/screens/mediaDetail/seriesSections.tsx',
+    'src/screens/mediaDetail/movieSections.tsx',
   ],
   sonarrRadarr: [
     'src/services/sonarrRadarr.ts',

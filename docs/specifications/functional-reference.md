@@ -499,6 +499,15 @@ présence Plex/Arr, bande-annonce, âge conseillé, casting, ordre de visionnage
 Reddit. Les recommandations contextuelles restent dans Explorer. Les modals personne et épisode restent
 dans la pile Retour.
 
+Depuis le 03/11/2026 (`SEENIT-UX-019`), les fiches série, film et épisode reprennent le prototype : un seul
+défilement sans onglets, hero titré en or, carte de progression avec **Marquer SxxEyy vu** et tuiles
+diffuseur/Plex, **Moyenne par saison**, pastilles de saison, barres de notes et lignes d'épisode,
+**Où regarder** en lignes, **Personnages**. Le film affiche « Si tu lances maintenant · Fin à HH:MM »,
+sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L'épisode ajoute la soirée de
+trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
+et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮ ;
+aucun bouton de téléchargement n'est plus affiché dans les fiches.
+
 Les bandes-annonces Film, Série, saisons, Explorer et actualités utilisent le même lecteur. Le nom courant
 et une seule ligne nature/langue restent lisibles dans l'en-tête ; lorsqu'il existe plusieurs vidéos, leur
 sélecteur reste dans une ligne dédiée plutôt que de remplacer la barre supérieure. Un simple code TMDB
