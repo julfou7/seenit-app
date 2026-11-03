@@ -77,3 +77,4 @@ export async function authenticatedFetch(input: string, _init?: RequestInit) {
  }
  return new Response(JSON.stringify({results:url.searchParams.get('q')?.toLowerCase().includes('saul')?[fixtureCharacter]:[],complete:true}),{status:200});
 }
+export const useShowActions = () => { const { shows: _shows, ...actions } = useShows(); return actions; };

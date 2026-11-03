@@ -148,6 +148,17 @@ export default function App() {
   }, []);
 
   const isReady = currentUser !== undefined;
+  // Le contenu est monté sous le splash dès la fin de son animation, puis le fondu ne commence qu'après
+  // sa première frame : l'Accueil n'est plus construit pendant le fondu, qui ne saccade plus.
+  const [splashAnimationDone, setSplashAnimationDone] = useState(false);
+  const [contentPainted, setContentPainted] = useState(false);
+  const mountContent = isReady && (splashAnimationDone || isSplashClosing);
+  useEffect(() => {
+    if (!mountContent || contentPainted) return;
+    let second = 0;
+    const first = requestAnimationFrame(() => { second = requestAnimationFrame(() => setContentPainted(true)); });
+    return () => { cancelAnimationFrame(first); cancelAnimationFrame(second); };
+  }, [mountContent, contentPainted]);
 
   useEffect(() => {
     if (!currentUser || window.location.pathname === '/tv/connect') return;
@@ -173,14 +184,15 @@ export default function App() {
     <>
       {showSplash && (
         <SplashScreen
-          isReady={isReady}
+          isReady={isReady && contentPainted}
           animate={true}
+          onAnimationDone={() => setSplashAnimationDone(true)}
           onStartClose={() => setIsSplashClosing(true)}
           onComplete={() => setShowSplash(false)}
         />
       )}
 
-      {isReady && isSplashClosing ? (
+      {mountContent ? (
         currentUser === null ? <LoginScreen /> : window.location.pathname === '/tv/connect'
           ? <Suspense fallback={<div role="status">Connexion SeenIt TV…</div>}><TvPairingPage user={currentUser} /></Suspense>
           : <MainApp />
@@ -254,8 +266,10 @@ function MainApp() {
     const requestId = ++detailOpenRequestRef.current;
     void loadShowDetailScreen();
 
+    // Lu à l'appel : dépendre de `shows` relançait le grand effet ci-dessous (écouteurs, BroadcastChannel,
+    // appels natifs) à chaque changement de bibliothèque, par exemple à chaque Vu.
     const matchingLocalShow = type === 'local'
-      ? shows.find(show => String(show.id) === String(id) || String(show.tmdbId) === String(id))
+      ? useShowsStore.getState().shows.find(show => String(show.id) === String(id) || String(show.tmdbId) === String(id))
       : undefined;
     const resolvedTmdbId = Number(
       type === 'tmdb' ? id : (tmdbId || matchingLocalShow?.tmdbId || 0),
@@ -281,7 +295,7 @@ function MainApp() {
         .catch(() => false);
       commitOpen();
     })();
-  }, [openShow, shows]);
+  }, [openShow]);
 
   const openLocalMedia = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     openShowSmooth(id, 'local', mediaType);
@@ -709,7 +723,7 @@ function MainApp() {
 
           {selectedShow && (
             <DialogLayer key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}`} label="Fiche média" onDismiss={closeShow} historyMode="external" blocking={false}
-              className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in slide-in-from-right duration-300 ease-out motion-reduce:animate-none pt-safe"
+              className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-right motion-reduce:animate-none pt-safe"
               style={{ willChange: 'transform' }}
             >
               <Suspense fallback={<div className="flex-1 bg-premium-ambient" aria-label="Chargement de la fiche" />}>

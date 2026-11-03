@@ -6,6 +6,7 @@ import { db, auth } from '../../lib/firebase';
 import { collection, doc, writeBatch, getDocs, getDocFromServer, runTransaction, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { tmdb } from '../shows/tmdb';
 import { fetchAuthoritativeShowsForUser, useShowsStore } from '../../store/showsStore';
+import { yieldToFrame } from './plexFrameBudget';
 import { type PlexSyncProgress, useSyncStore } from '../../store/syncStore';
 import { useToastStore } from '../../store/toastStore';
 import { openExternalUrl } from '../../lib/utils';
@@ -98,8 +99,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     let cloudPlexState: Record<string, any>;
     try {
       cloudPlexState = await loadPlexCloudState(user.uid);
-    } catch (error: any) {
-      const message = `Impossible de charger l’état Plex autoritatif du compte : ${error?.message || error}`;
+    } catch (error: unknown) {
+      const message = `Impossible de charger l’état Plex autoritatif du compte : ${error instanceof Error ? error.message : String(error)}`;
       appLogger.error('plex', message);
       if (!silent) useToastStore.getState().showToast(message, 'error');
       return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: message };
@@ -157,7 +158,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
     const progress: PlexSyncProgress = { uid: user.uid, mode: delta ? 'delta' : 'full', phase: 'collect', processed: 0, servers: [] };
     const publishStatus = (status: { message: string }) => useSyncStore.getState().setPlexSyncStatus({ ...status, progress: { ...progress } });
-    const waitForResume = async () => {
+    const waitForResume = async () => { await yieldToFrame();
       while (useSyncStore.getState().plexPauseUid === user.uid) {
         if (auth.currentUser?.uid !== user.uid) throw new Error('Compte SeenIt modifié pendant la pause Plex');
         await new Promise(resolve => setTimeout(resolve, 250));
@@ -211,7 +212,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const replacementCache: Record<string, PlexMediaInfo> = {};
         const cacheTimestamp = Date.now();
 
-        for (const entry of libraryAvailability) {
+        for (const entry of libraryAvailability) { await yieldToFrame();
           const tmdbId = Number(entry?.tmdbId);
           const mediaType: 'movie' | 'tv' | null = entry?.mediaType === 'tv' ? 'tv' : entry?.mediaType === 'movie' ? 'movie' : null;
           if (!Number.isFinite(tmdbId) || !mediaType || !entry?.serverId || !entry?.ratingKey) continue;
@@ -322,7 +323,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       // moins d'identités uniques. On préchauffe uniquement ces identités, avec une
       // concurrence bornée pour accélérer sans saturer TMDB ni Plex.
       const resolutionCandidates = new Map<string, { cacheKey: string; item: any }>();
-      for (const rawItem of history) {
+      for (const rawItem of history) { await yieldToFrame();
         const item = unwrapPlexMediaItem(rawItem);
         const isEpisode = item?.type === 'episode' || !!item?.grandparentTitle || !!item?.parentTitle;
         if (item?.type === 'season') continue;
@@ -338,7 +339,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           resolutionCandidates.set(cacheKey, { cacheKey, item });
         }
       }
-      for (const rawItem of watchlist) {
+      for (const rawItem of watchlist) { await yieldToFrame();
         const item = unwrapPlexMediaItem(rawItem);
         const mediaType: 'tv' | 'movie' = ['show', 'series', 'tv'].includes(String(item?.type || '').toLowerCase()) ? 'tv' : 'movie';
         const directTmdbId = extractTmdbIdFromPlex(item);
@@ -768,7 +769,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       // courant gagne sur un événement historique plus ancien. Une absence seule ne
       // vaut jamais dé-vu : seuls les états reçus ici peuvent supprimer une progression.
       if (hasLibraryWatchStates) {
-        for (const state of libraryWatchStates as PlexLibraryWatchState[]) {
+        for (const state of libraryWatchStates as PlexLibraryWatchState[]) { await yieldToFrame();
           if (!state || state.watched !== false) continue;
           const mediaType = state.mediaType === 'movie' ? 'movie' : 'tv';
           const matched = showsList.find(show => Number(show.tmdbId) === Number(state.tmdbId) && show.mediaType === mediaType);

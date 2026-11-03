@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { Archive, Trash2, Ban, Info, Clock, AlertCircle, RotateCcw, Bell, BellOff, Heart, HeartOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToastStore, ToastMessageObj } from '../store/toastStore';
-import { useShows } from '../hooks/useShows';
+import { useShowActions } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
 import { SeenItGlyph } from './SeenItLogo';
 import { isDownloadToastPresentation } from '../features/toasts/toastPresentation';
@@ -20,7 +20,7 @@ const PlexLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
 
 export function ToastContainer() {
   const { currentToast, queue, message, type, show, visible, onUndo, hideToast, clearQueuedScope } = useToastStore();
-  const { updateShow } = useShows();
+  const { updateShow } = useShowActions();
   const touchStartY = useRef<number | null>(null);
   const didDragRef = useRef(false);
 

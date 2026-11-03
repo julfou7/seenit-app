@@ -4,7 +4,7 @@ import { DialogLayer } from './ui/DialogLayer';
 import { UpcomingShowCard } from './cards/UpcomingShowCard';
 import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { useToastStore } from '../store/toastStore';
-import { useShows } from '../hooks/useShows';
+import { useShowActions } from '../hooks/useShows';
 import { auth } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
 import { tmdb } from '../features/shows/tmdb';
@@ -44,7 +44,7 @@ function Biography({ text }: { text: string }) {
 export function MovieActorProfile({ actor, origin, shows, onClose, onOpen }: Props) {
   const uid = auth.currentUser?.uid;
   const favorite = useFavoritePeopleStore(state => state.people.some(person => person.id === actor.id));
-  const { addShow } = useShows();
+  const { addShow } = useShowActions();
   const [person, setPerson] = useState(() => cachedActorPerson(uid, actor.id));
   const [credits, setCredits] = useState<ActorCredit[]>([]);
   const [error, setError] = useState(false), [attempt, setAttempt] = useState(0);

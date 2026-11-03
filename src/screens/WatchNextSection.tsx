@@ -1,5 +1,5 @@
 import './watchListHome.css';
-import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Show } from '../types';
 import type { SeriesCardAction } from '../components/cards/SeriesEpisodeCard';
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
@@ -177,6 +177,18 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     try { return show.seenEpisodes.includes('movie') ? await onUnseen(show, null) : await onMarkMovie(show); }
     catch (error) { setRetained(previous => { const next = { ...previous }; delete next[show.id]; return next; }); throw error; }
   };
+  // Billets films : rappels stables et acteur mis en cache par film jusqu'à un changement des données acteurs.
+  const ticketToggle = useLatestCallback(toggleMovie);
+  const ticketOpen = useLatestCallback(onOpen);
+  const openActorSheet = useCallback((actor: TicketActor, origin: Show) => setActorSheet({ actor, origin }), []);
+  const ticketActors = useMemo(() => new Map<string, TicketActor>(), [actorMetadata, favorites, actorIndex]);
+  const ticketActor = (show: Show) => {
+    const known = ticketActors.get(show.id);
+    if (known) return known;
+    const actor = selectTicketActor(actorMetadata.get(`movie:${show.tmdbId}`) || tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'), favorites, actorIndex);
+    if (actor) ticketActors.set(show.id, actor);
+    return actor;
+  };
   const [movieCount, setMovieCount] = useState(3);
   useEffect(() => {
     if (!active) return;
@@ -231,7 +243,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
       <div className="home-section-heading"><h2><span className="home-section-name">Films à voir</span><span className="home-count">{movies.length}</span></h2><HomeLayoutSwitch label="Films" list={movieList} onChange={switchMovies} /></div>
       <p className="home-movie-order">Ajouts les plus récents</p>
       <div className={movieList ? 'home-movie-list' : 'movie-ticket-rail'} id="films-a-voir-18c">
-        {orderedMovies.slice(0, movieList ? movieCount : movieRailLimit).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={onOpen} onToggle={toggleMovie} onRuntime={onRuntime} actor={selectTicketActor(actorMetadata.get(`movie:${show.tmdbId}`) || tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'), favorites, actorIndex)} onActor={actor => setActorSheet({ actor, origin: show })} />)}
+        {orderedMovies.slice(0, movieList ? movieCount : movieRailLimit).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={ticketOpen} onToggle={ticketToggle} onRuntime={onRuntime} actor={ticketActor(show)} onActor={openActorSheet} />)}
         {!movieList && <HomeLoadMore tile items={orderedMovies.slice(movieRailLimit)} onLoad={() => { rememberReveal('films-a-voir-18c'); setMovieRailLimit(count => count + HOME_PAGE_SIZE); }} />}
       </div>
       {movieList && <HomeLoadMore items={orderedMovies.slice(movieCount)} onLoad={() => setMovieCount(count => count + HOME_PAGE_SIZE)} />}

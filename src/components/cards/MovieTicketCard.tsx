@@ -18,7 +18,7 @@ const detailLimiter = createWatchProviderRequestLimiter(2);
 const detailGate = createPassiveCardEnrichmentGate(240);
 interface Props {
   actor?: TicketActor | null;
-  onActor?: (actor: TicketActor) => void;
+  onActor?: (actor: TicketActor, origin: Show) => void;
   layout?: 'poster' | 'horizontal';
   show: Show;
   start: number;
@@ -26,7 +26,9 @@ interface Props {
   onToggle: (show: Show) => void | boolean | Promise<void | boolean>;
   onRuntime: (id: string, runtime: number) => void;
 }
-export function MovieTicketCard({ actor = null, onActor, show, start, onOpen, onToggle, onRuntime, layout = 'poster' }: Props) {
+// Mémoïsé : un Vu, un toast ou l'arrivée d'une fiche voisine ne re-rend plus chaque billet (props stables).
+export const MovieTicketCard = React.memo(function MovieTicketCard({ actor = null, onActor, show, start, onOpen, onToggle, onRuntime, layout = 'poster' }: Props) {
+  const openActor = useCallback((selected: TicketActor) => onActor?.(selected, show), [onActor, show]);
   const cached = show.tmdbId ? tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie') : null;
   const [details, setDetails] = useState<unknown>(cached);
   const [phase, setPhase] = useState<{ kind: 'tear' | 'back'; sequence: number } | null>(null);
@@ -108,7 +110,7 @@ export function MovieTicketCard({ actor = null, onActor, show, start, onOpen, on
         <div className="movie-ticket__tint" aria-hidden="true" />
         <button className="movie-ticket__open" type="button" aria-label={`Ouvrir ${show.title}, film${year ? ` de ${year}` : ''}`} onClick={() => onOpen(show.id, 'movie')} />
         <div className="movie-ticket__poster" aria-hidden="true"><span>{initials}</span>{poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" loading="lazy" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}</div>
-        <div className="movie-ticket__info"><h3>{show.title}</h3>{actor && <MovieActorLine actor={actor} list onOpen={onActor} />}<p>{provider && <img src={provider} alt={providerName || 'Diffuseur'} title={providerName || undefined} loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}<span>{year}</span></p></div>
+        <div className="movie-ticket__info"><h3>{show.title}</h3>{actor && <MovieActorLine actor={actor} list onOpen={openActor} />}<p>{provider && <img src={provider} alt={providerName || 'Diffuseur'} title={providerName || undefined} loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}<span>{year}</span></p></div>
         {visibleWatched && <button type="button" className="movie-ticket__undo" aria-label={`Annuler le visionnage de ${show.title}`} disabled={pendingFrom !== null} onClick={toggle}><SeenItWatchedStamp screen className="movie-ticket__undo-stamp" /></button>}
       </div>
       <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span>{end?.afterMidnight ? 'après minuit' : 'fin à'}</span><strong className={end?.afterMidnight ? 'movie-ticket__late' : undefined}>{end ? end.label.replace('fin ', '') : '—'}</strong></div>
@@ -129,7 +131,7 @@ export function MovieTicketCard({ actor = null, onActor, show, start, onOpen, on
     </div>
     <h3>{show.title}</h3>
     <div className="movie-ticket__metadata"><span>{year}</span></div>
-    <MovieActorLine actor={actor} onOpen={onActor} />
+    <MovieActorLine actor={actor} onOpen={openActor} />
     <span className="sr-only" role="status" aria-live="polite">{error ? 'Le visionnage n’a pas pu être enregistré.' : phase ? `${show.title} marqué ${visibleWatched ? 'vu' : 'non vu'}` : ''}</span>
   </div>;
-}
+});

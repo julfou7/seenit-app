@@ -22,9 +22,13 @@ async function testTerrain224Harness(client,root) {
   const card = id => `[data-series-id="${id}"]`;
   const a=card('series-0'), last=card('series-1');
   await check(client,`document.querySelector('${a} .series-8f__code').textContent.includes('E02')`,'initial real resume');
+  // Rejet définitif : l'anneau parti au tap s'annule, l'erreur s'affiche et rien n'est marqué (SEENIT-UX-016).
+  await evaluate(client,`window.__homeAVoir.telemetry.failNext=true;document.querySelector('${a} .seenit-check').click()`);
+  await check(client,`window.__homeAVoir.telemetry.failNext===false && !window.__homeAVoir.snapshot().find(s=>s.id==='series-0').seenEpisodes.includes('1x2') && !document.querySelector('${a}').dataset.watchFeedback && !document.querySelector('${a} .series-8f__stamp') && document.querySelector('${a} .series-8f__code').textContent.includes('E02') && !document.querySelector('${a} .seenit-check').disabled`,'instant-ring-rollback');
   await evaluate(client,`window.__homeAVoir.telemetry.holdNext=true;document.querySelector('${a} .seenit-check').click()`);
   await pause(750);
-  await check(client,`document.querySelector('${a} .seenit-check').disabled && !document.querySelector('${a} .series-8f__stamp') && document.querySelector('${a} .series-8f__code').textContent.includes('E02')`,'slow-save');
+  // Écriture lente : l'anneau démarre au tap, mais ni tampon ni nouvelle reprise avant l'acquittement.
+  await check(client,`document.querySelector('${a} .seenit-check').disabled && document.querySelector('${a}').dataset.watchFeedback==='button' && !document.querySelector('${a} .series-8f__stamp') && document.querySelector('${a} .series-8f__code').textContent.includes('E02')`,'slow-save');
   await evaluate(client,'window.__homeAVoir.releaseWrite()');
   await check(client,`document.querySelector('${a}').dataset.watchFeedback==='button' && document.querySelector('${a} .seenit-check').dataset.celebrate==='true' && !document.querySelector('${a} .series-8f__stamp') && document.querySelector('${a} .series-8f__code').textContent.includes('E02')`,'button-first');
   await check(client,`document.querySelector('${a}').dataset.watchFeedback==='stamp' && document.querySelector('${a} .series-8f__stamp') && document.querySelector('${a} .series-8f__code').textContent.includes('E02')`,'stamp-before-name');

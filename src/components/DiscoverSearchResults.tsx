@@ -18,7 +18,7 @@ function Thumbnail({ path, person = false }: { path?: string | null; person?: bo
 }
 function ResultAction({ item, model }: { item: TMDBMedia; model: DiscoverViewModel }) {
   const [pending, setPending] = useState(false);
-  const { showToast } = useToastStore();
+  const showToast = useToastStore(state => state.showToast);
   const added = model.shows.some(show => searchMediaKey(show.tmdbId, show.mediaType) === searchMediaKey(item.id, item.media_type));
   return <button type="button" className="explorer-row-action" disabled={pending} onPointerDown={event => event.preventDefault()} aria-pressed={added}
     aria-label={`${added ? 'Retirer' : 'Ajouter'} ${item.title || item.name} ${added ? 'd’À voir' : 'à À voir'}`}

@@ -25,12 +25,11 @@ async function testTerrain226Harness(client,root){
   if(width===360){
    await evaluate(client,'window.__terrain224.splash.open(true)');
    await check(client,'document.querySelector("#seenit-splash-screen")?.dataset.ready==="false"','splash démarre');
-   await pause(2300);
+   // Signature complète (texte opaque, barre pleine) lisible avant le fondu, qui suit désormais l'animation.
+   await pause(2180);
    await check(client,`(()=>{const s=document.querySelector('#seenit-splash-screen');return s && !s.classList.contains('seenit-brand-splash--closing') && parseFloat(getComputedStyle(s.querySelector('p')).opacity)>.99 && s.querySelectorAll('i').length===8 && new DOMMatrix(getComputedStyle(s.querySelector('.seenit-brand-splash__episodes'),'::after').transform).m41===0})()`,'signature lisible et huit segments avant maintien');
    fs.writeFileSync(path.join(root,'quality-reports','terrain226-splash-hold.png'),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
-   await pause(950);
-   await check(client,'document.querySelector("#seenit-splash-screen") && !document.querySelector(".seenit-brand-splash--closing")','durée actuelle conservée pendant la lecture');
-   await check(client,'document.querySelector(".seenit-brand-splash--closing")','fermeture à durée inchangée');
+   await check(client,'document.querySelector(".seenit-brand-splash--closing")','fermeture juste après la signature');
    await check(client,'!document.querySelector("#seenit-splash-screen") && window.__terrain224.splash.closed===1','fermeture unique');
   }
   await evaluate(client,'window.__terrain226.calendar()');
