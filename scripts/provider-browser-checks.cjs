@@ -48,11 +48,11 @@ async function testProviderHarness(client, root) {
     await check(client, 'document.querySelector("#card-tv img") && window.__provider337.telemetry.reads === 1', 'cartes montées avant hydratation cloud');
     await check(client, 'document.querySelector("#card-stale [data-series-badge=pause]") && !document.querySelector("#card-stale .series-8f__status") && !document.querySelector("#card-new-season .series-8f__text").textContent.includes("Pas vu depuis")', 'le ruban de durée des séries en pause ne contamine pas une nouvelle saison');
     await client.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'no-preference'}]});
-    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon")).animationName.includes("bdSheen")','badge chaud animé par défaut');
+    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon"),"::after").animationName.includes("bdSheen")','badge chaud animé par défaut');
     await evaluate(client,'window.__provider337.setBadges(false)');
-    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon")).animationName==="none"','réglage UID : animation désactivée sans remonter les cartes');
+    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon"),"::after").animationName==="none"','réglage UID : animation désactivée sans remonter les cartes');
     await evaluate(client,'window.__provider337.setBadges(true)');
-    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon")).animationName.includes("bdSheen")','réglage UID : animation rétablie');
+    await check(client,'getComputedStyle(document.querySelector("#card-hot .series-ribbon"),"::after").animationName.includes("bdSheen")','réglage UID : animation rétablie');
     await evaluate(client, 'window.__card337 = document.querySelector("#card-tv > div"); window.__provider337.finishCloud([531])');
     const logo = id => `document.querySelector('#${id} img')?.getAttribute('src') || ''`;
     await check(client, `(${logo('card-tv')}).includes('paramount.png') && (${logo('card-movie')}).includes('paramount.png') && (${logo('card-grid')}).includes('paramount.png')`, 'hydratation sans Réglages met à jour les cartes réelles et le cache hérité');

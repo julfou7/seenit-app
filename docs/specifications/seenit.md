@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.244**
+Version applicative : **1.4.245**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -153,6 +153,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   package ou de signature n'est admis pour éviter le dialogue. Une nouvelle APK peut à nouveau nécessiter
   une analyse et aucune disparition systématique du dialogue n'est promise. Le runbook
   `docs/process/play-protect-sideload.md` fixe l'enregistrement initial et la preuve terrain à conserver.
+- **SEENIT-APK-007** — Au premier plan, SeenIt demande à Android le mode d'affichage le plus rapide à
+  résolution identique (`preferredDisplayModeId`), à la création puis à chaque reprise de l'activité :
+  sans préférence explicite, certains constructeurs laissent la WebView à 60 Hz sur un écran 120 Hz. Un
+  écran sans mode plus rapide ne change pas, une erreur garde le taux par défaut du système, et ni le
+  package, ni la signature, ni les permissions ne changent (`SEENIT-APK-001..005`).
 - Le fichier `docs/specifications/android-contract.json` fixe les invariants natifs vérifiables :
   identité, signature, version, icônes, permissions, deep link, origine API, safe areas et canal APK.
 - Lors d'une release APK, le contrôle Android s'exécute avant et après `npx cap sync android` afin de
@@ -861,6 +866,10 @@ pour le cache des sagas et univers.
   timeout, une identité Watchlist non résolue ou l’absence du signal explicite de complétude interdit
   toute suppression. La décision est relue dans une transaction Firestore afin qu’une action SeenIt
   concurrente gagne toujours. Aucun titre ou année ne participe à l’identité ou à la suppression.
+- **SEENIT-PLEX-010** — La synchronisation Plex partage le fil de l'interface : ses boucles (historique,
+  watchlist, disponibilités, états de bibliothèque, pauses) cèdent le fil dès qu'une tranche dépasse
+  6 ms (`scheduler.yield`, sinon une tâche), afin qu'aucune frame à 120 Hz ne soit bloquée au démarrage
+  comme au retour dans l'app. Ce découpage ne change ni l'ordre ni le résultat de la réconciliation.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
@@ -1302,7 +1311,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;
   à jour permet le retour du dernier épisode explicitement marqué dans la session, avec Annuler.
   Une écriture Firestore encore en attente reste en cours, sans faux échec ni rollback local sur
-  délai arbitraire ; seul son rejet définitif restaure l'état antérieur. Le succès attend son acquittement.
+  délai arbitraire ; seul son rejet définitif restaure l'état antérieur. Le succès attend son acquittement :
+  l'anneau du bouton démarre dès le tap pendant que l'écriture part, mais le tampon et la nouvelle reprise
+  n'apparaissent qu'après l'acquittement ; un rejet définitif annule l'anneau et affiche l'erreur.
   Les films sont des billets en carrousel affiche ou liste horizontale : fin depuis Maintenant,
   actualisée chaque minute et orange après minuit ; sans durée, aucune fin inventée. Le tri visible par ajout récent puis identité est stable pendant l’enrichissement et la navigation ; une coche conserve sa place pendant la session. Déchirure, état vu persistant et
   recollement suivent les écritures métier réversibles existantes. Carrousel de six films puis liste paginée par douze.

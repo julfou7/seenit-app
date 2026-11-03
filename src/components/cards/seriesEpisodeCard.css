@@ -86,11 +86,13 @@
 .series-8f__days[aria-pressed="true"]::before { box-shadow:inset 0 0 0 1px #e5a93d8c,0 4px 14px #0007; }
 .series-8f__days strong { position:relative; display:block; font-size:17px; font-weight:800; line-height:1; letter-spacing:-.04em; font-variant-numeric:tabular-nums; }
 .series-8f__days--long strong { font-size:15px; }
-.series-8f__days--today { color:#f2c36b; }.series-8f__days--today strong { font-size:14px; }.series-8f__days--today::before { animation:jGlow 1.8s infinite; }
+/* Lueur du jour en opacité sur un calque dédié (compositeur) : l'ancienne box-shadow animée repeignait la carte à chaque frame. */
+.series-8f__days--today { color:#f2c36b; }.series-8f__days--today strong { font-size:14px; }
+.series-8f__days--today::after { content:""; position:absolute; inset:4px 2px; border-radius:12px; box-shadow:inset 0 0 0 1px #e5a93d8c,0 0 0 6px #e5a93d2e; opacity:0; pointer-events:none; animation:jGlow 1.8s infinite; }
 .series-8f__days .series-8f__bell { top:-2px; right:-4px; }
 .series-8f[data-context="upcoming"] .series-8f__code { min-height:16px; font-size:12px; gap:0; }
-@keyframes jGlow { 50% { box-shadow:inset 0 0 0 1px #e5a93d8c,0 0 0 6px #e5a93d2e,0 4px 14px #0007; } }
-@media (prefers-reduced-motion:reduce) { .series-8f__days--today::before { animation:none; } }
+@keyframes jGlow { 50% { opacity:1; } }
+@media (prefers-reduced-motion:reduce) { .series-8f__days--today::after { animation:none; } }
 
 /* Reference ckTop34 + target48: center of the content above the season bar. */
 .series-8f__action { top:58px; }
@@ -120,9 +122,12 @@
 
 /* B07: one metallic ribbon, clipped by the poster, no availability pill. */
 .series-ribbon { --badge-bg:linear-gradient(90deg,#fff,#e4e4e7); position:absolute; top:10px; left:-26px; z-index:3; width:110px; padding:3px 0; transform:rotate(-38deg); display:flex; align-items:center; justify-content:center; gap:4px; color:#0b0b0f; background:var(--badge-bg); box-shadow:0 2px 8px #0008; font-size:9px; font-weight:900; line-height:1.2; text-transform:uppercase; letter-spacing:.06em; white-space:nowrap; pointer-events:none; }
-.series-ribbon--today { --badge-bg:linear-gradient(90deg,#fff2b8,#f5c518 45%,#e5a93d); color:#1a1206; --bdg:#f5c51899; animation:bdSheen 3.2s ease-in-out infinite,bdBreath 3.2s ease-in-out infinite; }
-.series-ribbon--yesterday { --badge-bg:linear-gradient(90deg,#fff8e7,#efd5a0); color:#1a1206; animation:bdSheen 4.8s ease-in-out 1.2s infinite; }
-.series-ribbon--today,.series-ribbon--yesterday { background:linear-gradient(105deg,transparent 40%,#ffffffcc 50%,transparent 60%) 150% 0/250% 100% no-repeat,var(--badge-bg); }
+/* Reflet en translation d'un calque (compositeur) au lieu de background-position, qui repeignait la carte en boucle. */
+.series-ribbon--today { --badge-bg:linear-gradient(90deg,#fff2b8,#f5c518 45%,#e5a93d); color:#1a1206; box-shadow:0 2px 8px #0008,0 0 12px 1px #f5c51866; }
+.series-ribbon--yesterday { --badge-bg:linear-gradient(90deg,#fff8e7,#efd5a0); color:#1a1206; }
+.series-ribbon--today,.series-ribbon--yesterday { overflow:hidden; }
+.series-ribbon--today::after,.series-ribbon--yesterday::after { content:""; position:absolute; inset:0; background:linear-gradient(105deg,transparent 40%,#ffffffcc 50%,transparent 60%); transform:translateX(-100%); pointer-events:none; animation:bdSheen 3.2s ease-in-out infinite; }
+.series-ribbon--yesterday::after { animation:bdSheen 4.8s ease-in-out 1.2s infinite; }
 .series-ribbon--remaining { --badge-bg:linear-gradient(90deg,#fbc59a,#dc8455); color:#1c0d05; }
 .series-ribbon--season { --badge-bg:linear-gradient(90deg,#ebcb96,#b8823a); color:#170f04; }
 .series-ribbon--final { --badge-bg:linear-gradient(90deg,#1c1c21,#0b0b0f); color:#f2c36b; box-shadow:inset 0 0 0 1px #f2c36bcc,0 2px 8px #0008; }
@@ -135,10 +140,9 @@
 .series-8f .series-8f__days { width:58px; flex-shrink:0; }
 .series-8f .series-8f__days::before { inset:4px 0; }
 .series-8f .series-8f__action { width:58px; right:5px; }
-.series-8f[data-animated-badges="false"] .series-ribbon { animation:none; }
-@keyframes bdSheen { 0%,58% { background-position:150% 0,0 0; } 100% { background-position:-50% 0,0 0; } }
-@keyframes bdBreath { 50% { box-shadow:0 2px 8px #0008,0 0 12px 1px var(--bdg); } }
-@media(prefers-reduced-motion:reduce) { .series-ribbon { animation:none; } }
+.series-8f[data-animated-badges="false"] .series-ribbon,.series-8f[data-animated-badges="false"] .series-ribbon::after { animation:none; }
+@keyframes bdSheen { 0%,58% { transform:translateX(-100%); } 100% { transform:translateX(100%); } }
+@media(prefers-reduced-motion:reduce) { .series-ribbon,.series-ribbon::after { animation:none; } }
 
 .series-8f__days:disabled { opacity:1; cursor:progress; }
 

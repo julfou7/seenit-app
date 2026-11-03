@@ -1,8 +1,11 @@
 package com.seenit.app;
 
 import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.Display;
 import android.view.View;
+import android.view.WindowManager;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import androidx.core.graphics.Insets;
@@ -22,6 +25,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SeenItPlexBackgroundPlugin.class);
         registerPlugin(SeenItTrailerPlugin.class);
         super.onCreate(savedInstanceState);
+        requestHighestRefreshRate();
 
         // Android 15/16 impose l'edge-to-edge. On le rend explicite aussi sur les versions
         // précédentes afin que la WebView occupe réellement la zone de la status bar.
@@ -42,6 +46,41 @@ public class MainActivity extends BridgeActivity {
                 settings.setSupportMultipleWindows(true);
             }
         } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // L'écran ou son mode peut avoir changé (pliable, écran externe) : la préférence est réappliquée.
+        requestHighestRefreshRate();
+    }
+
+    /**
+     * SEENIT-APK-007 — Sans préférence explicite, certains constructeurs (Samsung notamment) laissent la
+     * WebView à 60 Hz. SeenIt demande le mode le plus rapide à résolution identique tant qu'il est au
+     * premier plan ; un écran 60 Hz n'en propose pas d'autre et ne change donc pas.
+     */
+    private void requestHighestRefreshRate() {
+        try {
+            Display display = Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ? getDisplay() : getWindowManager().getDefaultDisplay();
+            if (display == null) return;
+            Display.Mode current = display.getMode();
+            Display.Mode best = current;
+            for (Display.Mode mode : display.getSupportedModes()) {
+                if (mode.getPhysicalWidth() == current.getPhysicalWidth()
+                    && mode.getPhysicalHeight() == current.getPhysicalHeight()
+                    && mode.getRefreshRate() > best.getRefreshRate()) {
+                    best = mode;
+                }
+            }
+            WindowManager.LayoutParams params = getWindow().getAttributes();
+            if (params.preferredDisplayModeId == best.getModeId()) return;
+            params.preferredDisplayModeId = best.getModeId();
+            getWindow().setAttributes(params);
+        } catch (Exception e) {
+            // Le taux par défaut du système reste un repli sûr.
             e.printStackTrace();
         }
     }

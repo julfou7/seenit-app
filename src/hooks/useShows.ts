@@ -13,17 +13,24 @@ import {
 const LEGACY_NORMALIZATION_BATCH_SIZE = 20;
 const scheduledLegacyNormalizations = new Set<string>();
 
-export function useShows() {
-  const shows = useShowsStore(state => state.shows);
-  const loading = useShowsStore(state => state.loading);
-  const addShowOptimistic = useShowsStore(state => state.addShowOptimistic);
+// Une même version de la bibliothèque n'est scannée qu'une fois, quel que soit le nombre de
+// composants abonnés (cartes À venir, Historique, Explorer…) : le scan était refait par instance.
+const scannedLibraries = new WeakSet<Show[]>();
+
+function isQuotaError(err: unknown): boolean {
+  const code = (err as { code?: unknown } | null)?.code;
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return code === 'resource-exhausted' || ['quota exceeded', 'quota-exceeded', 'resource-exhausted', 'resource_exhausted'].some(marker => message.includes(marker));
+}
+
+function useLegacyShowNormalization(shows: Show[], loading: boolean) {
   const updateShowOptimistic = useShowsStore(state => state.updateShowOptimistic);
-  const removeShowOptimistic = useShowsStore(state => state.removeShowOptimistic);
   const fetchShows = useShowsStore(state => state.fetchShows);
 
   useEffect(() => {
     const user = auth.currentUser;
-    if (!user || loading) return;
+    if (!user || loading || scannedLibraries.has(shows)) return;
+    scannedLibraries.add(shows);
 
     const candidates = shows
       .filter(show => Boolean(show.id) && shouldNormalizeInitialTrackingState(show))
@@ -39,22 +46,24 @@ export function useShows() {
       updateShowOptimistic(show.id, { status: 'plan_to_watch', updatedAt });
 
       const docRef = doc(db, 'users', user.uid, 'shows', show.id);
-      void updateDoc(docRef, { status: 'plan_to_watch', updatedAt }).catch((err: any) => {
+      void updateDoc(docRef, { status: 'plan_to_watch', updatedAt }).catch((err: unknown) => {
         fetchShows();
-        const errStr = err?.message || String(err);
-        if (
-          err?.code === 'resource-exhausted' ||
-          errStr.toLowerCase().includes('quota exceeded') ||
-          errStr.toLowerCase().includes('quota-exceeded') ||
-          errStr.toLowerCase().includes('resource-exhausted') ||
-          errStr.toLowerCase().includes('resource_exhausted')
-        ) {
-          useSyncStore.getState().setQuotaExceeded(true);
-        }
+        if (isQuotaError(err)) useSyncStore.getState().setQuotaExceeded(true);
         handleFirestoreError(err, OperationType.UPDATE, `users/${user.uid}/shows/${show.id}`);
       });
     }
   }, [shows, loading, updateShowOptimistic, fetchShows]);
+}
+
+/**
+ * Actions sur la bibliothèque, sans abonnement à son contenu : un composant qui ne fait qu'écrire
+ * (toast Annuler, cartes, App) ne se re-rend plus à chaque changement d'une autre fiche.
+ */
+export function useShowActions() {
+  const addShowOptimistic = useShowsStore(state => state.addShowOptimistic);
+  const updateShowOptimistic = useShowsStore(state => state.updateShowOptimistic);
+  const removeShowOptimistic = useShowsStore(state => state.removeShowOptimistic);
+  const fetchShows = useShowsStore(state => state.fetchShows);
 
   const addShow = useCallback(async (showData: Omit<Show, 'id' | 'userId'>) => {
     if (!auth.currentUser) throw new Error("Not authenticated");
@@ -209,5 +218,12 @@ export function useShows() {
     }
   }, []);
 
-  return { shows, loading, addShow, updateShow, deleteShow, getShowByTmdbId };
+  return { addShow, updateShow, deleteShow, getShowByTmdbId };
+}
+
+export function useShows() {
+  const shows = useShowsStore(state => state.shows);
+  const loading = useShowsStore(state => state.loading);
+  useLegacyShowNormalization(shows, loading);
+  return { shows, loading, ...useShowActions() };
 }

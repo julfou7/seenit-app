@@ -62,14 +62,16 @@ export function SeriesEpisodeCard({ show, today: day, episode, context, detail, 
   const [hue, setHue] = useState(() => readPosterHue(poster) ?? POSTER_HUE_FALLBACK);
   const [menuOpen, setMenuOpen] = useState(false);
   const [actionPending, setActionPending] = useState(false);
-  const [feedback, setFeedback] = useState<{ sequence: number; code: string; name: string; season: number; episode: number; phase: 'button' | 'stamp' | 'advance' } | null>(null);
+  const [feedback, setFeedback] = useState<{ sequence: number; code: string; name: string; season: number; episode: number; phase: 'button' | 'stamp' | 'advance'; acknowledged: boolean } | null>(null);
   const [markError, setMarkError] = useState(false);
   const [markingSnapshot, setMarkingSnapshot] = useState<{ code: string; subtitle: string | null; progress: SeriesSeasonProgress; backdropPath: string | null | undefined; status: ReturnType<typeof seriesBadge> } | null>(null);
   const feedbackAbort = useRef<AbortController | null>(null);
   useEffect(() => () => feedbackAbort.current?.abort(), []);
   const markPending = useRef(false);
   useEffect(() => {
-    if (!feedback) return;
+    // Avant l'acquittement, l'anneau tourne pendant que l'écriture part : seul un Vu acquitté puis retiré
+    // ailleurs (Annuler, autre appareil) interrompt l'animation.
+    if (!feedback?.acknowledged) return;
     const key = `${feedback.season}x${feedback.episode}`;
     const seen = show.seenEpisodes.some(value => {
       const match = /^(?:s\s*)?(\d+)\s*(?:x|e)\s*(\d+)$/i.exec(value.trim());
@@ -134,15 +136,23 @@ export function SeriesEpisodeCard({ show, today: day, episode, context, detail, 
     try {
       if (context.upToDate) { if (await context.onMarkUnseen?.() === false) { setMarkError(true); return; } setFeedback(null); return; }
       setMarkingSnapshot({ code, subtitle: subtitle || null, progress, backdropPath, status });
-      const completed = await context.onMarkSeen?.();
+      // L'écriture part tout de suite ; l'anneau du bouton aussi. Le tampon et la nouvelle reprise
+      // (le succès) attendent l'acquittement : un rejet définitif annule l'anneau (SEENIT-UX-016).
+      const marking = Promise.resolve().then(() => context.onMarkSeen?.());
+      const animate = Boolean(context.animateSeen && episode);
+      const reduced = animate && matchMedia('(prefers-reduced-motion:reduce)').matches;
+      if (animate && episode) {
+        try { navigator.vibrate?.(15); } catch { /* Le feedback visuel reste disponible. */ }
+        setFeedback(previous => ({ sequence: (previous?.sequence || 0) + 1, code, name: subtitle || '', season: episode.season_number, episode: episode.episode_number, phase: 'button', acknowledged: false }));
+      }
+      const buttonShown = animate ? waitForWatchFeedback(reduced ? 0 : WATCH_BUTTON_MS, controller.signal) : Promise.resolve(true);
+      const completed = await marking.catch(() => false as const);
       acknowledged = completed !== false;
       if (controller.signal.aborted) return false;
-      if (completed === false) { setMarkError(true); return false; }
-      if (!context.animateSeen || !episode) return;
-      try { navigator.vibrate?.(15); } catch { /* Le feedback visuel reste disponible. */ }
-      setFeedback(previous => ({ sequence: (previous?.sequence || 0) + 1, code, name: subtitle || '', season: episode.season_number, episode: episode.episode_number, phase: 'button' }));
-      const reduced = matchMedia('(prefers-reduced-motion:reduce)').matches;
-      if (!await waitForWatchFeedback(reduced ? 0 : WATCH_BUTTON_MS, controller.signal)) return false;
+      if (completed === false) { setFeedback(null); setMarkError(true); return false; }
+      if (!animate) return;
+      setFeedback(previous => previous && { ...previous, acknowledged: true });
+      if (!await buttonShown) return false;
       setFeedback(previous => previous && { ...previous, phase: 'stamp' });
       if (!await waitForWatchFeedback(reduced ? 0 : WATCH_STAMP_MS, controller.signal)) return false;
       setFeedback(previous => previous && { ...previous, phase: 'advance' });

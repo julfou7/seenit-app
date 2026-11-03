@@ -56,3 +56,4 @@ export function makePaulHistory() {
  paulGate = new Promise<void>(resolve => { releasePaul = resolve; });
  store.setState({shows:[{...base,id:'paul',tmdbId:901,title:'Paul, la série',seenEpisodes:['1x1','1x2'],episodeRecords:{'1x1':{watchedAt:at(-3,9,7)},'1x2':{watchedAt:at(-3,9,8)}},seasonsCache:undefined,seasonProgress:undefined}]});
 }
+export function useShowActions() { const { updateShow } = useShows(); return { updateShow }; }

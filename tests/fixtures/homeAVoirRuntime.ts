@@ -17,6 +17,7 @@ base.usePlexAvailabilityStore.setState({ cache: {
   'tv:10': { available: true, serverName: 'Série partielle' },
 } });
 export function useShows() { return { shows: base.useShowsStore(state => state.shows), loading: false, updateShow: base.updateShow, addShow: base.addShow }; }
+export function useShowActions() { return { updateShow: base.updateShow, addShow: base.addShow }; }
 export function makeLargeHistory() {
   const seed = base.initialShows[0];
   const now = Date.now();

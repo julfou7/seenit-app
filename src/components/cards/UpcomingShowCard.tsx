@@ -4,7 +4,8 @@ import { type Show } from '../../types';
 import { requestNotificationPermission, auth, db } from '../../lib/firebase';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { useToastStore } from '../../store/toastStore';
-import { useShows } from '../../hooks/useShows';
+import { useShowActions } from '../../hooks/useShows';
+import { useShowsStore } from '../../store/showsStore';
 import { cn, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
@@ -21,6 +22,8 @@ export interface UpcomingEpisodeInfo {
   air_date: string; // "YYYY-MM-DD"
   still_path?: string | null;
 }
+
+const NO_LIBRARY: Show[] = [];
 
 export function getUpcomingEpisodeInfo(s: Show): UpcomingEpisodeInfo | null {
   if (!s || s.isArchived || s.status === 'dropped') {
@@ -114,10 +117,12 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
   const reminderFlight = useRef(false);
   const [optimisticReminder, setOptimisticReminder] = useState<boolean | null>(null);
   const displayedReminder = optimisticReminder ?? isReminderSet;
-  const { showToast } = useToastStore();
-  const { updateShow, shows } = useShows();
+  const showToast = useToastStore(state => state.showToast);
+  const { updateShow } = useShowActions();
   const [visible, setVisible] = useState(false);
   const [collection, setCollection] = useState<CollectionPart[]>([]);
+  // Seule une carte film avec collection lit la bibliothèque : les autres ne se re-rendent plus à chaque Vu.
+  const shows = useShowsStore(state => show.mediaType === 'movie' && collection.length > 0 ? state.shows : NO_LIBRARY);
   useEffect(() => {
     if (!visible || compact || show.mediaType !== 'movie') return;
     let current = true;

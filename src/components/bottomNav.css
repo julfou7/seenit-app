@@ -11,10 +11,13 @@
 .navigation-tab__label{font-size:clamp(10px,.6rem,11px);font-weight:700;line-height:1.2;white-space:nowrap}
 .navigation-download-dot{position:absolute;top:-2px;right:-3px;width:9px;height:9px;border-radius:50%;background:#E5A93D;box-shadow:0 0 0 2px rgba(18,18,22,.95);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:#0B0B0F;line-height:1}
 .navigation-download-dot[data-kind=active]{animation:nvPulse 1.4s ease-out infinite}
+/* Onde du point actif : anneau en échelle + opacité (compositeur), sans box-shadow animée sous le flou de la barre. */
+.navigation-download-dot[data-kind=active]::after{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 2px rgba(229,169,61,.7);pointer-events:none;animation:nvRing 1.4s ease-out infinite}
 .navigation-download-dot[data-counted=true],.navigation-download-dot[data-kind=attention]{width:14px;height:14px;top:-5px;right:-7px}
 .navigation-download-dot[data-kind=attention]{background:#F87171}
 .navigation-download-dot[data-kind=ready]{background:#34D399}
-@keyframes nvPulse{0%{box-shadow:0 0 0 2px rgba(18,18,22,.95),0 0 0 2px rgba(229,169,61,.7);transform:scale(1)}50%{transform:scale(1.15)}75%,100%{box-shadow:0 0 0 2px rgba(18,18,22,.95),0 0 0 9px rgba(229,169,61,0)}100%{transform:scale(1)}}
+@keyframes nvPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+@keyframes nvRing{0%{transform:scale(1);opacity:1}75%,100%{transform:scale(2.2);opacity:0}}
 body:has([data-dialog-layer]:not([data-settings-layer])) .bottom-nav-shell{display:none}
 body:has([data-app-tab=discover]:not([aria-hidden=true]) [data-discover-search-mode=true]) .bottom-nav-shell{display:none}
-@media(prefers-reduced-motion:reduce){.navigation-tab,.navigation-download-dot{animation:none!important;transition:none!important}}
+@media(prefers-reduced-motion:reduce){.navigation-tab,.navigation-download-dot,.navigation-download-dot::after{animation:none!important;transition:none!important}}

@@ -221,7 +221,7 @@ export const HistoryFeed = memo(function HistoryFeed({
   const itemsPerPage = HISTORY_PAGE_SIZE;
   const { shows, loading, updateShow } = useShows();
   const showsById = useMemo(() => new Map((active ? shows : []).map(show => [show.id, show])), [shows, active]);
-  const { showToast } = useToastStore();
+  const showToast = useToastStore(state => state.showToast);
   const [metadataByKey, setMetadataByKey] = useState<Record<string, HistoryMetadata>>({});
   const [unseenModalItem, setUnseenModalItem] = useState<HistoryItem | null>(null);
   const [editingItem, setEditingItem] = useState<HistoryItem | null>(null);

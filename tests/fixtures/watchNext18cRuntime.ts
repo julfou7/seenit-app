@@ -141,6 +141,7 @@ export const useFavoritePeopleStore = create<{ people: Array<{id: number; name: 
 
 export const addShow = async (data: Omit<Show,'id'|'userId'>) => { const id=`added-${data.tmdbId}`; useShowsStore.setState(state=>({shows:[...state.shows,{...data,id,userId:auth.currentUser.uid}]})); if (telemetry.holdAddNext) { telemetry.holdAddNext=false; await new Promise<void>(resolve=>{releaseHeldAdd=resolve;}); } else await new Promise(resolve=>setTimeout(resolve,30)); return id; };
 export function useShows() { return { shows: useShowsStore(state => state.shows), addShow, updateShow }; }
+export function useShowActions() { return { addShow, updateShow }; }
 
 
 export const requestNotificationPermission = async () => 'fixture-token';

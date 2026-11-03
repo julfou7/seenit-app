@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.244",
+  "applicationVersion": "1.4.245",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -345,6 +345,19 @@
         {
           "file": "tests/playProtectDistribution.test.ts",
           "contains": "SEENIT-APK-006 distingue la vérification développeur de la réputation Play Protect hors Play"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-APK-007",
+      "title": "Mode d'affichage le plus rapide demandé au premier plan (120 Hz)",
+      "targets": [
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/androidRefreshRate.test.ts",
+          "contains": "SEENIT-APK-007 demande le mode d'affichage le plus rapide à résolution identique"
         }
       ]
     },
@@ -1034,6 +1047,20 @@
         {
           "file": "tests/plexWatchlistTracking.test.ts",
           "contains": "SEENIT-PLEX-009 le runtime persiste la provenance et relit avant suppression"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-010",
+      "title": "La synchronisation Plex cède le fil de l'interface à chaque tranche de 6 ms",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexFrameBudget.test.ts",
+          "contains": "SEENIT-PLEX-010 la synchro Plex cède le fil dès que sa tranche dépasse 6 ms"
         }
       ]
     },

@@ -605,7 +605,7 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
           isDragging
             ? "transition-none"
             : "transition-transform duration-300 ease-out",
-          !isExiting && dragX === 0 && "animate-in slide-in-from-right duration-300"
+          !isExiting && dragX === 0 && "animate-in fade-in slide-in-from-right"
         )}
       >
         {/* Sticky Header */}

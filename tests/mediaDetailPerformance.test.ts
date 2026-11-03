@@ -99,9 +99,10 @@ test('SEENIT-PERF-001 bascule épisode vers série sans réafficher l’écran i
 test('SEENIT-PERF-001 unifie le shell froid média sans double animation', () => {
   assert.match(detailWrapperSource, /MediaDetailColdShell/);
   assert.match(detailSource, /MediaDetailColdShell/);
-  assert.match(appSource, /animate-in slide-in-from-right duration-300/);
+  // Une seule entrée, celle des écrans Réglages (#806) : 180 ms, opacité et 18 px.
+  assert.match(appSource, /animate-in fade-in slide-in-from-right motion-reduce:animate-none/);
   assert.doesNotMatch(appSource, /slide-in-from-bottom-6|animate-overlay-in/);
-  assert.doesNotMatch(detailSource, /animate-in slide-in-from-right duration-300/);
+  assert.doesNotMatch(detailSource, /animate-in (?:fade-in )?slide-in-from-right/);
   assert.match(episodeDetailSource, /initial=\{\{ y: 18, opacity: 0 \}\}/);
   assert.match(episodeDetailSource, /initial=\{\{ opacity: 0 \}\}[\s\S]{0,160}animate=\{\{ opacity: 1 \}\}/);
 });
@@ -129,4 +130,15 @@ test('SEENIT-PERF-001 amorce le cache persistant avant d’ouvrir une fiche apr�
   assert.match(openSource, /detailOpenRequestRef\.current/);
   assert.match(detailWrapperSource, /peekRenderableMediaDetails/);
   assert.match(detailSource, /peekRenderableMediaDetails/);
+});
+
+test('#806 les classes d’entrée sont réellement définies, en transform et opacité, comme Réglages', () => {
+  const css = readFileSync('src/index.css', 'utf8');
+  assert.match(css, /\.animate-in \{\n  animation-name: seenitEnter;\n  animation-duration: var\(--tw-duration, 180ms\);\n  animation-timing-function: var\(--tw-ease, ease-out\);/);
+  assert.match(css, /\.slide-in-from-right \{ --seenit-enter-x: 18px; \}/);
+  assert.match(css, /\.fade-in \{ --seenit-enter-opacity: 0; \}/);
+  assert.match(css, /\[data-app-tab\] \{ animation: seenitTabIn \.16s ease-out both; \}/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{\n  \.animate-in, \[data-app-tab\] \{ animation: none; \}/);
+  const keyframes = css.slice(css.indexOf('@keyframes seenitEnter'), css.indexOf('.animate-in {'));
+  assert.doesNotMatch(keyframes, /width|height|top|left|margin|box-shadow/, 'aucune propriété de mise en page animée');
 });

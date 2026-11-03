@@ -217,7 +217,7 @@ export function WatchListScreen({
     }
   }, [loading]);
 
-  const { showToast } = useToastStore();
+  const showToast = useToastStore(state => state.showToast);
   const isQuotaExceeded = useSyncStore(state => state.isQuotaExceeded);
   const [pendingAction, setPendingAction] = useState<{ type: 'archive' | 'unfollow' | 'drop'; item: Show } | null>(null);
 

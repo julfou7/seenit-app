@@ -187,15 +187,48 @@ button.min-h-0.flex-1.overflow-hidden.bg-zinc-950 {
   will-change: transform, opacity;
 }
 
+/* Échelle horizontale (compositeur) plutôt que width : la barre du toast ne relance plus la mise en page
+   à chaque frame pendant ses 5 s, alors qu'elle s'affiche justement pendant les animations du Vu. */
 @keyframes toastProgress {
   from {
-    width: 100%;
+    transform: scaleX(1);
   }
   to {
-    width: 0%;
+    transform: scaleX(0);
   }
 }
 
 .animate-toast-progress {
   animation: toastProgress 5s linear forwards;
+}
+
+/* #806 — Transitions d'écran alignées sur Moi et Réglages. Les classes animate-in / fade-in /
+   slide-in-from-* / zoom-in-95 n'étaient fournies par aucun plugin : fiches, panneaux et modales
+   apparaissaient sans transition. Entrées courtes, en transform et opacity uniquement (compositeur) ;
+   les classes duration-* et ease-* existantes gardent leur durée via --tw-duration / --tw-ease. */
+@keyframes seenitEnter {
+  from {
+    opacity: var(--seenit-enter-opacity, 1);
+    transform: translate3d(var(--seenit-enter-x, 0), var(--seenit-enter-y, 0), 0) scale(var(--seenit-enter-scale, 1));
+  }
+}
+.animate-in {
+  animation-name: seenitEnter;
+  animation-duration: var(--tw-duration, 180ms);
+  animation-timing-function: var(--tw-ease, ease-out);
+  animation-fill-mode: both;
+}
+.fade-in { --seenit-enter-opacity: 0; }
+.zoom-in-95 { --seenit-enter-scale: .95; }
+/* Même décalage que l'entrée des écrans Réglages (regIn : 18 px). */
+.slide-in-from-right { --seenit-enter-x: 18px; }
+.slide-in-from-top { --seenit-enter-y: -8px; }
+.slide-in-from-bottom-2 { --seenit-enter-y: 8px; }
+
+/* Changement d'onglet : le fondu court de Moi (160 ms) sur le panneau qui redevient visible. */
+@keyframes seenitTabIn { from { opacity: 0; } }
+[data-app-tab] { animation: seenitTabIn .16s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, [data-app-tab] { animation: none; }
 }
