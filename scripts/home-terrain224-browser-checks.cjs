@@ -59,6 +59,12 @@ async function testTerrain224Harness(client,root) {
   await evaluate(client,`document.querySelector('[data-series-id="series-3"] .seenit-check').click()`);
   await check(client,`document.querySelector('#home-series-1 [data-series-id="series-3"]')?.dataset.watchFeedback==='stamp'`,'new arrival remains during stamp');
   await check(client,`document.querySelector('#home-series-0 [data-series-id="series-3"]') && !document.querySelector('[data-series-id="series-3"]').dataset.watchFeedback`,'transfer after real sequence completion');
+  // Annuler après l'arrivée dans Continuer, toast encore affiché : la série retourne dans Nouveautés sans redémarrage.
+  await evaluate(client,'window.__homeAVoir.toasts().find(toast=>toast.onUndo).onUndo()');
+  await check(client,`window.__homeAVoir.snapshot().find(s=>s.id==='series-3').seenEpisodes.length===0 && document.querySelector('#home-series-1 [data-series-id="series-3"]') && !document.querySelector('#home-series-0 [data-series-id="series-3"]')`,'undo-after-transfer');
+  // Ordre de visionnage : une série vue ailleurs (fiche, Plex) passe en tête de Continuer à regarder.
+  await evaluate(client,`window.__orderLast=[...document.querySelectorAll('#home-series-0 [data-series-id]')].at(-1).dataset.seriesId;window.__homeAVoir.watchedElsewhere(window.__orderLast)`);
+  await check(client,`document.querySelector('#home-series-0 [data-series-id]').dataset.seriesId===window.__orderLast`,'last-watched-first');
   await check(client,`(()=>{const bands=[...document.querySelectorAll('.series-ribbon')];return bands.length && bands.every(b=>{const r=b.getBoundingClientRect(),p=b.parentElement.getBoundingClientRect();return r.height<=22 && r.width<=p.width+2 && Math.abs(r.bottom-p.bottom)<=4 && getComputedStyle(b).transform==='none'})})()`,'bottom-band');
   await check(client,`(()=>{const btn=document.querySelector('.movie-ticket--poster .movie-ticket__check'),body=btn.parentElement,poster=body.querySelector('.movie-ticket__poster'),b=btn.getBoundingClientRect(),p=poster.getBoundingClientRect(),r=body.getBoundingClientRect();return b.top>=p.bottom-1 && b.bottom<=r.bottom+1 && /fin à|après minuit/.test(body.querySelector('.movie-ticket__stub')?.textContent || '')})()`,'ticket-action');
   await check(client,`getComputedStyle(document.querySelector('.navigation-tab'),'::after').content==='none'`,'navigation no bottom point');

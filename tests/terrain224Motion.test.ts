@@ -18,3 +18,11 @@ test('SEENIT-UX-014 terrain224 exécute le vrai shell et les transitions dans le
   const harness = readFileSync('scripts/home-terrain224-browser-checks.cjs','utf8');
   for (const requirement of ['slow-save','button-first','stamp-before-name','last-available','undo','refresh','bottom-band','ticket-action','splash-complete','reduced-motion']) assert.ok(harness.includes(requirement),requirement);
 });
+
+test('SEENIT-UX-018 Continuer suit le dernier visionnage et un Vu annulé rend la série à Nouveautés', () => {
+  const harness = readFileSync('scripts/home-terrain224-browser-checks.cjs','utf8');
+  for (const requirement of ['undo-after-transfer','last-watched-first']) assert.ok(harness.includes(requirement),requirement);
+  const section = readFileSync('src/screens/WatchNextSection.tsx','utf8');
+  assert.match(section,/index === 0 \? watchTime\(b\) - watchTime\(a\)/,'Continuer est trié du visionnage le plus récent au plus ancien');
+  assert.match(section,/hasSeenEpisodeKey\(/,'une arrivée dont l’épisode n’est plus vu quitte Continuer');
+});

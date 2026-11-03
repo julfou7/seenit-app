@@ -678,7 +678,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.245',
+        'X-Plex-Version': '1.4.246',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -1287,9 +1287,15 @@ async function startServer() {
         'https://metadata.provider.plex.tv/library/sections/watchlist/today?includeUserState=1'
       ];
 
+      // Watchlist, activité cloud et découverte des serveurs sont indépendantes : elles partent ensemble
+      // (SEENIT-PLEX-011) et leurs résultats sont fusionnés dans l'ordre d'origine, au lieu de trois allers-retours.
+      const seenItUserId = (req as AuthRequest).user?.uid || 'anonymous';
+      const serversTask = getPlexServers(token, plexClientIdentifier, delta ? 6000 : 9000, seenItUserId);
+      serversTask.catch(() => undefined); // l'erreur est relevée par l'await plus bas, pas en rejet orphelin
       let watchlistCollectionSucceeded = false;
       let watchlistCollectionComplete = false;
-      for (const wlEndpoint of watchlistEndpoints) {
+      let watchlistVisited = '';
+      const watchlistTask = (async () => { for (const wlEndpoint of watchlistEndpoints) {
         try {
           const items = await fetchPlexPages(wlEndpoint, {
             'X-Plex-Token': token,
@@ -1302,18 +1308,20 @@ async function startServer() {
           if (items.length > 0) {
             console.log(`[Plex Sync] Fetched ${items.length} watchlist items from Plex Watchlist endpoint: ${wlEndpoint}`);
             rawWatchlistItems.push(...items);
-            visitedSources.push(`Watchlist Plex (${items.length} éléments)`);
+            watchlistVisited = `Watchlist Plex (${items.length} éléments)`;
           }
           // Chaque URL est une alternative. Un endpoint exhaustif qui répond vide
           // prouve une Watchlist vide ; il ne faut pas la remplacer par le hub /today.
           break;
-        } catch (e: any) {
+        } catch (caught: unknown) {
+          const e = caught as { message?: unknown } | null;
           console.log(`[Plex Sync] Watchlist endpoint skipped (${wlEndpoint}): ${e?.message || e}`);
         }
       }
       if (!watchlistCollectionSucceeded) {
         console.warn('[Plex Sync] Watchlist indisponible pour ce passage ; elle sera retentée indépendamment du curseur.');
       }
+      })();
 
       const cloudEndpoints = delta
         ? [
@@ -1325,7 +1333,7 @@ async function startServer() {
           ];
 
       let cloudCollectionSucceeded = false;
-      for (const endpoint of cloudEndpoints) {
+      const cloudTask = (async () => { for (const endpoint of cloudEndpoints) {
         try {
           const items = await fetchPlexPages(endpoint, {
             'X-Plex-Token': token,
@@ -1342,10 +1350,13 @@ async function startServer() {
             sourceStats.cloudItems += items.length;
             visitedSources.push(`Plex Cloud (${items.length} éléments)`);
           }
-        } catch (e: any) {
+        } catch (caught: unknown) {
+          const e = caught as { message?: unknown } | null;
           console.log(`[Plex Sync] Cloud endpoint skipped (${endpoint}): ${e?.message || e}`);
         }
-      }
+      } })();
+      await Promise.all([watchlistTask, cloudTask]);
+      if (watchlistVisited) visitedSources.unshift(watchlistVisited);
 
       // En scan complet, récupérer l'historique lié au COMPTE Plex. Contrairement
       // au PMS /status/sessions/history, metadataItem.guid est une identité globale Plex.
@@ -1368,13 +1379,7 @@ async function startServer() {
       }
 
       // 2. Fetch user's servers from Plex.tv (Both owned servers & shared servers from friends)
-      const seenItUserId = (req as AuthRequest).user?.uid || 'anonymous';
-      const servers = await getPlexServers(
-        token,
-        plexClientIdentifier,
-        delta ? 6000 : 9000,
-        seenItUserId
-      );
+      const servers = await serversTask;
 
       console.log(`[Plex Sync] Found ${servers.length} Plex server(s) (personal & shared)`);
 

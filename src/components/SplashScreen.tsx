@@ -15,6 +15,10 @@ interface SplashScreenProps {
 // Dernière image clé à 2 160 ms : 140 ms de signature lisible, au lieu d'un maintien immobile jusqu'à 3,5 s.
 export const BRAND_SPLASH_ANIMATION_MS = 2300;
 
+const ringHalf = (id: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="${id}" x1="10%" y1="5%" x2="90%" y2="95%"><stop offset="0%" stop-color="#FFF2B8"/><stop offset="32%" stop-color="#F5C518"/><stop offset="70%" stop-color="#E5A93D"/><stop offset="100%" stop-color="#B37812"/></linearGradient></defs><circle cx="50" cy="50" r="38" fill="none" stroke="url(#${id})" stroke-width="10"/></svg>`;
+const RING_BOTTOM = ringHalf('seenit-splash-ring-bottom');
+const RING_TOP = ringHalf('seenit-splash-ring-top');
+
 export function SplashScreen({
   onComplete,
   onStartClose,
@@ -74,7 +78,13 @@ export function SplashScreen({
   }, [isClosing, reducedMotion]);
 
   return <div id="seenit-splash-screen" className={'seenit-brand-splash'+(isClosing ? ' seenit-brand-splash--closing' : '')} data-ready={timeElapsed || !animate || reducedMotion}>
-    <div className="brand-stacked-logo" role="img" aria-label="SeenIt" dangerouslySetInnerHTML={{__html:brandStackedSvg}} />
+    <div className="brand-stacked-logo" role="img" aria-label="SeenIt">
+      <div dangerouslySetInnerHTML={{__html:brandStackedSvg}} />
+      <span className="brand-splash-ring" aria-hidden="true">
+        <span className="brand-splash-ring__half brand-splash-ring__half--bottom"><span className="brand-splash-ring__window"><span className="brand-splash-ring__ring" dangerouslySetInnerHTML={{__html:RING_BOTTOM}} /></span></span>
+        <span className="brand-splash-ring__half brand-splash-ring__half--top"><span className="brand-splash-ring__window"><span className="brand-splash-ring__ring" dangerouslySetInnerHTML={{__html:RING_TOP}} /></span></span>
+      </span>
+    </div>
     <div className="seenit-brand-splash__episodes" aria-hidden="true">{Array.from({length:8},(_,index)=><i key={index}/>)}</div>
     <p>Chaque visionnage compte.</p>
   </div>;

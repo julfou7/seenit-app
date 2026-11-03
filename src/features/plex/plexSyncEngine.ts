@@ -6,7 +6,7 @@ import { db, auth } from '../../lib/firebase';
 import { collection, doc, writeBatch, getDocs, getDocFromServer, runTransaction, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { tmdb } from '../shows/tmdb';
 import { fetchAuthoritativeShowsForUser, useShowsStore } from '../../store/showsStore';
-import { yieldToFrame } from './plexFrameBudget';
+import { yieldToFrame } from './plexFrameBudget'; import { isUnchangedPlexDelta, plexWatchlistFingerprint } from './plexDeltaShortcut';
 import { type PlexSyncProgress, useSyncStore } from '../../store/syncStore';
 import { useToastStore } from '../../store/toastStore';
 import { openExternalUrl } from '../../lib/utils';
@@ -96,9 +96,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       if (!silent) useToastStore.getState().showToast(message, 'info');
       return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: message };
     }
-    let cloudPlexState: Record<string, any>;
+    let cloudPlexState: { authToken?: string; username?: string; lastSyncTimestamp?: unknown; resolutionCache?: Record<string, unknown>; watchlistFingerprint?: unknown };
     try {
-      cloudPlexState = await loadPlexCloudState(user.uid);
+      cloudPlexState = await loadPlexCloudState(user.uid) as typeof cloudPlexState;
     } catch (error: unknown) {
       const message = `Impossible de charger l’état Plex autoritatif du compte : ${error instanceof Error ? error.message : String(error)}`;
       appLogger.error('plex', message);
@@ -236,7 +236,9 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       const hasLibraryWatchStates = Array.isArray(libraryWatchStates) && libraryWatchStates.length > 0;
       const watchlistSnapshotComplete = plexData?.integrity?.watchlistCollectionComplete === true;
 
-      if (!hasHistory && !hasWatchlist && !hasLibraryWatchStates && !watchlistSnapshotComplete) {
+      const unchangedDelta = isUnchangedPlexDelta({ delta, history, libraryWatchStates, watchlist, watchlistComplete: watchlistSnapshotComplete, collectionComplete: plexData?.integrity?.collectionComplete === true, previousFingerprint: cloudPlexState.watchlistFingerprint, shows: useShowsStore.getState().shows, resolutionCache: sharedResolutionCache });
+      if ((!hasHistory && !hasWatchlist && !hasLibraryWatchStates && !watchlistSnapshotComplete) || unchangedDelta) {
+        if (unchangedDelta) appLogger.info('plex', `[Plex Sync] Delta sans nouveauté : Watchlist identique (${watchlist.length} titre(s)), bibliothèque non relue.`);
         const sourcesMsg = visitedSources && visitedSources.length > 0 ? ` (${visitedSources.join(', ')})` : '';
         // // appLogger.info('plex', `Plex vérifié : aucun nouveau média ni watchlist${sourcesMsg}`);
         const canCommitCursor = shouldCommitPlexCursor({
@@ -1082,7 +1084,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       if (canCommitCursor) {
         setPlexLastSyncTimestamp(user.uid, nextSyncCursor);
         await persistPlexCloudState(user.uid, {
-          lastSyncTimestamp: nextSyncCursor,
+          lastSyncTimestamp: nextSyncCursor, ...(watchlistSnapshotComplete ? { watchlistFingerprint: plexWatchlistFingerprint(watchlist) } : {}),
           resolutionCache: compactPlexResolutionCache(resolutionCache)
         });
         clearPlexSyncStatusDelayed(completedServerStatus, 5000);
