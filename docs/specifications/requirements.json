@@ -2586,6 +2586,10 @@
       ],
       "tests": [
         {
+          "file": "tests/ciFailureAnnotations.test.ts",
+          "contains": "SEENIT-QUALITY-008 une étape rouge publie sa cause exacte en annotation lisible par l’API"
+        },
+        {
           "file": "tests/ciValidationPerformance.test.ts",
           "contains": "SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance"
         },
