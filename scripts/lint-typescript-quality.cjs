@@ -2,7 +2,7 @@ const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
-const { isPureVersionAlignment } = require('./validate-change-contract.cjs');
+const { isPureVersionAlignment, isVersionOnlyPatch } = require('./validate-change-contract.cjs');
 
 const ROOT = path.resolve(__dirname, '..');
 const POLICY_PATH = path.join(ROOT, 'docs/specifications/typescript-quality-baseline.json');
@@ -267,7 +267,10 @@ function validateReport(report, policy, options = {}) {
       for (const reason of addedLineDebt(current, addedLineNumbers(baseSha, relativePath, root), allowance)) {
         violations.push(`${relativePath}: dette interdite dans les lignes modifiées (${reason})`);
       }
-      for (const reason of compareFileDebt(current, previous, allowance, { requireImprovement: !pureVersionAlignment })) {
+      // Un fichier dont le seul changement est la version (préparée dans la PR du correctif, AGENTS §0.0t)
+      // n'a pas de dette à rembourser ; toute nouvelle dette reste interdite.
+      const versionOnlyFile = !pureVersionAlignment && isVersionOnlyPatch(relativePath, readPatch(baseSha, relativePath, root));
+      for (const reason of compareFileDebt(current, previous, allowance, { requireImprovement: !pureVersionAlignment && !versionOnlyFile })) {
         violations.push(`${relativePath}: règle boy-scout non respectée (${reason})`);
       }
     }

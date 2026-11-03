@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.242",
+  "applicationVersion": "1.4.243",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -2649,6 +2649,10 @@
         "backend"
       ],
       "tests": [
+        {
+          "file": "tests/typescriptQualityGuard.test.ts",
+          "contains": "SEENIT-QUALITY-011 un fichier touché seulement par la version, dans une PR de correctif, n’a pas de dette à rembourser"
+        },
         {
           "file": "tests/typescriptQualityGuard.test.ts",
           "contains": "SEENIT-QUALITY-011 bloque toute nouvelle dette any/console et active le strict progressif"

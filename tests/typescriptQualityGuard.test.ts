@@ -143,3 +143,35 @@ test('SEENIT-QUALITY-011 bloque toute nouvelle dette any/console et active le st
 test('le formatteur minimal normalise fins de ligne et espaces sans réécrire le style', () => {
   assert.equal(normalizeText('const x = 1;  \r\n\r\n'), 'const x = 1;\n');
 });
+
+test('SEENIT-QUALITY-011 un fichier touché seulement par la version, dans une PR de correctif, n’a pas de dette à rembourser', () => {
+  const { execFileSync } = require('node:child_process') as typeof import('node:child_process');
+  const os = require('node:os') as typeof import('node:os');
+  const path = require('node:path') as typeof import('node:path');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'seenit-boyscout-'));
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
+  const write = (file: string, content: string) => { fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true }); fs.writeFileSync(path.join(root, file), content); };
+  try {
+    git('init', '-q'); git('config', 'user.email', 't@t'); git('config', 'user.name', 't');
+    const server = (version: string) => `const headers = {\n'X-Plex-Version': '${version}',\n};\nexport const legacy: any = headers;\nconsole.log(legacy);\n`;
+    const logos = (body: string) => `export const payload: any = ${body};\nconsole.log(payload);\n`;
+    write('server.ts', server('1.4.242'));
+    write('src/features/providers/platformLogos.ts', logos('1'));
+    git('add', '-A'); git('commit', '-qm', 'base');
+    const base = git('rev-parse', 'HEAD');
+    write('server.ts', server('1.4.243'));
+    write('src/features/providers/platformLogos.ts', logos('2'));
+    git('add', '-A'); git('commit', '-qm', 'fix + version');
+
+    const policy = { ...loadPolicy(), ceilings: { explicitAny: 10_000, directConsole: 10_000 }, criticalBoundaries: [] };
+    const report = { fileCount: 2, explicitAny: 2, directConsole: 2, files: {
+      'server.ts': scanSource(fs.readFileSync(path.join(root, 'server.ts'), 'utf8'), 'server.ts'),
+      'src/features/providers/platformLogos.ts': scanSource(fs.readFileSync(path.join(root, 'src/features/providers/platformLogos.ts'), 'utf8'), 'src/features/providers/platformLogos.ts'),
+    } };
+    const violations = validateReport(report, policy, { baseSha: base, root, pureVersionAlignment: false });
+    assert.equal(violations.some((v: string) => v.startsWith('server.ts')), false, 'la ligne de version seule ne force aucun remboursement');
+    assert.ok(violations.some((v: string) => v.startsWith('src/features/providers/platformLogos.ts: règle boy-scout')), 'le code du correctif reste soumis au boy-scout');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
