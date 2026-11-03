@@ -1,0 +1,89 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+import { averageRating, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages } from '../src/features/shows/detailPlanning.ts';
+import { buildVerifiedSimilar, directedMovies, movieIdsFromCredits, similarReasonFor } from '../src/features/shows/similarReasons.ts';
+
+test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée', () => {
+  assert.equal(formatClock(21 * 60 + 40 + 166), '00:26', 'un film de 2 h 46 lancé à 21:40 finit à 00:26');
+  const late = planMovieEnd(21 * 60 + 40, 166)!;
+  assert.equal(late.end, '00:26');
+  assert.equal(late.afterMidnight, 26);
+  assert.equal(late.beforeMidnight, 0);
+  assert.ok(late.midnightPercent !== null && Math.abs(late.midnightPercent - 70) < 0.01, 'minuit est à 140 min sur une fenêtre de 200');
+  const early = planMovieEnd(18 * 60, 100)!;
+  assert.equal(early.afterMidnight, 0);
+  assert.equal(early.beforeMidnight, 260);
+  assert.equal(early.midnightPercent, null, 'minuit hors fenêtre : pas de repère');
+  assert.equal(planMovieEnd(20 * 60, 0), null, 'durée inconnue : pas de carte');
+
+  const episodes = [{ runtime: 47 }, { runtime: 47 }, { runtime: null }, { runtime: 47 }];
+  const evening = planEpisodes(23 * 60, episodes, episode => episode.runtime);
+  assert.deepEqual(evening.plan.map(entry => entry.end), ['23:47', '00:34'], 'la soirée s’arrête au premier épisode sans durée');
+  assert.equal(evening.beforeMidnight, 1);
+  assert.equal(planEpisodes(20 * 60, episodes.slice(0, 2).concat(episodes[3]), episode => episode.runtime, 2).plan.length, 2, 'au plus la limite demandée');
+});
+
+test('SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules notes TMDB connues', () => {
+  assert.deepEqual(seasonAverages([{ season_number: 0, vote_average: 9 }, { season_number: 2, vote_average: 8.2 }, { season_number: 1, vote_average: 7.9 }, { season_number: 3, vote_average: 0 }]), [{ season: 1, average: 7.9 }, { season: 2, average: 8.2 }], 'saison 0 et notes absentes exclues, ordre des saisons');
+  assert.equal(averageRating([8, 9, 0, undefined, 'x']), 8.5);
+  assert.equal(averageRating([0, null]), null);
+  assert.deepEqual(episodeRank([8.4, 9.6, 9.1, 0], 9.6), { rank: 1, total: 3 }, 'meilleure note de la saison');
+  assert.deepEqual(episodeRank([8.4, 9.6, 9.1], 8.4), { rank: 3, total: 3 });
+  assert.equal(episodeRank([8.4], 0), null, 'épisode non noté : pas de rang');
+  assert.equal(ratingBarHeight(9.6, [8, 9.6]), 40);
+  assert.equal(ratingBarHeight(8, [8, 9.6]), 6);
+  assert.equal(ratingBarHeight(undefined, [8, 9.6]), 6, 'note absente : barre minimale, jamais inventée');
+});
+
+const director = { name: 'Denis Villeneuve', movieIds: new Set([335984, 329865]) };
+const lead = { name: 'Timothée Chalamet', movieIds: new Set([157336]) };
+const evidence = { director, leadActors: [lead], mainGenre: { id: 878, name: 'Science-fiction' } };
+
+test('SEENIT-RELATION-001 ne propose un similaire qu’avec une raison prouvée par TMDB', () => {
+  assert.deepEqual(similarReasonFor({ id: 335984, genre_ids: [878] }, evidence), { kind: 'director', reason: 'Même réalisateur · Denis Villeneuve' }, 'le réalisateur l’emporte sur le genre');
+  assert.deepEqual(similarReasonFor({ id: 157336, genre_ids: [878] }, evidence), { kind: 'actor', reason: 'Avec Timothée Chalamet' });
+  assert.deepEqual(similarReasonFor({ id: 1, genre_ids: [878] }, evidence), { kind: 'genre', reason: 'Même genre · Science-fiction' });
+  assert.equal(similarReasonFor({ id: 2, genre_ids: [18] }, evidence), null, 'sans raison, pas de carte');
+
+  const recommendations = [
+    { id: 872585, title: 'Oppenheimer', poster_path: '/o.jpg', genre_ids: [18] },
+    { id: 157336, title: 'Interstellar', poster_path: '/i.jpg', genre_ids: [878] },
+    { id: 1, title: 'SF', poster_path: '/s.jpg', genre_ids: [878] },
+    { id: 438631, title: 'Dune', poster_path: '/d.jpg', genre_ids: [878] },
+    { id: 3, title: 'Sans affiche', poster_path: null, genre_ids: [878] },
+    { id: 4, title: 'Adulte', poster_path: '/a.jpg', genre_ids: [878], adult: true },
+    { id: 5, name: 'Une série', poster_path: '/t.jpg', genre_ids: [878], media_type: 'tv' },
+  ];
+  const directorFilms = [{ id: 335984, title: 'Blade Runner 2049', poster_path: '/b.jpg', genre_ids: [878] }, { id: 157336, title: 'Doublon', poster_path: '/i.jpg' }];
+  const result = buildVerifiedSimilar(693134, recommendations, directorFilms, evidence, new Set([438631]));
+  assert.deepEqual(result.map(entry => entry.candidate.id), [335984, 157336, 1], 'réalisateur > acteur > genre ; collection, sans affiche, adulte, série et sans raison écartés');
+  assert.deepEqual(result.map(entry => entry.kind), ['director', 'actor', 'genre']);
+  assert.equal(buildVerifiedSimilar(693134, [{ id: 693134, poster_path: '/x.jpg', genre_ids: [878] }], [], evidence).length, 0, 'jamais le film courant');
+  assert.equal(buildVerifiedSimilar(693134, recommendations, [], evidence, new Set(), 1).length, 1, 'borné');
+});
+
+test('SEENIT-RELATION-001 rapproche par identifiant TMDB seulement, jamais par titre ou année', () => {
+  const credits = { crew: [{ id: 10, job: 'Director', title: 'A', release_date: '2010-01-01', poster_path: '/a.jpg', popularity: 1 }, { id: 11, job: 'Writer', title: 'B', release_date: '2011-01-01', poster_path: '/b.jpg' }, { id: 12, job: 'Director', title: 'C', release_date: '2999-01-01', poster_path: '/c.jpg' }, { id: 13, job: 'Director', title: 'D', release_date: '2012-01-01', poster_path: '/d.jpg', popularity: 9, media_type: 'tv' }], cast: [{ id: 20 }, { id: 21, media_type: 'tv' }] };
+  assert.deepEqual(directedMovies(credits, '2026-11-03').map(movie => movie.id), [10], 'réalisés, sortis, films seulement');
+  assert.deepEqual([...movieIdsFromCredits(credits, 'cast')], [20]);
+  assert.deepEqual([...movieIdsFromCredits(credits, 'director')], [10, 12]);
+  const sameTitle = buildVerifiedSimilar(1, [{ id: 99, title: 'Dune', poster_path: '/x.jpg', genre_ids: [18] }], [], { director: { name: 'X', movieIds: new Set([7]) }, leadActors: [], mainGenre: { id: 878, name: 'SF' } });
+  assert.equal(sameTitle.length, 0, 'un titre identique ne crée aucune raison');
+  const source = readFileSync('src/features/shows/similarReasons.ts', 'utf8');
+  const decision = source.slice(source.indexOf('export function similarReasonFor'), source.indexOf('type CreditEntry'));
+  assert.ok(decision.length > 200);
+  assert.doesNotMatch(decision, /\.title|release_date|toLowerCase|localeCompare/, 'la décision ne lit ni titre, ni année');
+  assert.match(decision, /movieIds\.has\(id\)/, 'personnes rapprochées par ID TMDB de film');
+  assert.match(decision, /genre_ids \|\| \[\]\)\.includes\(evidence\.mainGenre\.id\)/, 'genre rapproché par ID TMDB');
+});
+
+test('SEENIT-UX-019 le smoke monte les vraies fiches et vérifie leurs parcours', () => {
+  const smoke = readFileSync('scripts/pwa-browser-smoke.cjs', 'utf8');
+  assert.match(smoke, /\['mediaDetail', client => testMediaDetailHarness\(client\)\]/);
+  assert.match(smoke, /await buildMediaDetailHarness\(root\)/);
+  const harness = readFileSync('scripts/media-detail-browser-checks.cjs', 'utf8');
+  for (const step of ['plus d’onglets', 'le bouton or marque le prochain épisode', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
+  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  assert.doesNotMatch(view, /handleTabChange|id="section-about"|>À propos</, 'un seul défilement, sans onglets');
+});

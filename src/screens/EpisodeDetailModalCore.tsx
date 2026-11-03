@@ -2,18 +2,19 @@ import { DialogLayer, isTopDialogElement } from '../components/ui/DialogLayer';
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, useDragControls } from 'motion/react';
 import { type Show } from '../types';
-import { X, Check, Star, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles, Download, CheckCircle2, Play } from 'lucide-react';
-import { Capacitor } from '@capacitor/core';
-import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart, openExternalUrl } from '../lib/utils';
+import { X, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles } from 'lucide-react';
+import { computeAutoArchiveStatus, formatAirDateSafe, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
 import { syncSingleItem } from "../hooks/useDetailsSyncWorker";
 import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditEpisodeSearchQuery } from '../components/community/redditEpisodeSearch';
-import { DownloadModal, type SeasonInfo } from '../components/DownloadModal';
-import { useLiveDownloadStore } from '../store/liveDownloadStore';
-import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
+import { auth } from '../lib/firebase';
+import { readUserScopedJson } from '../lib/userIsolation';
+import { episodeRank, formatClock, formatRating, planEpisodes } from '../features/shows/detailPlanning';
+import { useClockMinutes, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
+import { EpisodeHeaderBlock, EpisodeNavRow, EpisodePlannerCard, ReactionRow, SeasonCurveCard, SpoilerSynopsis } from './mediaDetail/episodeSections';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { type EpisodeDetailData } from './episodeDetailTypes';
@@ -43,12 +44,12 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(false);
 
   const [showFutureConfirm, setShowFutureConfirm] = useState(false);
-  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+  const [revealedSynopsis, setRevealedSynopsis] = useState<Record<string, true>>({});
+  const [streamingProviders, setStreamingProviders] = useState<WhereToWatchProvider[]>([]);
+  const clockMinutes = useClockMinutes();
 
   const { shows, addShow, updateShow } = useShows();
   const { showToast } = useToastStore();
-
-  const { getEpisodeDownload } = useLiveDownloadStore();
 
   // Find live show from Zustand store so updates are instantly reactive
   const liveShow = shows.find(s =>
@@ -558,7 +559,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (!isTopDialogElement(dialogRootRef.current)) return;
-      if (isHydrating || isDownloadOpen || showFutureConfirm || isLoadingEpisode) return;
+      if (isHydrating || showFutureConfirm || isLoadingEpisode) return;
       const direction = resolveEpisodeNavigationDirectionFromKey(event);
       if (!direction) return;
 
@@ -577,7 +578,6 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     hasPrevious,
     hasNext,
     isHydrating,
-    isDownloadOpen,
     showFutureConfirm,
     isLoadingEpisode,
     handlePreviousEpisode,
@@ -649,7 +649,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         optimisticNextEp = null;
       } else if (optimisticNextEp && optimisticNextEp.season_number === currentSeason && optimisticNextEp.episode_number === currentEpisode.episode_number) {
         const effectiveTmdb = tmdbShowId || currentShow.tmdbId;
-        let nextEpDetails: any = null;
+        let nextEpDetails: EpisodeDetailData | null = null;
         if (effectiveTmdb) {
           try {
             const seasonRes = await tmdb.getSeasonDetails(effectiveTmdb, currentSeason);
@@ -771,7 +771,6 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
      });
   };
 
-  const formattedAirDate = currentEpisode.air_date ? formatAirDateSafe(currentEpisode.air_date, 'long') : 'Inconnue';
 
   const watchedDate = record?.watchedAt ? new Date(record.watchedAt).toLocaleDateString('fr-FR', {
     year: 'numeric', month: 'long', day: 'numeric'
@@ -825,11 +824,58 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     return buildRedditQuery(englishTitleResult.ok ? englishTitleResult.value : null);
   };
 
-  const activeShowSeasonMeta = activeShow as (Show & {
-    numberOfSeasons?: number;
-    seasonsCount?: number;
-    seasons?: SeasonInfo[];
-  }) | undefined;
+  // SEENIT-UX-019 — Données de la fiche épisode du prototype : saison, soirée, rang, anti-spoiler.
+  const showTmdbId = tmdbShowId || activeShow?.tmdbId;
+  const seenKeys = activeShow?.seenEpisodes || [];
+  const seasonEpisodes: EpisodeDetailData[] = (showTmdbId && seasonCacheRef.current[`${showTmdbId}_${currentSeason}`]) || [];
+  const nextSeasonEpisodes: EpisodeDetailData[] = (showTmdbId && seasonCacheRef.current[`${showTmdbId}_${currentSeason + 1}`]) || [];
+  const currentNumber = currentEpisode?.episode_number || 1;
+  const episodeCode = (season: number, episode: number) => `S${String(season).padStart(2, '0')} | E${String(episode).padStart(2, '0')}`;
+  const jumpToEpisode = (season: number, target: EpisodeDetailData) => {
+    if (isTransitioningRef.current || isLoadingEpisode) return;
+    if (season === currentSeason && target.episode_number === currentNumber) return;
+    navigationRequestRef.current += 1;
+    const requestId = navigationRequestRef.current;
+    const forward = season > currentSeason || (season === currentSeason && target.episode_number > currentNumber);
+    applyEpisodeNavigationTarget(requestId, forward ? 'next' : 'previous', { season, episode: target });
+    finishNavigationRequest(requestId);
+  };
+  const currentIndex = seasonEpisodes.findIndex(episode => episode.episode_number === currentNumber);
+  const upcomingQueue = [
+    ...seasonEpisodes.slice(Math.max(0, isSeen ? currentIndex + 1 : currentIndex)).map(episode => ({ season: currentSeason, episode })),
+    ...nextSeasonEpisodes.map(episode => ({ season: currentSeason + 1, episode })),
+  ].filter(entry => Boolean(entry.episode.air_date) && entry.episode.air_date! <= todayStr && !seenKeys.includes(`${entry.season}x${entry.episode.episode_number}`) || (entry.season === currentSeason && entry.episode.episode_number === currentNumber && !isSeen && !isFutureEpisode));
+  const evening = planEpisodes(clockMinutes, currentIndex >= 0 ? upcomingQueue : [], entry => entry.episode.runtime || currentEpisode.runtime);
+  const remainingToFinish = activeShow?.totalEpisodes ? Math.max(0, activeShow.totalEpisodes - seenKeys.length) : null;
+  const plannerText = `Avant minuit : ${evening.beforeMidnight} épisode${evening.beforeMidnight > 1 ? 's' : ''}.${remainingToFinish ? ` Encore ${remainingToFinish} pour finir la série` : ''} · touche un bloc pour l’ouvrir.`;
+  const seasonRatings = seasonEpisodes.map(episode => episode.vote_average);
+  const rank = episodeRank(seasonRatings, currentEpisode?.vote_average);
+  const rankLabel = rank && currentEpisode?.vote_average ? `★ ${formatRating(Number(currentEpisode.vote_average))} · ${rank.rank === 1 ? '▲ Meilleure note de la saison' : `${rank.rank}e note sur ${rank.total}`}` : null;
+  const seenInCurrentSeason = seasonEpisodes.filter(episode => seenKeys.includes(`${currentSeason}x${episode.episode_number}`)).length;
+  const previousSeasonEpisodes: EpisodeDetailData[] = (showTmdbId && seasonCacheRef.current[`${showTmdbId}_${currentSeason - 1}`]) || [];
+  const previousKey = currentNumber > 1 ? { season: currentSeason, episode: currentNumber - 1 } : previousSeasonEpisodes.length ? { season: currentSeason - 1, episode: Math.max(...previousSeasonEpisodes.map(episode => episode.episode_number)) } : null;
+  const synopsisHidden = !isSeen && Boolean(previousKey) && !seenKeys.includes(`${previousKey!.season}x${previousKey!.episode}`) && !revealedSynopsis[epKey];
+  const nextEntry = upcomingQueue.find(entry => !(entry.season === currentSeason && entry.episode.episode_number === currentNumber)) || (currentIndex >= 0 && seasonEpisodes[currentIndex + 1] ? { season: currentSeason, episode: seasonEpisodes[currentIndex + 1] } : null);
+  const shortLabel = (season: number, episode: number) => season === currentSeason ? `E${episode}` : `S${season}·E${episode}`;
+  const userPlatforms = readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', []);
+  useEffect(() => {
+    if (!showTmdbId) return;
+    let cancelled = false;
+    const apply = (payload: { results?: { FR?: { flatrate?: WhereToWatchProvider[]; free?: WhereToWatchProvider[]; ads?: WhereToWatchProvider[] } } } | null) => {
+      const fr = payload?.results?.FR;
+      const unique = new Map<number, WhereToWatchProvider>();
+      [...(fr?.flatrate || []), ...(fr?.free || []), ...(fr?.ads || [])].forEach(provider => { if (!unique.has(provider.provider_id)) unique.set(provider.provider_id, provider); });
+      if (!cancelled) setStreamingProviders([...unique.values()].slice(0, 3));
+    };
+    const cached = tmdb.peekWatchProviders(Number(showTmdbId), 'tv');
+    if (cached) apply(cached);
+    else void tmdb.getWatchProviders(Number(showTmdbId), 'tv').then(result => apply(result.ok ? result.value : null));
+    return () => { cancelled = true; };
+  }, [showTmdbId]);
+  const plexAvailable = Boolean(presence.plexInfo?.available);
+  const watchProviders: WhereToWatchProvider[] = [...streamingProviders, ...(plexAvailable ? [{ provider_id: 999999, provider_name: 'Plex', isPlex: true, serverName: presence.plexInfo?.serverName }] : [])];
+  const openPlex = () => { void openPlexWatchUrl(activeShow || { tmdbId: showTmdbId, imdbId: activeShow?.imdbId, title: activeShow?.title || tmdbShowTitle, mediaType: 'tv' }); };
+  const seenThenNext = async () => { if (!isSeen) await toggleSeen(); void handleNextEpisode(); };
 
   return (
     <DialogLayer ref={dialogRootRef} onDismiss={onClose} label="Détail de l’épisode" historyMode="external" role="dialog" className="fixed inset-0 z-40 flex flex-col items-center">
@@ -967,7 +1013,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                       <span className="text-xs font-semibold truncate max-w-[140px]">{show?.title || tmdbShowTitle || 'Retour'}</span>
                     </div>
                   </button>
-                  <button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 flex items-center justify-center text-zinc-300 active:scale-95 transition-all shadow-lg" aria-label="Fermer"><X size={18} /></button>
+                  <button type="button" onClick={onClose} className="w-11 h-11 rounded-full bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center justify-center text-white active:scale-95" aria-label="Fermer"><X size={18} /></button>
                 </div>
                 <div className="w-full">
                   <div className="relative w-full h-[280px] sm:h-[340px] bg-zinc-900 overflow-hidden"><div className="absolute inset-0 bg-gradient-to-t from-[#09090B] via-[#09090B]/40 to-transparent" /></div>
@@ -1004,311 +1050,61 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 </div>
               </div>
             )}
-            {/* 1. FLOATING BUTTONS (Positioned over the banner with safe-area support) */}
-            <div
-              className="absolute left-4 right-4 z-30 flex items-center justify-between pointer-events-auto"
-              style={{ top: '14px' }}
-            >
-              {/* Series Button */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const targetTmdbId = tmdbShowId || show?.tmdbId;
-                  if (onShowClick && targetTmdbId) {
-                    onShowClick(targetTmdbId, show?.mediaType || 'tv');
-                  } else {
-                    onClose();
-                  }
-                }}
-                className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 text-white active:scale-95 transition-all max-w-[200px] group shadow-lg"
-              >
-                <ArrowLeft size={16} className="text-[#E5A93D] shrink-0 group-hover:-translate-x-0.5 transition-transform" />
-                <div className="flex flex-col text-left overflow-hidden leading-tight">
-                  <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-bold -mb-0.5">Série</span>
-                  <span className="text-xs font-semibold truncate max-w-[140px]">{show?.title || tmdbShowTitle || 'Retour'}</span>
-                </div>
+            {/* Boutons flottants : retour série et fermer (44 px, prototype) */}
+            <div className="absolute left-3.5 right-3.5 z-30 flex items-center justify-between pointer-events-auto" style={{ top: '14px' }}>
+              <button type="button" onClick={(e) => { e.stopPropagation(); const targetTmdbId = tmdbShowId || show?.tmdbId; if (onShowClick && targetTmdbId) onShowClick(targetTmdbId, show?.mediaType || 'tv'); else onClose(); }} aria-label="Retour à la série" className="h-11 max-w-[230px] pl-2.5 pr-3.5 rounded-[22px] bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_4px_14px_rgba(0,0,0,0.4)] flex items-center gap-2 text-white active:scale-95">
+                <ArrowLeft size={18} className="text-[#E5A93D] shrink-0" />
+                <span className="min-w-0 flex flex-col text-left leading-[1.15]"><span className="text-[9px] font-extrabold tracking-[0.08em] text-zinc-400">SÉRIE</span><span className="text-[13px] font-bold truncate">{show?.title || tmdbShowTitle || 'Retour'}</span></span>
               </button>
-
-              {/* Close Button */}
-              <button
-                onClick={onClose}
-                className="w-9 h-9 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 flex items-center justify-center text-zinc-300 hover:text-white active:scale-95 transition-all shadow-lg"
-                aria-label="Fermer"
-              >
-                <X size={18} />
-              </button>
+              <button type="button" onClick={onClose} aria-label="Fermer" className="w-11 h-11 rounded-full bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center justify-center text-white active:scale-95"><X size={18} /></button>
             </div>
 
-            {/* 2. FREELY SCROLLING CONTENT */}
             <div className="w-full">
-              {/* Banner Section */}
-              <div className="relative w-full h-[280px] sm:h-[340px] bg-zinc-900 overflow-hidden">
-                {currentEpisode.still_path && (
-                  <img loading="lazy" decoding="async"
-                    src={`https://image.tmdb.org/t/p/w1280${currentEpisode.still_path}`}
-                    className="w-full h-full object-cover"
-                    alt=""
-                  />
+              <div className="relative w-full h-[250px] bg-zinc-900 overflow-hidden">
+                {currentEpisode.still_path && <img loading="eager" decoding="async" src={`https://image.tmdb.org/t/p/w1280${currentEpisode.still_path}`} className="w-full h-full object-cover" style={{ objectPosition: 'center 30%' }} alt="" />}
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(0deg,#09090b 0%,rgba(9,9,11,0.35) 50%,rgba(9,9,11,0.3) 100%)' }} />
+              </div>
+              <div className="px-[18px] -mt-11 relative z-10 flex flex-col gap-3.5 pb-nav">
+                <EpisodeHeaderBlock code={episodeCode(currentSeason, currentNumber)} title={currentEpisode.name || `Épisode ${currentNumber}`} airLabel={currentEpisode.air_date ? `${isFutureEpisode ? 'Diffusion le' : 'Diffusé le'} ${new Date(`${currentEpisode.air_date}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}` : 'Date de diffusion inconnue'} meta={[currentEpisode.runtime ? `${currentEpisode.runtime} min` : '', isSeen && watchedDate ? `Vu le ${watchedDate}` : ''].filter(Boolean).join(' · ')} isSeen={Boolean(isSeen)} isFuture={isFutureEpisode} futureLabel={relativeAirDateLabel} onToggle={handleMainButtonClick} />
+
+                {showFutureConfirm && (
+                  <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-3 animate-in fade-in duration-200">
+                    <p className="text-xs text-amber-200 font-medium leading-relaxed">Cet épisode n'a pas encore été diffusé. Veux-tu vraiment le marquer comme vu ?</p>
+                    <div className="flex gap-2 justify-center">
+                      <button onClick={() => setShowFutureConfirm(false)} className="min-h-11 px-4 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold touch-manipulation select-none cursor-pointer">Annuler</button>
+                      <button onClick={() => { setShowFutureConfirm(false); toggleSeen(); }} className="min-h-11 px-4 rounded-xl bg-[#E5A93D] text-black text-xs font-bold touch-manipulation select-none cursor-pointer">Marquer comme vu</button>
+                    </div>
+                  </div>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#09090B] via-[#09090B]/40 to-transparent" />
-              </div>
 
-              {/* Info & Content Section */}
-              <div className="px-5 -mt-16 relative z-10 space-y-4 pb-nav">
-                {/* Badge + Titre + Nom Série */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-block px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-white/10">
-                      S{currentSeason.toString().padStart(2, '0')} | E{currentEpisode.episode_number.toString().padStart(2, '0')}
-                    </span>
-                    {currentEpisode?.vote_average ? (
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 backdrop-blur-md rounded-full text-[10px] font-bold bg-zinc-800/80 text-blue-400 border border-blue-500/30">
-                        <Star size={11} className="fill-[#01b4e4] text-[#01b4e4] shrink-0" />
-                        <span className="text-zinc-100 font-extrabold">{Number(currentEpisode.vote_average).toFixed(1)}</span>
-                        <span className="bg-blue-500/20 text-blue-300 px-1 py-0.2 rounded font-black text-[9px]">TMDB</span>
-                        {currentEpisode.vote_count ? (
-                          <span className="text-zinc-500 font-medium">({formatVoteCount(currentEpisode.vote_count)})</span>
-                        ) : null}
-                      </span>
-                    ) : null}
-                  </div>
-                  <h1 className="text-3xl font-extrabold text-white leading-tight">
-                    {currentEpisode.name}
-                  </h1>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const targetTmdbId = tmdbShowId || show?.tmdbId;
-                      if (onShowClick && targetTmdbId) {
-                        onShowClick(targetTmdbId, show?.mediaType || 'tv');
-                      } else {
-                        onClose();
-                      }
-                    }}
-                    className="text-[#E5A93D] hover:text-[#f0c05a] text-sm font-bold transition-colors flex items-center gap-1.5 group uppercase tracking-wider"
-                  >
-                    {show?.title || tmdbShowTitle || 'Série'}
-                  </button>
-                </div>
+                {!isFutureEpisode && <EpisodePlannerCard heading={isSeen ? 'Vu · si tu enchaînes maintenant' : 'Si tu lances maintenant'} end={evening.plan.length ? evening.plan[0].end : ''} clock={formatClock(clockMinutes)} text={plannerText}
+                  blocks={evening.plan.map(entry => ({ key: `${entry.item.season}x${entry.item.episode.episode_number}`, label: shortLabel(entry.item.season, entry.item.episode.episode_number), runtime: entry.runtime, end: entry.end, onPick: () => jumpToEpisode(entry.item.season, entry.item.episode) }))} />}
 
-                <div className="space-y-6">
-                  <nav aria-label="Navigation entre épisodes" className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      aria-label="Épisode précédent"
-                      disabled={!hasPrevious || isLoadingEpisode}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handlePreviousEpisode();
-                      }}
-                      className="min-h-[44px] px-3 rounded-xl border border-white/10 bg-zinc-900/85 text-zinc-200 flex items-center justify-center gap-2 text-xs font-bold transition-colors hover:bg-zinc-800 disabled:opacity-35 disabled:cursor-not-allowed"
-                    >
-                      <ChevronLeft size={18} aria-hidden="true" />
-                      <span>Précédent</span>
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Épisode suivant"
-                      disabled={!hasNext || isLoadingEpisode}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        void handleNextEpisode();
-                      }}
-                      className="min-h-[44px] px-3 rounded-xl border border-white/10 bg-zinc-900/85 text-zinc-200 flex items-center justify-center gap-2 text-xs font-bold transition-colors hover:bg-zinc-800 disabled:opacity-35 disabled:cursor-not-allowed"
-                    >
-                      <span>Suivant</span>
-                      <ChevronRight size={18} aria-hidden="true" />
-                    </button>
-                  </nav>
+                <SeasonCurveCard label={`Saison ${currentSeason} · ${seenInCurrentSeason}/${seasonEpisodes.length} vus`} rankLabel={rankLabel}
+                  cells={seasonEpisodes.map(episode => ({ n: episode.episode_number, rating: Number(episode.vote_average) > 0 ? Number(episode.vote_average) : null, seen: seenKeys.includes(`${currentSeason}x${episode.episode_number}`), current: episode.episode_number === currentNumber, onPick: () => jumpToEpisode(currentSeason, episode) }))} />
 
-                  {/* Main Action Button (Pleine largeur) */}
-                  <div>
-                    {isSeen ? (
-                      <button
-                        onClick={handleMainButtonClick}
-                        className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-emerald-500 hover:bg-emerald-400 text-black font-bold shadow-lg shadow-emerald-500/20 touch-manipulation select-none cursor-pointer"
-                      >
-                        <Check size={22} className="stroke-[3]" />
-                        Épisode vu
-                      </button>
-                    ) : isFutureEpisode ? (
-                      <button
-                        onClick={handleMainButtonClick}
-                        className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-zinc-800 text-zinc-400 border border-zinc-700 font-medium cursor-pointer hover:bg-zinc-700 touch-manipulation select-none"
-                      >
-                        <Clock size={20} className="text-amber-400" />
-                        {relativeAirDateLabel}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={handleMainButtonClick}
-                        className="w-full py-4 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-[0.98] bg-[#E5A93D] hover:bg-[#d4982f] text-black font-bold shadow-lg shadow-[#E5A93D]/20 touch-manipulation select-none cursor-pointer"
-                      >
-                        <Check size={22} className="stroke-[3]" />
-                        Marquer comme vu
-                      </button>
-                    )}
-                  </div>
+                <SpoilerSynopsis text={currentEpisode.overview} hidden={synopsisHidden} why={previousKey ? `Tu n’as pas vu ${episodeCode(previousKey.season, previousKey.episode)}` : ''} onReveal={() => setRevealedSynopsis(current => ({ ...current, [epKey]: true }))} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} />
 
-                  {/* Bouton Télécharger l'épisode ou Badge de Disponibilité */}
-                  {(() => {
-                    const isUnreleased = currentEpisode?.air_date ? new Date(currentEpisode.air_date).getTime() > Date.now() : false;
-                    if (isUnreleased) {
-                      return (
-                        <div className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 bg-zinc-800/50 border border-zinc-700 text-zinc-400 font-bold text-xs shadow-sm select-none">
-                          <Clock size={16} className="text-zinc-500 shrink-0" />
-                          <span>Bientôt disponible</span>
-                        </div>
-                      );
-                    }
+                {!isSeen && !isFutureEpisode && hasNext && nextEntry && <button type="button" onClick={() => void seenThenNext()} disabled={isLoadingEpisode} className="h-[52px] px-4 rounded-2xl bg-[#18181b] shadow-[inset_0_0_0_1px_#3f3f46] flex items-center justify-center gap-1.5 text-[14px] font-bold text-white active:scale-[0.98]">Vu, puis {shortLabel(nextEntry.season, nextEntry.episode.episode_number)} ›</button>}
 
-                    const epKey = `S${currentSeason}E${currentEpisode?.episode_number}`;
-                    const isEpisodeAvailable = presence.episodesHasFile[epKey] || presence.seasonsHasFile[currentSeason] || (presence.hasFile && (presence.plexInfo?.available || presence.sonarrHasFile));
+                {isSeen && <ReactionRow value={record?.emotion} onPick={emotion => void updateRecord({ emotion: record?.emotion === emotion ? '' : emotion })} />}
+                {isSeen && hasNext && nextEntry && <button type="button" onClick={() => void handleNextEpisode()} className="flex items-center gap-3 p-3 rounded-[18px] bg-[rgba(24,24,27,0.7)] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.35)] text-left active:scale-[0.99]">
+                  <span className="w-24 aspect-video rounded-[9px] overflow-hidden bg-zinc-800 shrink-0">{nextEntry.episode.still_path && <img src={`https://image.tmdb.org/t/p/w300${nextEntry.episode.still_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />}</span>
+                  <span className="flex-1 min-w-0 flex flex-col gap-0.5"><span className="text-[12px] font-bold text-[#E5A93D]">Ensuite · {shortLabel(nextEntry.season, nextEntry.episode.episode_number)}</span><span className="text-[15px] font-bold text-white truncate">{nextEntry.episode.name}</span>{Number(nextEntry.episode.runtime) > 0 ? <span className="text-[12px] text-zinc-400">{Number(nextEntry.episode.runtime)} min · fin à {formatClock(clockMinutes + Number(nextEntry.episode.runtime))}</span> : null}</span>
+                  <span className="text-[18px] text-[#E5A93D]" aria-hidden="true">›</span>
+                </button>}
 
-                    if (isEpisodeAvailable) {
-            if (presence.plexInfo?.available) {
-              return (
-                <div className="flex flex-col items-center gap-2.5 w-full">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const targetTmdbId = tmdbShowId || activeShow?.tmdbId;
-                      void openPlexWatchUrl(activeShow || {
-                        tmdbId: targetTmdbId,
-                        imdbId: activeShow?.imdbId,
-                        title: activeShow?.title || tmdbShowTitle,
-                        mediaType: 'tv'
-                      });
-                    }}
-                    className="w-full py-3.5 px-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] bg-[#E5A93D] hover:bg-[#d4982f] text-black font-extrabold text-sm cursor-pointer shadow-lg shadow-[#E5A93D]/15 touch-manipulation select-none"
-                    aria-label="Regarder cet épisode dans Plex"
-                  >
-                    <Play size={18} className="fill-black shrink-0" />
-                    <span>Regarder dans Plex</span>
-                  </button>
+                {isFutureEpisode ? <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>
+                  : watchProviders.length > 0 && <WhereToWatchCard providers={watchProviders} loading={false} userPlatforms={userPlatforms} title={activeShow?.title || tmdbShowTitle || ''} onOpenPlex={openPlex} emptyLabel="" />}
 
-                  <button
-                    type="button"
-                    onClick={() => setIsDownloadOpen(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 hover:text-blue-400 transition-colors active:scale-95 touch-manipulation select-none"
-                  >
-                    <Download size={12} className="shrink-0" />
-                    <span>Télécharger à nouveau</span>
-                  </button>
-                </div>
-              );
-            }
+                <RedditSection
+                  query={redditEpisodeQuery}
+                  resolveQuery={resolveRedditQuery}
+                  isLocked={!isSeen}
+                  unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
+                />
 
-            return (
-              <div className="flex flex-col items-center gap-2 w-full">
-                <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold text-[10px] select-none">
-                  <CheckCircle2 size={13} className="shrink-0" />
-                  <span>Téléchargé</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsDownloadOpen(true)}
-                  className="inline-flex items-center justify-center gap-1.5 px-2 py-1.5 text-[10px] font-semibold text-zinc-500 hover:text-blue-400 transition-colors active:scale-95 touch-manipulation select-none"
-                >
-                  <Download size={12} className="shrink-0" />
-                  <span>Télécharger à nouveau</span>
-                </button>
-              </div>
-            );
-          }
-
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => setIsDownloadOpen(true)}
-                        className="w-full py-3 px-4 rounded-2xl flex items-center justify-center gap-2.5 transition-all active:scale-[0.98] bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 font-bold text-xs cursor-pointer shadow-sm touch-manipulation select-none"
-                      >
-                        <Download size={16} className="text-blue-400 shrink-0" />
-                        <span>Télécharger S{String(currentSeason).padStart(2, '0')}E{String(currentEpisode.episode_number).padStart(2, '0')}</span>
-                      </button>
-                    );
-                  })()}
-
-                  {/* Single Episode Live Download Banner */}
-                  {(() => {
-                    const epDownload = getEpisodeDownload(tmdbShowId || activeShow?.tmdbId, activeShow?.tvdbId, currentSeason, currentEpisode?.episode_number);
-                    if (!epDownload) return null;
-                    return (
-                      <div className="mt-2">
-                        <LiveDownloadBanner items={[epDownload]} />
-                      </div>
-                    );
-                  })()}
-
-                  {/* Synopsis - Interactif & Déroulable */}
-                  {currentEpisode.overview && (
-                    <div className="mt-2 mb-2 animate-in fade-in duration-700">
-                      <p
-                        onClick={() => setIsSynopsisExpanded(!isSynopsisExpanded)}
-                        className={cn(
-                          "text-[13px] text-zinc-300 leading-relaxed cursor-pointer transition-all duration-300 ease-in-out",
-                          !isSynopsisExpanded && "line-clamp-3"
-                        )}
-                      >
-                        {currentEpisode.overview}
-                      </p>
-                      {!isSynopsisExpanded && currentEpisode.overview.length > 120 && (
-                        <button
-                          onClick={() => setIsSynopsisExpanded(true)}
-                          className="text-[11px] font-extrabold uppercase tracking-wider text-zinc-500 mt-1 hover:text-white transition-colors cursor-pointer"
-                        >
-                          Suite...
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Custom Future Episode Confirmation Dialog */}
-                  {showFutureConfirm && (
-                    <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-3 animate-in fade-in duration-200">
-                      <p className="text-xs text-amber-200 font-medium leading-relaxed">
-                        Cet épisode n'a pas encore été diffusé. Veux-tu vraiment le marquer comme vu ?
-                      </p>
-                      <div className="flex gap-2 justify-center">
-                        <button
-                          onClick={() => setShowFutureConfirm(false)}
-                          className="px-4 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-semibold hover:bg-zinc-700 transition-colors touch-manipulation select-none cursor-pointer"
-                        >
-                          Annuler
-                        </button>
-                        <button
-                          onClick={() => {
-                            setShowFutureConfirm(false);
-                            toggleSeen();
-                          }}
-                          className="px-4 py-2.5 rounded-xl bg-[#E5A93D] text-black text-xs font-bold hover:bg-[#d4982f] transition-colors touch-manipulation select-none cursor-pointer"
-                        >
-                          Marquer comme vu
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dates */}
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800/50">
-                       <span className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Diffusé le</span>
-                       <span className="text-sm font-medium text-zinc-200">{formattedAirDate}</span>
-                     </div>
-                     <div className="bg-zinc-900 p-3 rounded-xl border border-zinc-800/50">
-                       <span className="block text-[10px] uppercase text-zinc-500 font-bold mb-1">Vu le</span>
-                       <span className="text-sm font-medium text-zinc-200">{isSeen ? (watchedDate || '--') : '--'}</span>
-                     </div>
-                  </div>
-
-                  <RedditSection
-                    query={redditEpisodeQuery}
-                    resolveQuery={resolveRedditQuery}
-                    isLocked={!isSeen}
-                    unlockMessage="Débloquez les discussions de la communauté sur cet épisode en le marquant comme vu."
-                  />
-                </div>
+                <EpisodeNavRow prevLabel={hasPrevious ? (currentNumber > 1 ? `E${currentNumber - 1}` : `S${currentSeason - 1}`) : 'Début'} nextLabel={hasNext ? (nextEntry ? shortLabel(nextEntry.season, nextEntry.episode.episode_number) : 'Suivant') : 'Fin'} hasPrevious={hasPrevious} hasNext={hasNext} disabled={isLoadingEpisode} onPrevious={() => void handlePreviousEpisode()} onNext={() => void handleNextEpisode()} />
               </div>
             </div>
           </motion.div>
@@ -1317,20 +1113,6 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       </motion.div>
     </motion.div>
 
-    <DownloadModal
-      isOpen={isDownloadOpen}
-      onClose={() => setIsDownloadOpen(false)}
-      title={activeShow?.title || tmdbShowTitle || 'Série'}
-      mediaType="tv"
-      tmdbId={tmdbShowId || activeShow?.tmdbId}
-      tvdbId={activeShow?.tvdbId}
-      imdbId={activeShow?.imdbId}
-      initialSeason={currentSeason}
-      initialEpisode={currentEpisode.episode_number}
-      totalSeasons={activeShowSeasonMeta?.numberOfSeasons || activeShowSeasonMeta?.seasonsCount || activeShowSeasonMeta?.seasons?.length || 1}
-      seasonsData={activeShowSeasonMeta?.seasons}
-      onSuccessToast={showToast}
-    />
   </DialogLayer>
   );
 }

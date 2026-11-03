@@ -387,10 +387,13 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 - **SEENIT-RATING-001** — Les notes publiques affichées par SeenIt proviennent exclusivement de TMDB :
   `vote_average` / `vote_count` du film, de la série ou de l'épisode exact. SeenIt ne normalise et ne
   substitue jamais une note IMDb à une note TMDB.
-- Le graphique d'une série compare les épisodes d'une seule saison avec les valeurs TMDB disponibles.
-  Il vit uniquement dans l'onglet **Épisodes**, conserve les nombres comme information principale et
-  utilise la couleur seulement comme renfort. Une saison longue reste consultable horizontalement avec
-  une cible accessible d'au moins 44 × 44 CSS px par épisode.
+- Les graphiques de notes d'une série utilisent uniquement les valeurs TMDB disponibles : **Moyenne par
+  saison** (`seasons[].vote_average`), barres de la saison sélectionnée et courbe de la fiche épisode
+  (`episode.vote_average`). Une note absente est ignorée, jamais estimée. Ils vivent dans la section
+  saisons de la fiche série et dans la fiche épisode (`SEENIT-UX-019`), conservent les nombres comme
+  information principale et utilisent la couleur seulement comme renfort. Chaque épisode reste atteignable
+  par une cible d'au moins 44 × 44 CSS px : sa ligne et sa coche dans la fiche série, sa case dans la
+  fiche épisode, en plus de Précédent / Suivant.
 - OMDb n'est plus un fournisseur SeenIt : aucune route, clé, requête ou cache OMDb/IMDb ne participe au
   runtime. Un identifiant IMDb peut continuer à transiter comme identifiant technique exact pour les
   résolutions Plex ou TVDB autorisées ; il ne produit jamais une note.
@@ -511,6 +514,12 @@ preuves complètes, ils doivent converger vers la même bibliothèque.
   - **Série** : **Franchise / univers** depuis TVDB uniquement ;
   - les sections **Films similaires** et **Séries similaires** sont supprimées des fiches. Les
     recommandations contextuelles et la découverte restent dans **Explorer**.
+  - révision du 03/11/2026 (`USR-2026-11-03-005`) : la fiche **Film** propose **Similaires, et pourquoi**
+    après la saga et la franchise. Un titre n'y figure que s'il porte une raison prouvée par TMDB et
+    rapprochée par identifiant : même réalisateur (crédit `Director`), même acteur principal (deux premiers
+    du casting) ou même genre principal. Sans raison prouvée, pas de carte ; le film courant, sa collection,
+    les titres sans affiche, adultes ou non-films sont écartés. Cette section n'est jamais un repli d'une
+    relation TVDB manquante et aucun titre ni année ne sert à rapprocher deux œuvres.
 
 L'identité d'une œuvre est toujours le couple `mediaType + tmdbId`, sérialisé sous la forme
 `movie:<tmdbId>` ou `tv:<tmdbId>`. Les espaces d'identifiants Film et Série sont distincts : `movie:42`
@@ -590,6 +599,31 @@ La décision produit complète et les décisions remplacées sont figées dans
 [`docs/decisions/media-relations-2026-09-06.md`](../decisions/media-relations-2026-09-06.md). La migration
 du runtime est suivie dans [#130](https://github.com/julfou7/seenit-app/issues/130) ; cette architecture
 n'est rouverte que par une nouvelle décision produit explicite.
+
+### 5.6.1 Fiches série, film et épisode — prototype du 24/10/2026
+
+- **SEENIT-UX-019** — Les fiches suivent le prototype « SeenIt Prototype » (24/10/2026) dans un seul
+  défilement, sans onglets : hero (affiche de fond, titre en or, années · saisons · genres ou année ·
+  durée · genres), puis :
+  - **Série** : carte de progression (épisodes vus, temps restant, un segment par saison), bouton or
+    **Marquer SxxEyy vu** qui marque directement le prochain épisode, tuiles du diffuseur et de Plex ;
+    chips note TMDB, âge et bande-annonce ; synopsis ; **Moyenne par saison** ; pastilles de saison
+    (sélection, jamais fermeture) ; carte de la saison (barres de notes, **Tout marquer vu / non vu**,
+    bande-annonce de saison) et lignes d'épisode (vignette, note, durée, coche 44 px) ; **Où regarder**
+    en lignes ; **Personnages** (personnage, épisodes, présence, interprète) ; univers TVDB ; catégories
+    et thèmes ; Reddit.
+  - **Film** : **Marquer vu** (annulable), signet **À voir**, bande-annonce ; « Si tu lances maintenant ·
+    Fin à HH:MM » tant que le film est sorti, non vu et hors salle ; chips ; synopsis ; Où regarder ;
+    saga TMDB en frise (Vu, Tu es ici, À venir) ; franchise ; **Similaires, et pourquoi** ; casting ;
+    catégories et thèmes ; Reddit.
+  - **Épisode** : code, titre, date de diffusion, durée et bouton **Vu** ; « Si tu lances maintenant »
+    pour trois épisodes diffusés et non vus (durées TMDB, aucune durée inventée) ; courbe des notes de la
+    saison et cases d'épisode ; résumé masqué tant que l'épisode précédent n'est pas vu, révélable au
+    toucher ; **Vu, puis Ex** ; réaction 👎 👍 ❤️ une fois vu (enregistrée dans l'épisode) ; Où regarder ;
+    Reddit verrouillé avant visionnage ; Précédent / Suivant, swipe et flèches (`SEENIT-UX-008`).
+  Les actions de cycle de vie (partager, synchroniser, abandonner/reprendre, retirer, supprimer) et
+  l'entrée existante **Téléchargement** restent dans le menu ⋮. Les fiches n'exposent plus de bouton
+  de téléchargement en ligne. Les cibles tactiles restent d'au moins 44 px.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 

@@ -48,19 +48,23 @@ test('SEENIT-PERF-001 charge le détail principal sans attendre les disponibilit
 test('SEENIT-PERF-001 affiche les repères déterministes pendant le skeleton froid', () => { assert.match(detailColdShellSource, /knownTitle/); assert.match(detailColdShellSource, /📺 SÉRIE/); assert.match(detailColdShellSource, /🎬 FILM/); assert.match(detailColdShellSource, />À propos</); assert.match(detailColdShellSource, />Épisodes</); assert.match(detailColdShellSource, />Casting</); assert.match(detailColdShellSource, />Synopsis</); assert.match(detailColdShellSource, />Catégories & Thèmes</); assert.match(detailColdShellSource, />Où regarder</); assert.match(detailColdShellSource, /Recherche Plex & streaming…/); assert.match(detailColdShellSource, /data-seenit-cold-shell="calm"/); assert.doesNotMatch(detailColdShellSource, /animate-pulse/); });
 
 test('SEENIT-PERF-001 garde la structure À propos Épisodes Casting indépendante des crédits', () => {
-  assert.match(detailSource, /<button onClick=\{\(\) => \{ handleTabChange\('casting'\); setShowAllCast\(false\); \}\}[\s\S]{0,260}>Casting<\/button>/);
-  assert.doesNotMatch(detailSource, /\(tmdbDetails\?\.aggregate_credits\?\.cast \|\| tmdbDetails\?\.credits\?\.cast\)\?\.length > 0\) && <button[\s\S]{0,260}>Casting<\/button>/);
-  assert.match(detailSource, /id="section-casting"[\s\S]{0,700}data-seenit-casting-loading="true"/);
-  assert.match(detailSource, /castingPayloadKnown[\s\S]{0,900}Aucun casting disponible\./);
+  // SEENIT-UX-019 : plus d'onglets ; la section Personnages/Casting existe dès le premier rendu et son
+  // squelette ne dépend que de la présence des crédits, pas de leur nombre.
+  assert.doesNotMatch(detailSource, /handleTabChange\('casting'\)/);
+  assert.match(detailSource, /const castPayloadKnown = isSeries \? Boolean\(tmdbDetails\?\.aggregate_credits \|\| tmdbDetails\?\.credits\) : Boolean\(tmdbDetails\?\.credits\)/);
+  assert.match(detailSource, /loading=\{!tmdbDetails \|\| !castPayloadKnown\}/);
+  assert.match(detailSource, /data-seenit-casting-loading="true"/);
 });
 test('SEENIT-PERF-001 garde le loader Relations à la géométrie des cartes finales', () => {
   assert.match(detailWrapperSource, /\[data-seenit-relation-loading\] > h3[\s\S]{0,120}font-size: 0/);
   assert.match(detailWrapperSource, /\[data-seenit-relation-loading\] > h3::after[\s\S]{0,220}animation: pulse/);
   assert.doesNotMatch(detailWrapperSource, /h3\.mb-3:has\(/);
-  assert.match(detailSource, /data-seenit-relation-loading="true"[\s\S]{0,420}w-\[120px\] sm:w-\[140px\][\s\S]{0,180}aspect-\[2\/3\]/);
+  // Le squelette reprend la géométrie des lignes finales (affiche 44 × 66) de la frise et de la franchise.
+  assert.match(detailSource, /data-seenit-relation-loading="true"[\s\S]{0,420}w-11 h-\[66px\]/);
+  assert.match(detailSource, /<span className="w-11 h-\[66px\] rounded-lg overflow-hidden bg-zinc-800 shrink-0"/);
   assert.doesNotMatch(detailSource, /saga_loader_[\s\S]{0,160}w-\[110px\]/);
 });
-test('SEENIT-PERF-001 unifie le chargement des disponibilités et expose un refresh Plex compact', () => { assert.match(detailSource, /Recherche Plex & streaming…/); assert.match(detailSource, /<h3[^>]*>Où regarder<\/h3><button/); assert.match(detailSource, /aria-label="Actualiser Plex"/); assert.match(detailSource, /className="inline-flex w-11 h-11/); assert.match(detailSource, /refreshPlexServers: true/); assert.match(presenceStoreSource, /refreshServers: refreshPlexServers/); assert.match(plexAvailabilitySource, /refreshServers/); assert.match(tmdbFacadeSource, /readWatchProviderCache/); assert.match(tmdbFacadeSource, /writeWatchProviderCache/); });
+test('SEENIT-PERF-001 unifie le chargement des disponibilités et expose un refresh Plex compact', () => { assert.match(detailSource, /Recherche Plex & streaming…/); assert.match(detailSource, /<h3[^>]*>Où regarder<\/h3>\{onRefreshPlex && <button/); assert.match(detailSource, /aria-label="Actualiser Plex"/); assert.match(detailSource, /className="w-11 h-11 inline-flex/); assert.match(detailSource, /refreshPlexServers: true/); assert.match(presenceStoreSource, /refreshServers: refreshPlexServers/); assert.match(plexAvailabilitySource, /refreshServers/); assert.match(tmdbFacadeSource, /readWatchProviderCache/); assert.match(tmdbFacadeSource, /writeWatchProviderCache/); });
 test('SEENIT-PERF-001 ouvre un épisode avec cache ou shell stable sans contenu provisoire', () => {
   const handlerStart = watchListSource.indexOf('const handleEpisodeClick');
   const handlerEnd = watchListSource.indexOf('const openEpisodeParentNow', handlerStart);

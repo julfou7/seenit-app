@@ -169,7 +169,7 @@ test('SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés d
   assert.deepEqual(groups.flat().map(([key]) => key), [
     'viewports', 'accessibility', 'componentActions', 'dialogs', 'providers', 'seriesCards', 'history', 'navbar',
     'tv', 'searchKeyboard', 'watchNext',
-    'homeV4', 'homeTerrain221', 'homeTerrain222', 'homeTerrain223', 'homeTerrain224', 'homeTerrain226', 'homeTerrain227', 'home', 'homePerformance', 'homeUnseen',
+    'homeV4', 'homeTerrain221', 'homeTerrain222', 'homeTerrain223', 'mediaDetail', 'homeTerrain224', 'homeTerrain226', 'homeTerrain227', 'home', 'homePerformance', 'homeUnseen',
   ], 'SEENIT_PWA_LANES=1 rejoue exactement la séquence historique');
   assert.equal(groups[1].at(-1)?.[0], 'watchNext', 'l’horloge virtuelle 18c reste la dernière de son client');
   assert.deepEqual(groups[0].slice(0, 3).map(([key]) => key), ['viewports', 'accessibility', 'componentActions']);
