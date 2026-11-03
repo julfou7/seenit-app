@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.243",
+  "applicationVersion": "1.4.244",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -2585,6 +2585,10 @@
         "ci"
       ],
       "tests": [
+        {
+          "file": "tests/ciValidationPerformance.test.ts",
+          "contains": "SEENIT-QUALITY-008 la clé du cache suit l’ABI Node, pas le patch de l’image du runner"
+        },
         {
           "file": "tests/ciFailureAnnotations.test.ts",
           "contains": "SEENIT-QUALITY-008 une étape rouge publie sa cause exacte en annotation lisible par l’API"

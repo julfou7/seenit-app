@@ -4,4 +4,4 @@ Names and logos remain trademarks of their respective owners.
 These assets are preferred artwork for recognized names. Installed app IDs and native fallback icons come from Tizen inventory.
 
 CANAL+ : repère typographique local ; marque appartenant à son titulaire, affichée uniquement pour une app découverte.
-CANAL+ (`canalplus.png`) : logo fourni par le propriétaire le 03/11/2026 ; Netflix et france.tv : assets fournis puis réparés (#809).
+CANAL+ (`canalplus.png`) et Netflix (`netflix.png`) : logos fournis par le propriétaire le 03/11/2026 ; france.tv : asset fourni puis réparé (#809).

@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.243**
+Version applicative : **1.4.244**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1658,8 +1658,8 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   releases via `/api/update` tant que ce fallback existe.
 - **SEENIT-QUALITY-008** — La validation continue échoue vite sans retirer de contrôle :
   l’intégrité de la SPEC s’exécute avant tout accès aux dépendances, puis un cache `node_modules` exact
-  est restauré avant l’installation conditionnelle. Sa clé dépend du système, de l'architecture, de la
-  version Node, du lockfile et des scripts de patch, hors champs de version de l'application (une
+  est restauré avant l’installation conditionnelle. Sa clé dépend du système, de l'architecture, de l'ABI
+  Node (version majeure et `process.versions.modules`, jamais le patch de l'image du runner), du lockfile et des scripts de patch, hors champs de version de l'application (une
   préparation de release ne vide donc pas le cache) ; seul `main` alimente le cache de référence et une
   PR ne peut pas l'empoisonner. Sur cache trouvé, aucune installation n'a lieu et la classification
   comme le contrat de changement s'exécutent directement. Un cache absent déclenche une installation
