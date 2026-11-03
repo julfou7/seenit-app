@@ -89,7 +89,8 @@ test('Réglages · retours v1.4.238 : journal désactivable, barre visible, vrai
 
   assert.match(profile, /blocking=\{false\} data-settings-layer=""/);
   assert.match(ui, /blocking=\{false\}\s+data-settings-layer=""/);
-  assert.match(navCss, /body:has\(\[data-dialog-layer\]:not\(\[data-settings-layer\]\)\) \.bottom-nav-shell\{display:none\}/);
+  // Réglages et, depuis SEENIT-UX-019, la fiche média gardent la barre ; les autres dialogues la masquent.
+  assert.match(navCss, /body:has\(\[data-dialog-layer\]:not\(\[data-settings-layer\]\):not\(\[data-media-layer\]\)\) \.bottom-nav-shell\{display:none\}/);
   assert.match(profile, /window\.addEventListener\('app-close-modals', handleCloseModals\)/);
 
   assert.match(core, /loadPlatformLogos\(STREAMING_PLATFORMS\.map\(platform => platform\.id\)\)/);

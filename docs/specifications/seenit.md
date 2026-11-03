@@ -624,6 +624,17 @@ n'est rouverte que par une nouvelle décision produit explicite.
   Les actions de cycle de vie (partager, synchroniser, abandonner/reprendre, retirer, supprimer) et
   l'entrée existante **Téléchargement** restent dans le menu ⋮. Les fiches n'exposent plus de bouton
   de téléchargement en ligne. Les cibles tactiles restent d'au moins 44 px.
+  Retours terrain v1.4.247 (03/11/2026) :
+  - le bouton or de la série est **Voir SxxEyy** : il ouvre la fiche du prochain épisode à voir, sans
+    le marquer ; on le marque depuis cette fiche ;
+  - genres et thèmes forment une rangée de pastilles alignées (32 px) juste sous le synopsis ;
+  - tout est en français : genres traduits par identifiant TMDB (« Reality » → « Téléréalité ») et rôles
+    génériques traduits et accordés (« Self » → « Lui-même » / « Elle-même », « (voice) » → « · voix ») ;
+  - **Où regarder** dédoublonne les plateformes par nom (« Netflix » et « Netflix Standard with Ads » ne
+    font qu'un), sur la fiche comme sur l'épisode ;
+  - la fiche média garde la barre de navigation ; seuls les dialogues plein écran la masquent ;
+  - une seule fiche acteur dans toute l'app : fiches, Explorer, Moi et À voir ouvrent celle des billets ;
+  - le squelette de chargement reprend le gabarit des nouvelles fiches (même hero, mêmes cartes).
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 

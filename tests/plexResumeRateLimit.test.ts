@@ -99,7 +99,7 @@ async function engineHarness() {
         export const getAuthenticatedHeaders=async()=>({});export const authenticatedFetch=()=>{throw new Error('fallback interdit')};
         export const resolveSeenItApiCandidates=()=>['https://example.invalid/api/plex/history'];export const resolveSeenItApiUrl=value=>value;
         export const appLogger={info:()=>{},warn:()=>{},error:()=>{},success:()=>{}};export const tmdb={};export const CURRENT_APP_VERSION='1.4.219';
-        export const collection=(...args)=>args;export const doc=(...args)=>args;
+        export const collection=(...args)=>args;export const doc=(...args)=>args;export const onSnapshot=()=>()=>{};
         export const getDocFromServer=async()=>{p().reads++;return {exists:()=>true,data:()=>({authToken:p().cloudAuthToken,lastSyncTimestamp:42})}};
         export const runTransaction=async()=>{p().writes++};export const setDoc=async()=>{p().writes++;if(p().migrationGate)await p().migrationGate};export const updateDoc=setDoc;export const getDocs=async()=>({docs:[]});export const writeBatch=()=>{};export const deleteField=()=>{};
         export const fetchAuthoritativeShowsForUser=async()=>{throw new Error('lecture progression interdite après refus')};export const useShowsStore={getState:()=>({})};

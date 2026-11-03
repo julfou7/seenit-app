@@ -13,8 +13,8 @@ type Kind = 'series' | 'movie' | 'episode';
 const seasonsMeta = [1, 2, 3, 4, 5].map(season => ({ season_number: season, episode_count: season === 5 ? 16 : 13, air_date: `${2007 + season}-01-20`, vote_average: [7.9, 8.2, 8.4, 8.6, 8.8][season - 1] }));
 const seriesDetails = {
   id: 1396, name: 'Breaking Bad', overview: 'Un professeur de chimie atteint d’un cancer devient fabricant de méthamphétamine pour assurer l’avenir de sa famille.', first_air_date: '2008-01-20', last_air_date: '2013-09-29', status: 'Ended', number_of_seasons: 5, number_of_episodes: 68, vote_average: 8.9, episode_run_time: [47],
-  genres: [{ id: 18, name: 'Drame' }, { id: 80, name: 'Crime' }], seasons: [{ season_number: 0, episode_count: 9 }, ...seasonsMeta],
-  aggregate_credits: { cast: [['Walter White', 'Bryan Cranston', 62], ['Jesse Pinkman', 'Aaron Paul', 62], ['Saul Goodman', 'Bob Odenkirk', 43], ['Mike Ehrmantraut', 'Jonathan Banks', 28], ['Skyler White', 'Anna Gunn', 62], ['Hank Schrader', 'Dean Norris', 62], ['Marie Schrader', 'Betsy Brandt', 62]].map(([character, name, count], index) => ({ id: 200 + index, name, profile_path: null, roles: [{ character, episode_count: count }], total_episode_count: count })) },
+  genres: [{ id: 18, name: 'Drame' }, { id: 80, name: 'Crime' }, { id: 10764, name: 'Reality' }], seasons: [{ season_number: 0, episode_count: 9 }, ...seasonsMeta],
+  aggregate_credits: { cast: ([['Walter White', 'Bryan Cranston', 62], ['Jesse Pinkman', 'Aaron Paul', 62], ['Saul Goodman', 'Bob Odenkirk', 43], ['Mike Ehrmantraut', 'Jonathan Banks', 28], ['Self', 'Anna Gunn', 62], ['Hank Schrader', 'Dean Norris', 62], ['Marie Schrader', 'Betsy Brandt', 62]] as Array<[string, string, number]>).map(([character, name, count]: [string, string, number], index) => ({ id: 200 + index, name, gender: index === 4 ? 1 : 2, profile_path: null as string | null, roles: [{ character, episode_count: count }], total_episode_count: count })) },
 };
 const movieDetails = {
   id: 693134, title: 'Dune : Deuxième partie', overview: 'Paul Atréides s’allie aux Fremen pour venger sa famille, et doit choisir entre l’amour et le destin de l’univers.', release_date: '2024-02-27', runtime: 166, vote_average: 8.1,
@@ -32,8 +32,8 @@ function Harness({ kind }: { kind: Kind }) {
   const [showMenu, setShowMenu] = useState(false);
   const [isSynopsisExpanded, setIsSynopsisExpanded] = useState(false);
   const [areThemesExpanded, setAreThemesExpanded] = useState(false);
-  const [trailerModalVideos, setTrailerModalVideos] = useState<unknown[] | null>(null);
-  const [selectedEpisode, setSelectedEpisode] = useState<unknown>(null);
+  const [trailerModalVideos, setTrailerModalVideos] = useState<Array<{ site: string; key: string; name: string }> | null>(null);
+  const [selectedEpisode, setSelectedEpisode] = useState<{ season: number; episode: { episode_number: number } } | null>(null);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const seen = show?.seenEpisodes || [];
   const isSeries = kind === 'series';
@@ -63,7 +63,7 @@ function Harness({ kind }: { kind: Kind }) {
     toggleMovieSeen: () => setShow(current => current?.seenEpisodes?.includes('movie') ? { ...current, seenEpisodes: [], status: 'plan_to_watch' } : { ...(current || { id: 'dune2', userId: 'fixture', tmdbId: 693134, title: 'Dune', mediaType: 'movie', episodeRecords: {}, createdAt: 0, updatedAt: 0 }), seenEpisodes: ['movie'], status: 'completed' } as Show),
     togglePlanToWatchMovie: () => setShow(current => current ? null : { id: 'dune2', userId: 'fixture', tmdbId: 693134, title: 'Dune', mediaType: 'movie', status: 'plan_to_watch', seenEpisodes: [], episodeRecords: {}, createdAt: 0, updatedAt: 0 } as unknown as Show),
     toggleSeasonSeen: (event: { stopPropagation: () => void }, season: number, count: number) => { event.stopPropagation(); setShow(current => { if (!current) return current; const keys = Array.from({ length: count }, (_, index) => `${season}x${index + 1}`); const all = keys.every(key => current.seenEpisodes.includes(key)); return { ...current, seenEpisodes: all ? current.seenEpisodes.filter(key => !keys.includes(key)) : [...new Set([...current.seenEpisodes, ...keys])] }; }); },
-    totalEpisodes: isSeries ? 68 : 1, trailerModalVideos, userPlatforms: [8], ytVideos: [{ site: 'YouTube', key: 'trailer' }],
+    totalEpisodes: isSeries ? 68 : 1, trailerModalVideos, userPlatforms: [8], ytVideos: [{ site: 'YouTube', key: 'trailer', name: 'Bande-annonce' }],
   };
   return <div className="max-w-md mx-auto h-[100dvh] flex flex-col"><ShowDetailView model={model} /></div>;
 }

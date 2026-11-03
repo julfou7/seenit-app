@@ -37,7 +37,7 @@ export async function loadActorCredits(uid: string, id: number): Promise<ActorCr
   try { return await request; } finally { pending.delete(key); }
 }
 
-export interface ActorPerson { name?: string; profile_path?: string | null; birthday?: string | null; deathday?: string | null; place_of_birth?: string | null; known_for_department?: string; biography?: string }
+export interface ActorPerson { name?: string; gender?: number | null; profile_path?: string | null; birthday?: string | null; deathday?: string | null; place_of_birth?: string | null; known_for_department?: string; biography?: string }
 const pendingPeople = new Map<string, Promise<ActorPerson>>();
 export function cachedActorPerson(uid: string | undefined, id: number): ActorPerson | null {
   const cached = readUserScopedJson<{ at: number; person: ActorPerson } | null>(uid, `home_actor_person_fr_${id}`, null);

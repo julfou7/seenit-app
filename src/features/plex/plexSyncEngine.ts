@@ -291,7 +291,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       if (auth.currentUser?.uid !== user.uid) {
         throw new Error('Compte SeenIt modifié pendant le chargement de la bibliothèque');
       }
-      const authoritySignature = buildLibraryStateSignature(authoritativeShows as Array<Record<string, any>>);
+      const authoritySignature = buildLibraryStateSignature(authoritativeShows as unknown as Parameters<typeof buildLibraryStateSignature>[0]);
       appLogger.info(
         'plex',
         `[Plex Sync] Bibliothèque Firestore autoritative : ${authoritativeShows.length} média(s), empreinte ${authoritySignature}.`

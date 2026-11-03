@@ -14,6 +14,8 @@ import { auth } from '../lib/firebase';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { episodeRank, formatClock, formatRating, planEpisodes } from '../features/shows/detailPlanning';
 import { useClockMinutes, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
+import { dedupeProvidersByName } from '../features/providers/providerNames';
+import { appLogger } from '../store/logStore';
 import { EpisodeHeaderBlock, EpisodeNavRow, EpisodePlannerCard, ReactionRow, SeasonCurveCard, SpoilerSynopsis } from './mediaDetail/episodeSections';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
@@ -665,7 +667,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               }
             }
           } catch (e) {
-            console.error('Error fetching next ep in modal:', e);
+            appLogger.warn('tmdb', 'Épisode suivant indisponible depuis la fiche épisode', e);
           }
         }
 
@@ -863,9 +865,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     let cancelled = false;
     const apply = (payload: { results?: { FR?: { flatrate?: WhereToWatchProvider[]; free?: WhereToWatchProvider[]; ads?: WhereToWatchProvider[] } } } | null) => {
       const fr = payload?.results?.FR;
-      const unique = new Map<number, WhereToWatchProvider>();
-      [...(fr?.flatrate || []), ...(fr?.free || []), ...(fr?.ads || [])].forEach(provider => { if (!unique.has(provider.provider_id)) unique.set(provider.provider_id, provider); });
-      if (!cancelled) setStreamingProviders([...unique.values()].slice(0, 3));
+      // Un seul « Netflix » même si TMDB liste aussi « Netflix Standard with Ads » (dédoublonnage par nom).
+      if (!cancelled) setStreamingProviders(dedupeProvidersByName([...(fr?.flatrate || []), ...(fr?.ads || []), ...(fr?.free || [])]).slice(0, 3));
     };
     const cached = tmdb.peekWatchProviders(Number(showTmdbId), 'tv');
     if (cached) apply(cached);

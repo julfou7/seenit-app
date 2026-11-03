@@ -1,6 +1,6 @@
 .reg-root{background:#0B0B0D;color:#fff}
 /* Les Réglages gardent la barre de navigation : le contenu réserve sa hauteur, même dans un dialogue. */
-.seenit-dialog-layer[data-settings-layer] .pb-nav{padding-bottom:calc(5.25rem + var(--seenit-safe-area-bottom,env(safe-area-inset-bottom,0px)))}
+.seenit-dialog-layer[data-settings-layer] .pb-nav,.seenit-dialog-layer[data-media-layer] .pb-nav{padding-bottom:calc(5.25rem + var(--seenit-safe-area-bottom,env(safe-area-inset-bottom,0px)))}
 .reg-page{display:flex;flex-direction:column;gap:18px;padding:10px 16px 0;animation:regIn .18s ease-out}
 .reg-head{display:flex;align-items:center;gap:10px;margin-left:-4px}
 .reg-back{flex-shrink:0;width:44px;height:44px;border-radius:22px;border:1px solid rgba(255,255,255,.10);background:#1C1C1F;display:flex;align-items:center;justify-content:center;color:#fff}

@@ -83,7 +83,40 @@ test('SEENIT-UX-019 le smoke monte les vraies fiches et vérifie leurs parcours'
   assert.match(smoke, /\['mediaDetail', client => testMediaDetailHarness\(client\)\]/);
   assert.match(smoke, /await buildMediaDetailHarness\(root\)/);
   const harness = readFileSync('scripts/media-detail-browser-checks.cjs', 'utf8');
-  for (const step of ['plus d’onglets', 'le bouton or marque le prochain épisode', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
+  for (const step of ['plus d’onglets', 'le bouton or ouvre le prochain épisode', 'genres TMDB traduits en français', 'rôle « Self » traduit et accordé', 'pastilles alignées', 'un seul Netflix', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.doesNotMatch(view, /handleTabChange|id="section-about"|>À propos</, 'un seul défilement, sans onglets');
+});
+
+test('SEENIT-UX-019 parle français : genres TMDB, rôles génériques et plateformes dédoublonnées', async () => {
+  const { frenchCharacterName, frenchGenreName, frenchGenres } = await import('../src/features/shows/frenchLabels.ts');
+  const { dedupeProvidersByName, getCleanProviderName } = await import('../src/features/providers/providerNames.ts');
+  assert.equal(frenchGenreName({ id: 10764, name: 'Reality' }), 'Téléréalité');
+  assert.equal(frenchGenreName({ id: 10765, name: 'Sci-Fi & Fantasy' }), 'Science-fiction & fantastique');
+  assert.equal(frenchGenreName({ id: 999999, name: 'Inconnu' }), 'Inconnu', 'genre inconnu : nom fourni conservé');
+  assert.deepEqual(frenchGenres([{ id: 18, name: 'Drame' }, { id: 10764, name: 'Reality' }]).map(genre => genre.name), ['Drame', 'Téléréalité']);
+  assert.equal(frenchCharacterName('Self', 2), 'Lui-même');
+  assert.equal(frenchCharacterName('Self', 1), 'Elle-même');
+  assert.equal(frenchCharacterName('Herself'), 'Elle-même');
+  assert.equal(frenchCharacterName('Host', 1), 'Présentatrice');
+  assert.equal(frenchCharacterName('Maui (voice)'), 'Maui · voix');
+  assert.equal(frenchCharacterName('Self - Contestant', 2), 'Lui-même · Contestant');
+  assert.equal(frenchCharacterName('Walter White'), 'Walter White', 'un vrai personnage reste tel quel');
+  assert.equal(getCleanProviderName({ provider_name: 'Netflix Standard with Ads' }), 'Netflix');
+  assert.deepEqual(dedupeProvidersByName([{ provider_id: 8, provider_name: 'Netflix' }, { provider_id: 1796, provider_name: 'Netflix Standard with Ads' }, { provider_id: 337, provider_name: 'Disney Plus' }]).map(provider => [provider.provider_id, provider.provider_name]), [[8, 'Netflix'], [337, 'Disney+']], 'le premier (abonnement) l’emporte');
+});
+
+test('SEENIT-UX-019 une seule fiche acteur, la barre visible sur la fiche et un squelette au même gabarit', () => {
+  for (const path of ['src/screens/ShowDetailView.tsx', 'src/screens/WatchListView.tsx', 'src/screens/DiscoverViewCore.tsx', 'src/screens/ProfileScreen.tsx']) {
+    const source = readFileSync(path, 'utf8');
+    assert.match(source, /import \{ PersonProfile as PersonDetailModal \} from '\.\.\/components\/PersonProfile'/, `${path} ouvre la fiche acteur unique`);
+    assert.doesNotMatch(source, /from '\.\/PersonDetailModal'/);
+  }
+  assert.match(readFileSync('src/components/PersonProfile.tsx', 'utf8'), /<MovieActorProfile [^>]*historyMode="external"/);
+  assert.match(readFileSync('src/App.tsx', 'utf8'), /label="Fiche média" onDismiss=\{closeShow\} historyMode="external" blocking=\{false\} data-media-layer=""/);
+  assert.match(readFileSync('src/components/bottomNav.css', 'utf8'), /:not\(\[data-media-layer\]\)\) \.bottom-nav-shell\{display:none\}/);
+  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  assert.match(view, /label=\{`Voir \$\{code\}`\}[^\n]*onClick=\{handleWatchNextEpisode\}/, 'le bouton or ouvre l’épisode, il ne marque rien');
+  assert.ok(view.indexOf('<ThemesCard') > view.indexOf('<DetailSynopsis') && view.indexOf('<ThemesCard') < view.indexOf('<SeasonAverageChart'), 'genres et thèmes juste sous le synopsis');
+  assert.match(readFileSync('src/screens/MediaDetailColdShell.tsx', 'utf8'), /style=\{\{ height: isSeries \? 300 : 380 \}\}/);
 });

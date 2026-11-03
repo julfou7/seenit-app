@@ -1,9 +1,11 @@
 import type { ActorCredit, ActorPerson } from './actorCredits';
 import type { Show } from '../../types';
+import { frenchCharacterName } from '../shows/frenchLabels.ts';
 
 export const actorCreditKey = (credit: ActorCredit) => `${credit.media_type}:${credit.id}`;
-export function actorRole(role: string | undefined): string {
-  return (role || '').replace(/\s*\(voice\)\s*/gi, ' · voix').trim();
+/** Rôle affiché, toujours en français (« Self » → « Lui-même », « (voice) » → « · voix »). */
+export function actorRole(role: string | undefined, gender?: number | null): string {
+  return frenchCharacterName(role, gender);
 }
 export function partitionActorCredits(credits: readonly ActorCredit[], seenKeys: ReadonlySet<string>, shows: readonly Pick<Show, 'mediaType' | 'tmdbId'>[], today: string) {
   const unique = [...new Map(credits.map(credit => [actorCreditKey(credit), credit])).values()];

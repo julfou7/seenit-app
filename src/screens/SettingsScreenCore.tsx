@@ -578,7 +578,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
         hasVisual ? 'success' : 'info'
       );
     } catch (error) {
-      console.warn('[Settings] Notification test failed:', error);
+      appLogger.warn('system', 'Test de notification impossible', error);
       showToast("🧪 Test · Impossible d'envoyer la notification.", "error");
     }
   };

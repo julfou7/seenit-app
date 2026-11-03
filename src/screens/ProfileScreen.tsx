@@ -4,7 +4,7 @@ import { Settings } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { SettingsScreen } from './SettingsScreen';
-import { PersonDetailModal } from './PersonDetailModal';
+import { PersonProfile as PersonDetailModal } from '../components/PersonProfile';
 import { cn } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { ProAnalyticsDashboard } from '../components/ProAnalyticsDashboard';

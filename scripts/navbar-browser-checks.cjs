@@ -152,9 +152,9 @@ async function testNavbarHarness(client, root) {
     const capture=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
     fs.writeFileSync(path.join(root,'quality-reports',`navbar-13j-${width}.png`),Buffer.from(capture.data,'base64'));
     await evaluate(client,'window.__nav13j.clearToasts();window.__nav13j.detail()');
-    await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display==="none" && document.querySelector("[data-dialog-layer]").getBoundingClientRect().height>=900','fiche plein écran sans barre');
+    await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none" && document.querySelector("[data-dialog-layer]").getBoundingClientRect().height>=900','fiche plein écran avec la barre (SEENIT-UX-019)');
     await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});
-    await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none"','barre restaurée au retour');
+    await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none"','barre toujours là au retour');
     await client.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
     await evaluate(client,'window.__nav13j.downloads([{id:"active",status:"downloading"}]);document.documentElement.style.fontSize="32px"');
     await check(client,'getComputedStyle(document.querySelector(".navigation-download-dot")).animationName==="none" && document.documentElement.scrollWidth<=document.documentElement.clientWidth','reduced-motion et texte agrandi');

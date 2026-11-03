@@ -51,7 +51,7 @@ function Harness() {
     {NAVIGATION_TABS.map(item=><Screen key={item.id} tab={item.id} active={tab===item.id} shortcut={tab===item.id&&shortcut?.tab===item.id?shortcut.id:undefined}/>)}
     <BottomNav currentTab={tab} onTabChange={setTab} onActiveTabClick={()=>activateCurrentNavigationTab(rootTab)} onActiveTabDoubleClick={()=>resetCurrentNavigationTab(rootTab)} onLongPress={long}/>
     {quick&&<QuickAccountSheet onClose={()=>setQuick(false)}/>}
-    {detail&&<DialogLayer label="Fiche média" blocking={false} historyMode="external" onDismiss={()=>setDetail(false)} className="fixed inset-0 bg-zinc-950"><h2>Fiche média</h2><button type="button" style={{minHeight:44,padding:16}} onClick={()=>setDetail(false)}>Retour à la liste</button></DialogLayer>}
+    {detail&&<DialogLayer label="Fiche média" blocking={false} historyMode="external" data-media-layer="" onDismiss={()=>setDetail(false)} className="fixed inset-0 bg-zinc-950"><h2>Fiche média</h2><button type="button" style={{minHeight:44,padding:16}} onClick={()=>setDetail(false)}>Retour à la liste</button></DialogLayer>}
     <ToastContainer />
   </div>;
 }

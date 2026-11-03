@@ -86,28 +86,7 @@ export const getEpisodeAirDateLabel = (airDate?: string | null) => {
   return `Le ${formatAirDateSafe(airDate, 'short')}`;
 };
 
-interface ProviderNameInput {
-  provider_name?: string | null;
-}
-
-export const getCleanProviderName = (provider: ProviderNameInput) => {
-  const providerName = provider.provider_name || '';
-  const name = providerName.toLowerCase();
-  if (name.includes('netflix')) return 'Netflix';
-  if (name.includes('prime') || name.includes('amazon')) return 'Prime Video';
-  if (name.includes('disney')) return 'Disney+';
-  if (name.includes('canal') || name.includes('mycanal')) return 'Canal+';
-  if (name.includes('apple tv') || name.includes('apple')) return 'Apple TV+';
-  if (name.includes('paramount')) return 'Paramount+';
-  if (name.includes('max') || name.includes('hbo')) return 'Max';
-  if (name.includes('france') || name.includes('ftv')) return 'France TV';
-  if (name.includes('arte')) return 'Arte';
-  return providerName
-    .replace(/ à la demande/gi, '')
-    .replace(/ Plus/gi, '+')
-    .replace(/ Channel/gi, '')
-    .trim();
-};
+export { getCleanProviderName, dedupeProvidersByName } from '../features/providers/providerNames';
 
 export { getProviderDirectLink, getProviderLinkPresentation, type ProviderLinkKind, type ProviderLinkPresentation } from '../features/providers/providerLink';
 

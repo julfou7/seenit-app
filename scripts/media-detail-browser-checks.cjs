@@ -10,7 +10,7 @@ async function buildMediaDetailHarness(root) {
     plugins: [{ name: 'media-detail-ports', setup(builder) {
       // La fiche épisode réelle est montée par la fixture ; seule ShowDetailView reçoit le bouchon.
       builder.onResolve({ filter: /\/EpisodeDetailModal$/ }, args => args.importer.endsWith('ShowDetailView.tsx') ? { path: runtime } : undefined);
-      builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:firebase|tmdb|showsStore|syncPlex|DownloadModal|PersonDetailModal|TrailerModal|useShows|toastStore|useDetailsSyncWorker|useMediaPresence|downloadConfigStore)$/ }, () => ({ path: runtime }));
+      builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:firebase|tmdb|showsStore|syncPlex|DownloadModal|PersonDetailModal|PersonProfile|TrailerModal|useShows|toastStore|useDetailsSyncWorker|useMediaPresence|downloadConfigStore)$/ }, () => ({ path: runtime }));
     } }],
   });
   const fonts = fs.readFileSync(path.join(root, 'index.html'), 'utf8').match(/<link[^>]+fonts.googleapis.com\/css[^>]*>/)?.[0] || '';
@@ -56,8 +56,11 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.querySelector("h1")?.textContent==="Breaking Bad" && document.body.innerText.includes("2008–2013 · 5 saisons · Drame, Crime")', 'hero série titré en or avec années, saisons et genres');
     await check(client, '!document.body.innerText.match(/^À propos$/m) && !' + byText('button', 'Casting').replace(/;$/, ''), 'plus d’onglets : un seul défilement');
     await check(client, 'document.body.innerText.includes("65 / 68 épisodes") && ' + byLabel('65 épisodes vus sur 68') + '', 'progression et segments par saison');
-    await click(client, byText('button', 'Marquer S05 | E14 vu'));
-    await check(client, 'document.body.innerText.includes("66 / 68 épisodes") && ' + byText('button', 'Marquer S05 | E15 vu'), 'le bouton or marque le prochain épisode puis avance');
+    await click(client, byText('button', 'Voir S05 | E14'));
+    await check(client, 'window.__mediaDetail.telemetry.opens.includes("next") && document.body.innerText.includes("65 / 68 épisodes")', 'le bouton or ouvre le prochain épisode sans le marquer');
+    await check(client, 'document.body.innerText.includes("Drame, Crime") && ' + byText('[aria-label="Genres et thèmes"] span', 'Téléréalité') + ' && !document.body.innerText.includes("Reality")', 'genres TMDB traduits en français');
+    await check(client, byText('[aria-labelledby=detail-cast-title] button', 'Elle-même') + ' && !document.body.innerText.match(/\\bSelf\\b/)', 'rôle « Self » traduit et accordé');
+    await check(client, '(()=>{const themes=document.querySelector("[aria-label=\\"Genres et thèmes\\"]"),chart=[...document.querySelectorAll("span")].find(el=>el.textContent==="Moyenne par saison");return themes&&chart&&(themes.compareDocumentPosition(chart)&Node.DOCUMENT_POSITION_FOLLOWING)&&new Set([...themes.children].filter(el=>el.getBoundingClientRect().height>0).map(el=>Math.round(el.getBoundingClientRect().height))).size===1})()', 'genres et thèmes sous le synopsis, pastilles alignées');
     await check(client, 'document.body.innerText.includes("Moyenne par saison") && document.querySelectorAll("[role=group][aria-label=Saisons] button").length===5', 'courbe des saisons et pastilles');
     await click(client, byLabel('Saison 1, ✓ vue'));
     await check(client, '' + byLabel('Saison 1, ✓ vue') + '?.getAttribute("aria-pressed")==="true" && document.body.innerText.includes("Saison 1 · 13/13")', 'une pastille sélectionne sa saison');
@@ -90,6 +93,7 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.querySelector("[role=dialog] h1")?.textContent==="Ozymandias" && document.body.innerText.includes("S05 | E14")', 'fiche épisode titrée');
     await check(client, 'document.body.innerText.includes("Si tu lances maintenant") && document.querySelectorAll(\'[aria-label^="Ouvrir E"]\').length===3', 'soirée de trois épisodes');
     await check(client, 'document.body.innerText.includes("Meilleure note de la saison") && document.querySelectorAll("[aria-current=true]").length>=1', 'courbe et rang dans la saison');
+    await check(client, '(document.querySelector("[role=dialog]").innerText.match(/^Netflix$/gm) || []).length===1 && !document.body.innerText.includes("with Ads")', 'un seul Netflix, sans « Standard with Ads »');
     for (const label of ['Épisode précédent', 'Épisode suivant']) await check(client, `${byLabel(label)}?.getBoundingClientRect().height>=44`, `${label} garde 44 px (SEENIT-UX-008)`);
     await click(client, byLabel('Épisode 16'));
     await check(client, 'document.querySelector("[role=dialog] h1")?.textContent==="Felina" && document.body.innerText.includes("Résumé masqué")', 'une case ouvre l’épisode et masque son résumé si le précédent n’est pas vu');

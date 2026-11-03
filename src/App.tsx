@@ -722,7 +722,7 @@ function MainApp() {
           </div>
 
           {selectedShow && (
-            <DialogLayer key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}`} label="Fiche média" onDismiss={closeShow} historyMode="external" blocking={false}
+            <DialogLayer key={`${selectedShow.id}-${selectedShow.mediaType || 'tv'}`} label="Fiche média" onDismiss={closeShow} historyMode="external" blocking={false} data-media-layer=""
               className="fixed inset-0 z-[150] bg-black flex flex-col overflow-hidden max-w-md mx-auto animate-in fade-in slide-in-from-right motion-reduce:animate-none pt-safe"
               style={{ willChange: 'transform' }}
             >

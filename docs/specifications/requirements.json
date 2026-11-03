@@ -100,6 +100,14 @@
         {
           "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 le smoke monte les vraies fiches et vérifie leurs parcours"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 parle français : genres TMDB, rôles génériques et plateformes dédoublonnées"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 une seule fiche acteur, la barre visible sur la fiche et un squelette au même gabarit"
         }
       ]
     },

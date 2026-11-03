@@ -10,7 +10,6 @@ import { UpToDateShowCard, getUpToDateOrNewSeasonCategory } from '../components/
 import { UpcomingShowCard, getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
 import { HistoryFeed } from '../components/HistoryFeed';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
-import { PersonDetailModal } from './PersonDetailModal';
 import { tmdb } from '../features/shows/tmdb';
 import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
 import { markWatchCardEpisode } from '../features/watchlist/watchCardResume';

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { type Show } from '../../types';
 import { cn, getTodayStr } from '../../lib/utils';
 import { mediaKeyFrom } from '../../features/shows/mediaRelations';
+import { frenchCharacterName } from '../../features/shows/frenchLabels';
 import { DetailCard, DetailChip, DetailSectionTitle } from './detailUi';
 
-type CastMember = { id: number; name: string; profile_path?: string | null; character?: string; roles?: Array<{ character?: string; episode_count?: number }>; total_episode_count?: number; episode_count?: number };
+type CastMember = { id: number; name: string; gender?: number | null; profile_path?: string | null; character?: string; roles?: Array<{ character?: string; episode_count?: number }>; total_episode_count?: number; episode_count?: number };
 
 const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase();
 
@@ -21,7 +22,7 @@ export function CastRows({ cast, isSeries, totalEpisodes, loading, onOpenPerson 
   return <section className="flex flex-col gap-2.5" aria-labelledby="detail-cast-title">
     <DetailSectionTitle id="detail-cast-title">{title}</DetailSectionTitle>
     {visible.map((actor, index) => {
-      const character = actor.roles?.length ? actor.roles.map(role => role.character).filter(Boolean).join(' / ') : actor.character;
+      const character = frenchCharacterName(actor.roles?.length ? actor.roles.map(role => role.character).filter(Boolean).join(' / ') : actor.character, actor.gender);
       const episodes = Number(actor.total_episode_count || actor.episode_count || 0);
       const presence = isSeries && totalEpisodes > 0 ? Math.min(100, Math.round((episodes / totalEpisodes) * 100)) : 0;
       return <button type="button" key={`cast-${actor.id}-${index}`} onClick={() => onOpenPerson(actor.id)} aria-label={`Ouvrir la fiche de ${actor.name}`} className="min-h-11 flex items-center gap-3 text-left active:opacity-80">
@@ -37,17 +38,19 @@ export function CastRows({ cast, isSeries, totalEpisodes, loading, onOpenPerson 
   </section>;
 }
 
+/**
+ * Genres et thèmes juste sous le synopsis, en une rangée de pastilles de même hauteur (32 px) alignées ;
+ * « +N thèmes » a l'allure d'une pastille et garde une cible de 44 px (SEENIT-UX-009).
+ */
 export function ThemesCard({ genres, keywords, expanded, onToggle, loading }: { genres: ReadonlyArray<{ id: number; name: string }>; keywords: readonly string[]; expanded: boolean; onToggle: () => void; loading: boolean }) {
-  if (loading) return <DetailCard className="p-4 flex flex-col gap-3" aria-hidden="true"><span className="text-[15px] font-bold">Catégories & thèmes</span><div className="flex gap-2 animate-pulse"><div className="h-7 w-20 rounded-lg bg-zinc-800/80" /><div className="h-7 w-24 rounded-lg bg-zinc-800/80" /></div></DetailCard>;
+  if (loading) return <div className="flex flex-wrap gap-1.5" aria-hidden="true"><div className="h-8 w-20 rounded-lg bg-zinc-800/80 animate-pulse" /><div className="h-8 w-24 rounded-lg bg-zinc-800/80 animate-pulse" /></div>;
   if (!genres.length && !keywords.length) return null;
-  return <DetailCard className="p-4 flex flex-col gap-3">
-    <span className="text-[15px] font-bold text-white">Catégories & thèmes</span>
-    <div className="flex flex-wrap gap-1.5">
-      {genres.map((genre, index) => <DetailChip key={`genre-${genre.id}-${index}`}>{genre.name}</DetailChip>)}
-      <span id="series-theme-keywords" className="contents">{expanded && keywords.map((keyword, index) => <DetailChip key={`kw-${index}`} className="font-semibold text-zinc-300 capitalize">{keyword}</DetailChip>)}</span>
-      {keywords.length > 0 && <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls="series-theme-keywords" className="min-h-11 px-2.5 rounded-lg text-[12px] font-bold text-[#F2C36B]">{expanded ? 'Masquer les thèmes' : `+${keywords.length} thèmes`}</button>}
-    </div>
-  </DetailCard>;
+  const chip = 'inline-flex h-8 items-center rounded-lg px-3 text-[12px] font-bold whitespace-nowrap';
+  return <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Genres et thèmes">
+    {genres.map((genre, index) => <span key={`genre-${genre.id}-${index}`} className={cn(chip, 'bg-[#18181b] text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]')}>{genre.name}</span>)}
+    <span id="series-theme-keywords" className="contents">{expanded && keywords.map((keyword, index) => <span key={`kw-${index}`} className={cn(chip, 'bg-transparent text-zinc-300 font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] first-letter:uppercase')}>{keyword}</span>)}</span>
+    {keywords.length > 0 && <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls="series-theme-keywords" className="relative inline-flex h-8 items-center rounded-lg px-3 text-[12px] font-bold text-[#F2C36B] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.4)] before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-['']">{expanded ? 'Masquer les thèmes' : `+${keywords.length} thèmes`}</button>}
+  </div>;
 }
 
 type RelationPart = { id: number; title?: string; name?: string; poster_path?: string | null; release_date?: string; first_air_date?: string; media_type?: string; seenitRelationKind?: string };

@@ -4,7 +4,7 @@ import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Heart, MoreVertical, Bookmark, Play, RefreshCw, RotateCcw, Ban, Trash2, Download, Share2 } from 'lucide-react';
 import { cn, openExternalUrl } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
-import { PersonDetailModal } from './PersonDetailModal';
+import { PersonProfile as PersonDetailModal } from '../components/PersonProfile';
 import { TrailerModal } from '../components/TrailerModal';
 import { DownloadModal } from '../components/DownloadModal';
 import { useShowsStore } from '../store/showsStore';
@@ -14,13 +14,15 @@ import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditMovieSearchQuery } from '../components/community/redditEpisodeSearch';
 import { getProviderLinkPresentation } from '../features/providers/providerLink';
 import { seasonAverages, formatRating } from '../features/shows/detailPlanning';
+import { frenchGenres } from '../features/shows/frenchLabels';
 import { DetailChip, DetailHero, DetailSynopsis, GoldCta, RoundHeaderButton, SquareAction, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
 import { CastRows, RelationList, RelationsLoading, ThemesCard } from './mediaDetail/detailSections';
 import { SeasonAverageChart, SeasonPanel, SeasonPills, SeriesProgressCard, seasonsOf } from './mediaDetail/seriesSections';
 import { MovieEndCard, VerifiedSimilarRail } from './mediaDetail/movieSections';
+import type { ShowDetailViewModel } from './mediaDetail/showDetailViewModel';
 
 interface ShowDetailViewProps {
-  model: Record<string, any>;
+  model: ShowDetailViewModel;
 }
 
 const STATUS_LABELS: Record<string, string> = { Ended: 'Terminée', Canceled: 'Annulée', 'Returning Series': 'En cours', 'In Production': 'En production', 'Post Production': 'Post-production', Planned: 'Prévue', Pilot: 'Pilote', ended: 'Terminée', canceled: 'Annulée', returning: 'En cours' };
@@ -53,7 +55,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const seasons = useMemo(() => seasonsOf(tmdbDetails), [tmdbDetails]);
   const averages = useMemo(() => seasonAverages(tmdbDetails?.seasons), [tmdbDetails?.seasons]);
   const runtimeFallback = Number(tmdbDetails?.episode_run_time?.[0]) || 45;
-  const genres: Array<{ id: number; name: string }> = tmdbDetails?.genres || [];
+  const genres: Array<{ id: number; name: string }> = frenchGenres(tmdbDetails?.genres); // « Reality » → « Téléréalité »
   const year = (tmdbDetails?.first_air_date || tmdbDetails?.release_date || show?.firstAirDate || '').slice(0, 4);
   const rawStatus = isSeries ? (tmdbDetails?.status || show?.status) : null;
   const statusText = rawStatus ? STATUS_LABELS[rawStatus] || null : null;
@@ -85,8 +87,9 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     if (show.isArchived) return <GoldCta tone="done" label="Revoir la série" onClick={rewatchShow} />;
     if (!epStatus) return <GoldCta tone="done" label="✓ Série à jour" ariaLabel="Série à jour sur la diffusion" />;
     if (epStatus.isUpcoming) return <GoldCta tone="neutral" label={epStatus.label} sub="Ouvrir l’épisode" onClick={handleWatchNextEpisode} />;
+    // Le bouton or ouvre le prochain épisode à voir (retour terrain du 03/11) ; le marquage se fait dans sa fiche.
     const code = `S${String(nextEp.season_number).padStart(2, '0')} | E${String(nextEp.episode_number).padStart(2, '0')}`;
-    return <GoldCta label={`Marquer ${code} vu`} sub={[nextEp.name, `${nextEp.runtime || runtimeFallback} min`].filter(Boolean).join(' · ')} onClick={event => toggleEpisodeSeen(event, nextEp.season_number, nextEp.episode_number)} />;
+    return <GoldCta label={`Voir ${code}`} sub={[nextEp.name, `${nextEp.runtime || runtimeFallback} min`].filter(Boolean).join(' · ')} ariaLabel={`Ouvrir l’épisode ${code}${nextEp.name ? ` : ${nextEp.name}` : ''}`} onClick={handleWatchNextEpisode} />;
   })();
 
   const selectedSeason = seasons.find(season => season.season_number === expandedSeason) || null;
@@ -95,7 +98,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const castPayloadKnown = isSeries ? Boolean(tmdbDetails?.aggregate_credits || tmdbDetails?.credits) : Boolean(tmdbDetails?.credits);
   const cast = (tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast || []);
   const collectionIds = useMemo(() => new Set<number>((collectionData?.parts || []).map((part: { id: number }) => Number(part.id))), [collectionData]);
-  const relationOpen = (part: { id: number; media_type?: string; title?: string }) => onShowClick && onShowClick(part.id, part.media_type || (part.title ? 'movie' : 'tv'));
+  const relationOpen = (part: { id: number; media_type?: string; title?: string }) => onShowClick && onShowClick(part.id, part.media_type === 'tv' || part.media_type === 'movie' ? part.media_type : part.title ? 'movie' : 'tv');
   const inMovieList = !isSeries && Boolean(show) && !hasSeenMedia && show?.status !== 'dropped';
   const menuItem = 'w-full min-h-12 px-4 text-left text-[14px] font-semibold flex items-center gap-3 active:bg-white/5';
 
@@ -148,6 +151,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           </>}
         </div>
         {tmdbDetails ? <DetailSynopsis text={tmdbDetails.overview || 'Aucun synopsis disponible.'} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} /> : <div className="space-y-2 animate-pulse" aria-hidden="true"><div className="h-3.5 w-full rounded bg-zinc-800/80" /><div className="h-3.5 w-4/5 rounded bg-zinc-800/80" /></div>}
+        <ThemesCard genres={genres} keywords={keywords} expanded={areThemesExpanded} onToggle={() => setAreThemesExpanded((expanded: boolean) => !expanded)} loading={!tmdbDetails} />
 
         {isSeries && <>
           <SeasonAverageChart averages={averages} />
@@ -163,7 +167,6 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         {collectionLoading && <RelationsLoading />}
         {!isSeries && <VerifiedSimilarRail movie={tmdbDetails} excludedIds={collectionIds} onOpen={movieId => onShowClick && onShowClick(movieId, 'movie')} />}
         {!isSeries && <CastRows cast={cast} isSeries={false} totalEpisodes={0} loading={!tmdbDetails || !castPayloadKnown} onOpenPerson={openPersonModal} />}
-        <ThemesCard genres={genres} keywords={keywords} expanded={areThemesExpanded} onToggle={() => setAreThemesExpanded((expanded: boolean) => !expanded)} loading={!tmdbDetails} />
         <RedditSection query={isSeries ? `${redditVisibleTitle} series discussion` : redditMovieQuery} resolveQuery={isSeries ? undefined : resolveRedditMovieQuery} isLocked={false} title="Discussions Reddit" description="Retrouvez les avis, théories et spoilers de la communauté." />
       </div>
 
@@ -171,7 +174,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         onShowClick={(tmdbId) => { setSelectedEpisode(null); if (window.history.state?.isEpisodeDetailModal || window.history.state?.isModal) window.history.back(); const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) || (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) || (show?.id && String(show.id) === String(tmdbId)); if (!isSameShow && onShowClick) setTimeout(() => onShowClick(tmdbId, show?.mediaType || 'tv'), 50); }}
         onClose={() => { setSelectedEpisode(null); if (window.history.state?.isEpisodeDetailModal || window.history.state?.isModal) window.history.back(); }}
         onLoadSeason={async (seasonNum) => { if (!effectiveTmdbId) return null; if (seasonsCache[seasonNum]) return seasonsCache[seasonNum]?.episodes || seasonsCache[seasonNum]; const res = await tmdb.getSeasonDetails(effectiveTmdbId, seasonNum); if (res.ok && res.value) { setSeasonsCache((prev: Record<number, unknown>) => ({ ...prev, [seasonNum]: res.value })); return res.value.episodes || res.value; } return null; }} />}
-      {selectedPersonId && <PersonDetailModal personId={selectedPersonId}
+      {selectedPersonId && <PersonDetailModal personId={selectedPersonId} hint={(() => { const member = cast.find((entry: { id: number }) => entry.id === selectedPersonId); return member ? { name: member.name, profile_path: member.profile_path, character: member.roles?.[0]?.character || member.character } : undefined; })()} origin={show || (effectiveTmdbId ? { id: '', userId: '', tmdbId: Number(effectiveTmdbId), title, mediaType: isSeries ? 'tv' : 'movie', posterPath: posterPath || null, backdropPath: backdropUrl || null, status: 'plan_to_watch', seenEpisodes: [], episodeRecords: {}, isArchived: false, createdAt: 0, updatedAt: 0 } as unknown as typeof show : null)}
         onClose={() => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); }}
         onShowClick={(tmdbId, type) => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) || (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) || (show?.id && String(show.id) === String(tmdbId)); if (!isSameShow && onShowClick) setTimeout(() => onShowClick(tmdbId, type || 'movie'), 50); }} />}
       {trailerModalVideos && <TrailerModal videos={trailerModalVideos} onClose={() => setTrailerModalVideos(null)} />}

@@ -12,7 +12,6 @@ import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { PersonCard } from '../components/cards/PersonCard';
 import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
-import { PersonDetailModal } from './PersonDetailModal';
 import { FilterModal } from '../components/FilterModal';
 import { TrailerModal } from '../components/TrailerModal';
 import { auth, db } from '../lib/firebase';
