@@ -1,5 +1,5 @@
-import { authenticatedFetch } from '../../lib/apiAuth';
-import { PROVIDER_BRAND_LOGOS } from '../../utils/providerLogos';
+// Le client authentifié (Firebase) n'est chargé qu'au moment d'une lecture réseau : le résolveur reste pur et testable.
+import { PROVIDER_BRAND_LOGOS } from '../../utils/providerLogos.ts';
 import { SEENIT_PLATFORM_IDENTITIES } from './platformIdentity.ts';
 
 /** Logos stables disponibles sans réseau, indexés par ID de préférence SeenIt. */
@@ -59,6 +59,7 @@ export async function loadPlatformLogos(ids: readonly number[]): Promise<Record<
   } catch {}
   if (fresh || ids.every(id => current[id])) return current;
   try {
+    const { authenticatedFetch } = await import('../../lib/apiAuth');
     const response = await authenticatedFetch('/api/media/tmdb/watch/providers/tv?language=fr-FR&watch_region=FR');
     if (!response.ok) return current;
     const data = await response.json() as { results?: Array<{ provider_id?: number; logo_path?: string }> };
