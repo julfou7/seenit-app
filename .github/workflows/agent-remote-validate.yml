@@ -92,7 +92,9 @@ jobs:
         if: steps.scope.outputs.docs_only != 'true'
         id: runtime
         run: |
-          echo "node_version=$(node -p 'process.versions.node')" >> "$GITHUB_OUTPUT"
+          # ABI Node (majeure + NODE_MODULE_VERSION) : seule compatibilité dont dépend node_modules ; un patch
+          # différent selon l'image du runner (22.23.3 / 22.23.4) ne force plus une réinstallation.
+          echo "node_version=$(node -p 'process.versions.node.split(".")[0] + "-abi" + process.versions.modules')" >> "$GITHUB_OUTPUT"
           echo "deps_hash=$(node scripts/dependency-cache-key.cjs)" >> "$GITHUB_OUTPUT"
 
       - name: Restore exact node_modules cache

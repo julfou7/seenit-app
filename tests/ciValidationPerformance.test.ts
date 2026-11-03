@@ -79,3 +79,11 @@ test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exac
   assert.match(summaryBlock, /Build Web \+ serveur/);
   assert.match(validateJob, /Set up Node\.js 22 with npm cache[\s\S]*cache:\s*npm/);
 });
+
+test('SEENIT-QUALITY-008 la clé du cache suit l’ABI Node, pas le patch de l’image du runner', () => {
+  for (const file of ['.github/workflows/build-apk.yml', '.github/workflows/agent-remote-validate.yml']) {
+    const source = readFileSync(file, 'utf8');
+    assert.match(source, /echo "node_version=\$\(node -p 'process\.versions\.node\.split\("\."\)\[0\] \+ "-abi" \+ process\.versions\.modules'\)" >> "\$GITHUB_OUTPUT"/, file);
+    assert.doesNotMatch(source, /node -p 'process\.versions\.node'\)/, `${file} : un patch Node ne doit plus changer la clé`);
+  }
+});

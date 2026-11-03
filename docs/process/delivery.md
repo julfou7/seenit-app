@@ -166,8 +166,9 @@ revanche sur l'analyseur TypeScript. Elle s'exécute donc sans installation lors
 trouvé ; lors du bootstrap exceptionnel d'un cache absent, l'installation déterministe précède ce
 contrôle sans le supprimer ni l'assouplir.
 
-Le cache `node_modules` est strictement exact. Sa clé comprend le système, l'architecture, la version
-Node réellement résolue, `package.json`, `package-lock.json`, le patch des notifications locales et
+Le cache `node_modules` est strictement exact. Sa clé comprend le système, l'architecture, l'ABI Node
+réellement résolue (version majeure et `process.versions.modules` : un patch 22.23.3 / 22.23.4 selon
+l'image du runner forçait une réinstallation de 20 s le 03/11/2026), `package.json`, `package-lock.json`, le patch des notifications locales et
 le matérialiseur Android. `scripts/dependency-cache-key.cjs` en retire seulement les champs de version
 de l'application : node_modules n'en dépend pas, et une préparation de release ne force plus une
 installation (19 s, deux fois, sur la v1.4.240). Aucun préfixe de restauration approximatif n'est autorisé. Les PR peuvent
