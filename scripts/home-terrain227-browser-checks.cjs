@@ -45,8 +45,7 @@ async function testTerrain227Harness(client,root){const reports=[];for(const wid
  if(width===360){
   await evaluate(client,'window.__terrain224.splash.open(true)');await check(client,`document.querySelector('.seenit-brand-splash__episodes')`,'splash');
   const cadence=await evaluate(client,`(()=>{const e=document.querySelector('.seenit-brand-splash__episodes'),all=e.getAnimations({subtree:true}),a=all.find(a=>a.animationName==='brandEpisodeReveal');if(!a)return null;a.pause();const values=Array.from({length:9},(_,i)=>{a.currentTime=i*160+1;return new DOMMatrix(getComputedStyle(e,'::after').transform).m41});a.currentTime=0;a.play();return {count:all.length,duration:a.effect.getTiming().duration,values}})()`);
-  // Remplissage continu (plus d'à-coups par segment) : de -220 à 0, strictement croissant, sans palier.
-  if(!cadence||cadence.count!==1||cadence.duration!==1280||Math.abs(cadence.values[0]+220)>2||Math.abs(cadence.values[8])>.5||cadence.values.some((v,i)=>i>0&&i<8&&v<=cadence.values[i-1]))throw Error('Terrain227 cadence '+JSON.stringify(cadence));
+  if(!cadence||cadence.count!==1||cadence.duration!==1280||cadence.values.some((v,i)=>Math.abs(v-(-220+27.5*i))>.5))throw Error('Terrain227 cadence '+JSON.stringify(cadence));
   await check(client,`!document.querySelector('#seenit-splash-screen') && window.__terrain224.splash.closed===1`,'splash termine');
  }
  reports.push({width,tick,ticket,notifications:true});

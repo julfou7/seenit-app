@@ -870,6 +870,15 @@ pour le cache des sagas et univers.
   watchlist, disponibilités, états de bibliothèque, pauses) cèdent le fil dès qu'une tranche dépasse
   6 ms (`scheduler.yield`, sinon une tâche), afin qu'aucune frame à 120 Hz ne soit bloquée au démarrage
   comme au retour dans l'app. Ce découpage ne change ni l'ordre ni le résultat de la réconciliation.
+- **SEENIT-PLEX-011** — Une synchro delta ne lit que ce qui a changé depuis le dernier curseur validé.
+  La Watchlist, relue en entier pour détecter ajouts et retraits, est réduite à une empreinte (identités
+  Plex fortes triées) enregistrée dans l'état Plex cloud uniquement avec un curseur validé. Si une delta
+  ne rapporte ni visionnage, ni état de bibliothèque, que sa collecte et sa Watchlist sont complètes, que
+  l'empreinte est identique et que chaque titre de la Watchlist correspond déjà à une fiche, elle avance
+  le curseur et s'arrête sans relire Firestore ni retraiter la bibliothèque. Au moindre écart (première
+  delta, ajout, retrait, titre sans fiche ou non résolu), le traitement complet s'applique inchangé.
+  Côté backend, la Watchlist, l'activité cloud et la découverte des serveurs partent ensemble ; leurs
+  résultats sont fusionnés dans l'ordre d'origine.
 - Le full scan est paginé. Un inventaire partiel ne remplace pas un cache complet, sauf si au
   moins un inventaire serveur complet et exploitable a été obtenu conformément à la politique.
 - La déduplication finale utilise `movie:<tmdbId>` ou
@@ -1303,6 +1312,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   chacune en rail de six cartes puis tuile Voir en liste et liste par douze via la bascule à deux icônes. Les badges
   statut sans emoji sont à côté du code épisode ; le rappel de sortie utilise une pastille rectangulaire J-X (auj. aujourd’hui), sans cercle de progression ni badge de statut dans À venir.
   Films à voir précède Pas vu depuis un moment, qui reste en dernière position.
+  Continuer est trié par dernier visionnage, le plus récent en premier ; une carte en cours d'animation
+  garde sa place jusqu'à la fin du geste. Une série passée de Nouveautés à Continuer par un Vu revient
+  dans Nouveautés dès que ce Vu est annulé, sans relancer l'app.
   À venir groupe Aujourd’hui, Cette semaine (sept jours suivants), Plus tard selon le calendrier local.
   L’historique mixte est paginé par dix. Les sections vides disparaissent et les états chargement,
   cache hors ligne et synchronisation restent explicites. Les films affichent six billets puis Voir en liste, avec pagination par douze ; toucher le tampon Vu annule le marquage.

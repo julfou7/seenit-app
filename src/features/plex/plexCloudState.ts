@@ -9,7 +9,7 @@ export async function loadPlexCloudState(userId: string): Promise<Record<string,
 
 export async function persistPlexCloudState(
   userId: string,
-  values: { lastSyncTimestamp?: number; resolutionCache?: Record<string, unknown> }
+  values: { lastSyncTimestamp?: number; resolutionCache?: Record<string, unknown>; watchlistFingerprint?: string }
 ): Promise<void> {
   const plexRef = doc(db, 'users', userId, 'settings', 'plex');
   await runTransaction(db, async (transaction) => {
@@ -29,6 +29,9 @@ export async function persistPlexCloudState(
         values.resolutionCache
       );
     }
+
+    // Empreinte de la dernière Watchlist entièrement traitée (SEENIT-PLEX-011).
+    if (values.watchlistFingerprint) next.watchlistFingerprint = values.watchlistFingerprint;
 
     transaction.set(plexRef, next, { merge: true });
   });

@@ -15,6 +15,7 @@ import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { MovieActorProfile } from '../components/MovieActorProfile';
 import { HOME_PAGE_SIZE } from '../features/watchlist/homePresentation';
 import { getTodayStr } from '../lib/utils';
+import { getShowLastWatchedTime } from './watchListPresentation';
 import './watchNext18c.css';
 import { HomeSwipeCard } from '../components/cards/HomeSwipeCard';
 import { HomeLayoutSwitch } from '../components/cards/HomeLayoutSwitch';
@@ -35,6 +36,13 @@ interface Props {
   onUnseen: (show: Show, episode: SeriesCardEpisode | null) => Promise<void | boolean>;
   actions: (show: Show) => SeriesCardAction[];
 }
+function hasSeenEpisodeKey(show: Show, key: string): boolean {
+  return (show.seenEpisodes || []).some(value => {
+    const match = /^(?:s\s*)?(\d+)\s*(?:x|e)\s*(\d+)$/i.exec(value.trim());
+    return Boolean(match) && `${Number(match![1])}x${Number(match![2])}` === key;
+  });
+}
+
 function useLatestCallback<Args extends unknown[], Result>(callback: (...args: Args) => Result) {
   const latest = useRef(callback);
   useLayoutEffect(() => { latest.current = callback; });
@@ -84,6 +92,12 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const originLocks = useRef(new Map<string, number>());
   const pendingScroll = useRef<string | null>(null);
   const [arrivals, setArrivals] = useState<Set<string>>(() => new Set());
+  // Une carte garde son rang seulement pendant son Vu ; une arrivée dans Continuer est liée à l'épisode marqué.
+  const animating = useRef(new Set<string>());
+  // Pendant un Vu, la carte garde sa date d'avant : elle ne saute pas en tête avant la fin de son animation.
+  const frozenWatchTimes = useRef(new Map<string, number>());
+  const watchTime = (show: Show) => frozenWatchTimes.current.get(show.id) ?? getShowLastWatchedTime(show);
+  const markedEpisodes = useRef(new Map<string, string>());
   const memberships = useRef(new Map<string, number>());
   groups.forEach((group, index) => group.forEach(show => { if (!originLocks.current.has(show.id) && !arrivals.has(show.id)) memberships.current.set(show.id, index); }));
   const [seriesOrder, setSeriesOrder] = useState(() => candidates.map(show => show.id));
@@ -125,8 +139,13 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     if (!show || show.isArchived || show.status === 'dropped') continue;
     (show.mediaType === 'movie' ? movieById : seriesById).set(id, show);
   }
-  const orderSet = new Set(seriesOrder);
-  const seriesIds = [...seriesOrder.filter(id => seriesById.has(id)), ...[...seriesById.keys()].filter(id => !orderSet.has(id))];
+  // Ordre de visionnage : la liste suit le tri des sections (dernier visionnage en premier), y compris pour
+  // un Vu fait ailleurs (fiche, Plex, autre appareil). Seule une carte en plein Vu garde son rang jusqu'à la fin.
+  const candidateIds = candidates.map(show => show.id);
+  const candidateSet = new Set(candidateIds);
+  const seriesIds: string[] = [...candidateIds, ...seriesOrder.filter(id => !candidateSet.has(id)), ...[...seriesById.keys()].filter(id => !candidateSet.has(id) && !seriesOrder.includes(id))]
+    .filter((id, index, all) => seriesById.has(id) && !animating.current.has(id) && all.indexOf(id) === index);
+  seriesOrder.forEach((id, index) => { if (animating.current.has(id) && seriesById.has(id)) seriesIds.splice(Math.min(index, seriesIds.length), 0, id); });
   const seriesKey = seriesIds.join('\0');
   useEffect(() => { setSeriesOrder(seriesKey ? seriesKey.split('\0') : []); }, [seriesKey]);
   const series = seriesIds.flatMap(id => { const show = seriesById.get(id); return show ? [show] : []; });
@@ -149,23 +168,41 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
       return next;
     });
     setRetained(previous => ({ ...previous, [show.id]: { episode: resume.episode! } }));
+    animating.current.add(show.id);
+    frozenWatchTimes.current.set(show.id, getShowLastWatchedTime(show));
+    markedEpisodes.current.set(show.id, `${resume.episode.season_number}x${resume.episode.episode_number}`);
     try {
       const result = await onMarkSeries(show);
-      if (result === false) { originLocks.current.delete(show.id); restoreReceipt(); return result; }
+      if (result === false) { animating.current.delete(show.id); frozenWatchTimes.current.delete(show.id); originLocks.current.delete(show.id); restoreReceipt(); return result; }
       if (origin === 0) originLocks.current.delete(show.id);
       return result;
     }
-    catch (error) { originLocks.current.delete(show.id); restoreReceipt(); throw error; }
+    catch (error) { animating.current.delete(show.id); frozenWatchTimes.current.delete(show.id); originLocks.current.delete(show.id); restoreReceipt(); throw error; }
   };
   const finishSeriesFeedback = (show: Show, completed: boolean) => {
     const origin = originLocks.current.get(show.id);
     originLocks.current.delete(show.id);
+    animating.current.delete(show.id);
+    frozenWatchTimes.current.delete(show.id);
+    // Fin du Vu : la carte reprend sa place dans l'ordre de visionnage (en tête, puisque vue à l'instant).
+    if (mounted.current) setSeriesOrder(previous => [show.id, ...previous.filter(id => id !== show.id)]);
     if (!completed || origin === undefined || origin === 0 || !mounted.current || !activeRef.current) return;
     memberships.current.set(show.id, 0);
     pendingScroll.current = show.id;
-    setSeriesOrder(previous => [show.id, ...previous.filter(id => id !== show.id)]);
     setArrivals(previous => new Set([...previous, show.id]));
   };
+  // Annuler après l'arrivée dans Continuer (toast encore affiché) : l'épisode marqué n'est plus vu, la carte
+  // retrouve la section calculée (Nouveautés…) au lieu d'y rester jusqu'au redémarrage.
+  useEffect(() => {
+    if (!arrivals.size) return;
+    const undone = [...arrivals].filter(id => {
+      const key = markedEpisodes.current.get(id);
+      const show = allShows.find(item => item.id === id);
+      return !key || !show || !hasSeenEpisodeKey(show, key);
+    });
+    if (!undone.length) return;
+    setArrivals(previous => { const next = new Set(previous); undone.forEach(id => { next.delete(id); markedEpisodes.current.delete(id); }); return next; });
+  }, [allShows, arrivals]);
   const seriesHandlers = {
     onOpen: useLatestCallback(onOpen), onEpisode: useLatestCallback(onEpisode),
     onMark: useLatestCallback(markSeries), onUnseen: useLatestCallback(onUnseen),
@@ -212,7 +249,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const start = now;
   const renderSeriesGroup = (index: number) => {
       const label = ['Continuer à regarder', 'Nouveautés', 'Pas vu depuis un moment'][index];
-      const items = series.filter(show => memberships.current.get(show.id) === index).sort((a, b) => index === 2 ? Number(Boolean(b.seenEpisodes?.length)) - Number(Boolean(a.seenEpisodes?.length)) : 0);
+      const items = series.filter(show => memberships.current.get(show.id) === index).sort((a, b) => index === 0 ? watchTime(b) - watchTime(a) : index === 2 ? Number(Boolean(b.seenEpisodes?.length)) - Number(Boolean(a.seenEpisodes?.length)) : 0);
       if (!items.length) return null;
       const expanded = Boolean(expandedGroups[index]);
       const limit = expanded ? groupLimits[index] || 3 : railLimits[index] || HOME_PAGE_SIZE;

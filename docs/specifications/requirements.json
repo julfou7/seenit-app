@@ -114,6 +114,10 @@
           "contains": "SEENIT-UX-018 le swipe retire une notification sans confondre scroll clic et action métier"
         },
         {
+          "file": "tests/terrain224Motion.test.ts",
+          "contains": "SEENIT-UX-018 Continuer suit le dernier visionnage et un Vu annulé rend la série à Nouveautés"
+        },
+        {
           "file": "tests/watchlistCarouselUx.test.ts",
           "contains": "#729 conserve les accès aux listes complètes par les icônes de vue"
         },
@@ -1061,6 +1065,32 @@
         {
           "file": "tests/plexFrameBudget.test.ts",
           "contains": "SEENIT-PLEX-010 la synchro Plex cède le fil dès que sa tranche dépasse 6 ms"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PLEX-011",
+      "title": "Une synchro delta sans nouveauté Plex s'arrête sans relire ni retraiter la bibliothèque",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexDeltaShortcut.test.ts",
+          "contains": "SEENIT-PLEX-011 une delta sans nouveauté s’arrête après Plex, sans relire la bibliothèque"
+        },
+        {
+          "file": "tests/plexDeltaShortcut.test.ts",
+          "contains": "SEENIT-PLEX-011 un titre Watchlist sans TMDB direct est reconnu par le cache de résolution"
+        },
+        {
+          "file": "tests/plexDeltaShortcut.test.ts",
+          "contains": "SEENIT-PLEX-011 l’empreinte n’est enregistrée qu’après une synchro entièrement validée"
+        },
+        {
+          "file": "tests/plexDeltaShortcut.test.ts",
+          "contains": "SEENIT-PLEX-011 le backend lance Watchlist, activité cloud et serveurs ensemble"
         }
       ]
     },

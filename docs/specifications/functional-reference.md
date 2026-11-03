@@ -149,12 +149,17 @@ prévues ; ce dernier n'accorde aucune confiance à l'appelant et exige les preu
 ### 3.2 Démarrage et convergence
 
 - Un splash Web SeenIt unique masque l'initialisation ; le splash système Android reste neutre.
-- Fluidité (03/11/2026, 120 Hz) : le splash dure 2,3 s, sa barre se remplit en continu, et l'app est montée
+- Fluidité (03/11/2026, 120 Hz) : le splash dure 2,3 s, sa barre se remplit segment par segment, l'anneau du logo est dessiné par le
+  compositeur (fluide même pendant le chargement), et l'app est montée
   sous le splash avant son fondu de 0,5 s. Les fiches et la page personne entrent comme les écrans Réglages
   (180 ms, opacité et 18 px), et un onglet qui réapparaît fait le fondu de Moi (160 ms). Sur Android, SeenIt
   demande le mode d'affichage le plus rapide de l'écran (`SEENIT-APK-007`). La synchro Plex cède le fil toutes
   les 6 ms (`SEENIT-PLEX-010`). Sur À voir, l'anneau du bouton Vu démarre au tap ; le tampon et l'épisode
   suivant attendent la confirmation de l'écriture, et un échec annule l'anneau (`SEENIT-UX-016`).
+- Continuer à regarder affiche d'abord la série vue le plus récemment. Annuler un Vu qui avait fait passer
+  une série de Nouveautés à Continuer la ramène aussitôt dans Nouveautés (`SEENIT-UX-018`).
+- Une synchro Plex delta sans nouveauté (aucun visionnage, Watchlist identique et déjà suivie) se termine
+  juste après la réponse Plex, sans relecture de la bibliothèque (`SEENIT-PLEX-011`).
 - Le cache local du bon UID peut produire le premier rendu, puis Firestore serveur remplace ce rendu.
 - Un listener Firestore maintient la bibliothèque à jour entre PWA et APK.
 - Le serveur gagne après le rendu de cache : un média supprimé sur un autre appareil ne doit pas être
@@ -1126,7 +1131,7 @@ Voir [marque v3](../design/marque-2026-10-25.md) : actifs fournis réutilisés s
 
 Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
 
-Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Remplacé le 03/11/2026 : remplissage continu, 2 300 ms puis fondu 500 ms. Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.
+Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Remplacé le 03/11/2026 : 2 300 ms puis fondu 500 ms, segments conservés, anneau en transforms. Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.
 
 Terrain229 : une réouverture de panneau ne suffit pas à prouver sa fluidité. Les périodes Historique et leurs totaux sont indexés et mémorisés ; aucune création de formateur de date par visionnage ni filtre intégral par période visible pendant le rendu. Le scénario navigateur mesure les composants de production sur6300visionnages, pagination et bascules répétées ; aucun historique utilisateur distant n’est modifié.
 
