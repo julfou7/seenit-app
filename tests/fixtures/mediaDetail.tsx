@@ -9,7 +9,7 @@ import { recommendationControl, seriesSeason, telemetry, useShowsStore } from '.
  * Fixture SEENIT-UX-019 : la vraie `ShowDetailView` montée avec un modèle de fiche (série façon
  * Breaking Bad, film avec saga et similaires prouvés). Les handlers modifient réellement l'état.
  */
-type Kind = 'series' | 'movie' | 'episode';
+type Kind = 'series' | 'movie' | 'episode' | 'episodeSkeleton';
 const seasonsMeta = [1, 2, 3, 4, 5].map(season => ({ season_number: season, episode_count: season === 5 ? 16 : 13, air_date: `${2007 + season}-01-20`, vote_average: [7.9, 8.2, 8.4, 8.6, 8.8][season - 1] }));
 const seriesDetails = {
   id: 1396, name: 'Breaking Bad', overview: 'Un professeur de chimie atteint d’un cancer devient fabricant de méthamphétamine pour assurer l’avenir de sa famille.', first_air_date: '2008-01-20', last_air_date: '2013-09-29', status: 'Ended', number_of_seasons: 5, number_of_episodes: 68, vote_average: 8.9, episode_run_time: [47],
@@ -77,6 +77,12 @@ const mediaDetail = {
     recommendationControl.directorCredits = { crew: [{ id: 335984, job: 'Director', title: 'Blade Runner 2049', release_date: '2017-10-04', poster_path: '/gajva2L0rPYkEWjzgFlBXCAVBE5.jpg', popularity: 50 }, { id: 329865, job: 'Director', title: 'Premier Contact', release_date: '2016-11-10', poster_path: '/x2FJsf1ElAgr63Y3PNPtJrcmpoe.jpg', popularity: 40 }] };
     recommendationControl.actorCredits = { 1190668: { cast: [{ id: 157336 }] } };
     if (!root) root = createRoot(document.getElementById('root')!);
+    if (kind === 'episodeSkeleton') {
+      // #857 : fiche épisode pendant son hydratation (squelette au gabarit actuel).
+      useShowsStore.setState({ shows: [library('series')!] });
+      root.render(<EpisodeDetailModal key="skeleton" isHydrating show={library('series')!} season={5} episode={{ episode_number: 14 }} tmdbShowTitle="Breaking Bad" tmdbShowId={1396} onClose={() => telemetry.opens.push('close')} onShowClick={() => telemetry.opens.push('series')} />);
+      return;
+    }
     if (kind === 'episode') {
       useShowsStore.setState({ shows: [library('series')!] });
       const season = seriesSeason(5);

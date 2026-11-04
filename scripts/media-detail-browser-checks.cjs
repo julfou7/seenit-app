@@ -60,6 +60,7 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.querySelector("h1")?.textContent==="Breaking Bad" && document.body.innerText.includes("2008–2013 · 5 saisons · Drame, Crime")', 'hero série titré en or avec années, saisons et genres');
     await check(client, '!document.body.innerText.match(/^À propos$/m) && !' + byText('button', 'Casting').replace(/;$/, ''), 'plus d’onglets : un seul défilement');
     await check(client, 'document.body.innerText.includes("65 / 68 épisodes") && ' + byLabel('65 épisodes vus sur 68') + '', 'progression et segments par saison');
+    await check(client, '(()=>{const chip=[...document.querySelectorAll("span")].find(el=>/^★ .* TMDB$/.test(el.textContent.trim()));const progress=' + byLabel('65 épisodes vus sur 68') + ';return chip&&progress&&(chip.compareDocumentPosition(progress)&Node.DOCUMENT_POSITION_FOLLOWING)})()', 'série : note et âge au-dessus de la progression (#857)');
     await click(client, byText('button', 'Voir S05 | E14'));
     await check(client, 'window.__mediaDetail.telemetry.opens.includes("next") && document.body.innerText.includes("65 / 68 épisodes")', 'le bouton or ouvre le prochain épisode sans le marquer');
     await check(client, 'document.body.innerText.includes("Drame, Crime") && ' + byText('[aria-label="Genres et thèmes"] span', 'Téléréalité') + ' && !document.body.innerText.includes("Reality")', 'genres TMDB traduits en français');
@@ -72,6 +73,7 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.body.innerText.includes("Saison 1 · 0/13") && ' + byText('button', 'Tout marquer vu'), 'tout marquer non vu puis vu depuis la carte saison');
     await click(client, byLabel('Marquer l’épisode 1 vu'));
     await check(client, 'document.body.innerText.includes("Saison 1 · 1/13") && ' + byLabel('Marquer l’épisode 1 non vu') + '?.getAttribute("aria-pressed")==="true"', 'la coche d’une ligne bascule l’épisode');
+    await check(client, byLabel('Marquer l’épisode 2 vu') + '?.classList.contains("seenit-check") && ' + byLabel('Marquer l’épisode 2 vu') + '.querySelector(".seenit-ring-glyph")', 'bouton Vu des lignes = celui de l’Accueil, anneau animé (#857)');
     // #845 : Entrée sur le bouton Vu imbriqué bascule l'épisode sans ouvrir sa fiche ; Entrée sur la ligne l'ouvre.
     await evaluate(client, `${byLabel('Marquer l’épisode 2 vu')}.focus()`);
     await pressEnter(client);
@@ -91,10 +93,14 @@ async function testMediaDetailHarness(client) {
     await mount(client, width, 'movie');
     await check(client, 'document.querySelector("h1")?.textContent==="Dune : Deuxième partie" && document.body.innerText.includes("2024 · 2 h 46 · Science-fiction, Aventure")', 'hero film');
     await check(client, 'document.body.innerText.includes("Si tu lances maintenant") && /Fin à \\d\\d:\\d\\d/.test(document.body.innerText)', 'heure de fin du film');
+    await check(client, '!/il est \\d/.test(document.body.innerText) && !document.body.innerText.includes("avant minuit")', 'Fin à épuré : ni « il est », ni « Fini … avant minuit » (#857)');
+    await check(client, '(()=>{const chip=[...document.querySelectorAll("span")].find(el=>/^★ .* TMDB$/.test(el.textContent.trim()));const cta=' + byText('button', 'Marquer vu') + ';return chip&&cta&&(chip.compareDocumentPosition(cta)&Node.DOCUMENT_POSITION_FOLLOWING)})()', 'note et âge au-dessus de Marquer vu (#857)');
+    await check(client, byText('button', 'Bande-annonce') + '?.textContent.trim()==="Bande-annonce"', 'bande-annonce en bouton entier, comme la série (#857)');
     await check(client, 'document.body.innerText.includes("Saga Dune") && document.body.innerText.includes("Tu es ici") && document.querySelector("[aria-current=true]")', 'saga en frise avec position courante');
     await check(client, byLabel('Blade Runner 2049 — Même réalisateur · Denis Villeneuve') + ' && ' + byLabel('Interstellar — Avec Timothée Chalamet') + ' && !document.body.innerText.includes("Oppenheimer")', 'similaires : seulement avec une raison prouvée');
-    await click(client, byLabel('Ajouter à ma liste'));
-    await check(client, byLabel('Retirer de ma liste') + '?.getAttribute("aria-pressed")==="true"', 'signet À voir');
+    await check(client, '(()=>{const follow=' + byText('button', 'Suivre le film') + ',seen=' + byText('button', 'Marquer vu') + ';return follow&&seen&&Math.abs(follow.getBoundingClientRect().width-seen.getBoundingClientRect().width)<2})()', 'suivre le film : un vrai bouton, aussi large que Marquer vu (#857)');
+    await click(client, byText('button', 'Suivre le film'));
+    await check(client, byLabel('Suivi, toucher pour ne plus suivre le film'), 'film suivi en un clic');
     await click(client, byText('button', 'Marquer vu'));
     await check(client, byText('button', '✓ Vu · annuler') + ' && !document.body.innerText.includes("Si tu lances maintenant")', 'film vu : bouton annulable, plus d’heure de fin');
     const movieGeometry = await evaluate(client, geometry);
@@ -102,6 +108,7 @@ async function testMediaDetailHarness(client) {
 
     await mount(client, width, 'episode');
     await check(client, 'document.querySelector("[role=dialog] h1")?.textContent==="Ozymandias" && document.body.innerText.includes("S05 | E14")', 'fiche épisode titrée');
+    await check(client, 'document.querySelector(\'[role=dialog] button.seenit-check[aria-label="Marquer vu"] .seenit-ring-glyph\') && !/il est \\d/.test(document.body.innerText)', 'Vu de la fiche épisode = anneau de l’Accueil, sans « il est » (#857)');
     await check(client, 'document.body.innerText.includes("Si tu lances maintenant") && document.querySelectorAll(\'[aria-label^="Ouvrir E"]\').length===3', 'soirée de trois épisodes');
     await check(client, 'document.body.innerText.includes("Meilleure note de la saison") && document.querySelectorAll("[aria-current=true]").length>=1', 'courbe et rang dans la saison');
     await check(client, '(document.querySelector("[role=dialog]").innerText.match(/^Netflix$/gm) || []).length===1 && !document.body.innerText.includes("with Ads")', 'un seul Netflix, sans « Standard with Ads »');
@@ -121,6 +128,8 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.body.innerText.includes("✓ Vu") && ' + byLabel('Ta réaction') + '', 'l’épisode marqué est vu et propose une réaction');
     await click(client, byLabel('J’adore'));
     await check(client, byLabel('J’adore') + '?.getAttribute("aria-pressed")==="true"', 'réaction enregistrée dans l’épisode');
+    await mount(client, width, 'episodeSkeleton');
+    await check(client, 'document.querySelector("[data-episode-skeleton]") && document.body.innerText.includes("S05 | E14") && ' + byLabel('Retour à la série') + ' && !document.querySelector(\'[class*="h-[280px]"]\')', 'squelette épisode au gabarit actuel (#857)');
     const episodeGeometry = await evaluate(client, geometry);
     if (episodeGeometry.overflow) throw new Error(`SEENIT-UX-019 épisode ${width}px déborde ${JSON.stringify(episodeGeometry)}`);
     const errors = await evaluate(client, 'window.__mediaErrors');

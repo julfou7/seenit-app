@@ -100,3 +100,28 @@ export function ratingBarHeight(value: unknown, ratings: readonly unknown[], min
   if (high - low < 0.05) return Math.round((minPx + maxPx) / 2);
   return Math.round(minPx + ((rating - low) / (high - low)) * (maxPx - minPx));
 }
+
+/**
+ * #857 — Libellé d'un épisode à venir, toujours relatif : « Aujourd’hui », « Demain », « Dans 5 jours », et
+ * au-delà d'une semaine « Dans 12 jours · 16 nov. ». Dates au format TMDB `YYYY-MM-DD`, jour calendaire local.
+ */
+export function upcomingEpisodeLabel(airDate: string, today: string): string {
+  const toUtcDay = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    return year && month && day ? Date.UTC(year, month - 1, day) : NaN;
+  };
+  const target = toUtcDay(airDate), from = toUtcDay(today);
+  if (!Number.isFinite(target) || !Number.isFinite(from)) return 'Bientôt';
+  const days = Math.round((target - from) / 86_400_000);
+  if (days <= 0) return 'Aujourd’hui';
+  if (days === 1) return 'Demain';
+  if (days <= 7) return `Dans ${days} jours`;
+  const date = new Date(target).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+  return `Dans ${days} jours · ${date}`;
+}
+
+/**
+ * #858 : le bouton Vu attend la vraie mutation (écriture, calcul du prochain épisode) avant son état final ;
+ * il n'anime le succès qu'une fois l'action terminée, et pas si elle renvoie explicitement `false`.
+ */
+export const settleSeenToggle = (result: unknown): Promise<false | undefined> => Promise.resolve(result).then(value => (value === false ? false : undefined));

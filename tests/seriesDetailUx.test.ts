@@ -50,7 +50,10 @@ test('SEENIT-RATING-001 affiche les notes de saison et d’épisode uniquement d
   for (const source of [core, seriesSections, episodeSections, episodeDetail, planning]) assert.doesNotMatch(source, /getSeasonImdbRatings|getEpisodeImdbVotes|omdbService|episodeImdbRating|episodeImdbVotes|imdbRating/);
   // Chaque épisode garde une cible de 44 px : ligne et coche dans la fiche série, case de la fiche épisode.
   assert.match(seriesSections, /min-h-\[62px\]/);
-  assert.match(seriesSections, /w-11 h-11 shrink-0/);
+  // #857 : la coche est le bouton Vu de l'Accueil (48 px, jamais moins de 44 px).
+  assert.match(seriesSections, /<SeenItCheckButton isWatched=\{watched\}/);
+  assert.match(readFileSync(new URL('../src/components/SeenItCheckButton.tsx', import.meta.url), 'utf8'), /min-h-11 min-w-11/);
+  assert.match(readFileSync(new URL('../src/components/seenItCheckButton.css', import.meta.url), 'utf8'), /\.seenit-check \{ width:48px; height:48px; min-width:44px; min-height:44px;/);
   assert.match(episodeSections, /className="flex-1 min-w-0 h-11 flex items-center"/);
   assert.match(seriesSections, /overflow-x-auto/);
   assert.doesNotMatch(ratings, /createPortal|document\.getElementById|MutationObserver/);

@@ -1,9 +1,10 @@
 import React from 'react';
 import { Play } from 'lucide-react';
 import { type Show } from '../../types';
-import { cn, formatAirDateSafe, getEpisodeRelativeAirDate, getTodayStr } from '../../lib/utils';
-import { averageRating, formatRating, ratingBarHeight, type SeasonAverage } from '../../features/shows/detailPlanning';
-import { DetailCard, SeenItCheckGlyph } from './detailUi';
+import { cn, formatAirDateSafe, getTodayStr } from '../../lib/utils';
+import { averageRating, formatRating, ratingBarHeight, settleSeenToggle, upcomingEpisodeLabel, type SeasonAverage } from '../../features/shows/detailPlanning';
+import { DetailCard } from './detailUi';
+import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 
 type SeasonMeta = { season_number: number; episode_count?: number; air_date?: string | null; vote_average?: number; name?: string };
 type EpisodeData = { id?: number; episode_number: number; name?: string; still_path?: string | null; air_date?: string | null; runtime?: number | null; vote_average?: number };
@@ -65,7 +66,7 @@ export function SeasonPills({ seasons, show, selected, onSelect }: { seasons: re
  * Saison sélectionnée : barres de notes TMDB par épisode (or = vu, contour blanc = prochain), moyenne,
  * « Tout marquer vu / non vu » et bande-annonce de saison, puis les lignes d'épisode.
  */
-export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, onToggleSeason, onToggleEpisode, onOpenEpisode, onSeasonTrailer }: { season: SeasonMeta; episodes: readonly EpisodeData[] | null; show: Show | null | undefined; nextKey: string | null; runtimeFallback: number; onToggleSeason: (event: React.MouseEvent) => void; onToggleEpisode: (event: React.MouseEvent, episode: number) => void; onOpenEpisode: (episode: EpisodeData) => void; onSeasonTrailer?: () => void }) {
+export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, onToggleSeason, onToggleEpisode, onOpenEpisode, onSeasonTrailer }: { season: SeasonMeta; episodes: readonly EpisodeData[] | null; show: Show | null | undefined; nextKey: string | null; runtimeFallback: number; onToggleSeason: (event: React.MouseEvent) => void; onToggleEpisode: (event: React.MouseEvent, episode: number) => unknown; onOpenEpisode: (episode: EpisodeData) => void; onSeasonTrailer?: () => void }) {
   const number = season.season_number, count = season.episode_count || 0, today = getTodayStr();
   const seen = seenInSeason(show, number);
   const future = count === 0 || Boolean(season.air_date && season.air_date > today) || (episodes ? episodes.length > 0 && episodes.every(episode => episode.air_date && episode.air_date > today) : false);
@@ -88,14 +89,16 @@ export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, 
       : <div className="flex flex-col">{episodes.map(episode => {
         const key = `${number}x${episode.episode_number}`, watched = isSeen(episode.episode_number), isNext = key === nextKey;
         const aired = !episode.air_date || episode.air_date <= today;
-        const relative = !aired && episode.air_date ? getEpisodeRelativeAirDate(episode.air_date) : null;
+        // #857 : à venir = ligne nette (plus de demi-grisé) et libellé relatif, daté au-delà de 7 jours.
+        const relative = !aired && episode.air_date ? upcomingEpisodeLabel(episode.air_date, today) : null;
         const runtime = episode.runtime || runtimeFallback;
         // #845 : seule la ligne elle-même ouvre l'épisode au clavier ; Entrée sur le bouton Vu imbriqué ne fait que le basculer.
-        return <div key={`ep-${key}`} role="button" tabIndex={0} onClick={() => onOpenEpisode(episode)} onKeyDown={event => { if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); onOpenEpisode(episode); }} aria-label={`Épisode ${episode.episode_number} : ${episode.name || ''}`} className={cn('flex items-center gap-2 min-h-[62px] py-1.5 pl-2.5 pr-1.5 rounded-[14px] cursor-pointer', isNext ? 'bg-[rgba(229,169,61,0.08)] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)]' : watched ? '' : 'bg-white/[0.03]', !aired && 'opacity-60')}>
+        return <div key={`ep-${key}`} role="button" tabIndex={0} onClick={() => onOpenEpisode(episode)} onKeyDown={event => { if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); onOpenEpisode(episode); }} aria-label={`Épisode ${episode.episode_number} : ${episode.name || ''}`} className={cn('flex items-center gap-2 min-h-[62px] py-1.5 pl-2.5 pr-1.5 rounded-[14px] cursor-pointer', isNext ? 'bg-[rgba(229,169,61,0.08)] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)]' : watched ? '' : 'bg-white/[0.03]', !aired && 'shadow-[inset_0_0_0_1px_rgba(229,169,61,0.28)]')}>
           <span className={cn('w-5 shrink-0 text-[14px] font-extrabold', isNext ? 'text-[#F2C36B]' : watched ? 'text-zinc-600' : 'text-zinc-400')}>{episode.episode_number}</span>
           <span className="w-[84px] h-[47px] rounded-lg overflow-hidden bg-zinc-800 shrink-0">{episode.still_path && <img src={`https://image.tmdb.org/t/p/w300${episode.still_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" style={{ opacity: watched ? 0.55 : 1 }} />}</span>
           <span className="flex-1 min-w-0 flex flex-col gap-[3px]"><span className={cn('text-[15px] font-bold truncate decoration-[1.5px]', watched ? 'text-zinc-500 line-through' : 'text-white')}>{episode.name || `Épisode ${episode.episode_number}`}</span><span className="text-[12px] text-zinc-400">{relative ? <b className="text-[#F2C36B]">{relative}</b> : <>{episode.vote_average ? <b className={watched ? 'text-zinc-500' : 'text-white'}>★ {formatRating(Number(episode.vote_average))}</b> : null}{episode.vote_average ? ' · ' : ''}{runtime} min{isNext ? ' · prochain' : ''}</>}</span></span>
-          {aired && <button type="button" onClick={event => onToggleEpisode(event, episode.episode_number)} aria-label={watched ? `Marquer l’épisode ${episode.episode_number} non vu` : `Marquer l’épisode ${episode.episode_number} vu`} aria-pressed={watched} className="w-11 h-11 shrink-0 flex items-center justify-center rounded-xl active:scale-90 transition-transform"><SeenItCheckGlyph seen={watched} size={26} /></button>}
+          {/* #857 : même bouton Vu que l'Accueil (anneau SeenIt et son animation). */}
+          {aired && <SeenItCheckButton isWatched={watched} title={watched ? `Marquer l’épisode ${episode.episode_number} non vu` : `Marquer l’épisode ${episode.episode_number} vu`} onClick={event => settleSeenToggle(onToggleEpisode(event, episode.episode_number))} />}
         </div>;
       })}</div>}
   </section>;

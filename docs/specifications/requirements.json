@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.251",
+  "applicationVersion": "1.4.252",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -92,6 +92,14 @@
         {
           "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 #857 un épisode à venir dit quand il sort, en relatif et daté au-delà d’une semaine"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 #858 le bouton Vu attend la vraie mutation avant d’annoncer le succès"
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",
