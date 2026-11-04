@@ -83,7 +83,7 @@ test('SEENIT-UX-019 le smoke monte les vraies fiches et vérifie leurs parcours'
   assert.match(smoke, /\['mediaDetail', client => testMediaDetailHarness\(client\)\]/);
   assert.match(smoke, /await buildMediaDetailHarness\(root\)/);
   const harness = readFileSync('scripts/media-detail-browser-checks.cjs', 'utf8');
-  for (const step of ['Fin à épuré : ni « il est », ni « Fini … avant minuit » (#857)', 'note et âge au-dessus de Marquer vu (#857)', 'série : note et âge au-dessus de la progression (#857)', 'bande-annonce en bouton entier, comme la série (#857)', 'suivre le film : un vrai bouton, aussi large que Marquer vu (#857)', 'bouton Vu des lignes = celui de l’Accueil, anneau animé (#857)', 'Vu de la fiche épisode = anneau de l’Accueil, sans « il est » (#857)', 'squelette épisode au gabarit actuel (#857)', 'Entrée sur Vu ne fait que basculer l’épisode', 'Entrée sur la ligne ouvre l’épisode sans le marquer', 'plus d’onglets', 'le bouton or ouvre le prochain épisode', 'genres TMDB traduits en français', 'rôle « Self » traduit et accordé', 'pastilles alignées', 'un seul Netflix', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
+  for (const step of ['film : un seul bouton Suivre et les tuiles, comme la série (#859)', 'film suivi : le bouton devient Marquer vu (#859)', 'anneau Vu dessiné par le compositeur, sans atténuation (#859)', 'anneau Vu final net après l’animation (#859)', 'Fin à épuré : ni « il est », ni « Fini … avant minuit » (#857)', 'note et âge au-dessus de Marquer vu (#857)', 'série : note et âge au-dessus de la progression (#857)', 'bande-annonce en bouton entier, comme la série (#857)', 'bouton Vu des lignes = celui de l’Accueil, anneau animé (#857)', 'Vu de la fiche épisode = anneau de l’Accueil, sans « il est » (#857)', 'squelette épisode au gabarit actuel (#857)', 'Entrée sur Vu ne fait que basculer l’épisode', 'Entrée sur la ligne ouvre l’épisode sans le marquer', 'plus d’onglets', 'le bouton or ouvre le prochain épisode', 'genres TMDB traduits en français', 'rôle « Self » traduit et accordé', 'pastilles alignées', 'un seul Netflix', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.doesNotMatch(view, /handleTabChange|id="section-about"|>À propos</, 'un seul défilement, sans onglets');
 });
@@ -130,9 +130,9 @@ test('SEENIT-UX-019 #857 un épisode à venir dit quand il sort, en relatif et d
   assert.equal(upcomingEpisodeLabel('bientôt', '2026-11-04'), 'Bientôt');
   const rows = readFileSync('src/screens/mediaDetail/seriesSections.tsx', 'utf8');
   assert.doesNotMatch(rows, /!aired && 'opacity-60'/, 'plus de ligne à moitié grisée');
-  assert.match(rows, /<SeenItCheckButton isWatched=\{watched\}/, 'bouton Vu des lignes = bouton de l’Accueil');
+  assert.match(rows, /<SeenItCheckButton className="seenit-check--compositor" celebrationLayer=\{<CompositorCelebration \/>\} isWatched=\{watched\}/, 'bouton Vu des lignes = bouton de l’Accueil');
   const header = readFileSync('src/screens/mediaDetail/episodeSections.tsx', 'utf8');
-  assert.match(header, /<SeenItCheckButton isWatched=\{isSeen\}/);
+  assert.match(header, /<SeenItCheckButton \{\.\.\.\(isFuture && !isSeen \? \{\} : \{ className: 'seenit-check--compositor', celebrationLayer: <CompositorCelebration \/> \}\)\} isWatched=\{isSeen\}/);
   assert.doesNotMatch(readFileSync('src/screens/mediaDetail/detailUi.tsx', 'utf8'), /SeenItCheckGlyph/, 'le pictogramme TV a disparu');
   assert.doesNotMatch(readFileSync('src/screens/mediaDetail/movieSections.tsx', 'utf8'), /il est \{formatClock|beforeMidnight\} min avant minuit/, 'ni « il est », ni « Fini X min avant minuit »');
 });
@@ -147,4 +147,16 @@ test('SEENIT-UX-019 #858 le bouton Vu attend la vraie mutation avant d’annonce
   assert.match(readFileSync('src/screens/mediaDetail/seriesSections.tsx', 'utf8'), /onClick=\{event => settleSeenToggle\(onToggleEpisode\(event, episode\.episode_number\)\)\}/);
   assert.match(readFileSync('src/screens/mediaDetail/episodeSections.tsx', 'utf8'), /settleSeenToggle\(onToggle\(\)\)/);
   assert.match(readFileSync('src/screens/EpisodeDetailModalCore.tsx', 'utf8'), /const handleMainButtonClick = \(\) => \{[\s\S]*?return toggleSeen\(\);/);
+});
+
+test('SEENIT-UX-019 #859 film à bouton unique et anneau Vu sur le compositeur', () => {
+  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  assert.match(view, /<div className="flex gap-2">\{movieCta\}\{mainProvider && providerTile\(mainProvider\)\}\{plexProvider && providerTile\(plexProvider\)\}<\/div>/);
+  assert.match(view, /if \(!movieFollowed\) return <GoldCta label="Suivre le film"/);
+  const css = readFileSync('src/components/seenItCheckButton.css', 'utf8');
+  const compositor = css.slice(css.indexOf('#859'));
+  assert.doesNotMatch(compositor.replace(/@media[\s\S]*$/, ''), /stroke-dashoffset/, 'aucune propriété SVG animée en mode compositeur');
+  assert.match(compositor, /@keyframes seenitSweep \{ from \{ transform:rotate\(0\); \} to \{ transform:rotate\(180deg\); \} \}/);
+  assert.match(compositor, /\[aria-busy=true\]:disabled \{ opacity:1;/);
+  assert.match(readFileSync('src/screens/mediaDetail/seriesSections.tsx', 'utf8'), /<SeenItCheckButton className="seenit-check--compositor" celebrationLayer=/);
 });

@@ -81,6 +81,10 @@ async function testMediaDetailHarness(client) {
     await evaluate(client, 'document.querySelector(\'[aria-label^="Épisode 3 :"]\').focus()');
     await pressEnter(client);
     await check(client, 'window.__mediaDetail.telemetry.opens.includes("episode:1x3") && document.body.innerText.includes("Saison 1 · 2/13")', 'Entrée sur la ligne ouvre l’épisode sans le marquer');
+    // #859 : animation au toucher, sans atténuation, entièrement sur le compositeur (aucune animation SVG).
+    await evaluate(client, `${byLabel('Marquer l’épisode 5 vu')}.click()`);
+    await check(client, '(()=>{const b=document.querySelector(\'[aria-label="Marquer l’épisode 5 vu"],[aria-label="Marquer l’épisode 5 non vu"]\');if(!b||b.dataset.celebrate!=="true"||!b.classList.contains("seenit-check--compositor")||!b.querySelector(".seenit-check__sweep"))return false;const all=b.getAnimations({subtree:true});return all.length>=5&&all.every(a=>!(a.effect.target instanceof SVGElement))&&getComputedStyle(b).opacity==="1"})()', 'anneau Vu dessiné par le compositeur, sans atténuation (#859)');
+    await check(client, '(()=>{const b=' + byLabel('Marquer l’épisode 5 non vu') + ';return b&&b.getAttribute("aria-pressed")==="true"&&!b.dataset.celebrate&&!b.querySelector(".seenit-check__sweep")})()', 'anneau Vu final net après l’animation (#859)');
     await check(client, byText('a,button,div', 'Inclus dans ton abonnement') + ' && ' + byLabel('Actualiser Plex') + ' && ' + byText('button', 'Sur Julien-NAS'), 'Où regarder en lignes avec Plex et actualisation');
     await check(client, 'document.querySelectorAll(\'[aria-labelledby=detail-cast-title] > button[aria-label^="Ouvrir la fiche"]\').length===6 && ' + byText('button', 'Afficher tout le casting (7)'), 'Personnages : six lignes puis tout le casting');
     await check(client, byText('button', 'Better Call Saul') + ' && document.body.innerText.includes("Dans le même univers")', 'univers TVDB en lignes');
@@ -94,13 +98,14 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.querySelector("h1")?.textContent==="Dune : Deuxième partie" && document.body.innerText.includes("2024 · 2 h 46 · Science-fiction, Aventure")', 'hero film');
     await check(client, 'document.body.innerText.includes("Si tu lances maintenant") && /Fin à \\d\\d:\\d\\d/.test(document.body.innerText)', 'heure de fin du film');
     await check(client, '!/il est \\d/.test(document.body.innerText) && !document.body.innerText.includes("avant minuit")', 'Fin à épuré : ni « il est », ni « Fini … avant minuit » (#857)');
-    await check(client, '(()=>{const chip=[...document.querySelectorAll("span")].find(el=>/^★ .* TMDB$/.test(el.textContent.trim()));const cta=' + byText('button', 'Marquer vu') + ';return chip&&cta&&(chip.compareDocumentPosition(cta)&Node.DOCUMENT_POSITION_FOLLOWING)})()', 'note et âge au-dessus de Marquer vu (#857)');
+    await check(client, '(()=>{const chip=[...document.querySelectorAll("span")].find(el=>/^★ .* TMDB$/.test(el.textContent.trim()));const cta=' + byText('button', 'Suivre le film') + ';return chip&&cta&&(chip.compareDocumentPosition(cta)&Node.DOCUMENT_POSITION_FOLLOWING)})()', 'note et âge au-dessus de Marquer vu (#857)');
     await check(client, byText('button', 'Bande-annonce') + '?.textContent.trim()==="Bande-annonce"', 'bande-annonce en bouton entier, comme la série (#857)');
     await check(client, 'document.body.innerText.includes("Saga Dune") && document.body.innerText.includes("Tu es ici") && document.querySelector("[aria-current=true]")', 'saga en frise avec position courante');
     await check(client, byLabel('Blade Runner 2049 — Même réalisateur · Denis Villeneuve') + ' && ' + byLabel('Interstellar — Avec Timothée Chalamet') + ' && !document.body.innerText.includes("Oppenheimer")', 'similaires : seulement avec une raison prouvée');
-    await check(client, '(()=>{const follow=' + byText('button', 'Suivre le film') + ',seen=' + byText('button', 'Marquer vu') + ';return follow&&seen&&Math.abs(follow.getBoundingClientRect().width-seen.getBoundingClientRect().width)<2})()', 'suivre le film : un vrai bouton, aussi large que Marquer vu (#857)');
+    // #859 : un seul bouton à états, avec les tuiles diffuseur et Plex comme la série.
+    await check(client, '(()=>{const cta=' + byText('button', 'Suivre le film') + ';if(!cta||' + byText('button', 'Marquer vu') + ')return false;const row=cta.parentElement;return row.querySelector(\'[aria-label="Ouvrir Netflix"]\')&&row.querySelector(\'[aria-label="Ouvrir Plex"]\')})()', 'film : un seul bouton Suivre et les tuiles, comme la série (#859)');
     await click(client, byText('button', 'Suivre le film'));
-    await check(client, byLabel('Suivi, toucher pour ne plus suivre le film'), 'film suivi en un clic');
+    await check(client, byText('button', 'Marquer vu') + '?.textContent.includes("Film suivi") && !' + byText('button', 'Suivre le film'), 'film suivi : le bouton devient Marquer vu (#859)');
     await click(client, byText('button', 'Marquer vu'));
     await check(client, byText('button', '✓ Vu · annuler') + ' && !document.body.innerText.includes("Si tu lances maintenant")', 'film vu : bouton annulable, plus d’heure de fin');
     const movieGeometry = await evaluate(client, geometry);

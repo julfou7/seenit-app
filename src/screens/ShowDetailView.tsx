@@ -92,6 +92,16 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     return <GoldCta label={`Voir ${code}`} sub={[nextEp.name, `${nextEp.runtime || runtimeFallback} min`].filter(Boolean).join(' · ')} ariaLabel={`Ouvrir l’épisode ${code}${nextEp.name ? ` : ${nextEp.name}` : ''}`} onClick={handleWatchNextEpisode} />;
   })();
 
+  // #859 : un seul bouton à états pour le film, avec les tuiles diffuseur et Plex comme la série. Suivre,
+  // puis Marquer vu (ou « Pas encore sorti »), puis « ✓ Vu · annuler ». Ne plus suivre reste dans le menu ⋮.
+  const movieFollowed = !isSeries && Boolean(show) && show?.status !== 'dropped';
+  const movieCta = (() => {
+    if (hasSeenMedia) return <GoldCta tone="done" label="✓ Vu · annuler" ariaLabel="Vu, toucher pour annuler" onClick={toggleMovieSeen} />;
+    if (!movieFollowed) return <GoldCta label="Suivre le film" onClick={togglePlanToWatchMovie} />;
+    if (isUnreleased) return <GoldCta tone="neutral" label="Pas encore sorti" sub="Film suivi" onClick={() => showToast('Ce film n’est pas encore sorti.', 'info')} />;
+    return <GoldCta label="Marquer vu" sub="Film suivi" onClick={toggleMovieSeen} />;
+  })();
+
   const selectedSeason = seasons.find(season => season.season_number === expandedSeason) || null;
   const selectedEpisodes = selectedSeason ? seasonsCache[selectedSeason.season_number]?.episodes || null : null;
   const seasonVideos = selectedSeason ? (seasonsCache[selectedSeason.season_number]?.videos?.results || []).filter((video: { site?: string }) => video.site === 'YouTube') : [];
@@ -99,7 +109,6 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const cast = (tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast || []);
   const collectionIds = useMemo(() => new Set<number>((collectionData?.parts || []).map((part: { id: number }) => Number(part.id))), [collectionData]);
   const relationOpen = (part: { id: number; media_type?: string; title?: string }) => onShowClick && onShowClick(part.id, part.media_type === 'tv' || part.media_type === 'movie' ? part.media_type : part.title ? 'movie' : 'tv');
-  const inMovieList = !isSeries && Boolean(show) && !hasSeenMedia && show?.status !== 'dropped';
   const menuItem = 'w-full min-h-12 px-4 text-left text-[14px] font-semibold flex items-center gap-3 active:bg-white/5';
 
   return (
@@ -144,11 +153,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           </>}
         </div>
         {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}</SeriesProgressCard>
-          : <div className="flex gap-2">
-            <GoldCta tone={hasSeenMedia ? 'done' : 'gold'} label={hasSeenMedia ? '✓ Vu · annuler' : isUnreleased ? 'Pas encore sorti' : 'Marquer vu'} onClick={hasSeenMedia || !isUnreleased ? toggleMovieSeen : () => showToast('Ce film n’est pas encore sorti.', 'info')} className="rounded-[16px]" />
-            {/* #857 : suivre le film redevient un vrai bouton, aussi visible que « Marquer vu ». */}
-            {!hasSeenMedia && <GoldCta tone={inMovieList ? 'done' : 'neutral'} label={inMovieList ? '✓ Suivi' : 'Suivre le film'} ariaLabel={inMovieList ? 'Suivi, toucher pour ne plus suivre le film' : undefined} onClick={togglePlanToWatchMovie} className="rounded-[16px]" />}
-          </div>}
+          : <div className="flex gap-2">{movieCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}</div>}
         {!isSeries && !hasSeenMedia && !isUnreleased && !isAtCinema && <MovieEndCard runtime={tmdbDetails?.runtime} />}
 
         {tmdbDetails ? <DetailSynopsis text={tmdbDetails.overview || 'Aucun synopsis disponible.'} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} /> : <div className="space-y-2 animate-pulse" aria-hidden="true"><div className="h-3.5 w-full rounded bg-zinc-800/80" /><div className="h-3.5 w-4/5 rounded bg-zinc-800/80" /></div>}

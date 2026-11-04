@@ -5,6 +5,7 @@ import { cn, formatAirDateSafe, getTodayStr } from '../../lib/utils';
 import { averageRating, formatRating, ratingBarHeight, settleSeenToggle, upcomingEpisodeLabel, type SeasonAverage } from '../../features/shows/detailPlanning';
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
+import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
 
 type SeasonMeta = { season_number: number; episode_count?: number; air_date?: string | null; vote_average?: number; name?: string };
 type EpisodeData = { id?: number; episode_number: number; name?: string; still_path?: string | null; air_date?: string | null; runtime?: number | null; vote_average?: number };
@@ -97,8 +98,8 @@ export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, 
           <span className={cn('w-5 shrink-0 text-[14px] font-extrabold', isNext ? 'text-[#F2C36B]' : watched ? 'text-zinc-600' : 'text-zinc-400')}>{episode.episode_number}</span>
           <span className="w-[84px] h-[47px] rounded-lg overflow-hidden bg-zinc-800 shrink-0">{episode.still_path && <img src={`https://image.tmdb.org/t/p/w300${episode.still_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" style={{ opacity: watched ? 0.55 : 1 }} />}</span>
           <span className="flex-1 min-w-0 flex flex-col gap-[3px]"><span className={cn('text-[15px] font-bold truncate decoration-[1.5px]', watched ? 'text-zinc-500 line-through' : 'text-white')}>{episode.name || `Épisode ${episode.episode_number}`}</span><span className="text-[12px] text-zinc-400">{relative ? <b className="text-[#F2C36B]">{relative}</b> : <>{episode.vote_average ? <b className={watched ? 'text-zinc-500' : 'text-white'}>★ {formatRating(Number(episode.vote_average))}</b> : null}{episode.vote_average ? ' · ' : ''}{runtime} min{isNext ? ' · prochain' : ''}</>}</span></span>
-          {/* #857 : même bouton Vu que l'Accueil (anneau SeenIt et son animation). */}
-          {aired && <SeenItCheckButton isWatched={watched} title={watched ? `Marquer l’épisode ${episode.episode_number} non vu` : `Marquer l’épisode ${episode.episode_number} vu`} onClick={event => settleSeenToggle(onToggleEpisode(event, episode.episode_number))} />}
+          {/* #857 : même bouton Vu que l'Accueil ; #859 : animation au toucher, dessinée par le compositeur. */}
+          {aired && <SeenItCheckButton className="seenit-check--compositor" celebrationLayer={<CompositorCelebration />} isWatched={watched} title={watched ? `Marquer l’épisode ${episode.episode_number} non vu` : `Marquer l’épisode ${episode.episode_number} vu`} onClick={event => settleSeenToggle(onToggleEpisode(event, episode.episode_number))} />}
         </div>;
       })}</div>}
   </section>;

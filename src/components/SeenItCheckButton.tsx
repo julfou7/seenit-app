@@ -14,6 +14,12 @@ export interface SeenItCheckButtonProps {
   glyph?: 'signature' | 'screen';
   className?: string;
   title?: string;
+  /**
+   * #859 — Calque de célébration dessiné par le compositeur (fourni par l'écran, hors point d'entrée). S'il est
+   * présent, l'animation part au toucher (annulée si l'action échoue ou renvoie `false`) et remplace celle du SVG.
+   * L'écran ajoute la classe `seenit-check--compositor` (pas d'atténuation pendant l'attente).
+   */
+  celebrationLayer?: React.ReactNode;
 }
 
 /**
@@ -30,7 +36,8 @@ export function SeenItCheckButton({
   size: _size = 28,
   glyph: _glyph = 'signature',
   className = '',
-  title
+  title,
+  celebrationLayer,
 }: SeenItCheckButtonProps) {
   const [isTapped, setIsTapped] = useState(false);
   const [internalPending, setInternalPending] = useState(false);
@@ -56,15 +63,23 @@ export function SeenItCheckButton({
       tapTimerRef.current = null;
     }, 180);
 
+    // Mode compositeur : retour immédiat au toucher (#859), retiré si l'action échoue ou renvoie false.
+    const canCelebrate = !isWatched && celebrating === undefined;
+    const celebrateFor = (on: boolean) => {
+      if (successTimer.current) clearTimeout(successTimer.current);
+      setCelebrate(on);
+      if (on) successTimer.current = setTimeout(() => setCelebrate(false), 1100);
+    };
+    const optimistic = Boolean(celebrationLayer) && canCelebrate;
+    if (optimistic) celebrateFor(true);
+
     setInternalPending(true);
+    let result: void | boolean = false;
     try {
-      const result = await onClick(e);
-      if (result !== false && !isWatched && celebrating === undefined) {
-        setCelebrate(true);
-        successTimer.current = setTimeout(() => setCelebrate(false), 1100);
-      }
+      result = await onClick(e);
     } finally {
       setInternalPending(false);
+      if (result === false ? optimistic : !optimistic && canCelebrate) celebrateFor(!optimistic);
     }
   };
 
@@ -94,6 +109,7 @@ export function SeenItCheckButton({
       style={{ touchAction: 'manipulation' }}
     >
       <SeenItRing size={42} active={active} className="seenit-ring-glyph" />
+      {showCelebration && !error && celebrationLayer}
     </button>
   );
 }

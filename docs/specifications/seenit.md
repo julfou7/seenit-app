@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.252**
+Version applicative : **1.4.253**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -667,6 +667,14 @@ n'est rouverte que par une nouvelle décision produit explicite.
     relatif (« Demain », « Dans 5 jours ») et daté au-delà d'une semaine (« Dans 12 jours · 16 nov. ») ;
   - le squelette de la fiche épisode reprend le gabarit actuel : image, en-tête avec l'anneau Vu, carte
     « Fin à », courbe de saison, résumé, et les mêmes boutons flottants que la page.
+  Retours terrain v1.4.252 (04/11/2026, #859) :
+  - le film n'a plus qu'**un seul bouton**, suivi des tuiles du diffuseur et de Plex comme la série :
+    **Suivre le film**, puis **Marquer vu** (ou « Pas encore sorti ») une fois suivi, puis « ✓ Vu ·
+    annuler ». Ne plus suivre reste dans le menu ⋮ ;
+  - dans les fiches, le bouton **Vu** anime dès le toucher (retiré si l'enregistrement échoue), ne
+    s'atténue pas pendant l'attente, et dessine l'anneau puis la coche par des calques animés en
+    transform/opacity (compositeur), sans saccade quand la fiche se re-rend. L'Accueil garde son
+    animation actuelle.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 
