@@ -95,6 +95,10 @@
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 #857 un épisode à venir dit quand il sort, en relatif et daté au-delà d’une semaine"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules notes TMDB connues"
         },
         {

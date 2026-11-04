@@ -34,21 +34,10 @@ export function DetailChip({ children, className, ...rest }: React.HTMLAttribute
   return <span {...rest} className={cn('inline-flex h-7 items-center gap-1 rounded-lg bg-[#18181b] px-2.5 text-[12px] font-bold text-zinc-200 whitespace-nowrap shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]', className)}>{children}</span>;
 }
 
-/** Pictogramme SeenIt « écran + coche » du prototype, plein or quand c'est vu. */
-export function SeenItCheckGlyph({ seen, size = 24, strong = false }: { seen: boolean; size?: number; strong?: boolean }) {
-  const frame = seen ? DETAIL_GOLD : strong ? '#a1a1aa' : '#71717a';
-  const screen = seen ? DETAIL_GOLD : '#0B0B0F';
-  const mark = seen ? '#0B0B0F' : strong ? '#e4e4e7' : '#a1a1aa';
-  return <svg viewBox="0 0 100 100" width={size} height={size} fill="none" aria-hidden="true"><rect x="14" y="17" width="72" height="52" rx="10" fill={screen} stroke={frame} strokeWidth="5" /><path d="M 38 44 L 46 52 L 62 34" stroke={mark} strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" /><path d="M 50 67 L 50 78.5M30 79C40 78 60 78 70 79" stroke={frame} strokeWidth="5" strokeLinecap="round" /></svg>;
-}
-
+/** Bouton principal pleine largeur des fiches (or, « fait » ou neutre). */
 export function GoldCta({ label, sub, onClick, tone = 'gold', disabled, ariaLabel, className }: { label: React.ReactNode; sub?: React.ReactNode; onClick?: (event: React.MouseEvent<HTMLButtonElement>) => void; tone?: 'gold' | 'done' | 'neutral'; disabled?: boolean; ariaLabel?: string; className?: string }) {
   const toneClass = tone === 'gold' ? 'bg-[#E5A93D] text-black' : tone === 'done' ? 'bg-[rgba(229,169,61,0.14)] text-[#F2C36B] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.5)]' : 'bg-[#18181b] text-zinc-100 shadow-[inset_0_0_0_1px_#3f3f46]';
   return <button type="button" onClick={onClick} disabled={disabled} aria-label={ariaLabel} className={cn('flex-1 min-w-0 h-[52px] rounded-[15px] px-3 flex flex-col items-center justify-center leading-tight active:scale-[0.98] transition-transform touch-manipulation disabled:opacity-60', toneClass, className)}><span className="text-[14px] font-extrabold truncate max-w-full">{label}</span>{sub && <span className="text-[11px] font-semibold opacity-75 truncate max-w-full">{sub}</span>}</button>;
-}
-
-export function SquareAction({ label, onClick, active = false, children }: { label: string; onClick: () => void; active?: boolean; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} aria-label={label} title={label} aria-pressed={active} className={cn('w-[52px] h-[52px] shrink-0 rounded-[16px] flex items-center justify-center active:scale-95 transition-transform touch-manipulation', active ? 'bg-[rgba(229,169,61,0.16)] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.5)] text-[#E5A93D]' : 'bg-[#18181b] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] text-zinc-100')}>{children}</button>;
 }
 
 export function RoundHeaderButton({ label, onClick, children, expanded }: { label: string; onClick: (event: React.MouseEvent<HTMLButtonElement>) => void; children: React.ReactNode; expanded?: boolean }) {

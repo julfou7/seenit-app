@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { averageRating, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages } from '../src/features/shows/detailPlanning.ts';
+import { averageRating, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
 import { buildVerifiedSimilar, directedMovies, movieIdsFromCredits, similarReasonFor } from '../src/features/shows/similarReasons.ts';
 
 test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée', () => {
@@ -83,7 +83,7 @@ test('SEENIT-UX-019 le smoke monte les vraies fiches et vérifie leurs parcours'
   assert.match(smoke, /\['mediaDetail', client => testMediaDetailHarness\(client\)\]/);
   assert.match(smoke, /await buildMediaDetailHarness\(root\)/);
   const harness = readFileSync('scripts/media-detail-browser-checks.cjs', 'utf8');
-  for (const step of ['Entrée sur Vu ne fait que basculer l’épisode', 'Entrée sur la ligne ouvre l’épisode sans le marquer', 'plus d’onglets', 'le bouton or ouvre le prochain épisode', 'genres TMDB traduits en français', 'rôle « Self » traduit et accordé', 'pastilles alignées', 'un seul Netflix', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
+  for (const step of ['Fin à épuré : ni « il est », ni « Fini … avant minuit » (#857)', 'note et âge au-dessus de Marquer vu (#857)', 'série : note et âge au-dessus de la progression (#857)', 'bande-annonce en bouton entier, comme la série (#857)', 'suivre le film : un vrai bouton, aussi large que Marquer vu (#857)', 'bouton Vu des lignes = celui de l’Accueil, anneau animé (#857)', 'Vu de la fiche épisode = anneau de l’Accueil, sans « il est » (#857)', 'squelette épisode au gabarit actuel (#857)', 'Entrée sur Vu ne fait que basculer l’épisode', 'Entrée sur la ligne ouvre l’épisode sans le marquer', 'plus d’onglets', 'le bouton or ouvre le prochain épisode', 'genres TMDB traduits en français', 'rôle « Self » traduit et accordé', 'pastilles alignées', 'un seul Netflix', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.doesNotMatch(view, /handleTabChange|id="section-about"|>À propos</, 'un seul défilement, sans onglets');
 });
@@ -119,4 +119,20 @@ test('SEENIT-UX-019 une seule fiche acteur, la barre visible sur la fiche et un 
   assert.match(view, /label=\{`Voir \$\{code\}`\}[^\n]*onClick=\{handleWatchNextEpisode\}/, 'le bouton or ouvre l’épisode, il ne marque rien');
   assert.ok(view.indexOf('<ThemesCard') > view.indexOf('<DetailSynopsis') && view.indexOf('<ThemesCard') < view.indexOf('<SeasonAverageChart'), 'genres et thèmes juste sous le synopsis');
   assert.match(readFileSync('src/screens/MediaDetailColdShell.tsx', 'utf8'), /style=\{\{ height: isSeries \? 300 : 380 \}\}/);
+});
+
+test('SEENIT-UX-019 #857 un épisode à venir dit quand il sort, en relatif et daté au-delà d’une semaine', () => {
+  assert.equal(upcomingEpisodeLabel('2026-11-04', '2026-11-04'), 'Aujourd’hui');
+  assert.equal(upcomingEpisodeLabel('2026-11-05', '2026-11-04'), 'Demain');
+  assert.equal(upcomingEpisodeLabel('2026-11-11', '2026-11-04'), 'Dans 7 jours');
+  assert.equal(upcomingEpisodeLabel('2026-11-16', '2026-11-04'), 'Dans 12 jours · 16 nov.', 'au-delà de 7 jours : « dans X jours » et la date');
+  assert.equal(upcomingEpisodeLabel('2027-01-02', '2026-12-30'), 'Dans 3 jours', 'passage d’année');
+  assert.equal(upcomingEpisodeLabel('bientôt', '2026-11-04'), 'Bientôt');
+  const rows = readFileSync('src/screens/mediaDetail/seriesSections.tsx', 'utf8');
+  assert.doesNotMatch(rows, /!aired && 'opacity-60'/, 'plus de ligne à moitié grisée');
+  assert.match(rows, /<SeenItCheckButton isWatched=\{watched\}/, 'bouton Vu des lignes = bouton de l’Accueil');
+  const header = readFileSync('src/screens/mediaDetail/episodeSections.tsx', 'utf8');
+  assert.match(header, /<SeenItCheckButton isWatched=\{isSeen\}/);
+  assert.doesNotMatch(readFileSync('src/screens/mediaDetail/detailUi.tsx', 'utf8'), /SeenItCheckGlyph/, 'le pictogramme TV a disparu');
+  assert.doesNotMatch(readFileSync('src/screens/mediaDetail/movieSections.tsx', 'utf8'), /il est \{formatClock|beforeMidnight\} min avant minuit/, 'ni « il est », ni « Fini X min avant minuit »');
 });

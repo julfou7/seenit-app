@@ -16,7 +16,7 @@ import { episodeRank, formatClock, formatRating, planEpisodes } from '../feature
 import { useClockMinutes, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
 import { dedupeProvidersByName } from '../features/providers/providerNames';
 import { appLogger } from '../store/logStore';
-import { EpisodeHeaderBlock, EpisodeNavRow, EpisodePlannerCard, ReactionRow, SeasonCurveCard, SpoilerSynopsis } from './mediaDetail/episodeSections';
+import { EpisodeDetailSkeleton, EpisodeHeaderBlock, EpisodeNavRow, EpisodePlannerCard, ReactionRow, SeasonCurveCard, SpoilerSynopsis } from './mediaDetail/episodeSections';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { type EpisodeDetailData } from './episodeDetailTypes';
@@ -1001,37 +1001,14 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 transition={{ duration: 0.12 }}
                 aria-busy="true"
               >
-                <div className="absolute left-4 right-4 z-30 flex items-center justify-between pointer-events-auto" style={{ top: '14px' }}>
-                  <button type="button" onClick={(e) => {
-                    e.stopPropagation();
-                    const targetTmdbId = tmdbShowId || show?.tmdbId;
-                    if (onShowClick && targetTmdbId) onShowClick(targetTmdbId, show?.mediaType || 'tv');
-                    else onClose();
-                  }} className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-zinc-900/85 backdrop-blur-md border border-white/10 text-white active:scale-95 transition-all max-w-[200px] group shadow-lg">
-                    <ArrowLeft size={16} className="text-[#E5A93D] shrink-0" />
-                    <div className="flex flex-col text-left overflow-hidden leading-tight">
-                      <span className="text-[9px] uppercase tracking-wider text-zinc-400 font-bold -mb-0.5">Série</span>
-                      <span className="text-xs font-semibold truncate max-w-[140px]">{show?.title || tmdbShowTitle || 'Retour'}</span>
-                    </div>
+                <div className="absolute left-3.5 right-3.5 z-30 flex items-center justify-between pointer-events-auto" style={{ top: '14px' }}>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); const targetTmdbId = tmdbShowId || show?.tmdbId; if (onShowClick && targetTmdbId) onShowClick(targetTmdbId, show?.mediaType || 'tv'); else onClose(); }} aria-label="Retour à la série" className="h-11 max-w-[230px] pl-2.5 pr-3.5 rounded-[22px] bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_4px_14px_rgba(0,0,0,0.4)] flex items-center gap-2 text-white active:scale-95">
+                    <ArrowLeft size={18} className="text-[#E5A93D] shrink-0" />
+                    <span className="min-w-0 flex flex-col text-left leading-[1.15]"><span className="text-[9px] font-extrabold tracking-[0.08em] text-zinc-400">SÉRIE</span><span className="text-[13px] font-bold truncate">{show?.title || tmdbShowTitle || 'Retour'}</span></span>
                   </button>
-                  <button type="button" onClick={onClose} className="w-11 h-11 rounded-full bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center justify-center text-white active:scale-95" aria-label="Fermer"><X size={18} /></button>
+                  <button type="button" onClick={onClose} aria-label="Fermer" className="w-11 h-11 rounded-full bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center justify-center text-white active:scale-95"><X size={18} /></button>
                 </div>
-                <div className="w-full">
-                  <div className="relative w-full h-[280px] sm:h-[340px] bg-zinc-900 overflow-hidden"><div className="absolute inset-0 bg-gradient-to-t from-[#09090B] via-[#09090B]/40 to-transparent" /></div>
-                  <div className="px-5 -mt-16 relative z-10 space-y-4 pb-nav">
-                    <div className="space-y-3">
-                      <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-zinc-800/80 text-zinc-300 border border-white/10">S{currentSeason.toString().padStart(2, '0')} | E{String(currentEpisode?.episode_number || initialEpisode?.episode_number || 1).padStart(2, '0')}</span>
-                      <div className="h-9 w-4/5 max-w-[280px] rounded-lg bg-zinc-800/80" aria-hidden="true" />
-                      <div className="text-[#E5A93D] text-sm font-bold uppercase tracking-wider">{show?.title || tmdbShowTitle || 'Série'}</div>
-                    </div>
-                    <div className="h-14 w-full rounded-2xl bg-zinc-800/80" aria-hidden="true" />
-                    <div className="space-y-2 pt-2" aria-hidden="true">
-                      <div className="h-3.5 w-full rounded bg-zinc-800/80" />
-                      <div className="h-3.5 w-11/12 rounded bg-zinc-800/80" />
-                      <div className="h-3.5 w-4/5 rounded bg-zinc-800/80" />
-                    </div>
-                  </div>
-                </div>
+                <EpisodeDetailSkeleton code={`S${currentSeason.toString().padStart(2, '0')} | E${String(currentEpisode?.episode_number || initialEpisode?.episode_number || 1).padStart(2, '0')}`} title={currentEpisode?.name || initialEpisode?.name} />
               </motion.div>
             ) : (
             <motion.div
@@ -1078,7 +1055,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                   </div>
                 )}
 
-                {!isFutureEpisode && <EpisodePlannerCard heading={isSeen ? 'Vu · si tu enchaînes maintenant' : 'Si tu lances maintenant'} end={evening.plan.length ? evening.plan[0].end : ''} clock={formatClock(clockMinutes)} text={plannerText}
+                {!isFutureEpisode && <EpisodePlannerCard heading={isSeen ? 'Vu · si tu enchaînes maintenant' : 'Si tu lances maintenant'} end={evening.plan.length ? evening.plan[0].end : ''} text={plannerText}
                   blocks={evening.plan.map(entry => ({ key: `${entry.item.season}x${entry.item.episode.episode_number}`, label: shortLabel(entry.item.season, entry.item.episode.episode_number), runtime: entry.runtime, end: entry.end, onPick: () => jumpToEpisode(entry.item.season, entry.item.episode) }))} />}
 
                 <SeasonCurveCard label={`Saison ${currentSeason} · ${seenInCurrentSeason}/${seasonEpisodes.length} vus`} rankLabel={rankLabel}

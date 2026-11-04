@@ -1,28 +1,31 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { DetailCard, SeenItCheckGlyph } from './detailUi';
+import { DetailCard } from './detailUi';
+import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 
 /** SEENIT-UX-019 — Sections de la fiche épisode du prototype (« Pellicule + courbe »). */
 export function EpisodeHeaderBlock({ code, title, airLabel, meta, isSeen, isFuture, futureLabel, onToggle }: { code: string; title: string; airLabel: string; meta: string; isSeen: boolean; isFuture: boolean; futureLabel: string; onToggle: () => void }) {
   const state = isSeen ? '✓ Vu' : isFuture ? futureLabel : 'À voir';
   return <div className="flex items-end gap-3">
     <div className="flex-1 min-w-0 flex flex-col gap-1"><span className="text-[13px] font-extrabold text-[#E5A93D]">{code}</span><h1 className="text-[30px] font-extrabold leading-[1.08] tracking-[-0.03em] text-white">{title}</h1><span className="text-[13px] text-zinc-300">{airLabel}</span>{meta && <span className="text-[13px] text-zinc-400">{meta}</span>}</div>
-    <button type="button" onClick={onToggle} aria-label={isSeen ? 'Vu · toucher pour annuler' : isFuture ? `Pas encore diffusé · ${futureLabel}` : 'Marquer vu'} aria-pressed={isSeen} className="w-[68px] shrink-0 flex flex-col items-center gap-1 active:scale-95 transition-transform">
-      <span className="w-[60px] h-[60px] rounded-[18px] flex items-center justify-center" style={{ background: isSeen ? '#E5A93D' : 'rgba(24,24,27,0.85)', boxShadow: `inset 0 0 0 1.5px ${isSeen ? '#E5A93D' : 'rgba(255,255,255,0.22)'}` }}><SeenItCheckGlyph seen={false} strong size={36} /></span>
+    {/* #857 : même bouton Vu que l'Accueil (anneau SeenIt animé), plus de pictogramme TV. Un épisode à venir
+        ouvre d'abord la confirmation : pas d'animation tant qu'il n'est pas réellement marqué. */}
+    <div className="w-[68px] shrink-0 flex flex-col items-center gap-1">
+      <SeenItCheckButton isWatched={isSeen} title={isSeen ? 'Vu · toucher pour annuler' : isFuture ? `Pas encore diffusé · ${futureLabel}` : 'Marquer vu'} onClick={() => { onToggle(); return isFuture && !isSeen ? false : undefined; }} />
       <span className={cn('text-[11px] font-extrabold whitespace-nowrap', isSeen ? 'text-[#F2C36B]' : 'text-zinc-400')}>{state}</span>
-    </button>
+    </div>
   </div>;
 }
 
 export interface PlannerBlock { key: string; label: string; runtime: number; end: string; onPick: () => void }
 
 /** « Si tu lances maintenant · Fin à » : trois épisodes enchaînés, largeur proportionnelle à leur durée. */
-export function EpisodePlannerCard({ heading, end, clock, blocks, text }: { heading: string; end: string; clock: string; blocks: readonly PlannerBlock[]; text: string }) {
+export function EpisodePlannerCard({ heading, end, blocks, text }: { heading: string; end: string; blocks: readonly PlannerBlock[]; text: string }) {
   if (!blocks.length) return null;
   const tone = (index: number) => index === 0 ? { background: '#E5A93D', color: '#1a1206', boxShadow: 'none' } : index === 1 ? { background: 'rgba(229,169,61,0.18)', color: '#F2C36B', boxShadow: 'inset 0 0 0 1px rgba(229,169,61,0.5)' } : { background: '#27272a', color: '#a1a1aa', boxShadow: 'none' };
   return <DetailCard accent className="p-4 flex flex-col gap-3">
-    <div className="flex justify-between items-end"><div className="flex flex-col gap-0.5"><span className="text-[13px] text-zinc-400">{heading}</span><span className="text-[34px] font-extrabold leading-none tracking-[-0.04em] text-[#E5A93D]">Fin à {end}</span></div><span className="text-[12px] text-zinc-500 pb-1">il est {clock}</span></div>
+    <div className="flex justify-between items-end"><div className="flex flex-col gap-0.5"><span className="text-[13px] text-zinc-400">{heading}</span><span className="text-[34px] font-extrabold leading-none tracking-[-0.04em] text-[#E5A93D]">Fin à {end}</span></div></div>
     <div className="flex gap-[3px] h-7">{blocks.map((block, index) => <button type="button" key={block.key} onClick={block.onPick} aria-label={`Ouvrir ${block.label}, fin à ${block.end}`} className="rounded-[7px] flex items-center pl-2 text-[11px] font-extrabold" style={{ flex: block.runtime, ...tone(index) }}>{block.label}</button>)}</div>
     <div className="flex gap-[3px]" aria-hidden="true">{blocks.map(block => <span key={`end-${block.key}`} className="text-[11px] text-zinc-400 text-right pr-1" style={{ flex: block.runtime }}>{block.end}</span>)}</div>
     <span className="text-[13px] text-zinc-300">{text}</span>
@@ -72,4 +75,24 @@ export function EpisodeNavRow({ prevLabel, nextLabel, hasPrevious, hasNext, disa
     <span className="text-[12px] font-semibold text-zinc-500 text-center">glisse pour changer d’épisode</span>
     <button type="button" aria-label="Épisode suivant" disabled={!hasNext || disabled} onClick={event => { event.stopPropagation(); onNext(); }} className={cn(base, 'text-zinc-200')}>{nextLabel}<ChevronRight size={18} aria-hidden="true" /></button>
   </nav>;
+}
+
+/**
+ * #857 — Squelette de la fiche épisode au gabarit actuel (image, en-tête avec l'anneau Vu, « Fin à », courbe de
+ * saison, résumé), affiché pendant l'hydratation au lieu de l'ancienne page.
+ */
+export function EpisodeDetailSkeleton({ code, title }: { code: string; title?: string | null }) {
+  const bar = 'rounded bg-zinc-800/80 animate-pulse';
+  return <div className="w-full" data-episode-skeleton="">
+    <div className="relative w-full h-[250px] bg-zinc-900 overflow-hidden"><div className="absolute inset-0" style={{ background: 'linear-gradient(0deg,#09090b 0%,rgba(9,9,11,0.35) 50%,rgba(9,9,11,0.3) 100%)' }} /></div>
+    <div className="px-[18px] -mt-11 relative z-10 flex flex-col gap-3.5 pb-nav" aria-hidden="true">
+      <div className="flex items-end gap-3">
+        <div className="flex-1 min-w-0 flex flex-col gap-1.5"><span className="text-[13px] font-extrabold text-[#E5A93D]">{code}</span>{title ? <span className="text-[30px] font-extrabold leading-[1.08] tracking-[-0.03em] text-white line-clamp-2">{title}</span> : <div className={cn(bar, 'h-8 w-4/5 rounded-lg')} />}<div className={cn(bar, 'h-3.5 w-40')} /></div>
+        <div className="w-[68px] shrink-0 flex flex-col items-center gap-1"><div className="w-12 h-12 rounded-full bg-zinc-800/80 animate-pulse" /><div className={cn(bar, 'h-3 w-10')} /></div>
+      </div>
+      <DetailCard accent className="p-4 flex flex-col gap-3"><div className={cn(bar, 'h-3.5 w-36')} /><div className={cn(bar, 'h-8 w-44 rounded-lg')} /><div className={cn(bar, 'h-7 w-full rounded-[7px]')} /></DetailCard>
+      <DetailCard className="p-3.5 flex flex-col gap-2.5"><div className={cn(bar, 'h-3.5 w-32')} /><div className={cn(bar, 'h-[62px] w-full rounded-lg')} /></DetailCard>
+      <div className="flex flex-col gap-2"><div className={cn(bar, 'h-3.5 w-full')} /><div className={cn(bar, 'h-3.5 w-11/12')} /><div className={cn(bar, 'h-3.5 w-4/5')} /></div>
+    </div>
+  </div>;
 }

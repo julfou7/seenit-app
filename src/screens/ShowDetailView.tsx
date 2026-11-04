@@ -1,7 +1,7 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { useMemo } from 'react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
-import { ChevronLeft, Heart, MoreVertical, Bookmark, Play, RefreshCw, RotateCcw, Ban, Trash2, Download, Share2 } from 'lucide-react';
+import { ChevronLeft, Heart, MoreVertical, Play, RefreshCw, RotateCcw, Ban, Trash2, Download, Share2 } from 'lucide-react';
 import { cn, openExternalUrl } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonProfile as PersonDetailModal } from '../components/PersonProfile';
@@ -15,7 +15,7 @@ import { buildRedditMovieSearchQuery } from '../components/community/redditEpiso
 import { getProviderLinkPresentation } from '../features/providers/providerLink';
 import { seasonAverages, formatRating } from '../features/shows/detailPlanning';
 import { frenchGenres } from '../features/shows/frenchLabels';
-import { DetailChip, DetailHero, DetailSynopsis, GoldCta, RoundHeaderButton, SquareAction, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
+import { DetailChip, DetailHero, DetailSynopsis, GoldCta, RoundHeaderButton, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
 import { CastRows, RelationList, RelationsLoading, ThemesCard } from './mediaDetail/detailSections';
 import { SeasonAverageChart, SeasonPanel, SeasonPills, SeriesProgressCard, seasonsOf } from './mediaDetail/seriesSections';
 import { MovieEndCard, VerifiedSimilarRail } from './mediaDetail/movieSections';
@@ -133,23 +133,24 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       <DetailHero imageUrl={backdropUrl || posterPath} title={title} meta={tmdbDetails || year ? meta : null} height={isSeries ? 300 : 380} />
 
       <div className="px-4 pt-1.5 pb-8 flex flex-col gap-3.5">
-        {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}</SeriesProgressCard>
-          : <div className="flex gap-2">
-            <GoldCta tone={hasSeenMedia ? 'done' : 'gold'} label={hasSeenMedia ? '✓ Vu · annuler' : isUnreleased ? 'Pas encore sorti' : 'Marquer vu'} onClick={hasSeenMedia || !isUnreleased ? toggleMovieSeen : () => showToast('Ce film n’est pas encore sorti.', 'info')} className="rounded-[16px]" />
-            {!hasSeenMedia && <SquareAction label={inMovieList ? 'Retirer de ma liste' : 'Ajouter à ma liste'} active={inMovieList} onClick={togglePlanToWatchMovie}><Bookmark size={20} className={cn(inMovieList && 'fill-[#E5A93D]')} /></SquareAction>}
-            {hasTrailer && <SquareAction label="Bande-annonce" onClick={() => setTrailerModalVideos(ytVideos)}><Play size={18} className="fill-current" /></SquareAction>}
-          </div>}
-        {!isSeries && !hasSeenMedia && !isUnreleased && !isAtCinema && <MovieEndCard runtime={tmdbDetails?.runtime} />}
-
+        {/* #857 : note, âge et bande-annonce en tête, au-dessus du bouton principal (film comme série). */}
         <div className="flex flex-wrap gap-1.5 min-h-7">
           {!tmdbDetails ? <><div className="h-7 w-20 rounded-lg bg-zinc-800/80 animate-pulse" /><div className="h-7 w-14 rounded-lg bg-zinc-800/80 animate-pulse" /></> : <>
             {isAtCinema && <DetailChip className="text-[#F2C36B] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.5)]">🎟 Au cinéma</DetailChip>}
             {isUpcomingMovie && <DetailChip className="text-[#F2C36B]">À venir</DetailChip>}
             {tmdbRating && <DetailChip>★ {tmdbRating} TMDB</DetailChip>}
             <DetailChip className={ratingInfo.colorClass} aria-label={ratingInfo.provenance ? `${ratingInfo.label}, classification ${ratingInfo.provenance}` : ratingInfo.label} title={ratingInfo.provenance ? `${ratingInfo.provenance} · ${ratingInfo.label}` : ratingInfo.label}><strong>{ratingInfo.label}</strong>{ratingInfo.provenance && <small className="text-[9px] font-semibold opacity-65">{ratingInfo.provenance}</small>}</DetailChip>
-            {isSeries && hasTrailer && <button type="button" onClick={() => setTrailerModalVideos(ytVideos)} className="inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-[#18181b] px-2.5 text-[12px] font-bold text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"><Play size={12} className="fill-current" />Bande-annonce</button>}
+            {hasTrailer && <button type="button" onClick={() => setTrailerModalVideos(ytVideos)} className="inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-[#18181b] px-2.5 text-[12px] font-bold text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"><Play size={12} className="fill-current" />Bande-annonce</button>}
           </>}
         </div>
+        {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}</SeriesProgressCard>
+          : <div className="flex gap-2">
+            <GoldCta tone={hasSeenMedia ? 'done' : 'gold'} label={hasSeenMedia ? '✓ Vu · annuler' : isUnreleased ? 'Pas encore sorti' : 'Marquer vu'} onClick={hasSeenMedia || !isUnreleased ? toggleMovieSeen : () => showToast('Ce film n’est pas encore sorti.', 'info')} className="rounded-[16px]" />
+            {/* #857 : suivre le film redevient un vrai bouton, aussi visible que « Marquer vu ». */}
+            {!hasSeenMedia && <GoldCta tone={inMovieList ? 'done' : 'neutral'} label={inMovieList ? '✓ Suivi' : 'Suivre le film'} ariaLabel={inMovieList ? 'Suivi, toucher pour ne plus suivre le film' : undefined} onClick={togglePlanToWatchMovie} className="rounded-[16px]" />}
+          </div>}
+        {!isSeries && !hasSeenMedia && !isUnreleased && !isAtCinema && <MovieEndCard runtime={tmdbDetails?.runtime} />}
+
         {tmdbDetails ? <DetailSynopsis text={tmdbDetails.overview || 'Aucun synopsis disponible.'} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} /> : <div className="space-y-2 animate-pulse" aria-hidden="true"><div className="h-3.5 w-full rounded bg-zinc-800/80" /><div className="h-3.5 w-4/5 rounded bg-zinc-800/80" /></div>}
         <ThemesCard genres={genres} keywords={keywords} expanded={areThemesExpanded} onToggle={() => setAreThemesExpanded((expanded: boolean) => !expanded)} loading={!tmdbDetails} />
 

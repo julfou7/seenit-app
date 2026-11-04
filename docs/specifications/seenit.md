@@ -651,6 +651,22 @@ n'est rouverte que par une nouvelle décision produit explicite.
   - la fiche média garde la barre de navigation ; seuls les dialogues plein écran la masquent ;
   - une seule fiche acteur dans toute l'app : fiches, Explorer, Moi et À voir ouvrent celle des billets ;
   - le squelette de chargement reprend le gabarit des nouvelles fiches (même hero, mêmes cartes).
+  Retours terrain v1.4.251 (04/11/2026, #857) :
+  - la rangée note TMDB, âge et **Bande-annonce** passe au-dessus du bouton principal, au-dessus de
+    **Marquer vu** pour un film et de la carte de progression pour une série. Le film reprend le bouton
+    **Bande-annonce** entier de la série, à la place de l'icône ▶ ;
+  - un film se **suit** et se **marque vu** en un clic chacun : **Suivre le film** (puis « ✓ Suivi »)
+    est un bouton aussi large que **Marquer vu**, et non plus un signet discret ;
+  - la carte « Fin à » ne montre plus l'heure courante (« il est HH:MM », auparavant affichée deux fois),
+    ni « Fini X min avant minuit ». Seuls restent l'heure de fin, la barre et le repère de minuit, et la
+    carte de soirée de l'épisode n'affiche pas non plus l'heure courante ;
+  - le bouton **Vu** des lignes d'épisode et celui de la fiche épisode sont le bouton de l'Accueil
+    (anneau SeenIt et son animation), sans pictogramme TV. Un épisode à venir ouvre d'abord la
+    confirmation, sans animation tant qu'il n'est pas marqué ;
+  - un épisode à venir n'est plus à moitié grisé : sa ligne est nette, bordée d'or, avec un libellé
+    relatif (« Demain », « Dans 5 jours ») et daté au-delà d'une semaine (« Dans 12 jours · 16 nov. ») ;
+  - le squelette de la fiche épisode reprend le gabarit actuel : image, en-tête avec l'anneau Vu, carte
+    « Fin à », courbe de saison, résumé, et les mêmes boutons flottants que la page.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 
