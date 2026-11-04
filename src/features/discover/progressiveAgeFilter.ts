@@ -46,7 +46,7 @@ function identityFor(item: Record<string, unknown>): BatchIdentity | null {
   const mediaType: MediaType = item?.media_type === 'movie' || Boolean(item?.release_date) ? 'movie' : 'tv';
   return { item, mediaType, id, key: `${mediaType}:${id}` };
 }
-function rememberBatchDetails(key: string, details: any, persist = true): void {
+function rememberBatchDetails(key: string, details: unknown, persist = true): void {
   parentalBatchCache.delete(key); parentalBatchCache.set(key, details);
   while (parentalBatchCache.size > BATCH_CACHE_MAX) parentalBatchCache.delete(parentalBatchCache.keys().next().value!);
   if (!persist) return;
@@ -236,6 +236,9 @@ export function createProgressiveAgeDiscover(
       }
     };
     if (maxAge === null) {
+      // #855 : filtre d'âge retiré, l'anticipation des âges devient inutile et ne doit plus consommer le quota.
+      warming?.controller.abort();
+      warming = null;
       if (page === 1) publishSnapshot(null);
       return dependencies.discover(options);
     }
