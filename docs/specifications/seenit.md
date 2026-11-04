@@ -651,7 +651,8 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   panne, ce détail connu (similaires compris) reste servi et une nouvelle tentative n'est permise
   qu'après 5 minutes, sans rafale d'appels ni lecture Firestore. Une fiche restée ouverte au-delà de
   cette échéance se relit d'elle-même, à l'échéance ou au retour au premier plan (heure murale, car la
-  veille gèle les minuteurs), et affiche le détail révalidé (#851).
+  veille gèle les minuteurs), et affiche le détail révalidé ; tant que TMDB est en panne, la relecture est
+  retentée toutes les 5 minutes au premier plan, jamais en arrière-plan (#851).
   En complément, chaque détail résolu produit un **snapshot de premier rendu** public, typé et compact
   (`detail_render`) qui conserve les champs immédiatement visibles — titre, synopsis, affiche/fond,
   catégories, thèmes, quelques logos/vidéos et les métadonnées structurelles légères. Ce snapshot est
