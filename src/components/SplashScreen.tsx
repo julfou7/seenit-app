@@ -17,6 +17,12 @@ export const BRAND_SPLASH_ANIMATION_MS = 2300;
 
 const ringHalf = (id: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="${id}" x1="10%" y1="5%" x2="90%" y2="95%"><stop offset="0%" stop-color="#FFF2B8"/><stop offset="32%" stop-color="#F5C518"/><stop offset="70%" stop-color="#E5A93D"/><stop offset="100%" stop-color="#B37812"/></linearGradient></defs><circle cx="50" cy="50" r="38" fill="none" stroke="url(#${id})" stroke-width="10"/></svg>`;
 const RING_BOTTOM = ringHalf('seenit-splash-ring-bottom');
+// Anneau complet et coche du symbole, en couches HTML : leur apparition est animée par le compositeur, jamais
+// par le fil principal (occupé à monter l'app sous le splash). Le symbole SVG du logo reste masqué jusqu'à la fin.
+const ringFull = (id: string) => ringHalf(id);
+const tickMark = (id: string) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="${id}" x1="10%" y1="5%" x2="90%" y2="95%"><stop offset="0%" stop-color="#FFF2B8"/><stop offset="32%" stop-color="#F5C518"/><stop offset="70%" stop-color="#E5A93D"/><stop offset="100%" stop-color="#B37812"/></linearGradient></defs><path d="M36 51 L46 61 L65 40" fill="none" stroke="url(#${id})" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const RING_FULL = ringFull('seenit-splash-ring-full');
+const TICK_MARK = tickMark('seenit-splash-tick');
 const RING_TOP = ringHalf('seenit-splash-ring-top');
 
 export function SplashScreen({
@@ -83,6 +89,8 @@ export function SplashScreen({
       <span className="brand-splash-ring" aria-hidden="true">
         <span className="brand-splash-ring__half brand-splash-ring__half--bottom"><span className="brand-splash-ring__window"><span className="brand-splash-ring__ring" dangerouslySetInnerHTML={{__html:RING_BOTTOM}} /></span></span>
         <span className="brand-splash-ring__half brand-splash-ring__half--top"><span className="brand-splash-ring__window"><span className="brand-splash-ring__ring" dangerouslySetInnerHTML={{__html:RING_TOP}} /></span></span>
+          <span className="brand-splash-ring__full" dangerouslySetInnerHTML={{__html:RING_FULL}} />
+          <span className="brand-splash-ring__tick" dangerouslySetInnerHTML={{__html:TICK_MARK}} />
       </span>
     </div>
     <div className="seenit-brand-splash__episodes" aria-hidden="true">{Array.from({length:8},(_,index)=><i key={index}/>)}</div>

@@ -150,7 +150,8 @@ prévues ; ce dernier n'accorde aucune confiance à l'appelant et exige les preu
 
 - Un splash Web SeenIt unique masque l'initialisation ; le splash système Android reste neutre.
 - Fluidité (03/11/2026, 120 Hz) : le splash dure 2,3 s, sa barre se remplit segment par segment, l'anneau du logo est dessiné par le
-  compositeur (fluide même pendant le chargement), et l'app est montée
+  compositeur (fluide même pendant le chargement ; depuis la v1.4.249, la coche et l'anneau final aussi, si bien
+  que l'anneau ne disparaît plus pendant que l'app se monte dessous), et l'app est montée
   sous le splash avant son fondu de 0,5 s. Les fiches et la page personne entrent comme les écrans Réglages
   (180 ms, opacité et 18 px), et un onglet qui réapparaît fait le fondu de Moi (160 ms). Sur Android, SeenIt
   demande le mode d'affichage le plus rapide de l'écran (`SEENIT-APK-007`). La synchro Plex cède le fil toutes
