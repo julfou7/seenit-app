@@ -54,6 +54,8 @@ export const tmdb = {
   },
 };
 export const discoverSeenIt = list;
+export const discoverSeenItDirect = list;
+export const EXPLORER_TRENDING_MIN_VOTES = 10;
 export function usePassiveWatchProvider() { return { cardRef: useRef<HTMLDivElement>(null), providerName: null, providerLogo: null, isProviderLoading: false }; }
 
 const fixtureCharacter = {

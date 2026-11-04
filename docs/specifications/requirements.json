@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.250",
+  "applicationVersion": "1.4.251",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -2953,6 +2953,32 @@
       ]
     },
     {
+      "id": "SEENIT-PROVIDER-002",
+      "title": "Diffuseurs Explorer groupés par écran, région FR, préchargement dans la liste",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/watchProviderBatch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 #853 une requête groupée par écran, réduite à la France et mise en cache"
+        },
+        {
+          "file": "tests/watchProviderBatch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 #853 parse et compacte sans jamais inventer d’offre"
+        },
+        {
+          "file": "tests/watchProviderBatch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 #853 les cartes visibles ensemble partagent une requête, avec repli titre par titre"
+        },
+        {
+          "file": "tests/watchProviderBatch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 #853 la marge de préchargement des logos agit dans la liste qui défile"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-PERF-001",
       "title": "Cache chaud typé et réouverture instantanée des fiches média",
       "targets": [
@@ -3233,6 +3259,36 @@
         {
           "file": "tests/characters.test.ts",
           "contains": "SEENIT-DISCOVER-004"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DISCOVER-007",
+      "title": "Explorer frais et fluide : tendances du jour, nouveautés, page suivante préparée",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/explorerTrendsPrefetch.test.ts",
+          "contains": "SEENIT-DISCOVER-007 #853 la tendance du jour passe d’abord et une sortie récente n’est plus écartée"
+        },
+        {
+          "file": "tests/explorerTrendsPrefetch.test.ts",
+          "contains": "SEENIT-DISCOVER-007 #853 le proxy TMDB laisse passer la fenêtre de diffusion des séries"
+        },
+        {
+          "file": "tests/explorerTrendsPrefetch.test.ts",
+          "contains": "SEENIT-DISCOVER-007 #853 les personnes de la tendance restent hors de la grille des titres"
+        },
+        {
+          "file": "tests/explorerTrendsPrefetch.test.ts",
+          "contains": "SEENIT-DISCOVER-007 #853 la page suivante est préparée une fois puis reprise sans nouvel appel"
+        },
+        {
+          "file": "tests/explorerTrendsPrefetch.test.ts",
+          "contains": "SEENIT-DISCOVER-007 #853 le filtre d’âge résout en avance les âges de la page suivante"
         }
       ]
     }

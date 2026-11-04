@@ -44,7 +44,7 @@ test('SEENIT-PERF-001 borne toutes les mémoires TMDB et n’ajoute aucun Firest
   );
   assert.doesNotMatch(clientSource, /episodeDetailsCache = new Map/);
 
-  assert.equal(WATCH_PROVIDER_CACHE_MAX_ENTRIES, 120);
+  assert.equal(WATCH_PROVIDER_CACHE_MAX_ENTRIES, 400, '#853 : ~10 pages Explorer, entrées réduites à la région FR');
   assert.equal(WATCH_PROVIDER_LIBRARY_CACHE_MAX_ENTRIES, 240);
   assert.equal(WATCH_PROVIDER_CACHE_TTL_MS, 6 * 60 * 60 * 1000);
   assert.equal(WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS, 7 * 24 * 60 * 60 * 1000);
@@ -156,7 +156,10 @@ test('issue #410 route Explorer Tout par le cache Discover commun', () => {
 
   assert.doesNotMatch(methodSlice('getPopularPersons', 'getNowPlaying'), /getCachedDiscoverResponse/);
   assert.match(coreSource, /const fetchCachedDiscoverPayload = async \(url: string\) => tmdbClient\.getCachedDiscoverResponse\(url\)/);
-  assert.match(discoverScreenSource, /tmdb\.getTrending\('all', page, selectedPlatforms\)/);
-  assert.match(discoverScreenSource, /tmdb\.getPopular\('tv', page, selectedPlatforms\)/);
-  assert.match(discoverScreenSource, /tmdb\.getPopular\('movie', page, selectedPlatforms\)/);
+  // #853 : le chargement des pages d'Explorer vit dans explorerHomePages (préchargement de la page suivante).
+  const explorerHomePagesSource = readFileSync('src/features/discover/explorerHomePages.ts', 'utf8');
+  assert.match(discoverScreenSource, /loadExplorerHomePage\(query, page,/);
+  assert.match(explorerHomePagesSource, /tmdb\.getTrending\('all', page, selectedPlatforms\)/);
+  assert.match(explorerHomePagesSource, /tmdb\.getPopular\('tv', page, selectedPlatforms\)/);
+  assert.match(explorerHomePagesSource, /tmdb\.getPopular\('movie', page, selectedPlatforms\)/);
 });

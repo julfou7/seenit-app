@@ -19,7 +19,7 @@ test('SEENIT-DISCOVER-003 E-20 les filtres sont directs et le reset conserve la 
  assert.match(filterModalSource, /onClick=\{\(\) => onApply\(toggle\(platforms/);
 });
 
-test('toute combinaison de filtres ou de tri passe par le moteur canonique', () => { assert.match(discoverSource, /else if \(hasActiveFilters \|\| sortBy !== 'popular'\)/); assert.match(discoverSource, /discoverSeenIt\(\{/); assert.match(discoverSource, /category: activeCategory/); assert.match(discoverSource, /watchProviders: selectedPlatforms/); assert.match(discoverSource, /genres: selectedGenres/); assert.match(discoverSource, /sortOrder/); });
+test('toute combinaison de filtres ou de tri passe par le moteur canonique', () => { assert.match(discoverSource, /else if \(hasActiveFilters \|\| sortBy !== 'popular'\)/); assert.match(discoverSource, /const discover = parseMaxAgeFilter\(pegi \|\| 'Tous'\) === null \? discoverSeenItDirect : discoverSeenIt;\s+const discoverRes = await discover\(\{/); assert.match(discoverSource, /category: activeCategory/); assert.match(discoverSource, /watchProviders: selectedPlatforms/); assert.match(discoverSource, /genres: selectedGenres/); assert.match(discoverSource, /sortOrder/); });
 test('SEENIT-DISCOVER-003 E-02 un filtre ne vole aucun résultat pour le hero', () => {
  assert.match(discoverSource, /debouncedQuery\.trim\(\) \|\| activeCategory !== 'Tout' \|\| hasActiveFilters/);
  assert.match(discoverSource, /showHeroSurface = !isSearchMode && !debouncedQuery\.trim\(\)/);

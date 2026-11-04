@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.250**
+Version applicative : **1.4.251**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -288,6 +288,20 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 
 - **SEENIT-DISCOVER-004** — Recherche et fiche de personnages de fiction E-40..49 / P-01..12 : [complément4c](../design/explorer-personnage-2026-10-29.md), #398/#787. Source validée : bibliothèque et univers reliés prouvés, index public borné côté backend, cache et quotas ; personnages distincts des acteurs. La recherche filtre un index local des distributions publiques par titre (14 j, IndexedDB, sans donnée privée) alimenté par `/api/media/characters/index` (24 titres par lot, cache serveur compact partagé, échecs et délai de reprise signalés) : une frappe ne relance aucun balayage de la bibliothèque et un quota atteint produit une couverture partielle signalée puis reprise, jamais une liste vide silencieuse. La route historique `/api/media/characters` reste servie pour les APK installées. Progression privée et favoris locaux par UID. Les ratios vus et co-crédits exigent les identités exactes des épisodes ; les calculs incomplets sont signalés, jamais fabriqués depuis aggregate_credits seul.
 
+- **SEENIT-DISCOVER-007** — Explorer reste frais et fluide (#853) :
+  - **Tendances du jour.** « Tout », « Films » et « Séries » partent de la tendance TMDB du jour,
+    complétée par celle de la semaine, sans doublon. Le complément « populaire » ne garde que les
+    nouveautés : films sortis depuis 18 mois, séries dont un épisode a été diffusé ces 60 derniers jours.
+    Un titre y est retenu dès 10 votes TMDB, au lieu de 50, pour que les sorties de la semaine
+    remontent. Les titres déjà vus restent masqués et les personnes de la tendance « all » restent dans
+    leur rangée dédiée, jamais dans la grille des titres.
+  - **Défilement infini sans attente.** Dès qu'une page est affichée, la suivante est préparée quand le
+    fil principal est libre (sources TMDB et preuves « Au cinéma » comprises), puis reprise telle quelle
+    une seule fois. Elle est rechargée après 10 minutes ou si un filtre change. Le déclenchement a lieu à
+    1 200 px du bas ; le libellé « Chargement… » n'apparaît qu'au-delà de 250 ms.
+  - **Filtre d'âge.** Il garde son anticipation dédiée (sources Discover, âges de la page suivante) et
+    n'utilise pas ce préchargement, car il publie des résultats partiels pour la page en cours.
+
 - **SEENIT-DISCOVER-001** — La catégorie Explorer **« Au cinéma »** et tout badge portant ce libellé
   exigent une preuve TMDB de sortie théâtrale en France : une entrée `release_dates` de pays `FR` et de
   type `2` (Theatrical limited) ou `3` (Theatrical), dans la fenêtre courante de J-75 à J+10. Une date
@@ -364,9 +378,11 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   jamais persisté. Les caches conservent la preuve brute TMDB, pas l'âge calculé, afin qu'une évolution
   du mapping SeenIt soit appliquée immédiatement.
 - Pendant un filtre d'âge actif, Explorer maintient une **fenêtre bornée de deux pages Discover source
-  en avance**. Cette anticipation ne résout ni n'assouplit la classification parentale : elle prépare
-  uniquement les requêtes Discover des pages suivantes afin que le scroll rare ne paie plus
-  séquentiellement leur latence réseau. Une page préchargée est réutilisée exactement une fois par la
+  en avance**. Dès qu'une page est résolue, les preuves TMDB de la page suivante sont aussi lues en
+  tâche de fond, sous les mêmes caches, bornes et quotas (#853). Cette anticipation n'assouplit jamais
+  la classification : le résolveur reste seul juge. La page atteinte réutilise la lecture en cours au
+  lieu d'en ouvrir une seconde, et un changement de filtre l'annule. Le quota de classifications
+  manquantes passe de 240 à 480 par compte et par minute, car les preuves « Au cinéma » le partagent. Une page préchargée est réutilisée exactement une fois par la
   pagination normale, l'ordre des pages reste inchangé et un changement de filtre invalide
   immédiatement la fenêtre.
 - La fiche, les cartes et Explorer réutilisent le même résolveur ; aucune copie locale de mapping ou
@@ -726,6 +742,18 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   en `stale-if-error` pendant 7 jours au maximum. Le cache mémoire de session reste prioritaire et aucune
   donnée utilisateur ou secret Plex n'est stocké dans ce cache. Seul le territoire `FR` effectivement
   consommé par SeenIt est persisté ; les autres pays du payload TMDB restent hors du stockage local.
+- **SEENIT-PROVIDER-002** — Les diffuseurs des cartes Explorer sont demandés **par écran**, plus par
+  carte (#853) :
+  - **Requête groupée.** Les cartes devenues visibles ensemble partagent une requête authentifiée
+    `/api/media/watch-providers` de 40 titres au plus, regroupée en 24 ms. Le backend lit
+    `watch/providers` de TMDB (8 appels simultanés, quota de 600 titres manquants par compte et par
+    minute), ne renvoie que la région FR et met le résultat en cache 6 h. Une erreur fournisseur n'est
+    jamais mise en cache : la carte concernée redemande seule, comme avant. Un backend sans cette route
+    garde le même repli.
+  - **Préchargement effectif.** La liste d'Explorer se déclare racine d'observation, si bien que la
+    marge de 200 px précharge réellement les logos avant leur arrivée à l'écran.
+  - **Caches.** Le cache local garde 400 titres (région FR seulement) et le cache mémoire 240.
+  - **Personnes.** Elles ne déclenchent plus d'appel de diffuseurs.
 - **SEENIT-PROVIDER-001** — Les badges suivent l'ordre Mes plateformes réellement disponibles en FR
   (`flatrate`, `free`, `ads`) > Plex personnel disponible > diffuseur public non sélectionné. Achat/location
   restent exclus. Une carte montée réagit aux bascules ON/OFF/ON et à l'hydratation cloud de la session,

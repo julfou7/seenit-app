@@ -1,7 +1,8 @@
 export const WATCH_PROVIDER_CACHE_STORAGE_KEY = 'seenit_watch_providers_v1';
 export const WATCH_PROVIDER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 export const WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-export const WATCH_PROVIDER_CACHE_MAX_ENTRIES = 120;
+// #853 : ~10 pages d'Explorer (entrées réduites à la région FR, 1 à 2 Ko chacune).
+export const WATCH_PROVIDER_CACHE_MAX_ENTRIES = 400;
 export const WATCH_PROVIDER_LIBRARY_CACHE_MAX_ENTRIES = 240;
 export const WATCH_PROVIDER_CACHE_IDLE_TIMEOUT_MS = 2_000;
 
@@ -41,15 +42,13 @@ function getDefaultStorage(): StorageLike | null {
   }
 }
 
-function compactWatchProviderPayload(data: any): any {
-  const results = data?.results;
+function compactWatchProviderPayload<T>(data: T): T {
+  const results = (data as { results?: unknown } | null | undefined)?.results;
   if (!results || typeof results !== 'object' || Array.isArray(results)) return data;
   const countries = Object.keys(results);
   if (countries.every(country => country === 'FR')) return data;
-  return {
-    ...data,
-    results: results.FR ? { FR: results.FR } : {},
-  };
+  const fr = (results as Record<string, unknown>).FR;
+  return { ...data, results: fr ? { FR: fr } : {} };
 }
 
 export function getWatchProviderCacheKey(id: number, type: 'tv' | 'movie'): string {

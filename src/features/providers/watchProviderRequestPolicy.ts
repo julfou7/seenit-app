@@ -2,8 +2,13 @@ export const WATCH_PROVIDER_MAX_CONCURRENT = 4;
 export const WATCH_PROVIDER_CARD_SCROLL_SETTLE_MS = 180;
 export const WATCH_PROVIDER_CARD_FALLBACK_DELAY_MS = 50;
 
-const observedProviderCards = new Map<Element, () => void>();
-let sharedProviderCardObserver: IntersectionObserver | null = null;
+/**
+ * #853 : une liste qui défile dans son propre conteneur le marque `data-watch-provider-root`. L'observateur prend
+ * ce conteneur pour racine, sinon la marge de 200 px serait sans effet (la carte reste coupée par le conteneur).
+ */
+export const WATCH_PROVIDER_ROOT_ATTRIBUTE = 'data-watch-provider-root';
+const observedProviderCards = new Map<Element, { callback: () => void; root: Element | null }>();
+const providerCardObservers = new Map<Element | null, IntersectionObserver>();
 let lastProviderInteractionAt = 0;
 let providerInteractionTrackingInstalled = false;
 
@@ -23,38 +28,44 @@ function ensureProviderCardInteractionTracking(): void {
 }
 
 function releaseProviderCard(element: Element): void {
+  const observed = observedProviderCards.get(element);
+  if (!observed) return;
   observedProviderCards.delete(element);
-  sharedProviderCardObserver?.unobserve(element);
-  if (observedProviderCards.size === 0) {
-    sharedProviderCardObserver?.disconnect();
-    sharedProviderCardObserver = null;
+  const observer = providerCardObservers.get(observed.root);
+  observer?.unobserve(element);
+  if (observer && ![...observedProviderCards.values()].some(entry => entry.root === observed.root)) {
+    observer.disconnect();
+    providerCardObservers.delete(observed.root);
   }
 }
 
-function getProviderCardObserver(): IntersectionObserver | null {
+function getProviderCardObserver(root: Element | null): IntersectionObserver | null {
   if (typeof IntersectionObserver === 'undefined') return null;
-  if (sharedProviderCardObserver) return sharedProviderCardObserver;
+  const existing = providerCardObservers.get(root);
+  if (existing) return existing;
 
   ensureProviderCardInteractionTracking();
-  sharedProviderCardObserver = new IntersectionObserver(entries => {
+  const observer = new IntersectionObserver(entries => {
     for (const entry of entries) {
       if (!entry.isIntersecting) continue;
-      const callback = observedProviderCards.get(entry.target);
+      const callback = observedProviderCards.get(entry.target)?.callback;
       releaseProviderCard(entry.target);
       callback?.();
     }
-  }, { rootMargin: '200px' });
-  return sharedProviderCardObserver;
+  }, { root, rootMargin: '200px' });
+  providerCardObservers.set(root, observer);
+  return observer;
 }
 
 export function observeWatchProviderCard(element: Element, callback: () => void): () => void {
-  const observer = getProviderCardObserver();
+  const root = typeof element.closest === 'function' ? element.closest(`[${WATCH_PROVIDER_ROOT_ATTRIBUTE}]`) : null;
+  const observer = getProviderCardObserver(root);
   if (!observer) {
     callback();
     return () => {};
   }
 
-  observedProviderCards.set(element, callback);
+  observedProviderCards.set(element, { callback, root });
   observer.observe(element);
   return () => releaseProviderCard(element);
 }
