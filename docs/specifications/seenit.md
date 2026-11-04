@@ -381,7 +381,7 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   en avance**. Dès qu'une page est résolue, les preuves TMDB de la page suivante sont aussi lues en
   tâche de fond, sous les mêmes caches, bornes et quotas (#853). Cette anticipation n'assouplit jamais
   la classification : le résolveur reste seul juge. La page atteinte réutilise la lecture en cours au
-  lieu d'en ouvrir une seconde, et un changement de filtre l'annule. Le quota de classifications
+  lieu d'en ouvrir une seconde ; un changement ou le retrait du filtre l'annule (#855). Le quota de classifications
   manquantes passe de 240 à 480 par compte et par minute, car les preuves « Au cinéma » le partagent. Une page préchargée est réutilisée exactement une fois par la
   pagination normale, l'ordre des pages reste inchangé et un changement de filtre invalide
   immédiatement la fenêtre.

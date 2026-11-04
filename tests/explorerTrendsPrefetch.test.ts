@@ -177,4 +177,11 @@ test('SEENIT-DISCOVER-007 #853 le filtre d’âge résout en avance les âges de
 
   await progressive({ type: 'tv', page: 1, pegi: '7' });
   assert.equal(warm3.signal.aborted, true, 'un changement de filtre annule l’anticipation devenue inutile');
+
+  // #855 : filtre d'âge retiré, l'anticipation en cours est annulée elle aussi.
+  await flush();
+  const warmAfterSeven = resolved.at(-1)!;
+  assert.equal(warmAfterSeven.signal.aborted, false, 'le filtre 7 ans prépare sa propre page suivante');
+  await progressive({ type: 'tv', page: 1, pegi: 'Tous' });
+  assert.equal(warmAfterSeven.signal.aborted, true, 'sans filtre d’âge, plus aucune résolution anticipée ni quota consommé');
 });
