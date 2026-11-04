@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { db, auth } from '../lib/firebase';
-import { collection, query, getDocs, getDocsFromCache, getDocsFromServer, doc, writeBatch, onSnapshot } from 'firebase/firestore';
+import { collection, query, getDocs, getDocsFromCache, getDocsFromServer, doc, writeBatch, onSnapshot, type QuerySnapshot } from 'firebase/firestore';
 import { type Show } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/firebaseErrors';
 import { useSyncStore } from './syncStore';
 import { appLogger } from './logStore';
 import { getNextEpisodeNumber, checkIsUpToDate } from '../lib/utils';
 import { createLibraryCacheWriter } from '../features/shows/libraryCacheWriter';
+import { invalidateServerConfirmedLibrary, recordAppliedLibrarySnapshot } from '../features/shows/serverConfirmedLibrary';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -317,10 +318,12 @@ export function setupRealtimeShowsListener(userId: string) {
   }
   try {
     const showsRef = collection(db, 'users', userId, 'shows');
-    let latestSnapshot: any = null;
+    invalidateServerConfirmedLibrary();
+    let latestSnapshot: QuerySnapshot | null = null;
     let coalesceHandle: number | null = null;
     let cancelIdleWork: (() => void) | null = null;
     let hasAppliedInitialSnapshot = false;
+    let lastAppliedShows: Show[] | null = null;
 
     const cancelScheduledWork = () => {
       if (coalesceHandle !== null) {
@@ -333,18 +336,31 @@ export function setupRealtimeShowsListener(userId: string) {
       }
     };
 
-    const applySnapshot = (snapshot: any) => {
+    const applySnapshot = (snapshot: QuerySnapshot) => {
       if (auth.currentUser?.uid !== userId) return;
       const remoteShows: Show[] = [];
-      snapshot.forEach((docSnap: any) => {
+      snapshot.forEach((docSnap) => {
         remoteShows.push({ ...docSnap.data(), id: String(docSnap.id) } as Show);
       });
       const { mergedShows } = deduplicateAndMergeShows(remoteShows);
+      // #843 : seule une bibliothèque issue du serveur peut fonder une décision autoritative (raccourci delta Plex).
+      recordAppliedLibrarySnapshot(userId, mergedShows, snapshot.metadata);
+      lastAppliedShows = mergedShows;
       applyMergedShowsState(userId, mergedShows);
     };
 
-    const scheduleSnapshot = (snapshot: any) => {
+    const scheduleSnapshot = (snapshot: QuerySnapshot) => {
+      // Instantané de métadonnées seules (cache → serveur, écriture confirmée) : aucun document n'a changé depuis
+      // l'instantané appliqué, donc pas de nouvelle fusion de la bibliothèque, seulement sa confirmation serveur.
+      const nothingPending = coalesceHandle === null && cancelIdleWork === null;
+      if (lastAppliedShows && nothingPending && snapshot.docChanges().length === 0) {
+        latestSnapshot = snapshot;
+        recordAppliedLibrarySnapshot(userId, lastAppliedShows, snapshot.metadata);
+        return;
+      }
       latestSnapshot = snapshot;
+      // Tant que cet instantané plus récent n'est pas appliqué, la copie confirmée précédente peut être périmée.
+      invalidateServerConfirmedLibrary();
 
       if (!hasAppliedInitialSnapshot) {
         hasAppliedInitialSnapshot = true;
@@ -365,11 +381,14 @@ export function setupRealtimeShowsListener(userId: string) {
       }, REALTIME_SNAPSHOT_COALESCE_MS);
     };
 
-    const firestoreUnsubscribe = onSnapshot(showsRef, scheduleSnapshot, (err) => {
+    // includeMetadataChanges : le passage du cache local au serveur est signalé même sans document modifié.
+    const firestoreUnsubscribe = onSnapshot(showsRef, { includeMetadataChanges: true }, scheduleSnapshot, (err) => {
+      invalidateServerConfirmedLibrary();
       appLogger.warn('sync', '[showsStore] Realtime listener interrompu', err);
     });
 
     unsubscribeRealtimeListener = () => {
+      invalidateServerConfirmedLibrary();
       firestoreUnsubscribe();
       cancelScheduledWork();
       latestSnapshot = null;

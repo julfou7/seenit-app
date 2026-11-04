@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { collectFraction, formatCompactCount, overallPlexPercent, serverStatusLabel } from '../src/features/plex/plexSyncProgressModel.ts';
+import { collectFraction, formatCompactCount, overallPlexPercent, serverFraction, serverStatusLabel } from '../src/features/plex/plexSyncProgressModel.ts';
 import { createPlexSyncProgressReporter } from '../src/features/runtime/plexSyncProgressReporter.ts';
 import { mapOrderedWithConcurrency } from '../src/features/runtime/orderedConcurrency.ts';
 import { describeBackendNetworkFailure, executeBackendAttempts, isBackendTimeoutError } from '../src/lib/nativeBackendRetry.ts';
@@ -122,6 +122,29 @@ test('SEENIT-PLEX-012 le backend lit les serveurs en parallèle, s’arrête à 
   // Fusion dans l'ordre d'origine : historique puis bibliothèque, serveur par serveur.
   const merge = route.slice(route.indexOf('for (const scan of serverScans)'), route.indexOf("if (collectDeadline.aborted)"));
   assert.ok(merge.indexOf('allRawItems.push(...scan.historyItems)') < merge.indexOf('allRawItems.push(...scan.libraryItems)'));
+});
+
+test('SEENIT-PLEX-012 garde le curseur si le délai expire pendant l’enrichissement et compte l’historique PMS au dénominateur (#847, #848)', () => {
+  const server = readFileSync('server.ts', 'utf8');
+  const route = server.slice(server.indexOf("app.post(['/api/plex/history', '/api/plex-sync']"), server.indexOf("\n  app.", server.indexOf("app.post(['/api/plex/history'") + 10));
+  // #847 : le délai global est relu APRÈS l'enrichissement, avant le calcul d'intégrité qui valide le curseur.
+  const enrich = route.indexOf('await mapOrderedWithConcurrency(allRawItems, 8');
+  const deadlineAfterEnrich = route.indexOf("if (collectDeadline.aborted) incompleteSources.add('délai de collecte dépassé')", enrich);
+  const integrity = route.indexOf('collectionComplete: incompleteSources.size === 0');
+  assert.ok(enrich > 0 && deadlineAfterEnrich > enrich && deadlineAfterEnrich < route.indexOf('const normalizedHistory') && deadlineAfterEnrich < integrity, 'un enrichissement coupé par le délai rend la collecte incomplète');
+  // #848 : l'historique PMS d'une complète entre au dénominateur (borné aux pages lues), jamais en delta.
+  assert.match(route, /const onHistoryPage = \(count: number, totalSize\?: number\) => syncProgress\.serverItems\(serverId, count, delta \|\| totalSize === undefined \? undefined : Math\.min\(totalSize, PMS_HISTORY_MAX_PAGES \* 100\)\)/);
+  assert.match(route, /history\/all\?sort=viewedAt:desc`, historyHeaders, serverTimeout, PMS_HISTORY_MAX_PAGES,/);
+
+  // Effet sur le % : 3 000 vus d'historique PMS puis 100 médias d'inventaire sur 1 000.
+  const reporter = createPlexSyncProgressReporter({ syncId: null, mode: 'full', now: () => 0, write: async () => {} });
+  reporter.setServers([{ id: 'a', name: 'A', owned: true }]);
+  reporter.serverScanning('a');
+  reporter.serverItems('a', 3000, 3000);
+  reporter.serverItems('a', 100, 1000);
+  const scanning = reporter.snapshot().servers[0];
+  assert.equal(scanning.total, 4000, 'numérateur et dénominateur portent sur le même travail');
+  assert.ok(serverFraction(scanning) < 0.8, 'le serveur n’atteint pas le plafond de 95 % en plein inventaire');
 });
 
 test('SEENIT-PLEX-012 regroupe les toasts et compacte le panneau de synchro', () => {

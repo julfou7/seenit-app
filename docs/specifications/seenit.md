@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.249**
+Version applicative : **1.4.250**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -646,6 +646,10 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   en vol partagent une seule Promise, y compris lorsqu'elles viennent de surfaces différentes.
 - Le cache chaud mémoire reste prioritaire. Les détails média sont persistés dans IndexedDB pendant
   24 h comme valeur fraîche et restent utilisables jusqu'à 30 jours uniquement en `stale-if-error`.
+  Le cache chaud mémoire suit la même fraîcheur de 24 h (#755) : au-delà, le premier rendu garde le
+  détail connu pendant qu'une seule révalidation partagée (single-flight) interroge TMDB. En cas de
+  panne, ce détail connu (similaires compris) reste servi et une nouvelle tentative n'est permise
+  qu'après 5 minutes, sans rafale d'appels ni lecture Firestore.
   En complément, chaque détail résolu produit un **snapshot de premier rendu** public, typé et compact
   (`detail_render`) qui conserve les champs immédiatement visibles — titre, synopsis, affiche/fond,
   catégories, thèmes, quelques logos/vidéos et les métadonnées structurelles légères. Ce snapshot est
@@ -924,6 +928,11 @@ pour le cache des sagas et univers.
   l'empreinte est identique et que chaque titre de la Watchlist correspond déjà à une fiche, elle avance
   le curseur et s'arrête sans relire Firestore ni retraiter la bibliothèque. Au moindre écart (première
   delta, ajout, retrait, titre sans fiche ou non résolu), le traitement complet s'applique inchangé.
+  « Correspond déjà à une fiche » se vérifie sur la bibliothèque confirmée par le serveur Firestore : le
+  dernier instantané du listener temps réel doit venir du serveur, sans écriture locale en attente ni
+  instantané plus récent en cours d'application. Tant que la bibliothèque n'est connue que par le cache
+  local (au démarrage, ou après une suppression sur un autre appareil pas encore reçue), le traitement
+  complet relit Firestore (#843).
   Côté backend, la Watchlist, l'activité cloud et la découverte des serveurs partent ensemble ; leurs
   résultats sont fusionnés dans l'ordre d'origine.
 - **SEENIT-PLEX-012** — Une synchro Plex est bornée, unique et observable :
@@ -931,8 +940,9 @@ pour le cache des sagas et univers.
     (seules une panne DNS ou une connexion refusée essaient l'origine ou le transport suivant). Si l'app
     se déconnecte, le backend arrête la collecte en cours. La collecte complète dispose de 12 min côté
     app ; le backend s'arrête de lui-même à 10 min et renvoie alors un résultat **incomplet** : le
-    curseur n'avance pas et le cache des disponibilités n'est pas remplacé (`SEENIT-PLEX-003`). En PWA,
-    une collecte complète continue quand l'onglet passe en arrière-plan.
+    curseur n'avance pas et le cache des disponibilités n'est pas remplacé (`SEENIT-PLEX-003`). C'est aussi
+    le cas quand le délai expire pendant l'enrichissement des entrées, qui ne serait alors que partiel
+    (#847). En PWA, une collecte complète continue quand l'onglet passe en arrière-plan.
   - **En parallèle, dans l'ordre d'origine.** Jusqu'à trois serveurs, et dans chacun jusqu'à trois
     bibliothèques, sont lus en même temps ; leurs résultats sont fusionnés dans l'ordre des serveurs et
     des bibliothèques, si bien que le résultat est identique à une lecture séquentielle. L'historique du
@@ -943,7 +953,9 @@ pour le cache des sagas et univers.
     `users/{uid}/settings/plexSyncProgress` (identifiant de synchro, état et éléments lus/attendus par
     serveur), au plus toutes les 1,5 s et seulement au-delà de 2 s de collecte. L'app combine cette
     collecte (70 %) et ses propres étapes (30 %) en un pourcentage qui ne recule jamais, en delta comme
-    en complète. Une collecte sans total connu n'affiche pas de faux pourcentage.
+    en complète. Une collecte sans total connu n'affiche pas de faux pourcentage. En complète, quand
+    l'historique PMS d'un serveur remplace l'historique du compte, son total (borné aux pages lues) entre
+    au dénominateur avec l'inventaire, pour ne pas atteindre le plafond en cours de lecture (#848).
   - **Affichage compact.** Le panneau de synchro tient en un écran : titre et pourcentage, une ligne
     d'état, la barre, puis **une ligne par serveur** (pastille, nom tronqué, « 1,2 k vus », « 42 % »,
     « hors ligne » ou « inaccessible »), sans URL ni jeton ; au repos, le dernier bilan en une ligne et
@@ -1762,8 +1774,9 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   durées. La cible nominale est une médiane de 45 s et un p95 de 90 s sur 20 validations consécutives ;
   un plafond dur de 10 minutes transforme toute dérive d'infrastructure prolongée en échec explicite.
   En CI, une étape rouge publie sa cause exacte en annotation `::error` (lignes `❌`, `not ok`, `ERR_…`,
-  `error TS…`), lisible sans log par `GET …/check-runs/<job_id>/annotations` ; la procédure de lecture est
-  AGENTS §0.3b.
+  `error TS…`), lisible sans log par `GET …/check-runs/<job_id>/annotations`. Une erreur levée par
+  l'orchestrateur lui-même (preuve d'arbre invalide, option inconnue) est annotée aussi, une seule
+  fois (#841) ; la procédure de lecture est AGENTS §0.3b.
 - **SEENIT-QUALITY-009** — Un correctif ciblé dont l'issue, la cause racine et le périmètre sont déjà
   établis suit une intervention bornée : l'agent lit la carte fonctionnelle et les sections canoniques
   directement concernées, conserve l'accès aux index complets sans reconstruire l'historique global,

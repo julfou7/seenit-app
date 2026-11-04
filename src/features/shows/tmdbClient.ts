@@ -28,6 +28,13 @@ import {
 export const PARENTAL_RATING_MAX_CONCURRENT = 8;
 export const EPISODE_DETAILS_CACHE_TTL_MS = 30 * 60 * 1000;
 export const EPISODE_DETAILS_CACHE_MAX_ENTRIES = 120;
+/**
+ * #755 : âge maximal d'un détail TMDB gardé en mémoire, aligné sur la fraîcheur publique de la famille
+ * `details` (PUBLIC_METADATA_CACHE_POLICIES). Au-delà, la prochaine lecture révalide en single-flight.
+ */
+export const MEDIA_DETAILS_MEMORY_FRESH_MS = 24 * 60 * 60 * 1000;
+/** Après une révalidation en échec, le contenu connu est resservi sans nouvel appel pendant ce délai. */
+export const MEDIA_DETAILS_REVALIDATION_RETRY_MS = 5 * 60 * 1000;
 
 export interface TmdbEpisodeDetails extends Record<string, unknown> {
   episode_number: number;
@@ -446,6 +453,8 @@ export class TMDBClient {
     return err(new Error(`No media found on TMDB for external ID ${externalId}`));
   }
   private detailsCache = new BoundedCache<string, any>(80);
+  /** Échéance de révalidation de chaque entrée de detailsCache (même capacité, mêmes clés). */
+  private detailsRevalidateAt = new BoundedCache<string, number>(80);
   private detailRenderCache = new BoundedCache<string, any>(80);
   private englishMediaTitleCache = new BoundedCache<string, string | null>(120);
   private englishMediaTitleInFlight = new Map<string, Promise<Result<string | null>>>();
@@ -498,7 +507,7 @@ export class TMDBClient {
     // il enrichit detail_render avant le premier paint, sans appel fournisseur.
     const persistedDetails = await readPublicMetadataCache<any>('details', cacheKey);
     if (persistedDetails?.fresh) {
-      this.detailsCache.set(cacheKey, persistedDetails.data);
+      this.rememberMediaDetails(cacheKey, persistedDetails.data, persistedDetails.storedAt + MEDIA_DETAILS_MEMORY_FRESH_MS);
       this.cacheMediaDetailRenderSnapshot(cacheKey, persistedDetails.data, type, persistedDetails.storedAt);
       return true;
     }
@@ -518,10 +527,23 @@ export class TMDBClient {
     return this.primeMediaRenderSnapshotFromPersistentCache(id, type);
   }
 
+  /** Mémorise un détail avec son échéance : `storedAt` + TTL, ou un court délai après une panne. */
+  private rememberMediaDetails(cacheKey: string, value: unknown, revalidateAt: number): void {
+    this.detailsCache.set(cacheKey, value);
+    this.detailsRevalidateAt.set(cacheKey, revalidateAt);
+  }
+
+  private hasFreshMemoryDetails(cacheKey: string): boolean {
+    const revalidateAt = this.detailsRevalidateAt.get(cacheKey);
+    return revalidateAt !== undefined && Date.now() < revalidateAt;
+  }
+
   private async getCachedMediaDetails(id: number, type: RelationMediaType, refresh = false) {
     const cacheKey = `${type}_${Number(id)}`;
     const cached = this.detailsCache.get(cacheKey);
-    if (!refresh && cached) {
+    // #755 : une entrée chaude n'est servie directement que dans son TTL ; au-delà, la fiche garde son
+    // premier rendu (peek*) pendant qu'un seul rafraîchissement partagé fait converger les métadonnées.
+    if (!refresh && cached && this.hasFreshMemoryDetails(cacheKey)) {
       if (!this.detailRenderCache.get(cacheKey)) {
         this.cacheMediaDetailRenderSnapshot(cacheKey, cached, type, undefined, false);
       }
@@ -530,72 +552,63 @@ export class TMDBClient {
 
     const persisted = await readPublicMetadataCache<any>('details', cacheKey, { allowStale: true });
     if (!refresh && persisted?.fresh) {
-      this.detailsCache.set(cacheKey, persisted.data);
+      this.rememberMediaDetails(cacheKey, persisted.data, persisted.storedAt + MEDIA_DETAILS_MEMORY_FRESH_MS);
       this.cacheMediaDetailRenderSnapshot(cacheKey, persisted.data, type, persisted.storedAt);
       return ok(persisted.data);
     }
 
     return runPublicMetadataSingleFlight('details', cacheKey, async (): Promise<Result<any>> => {
       const queuedMemory = this.detailsCache.get(cacheKey);
-      if (!refresh && queuedMemory) return ok(queuedMemory);
+      if (!refresh && queuedMemory && this.hasFreshMemoryDetails(cacheKey)) return ok(queuedMemory);
 
       const queuedPersistent = await readPublicMetadataCache<any>('details', cacheKey, { allowStale: true });
       if (!refresh && queuedPersistent?.fresh) {
-        this.detailsCache.set(cacheKey, queuedPersistent.data);
+        this.rememberMediaDetails(cacheKey, queuedPersistent.data, queuedPersistent.storedAt + MEDIA_DETAILS_MEMORY_FRESH_MS);
         this.cacheMediaDetailRenderSnapshot(cacheKey, queuedPersistent.data, type, queuedPersistent.storedAt);
         return ok(queuedPersistent.data);
       }
-      const fallback = queuedPersistent || persisted;
+      // Le détail mémoire (avec similaires et recommandations) prime sur la copie persistée, plus pauvre.
+      const fallback: { data: unknown; storedAt?: number } | null = queuedMemory ? { data: queuedMemory } : (queuedPersistent || persisted);
+      // Panne pendant la révalidation : le contenu connu reste servi, puis une nouvelle tentative est permise après un court délai.
+      const keepKnownDetails = (known: { data: unknown; storedAt?: number }): Result<unknown> => {
+        this.rememberMediaDetails(cacheKey, known.data, Date.now() + MEDIA_DETAILS_REVALIDATION_RETRY_MS);
+        this.cacheMediaDetailRenderSnapshot(cacheKey, known.data, type, known.storedAt, known.storedAt !== undefined);
+        return ok(known.data);
+      };
 
       const appended = type === 'tv'
         ? 'credits,aggregate_credits,similar,recommendations,videos,content_ratings,external_ids,images,keywords'
         : 'credits,similar,recommendations,videos,release_dates,external_ids,images,keywords';
       const url = new URL(`${this.baseUrl}/${type}/${id}?language=fr-FR&append_to_response=${appended}&include_video_language=fr,en,null&include_image_language=fr,en,null,de,es,it,ja,ko`);
       const res = await tryCatch(authenticatedFetch(url.toString()));
-      if (!res.ok) {
-        if (!refresh && fallback) {
-          this.detailsCache.set(cacheKey, fallback.data);
-          this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
-          return ok(fallback.data);
-        }
-        return err((res as any).error);
+      if ('error' in res) {
+        if (!refresh && fallback) return keepKnownDetails(fallback);
+        return err(res.error);
       }
       if (!res.value.ok) {
-        if (!refresh && fallback && isPublicMetadataFallbackStatus(res.value.status)) {
-          this.detailsCache.set(cacheKey, fallback.data);
-          this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
-          return ok(fallback.data);
-        }
+        if (!refresh && fallback && isPublicMetadataFallbackStatus(res.value.status)) return keepKnownDetails(fallback);
         return err(new Error(`TMDB Error: ${res.value.status}`));
       }
       const data = await tryCatch(res.value.json());
-      if (!data.ok) {
-        if (!refresh && fallback) {
-          this.detailsCache.set(cacheKey, fallback.data);
-          this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
-          return ok(fallback.data);
-        }
-        return err((data as any).error);
+      if ('error' in data) {
+        if (!refresh && fallback) return keepKnownDetails(fallback);
+        return err(data.error);
       }
       if (data.value && data.value.status_code) {
-        if (!refresh && fallback) {
-          this.detailsCache.set(cacheKey, fallback.data);
-          this.cacheMediaDetailRenderSnapshot(cacheKey, fallback.data, type, fallback.storedAt);
-          return ok(fallback.data);
-        }
+        if (!refresh && fallback) return keepKnownDetails(fallback);
         return err(new Error(data.value.status_message || 'TMDB Error'));
       }
 
       if (data.value) {
         data.value.media_type = type;
         if (data.value.similar?.results) {
-          data.value.similar.results = data.value.similar.results.filter((item: any) => !isAdultOrParodyMedia(item));
+          data.value.similar.results = data.value.similar.results.filter((item: unknown) => !isAdultOrParodyMedia(item));
         }
         if (data.value.recommendations?.results) {
-          data.value.recommendations.results = data.value.recommendations.results.filter((item: any) => !isAdultOrParodyMedia(item));
+          data.value.recommendations.results = data.value.recommendations.results.filter((item: unknown) => !isAdultOrParodyMedia(item));
         }
         if (type === 'tv') adjustTMDBShowDataForEurope(data.value);
-        this.detailsCache.set(cacheKey, data.value);
+        this.rememberMediaDetails(cacheKey, data.value, Date.now() + MEDIA_DETAILS_MEMORY_FRESH_MS);
         this.cacheMediaDetailRenderSnapshot(cacheKey, data.value, type);
         const { similar: _similar, recommendations: _recommendations, ...persistedDetails } = data.value;
         writePublicMetadataCache('details', cacheKey, persistedDetails);

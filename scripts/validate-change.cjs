@@ -34,7 +34,10 @@ function formatFailureAnnotation(label, lines) {
 }
 
 function reportFailure(label, output) {
-  const lines = extractFailureLines(output);
+  publishFailure(label, extractFailureLines(output));
+}
+
+function publishFailure(label, lines) {
   console.log(formatFailureAnnotation(label, lines));
   if (process.env.GITHUB_STEP_SUMMARY) {
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n### ❌ ${label}\n\n\`\`\`text\n${lines.join('\n') || 'voir le log du job'}\n\`\`\`\n`, 'utf8');
@@ -64,6 +67,7 @@ function run(command, args, options = {}) {
     if (annotate) reportFailure(label, `${result.stdout || ''}\n${result.stderr || ''}`);
     const error = new Error(`${label} a échoué avec le code ${result.status}.`);
     error.exitCode = result.status || 1;
+    error.annotated = annotate;
     throw error;
   }
 }
@@ -231,6 +235,15 @@ function parsePhase(args) {
   throw new Error(`Option invalide : ${requested.join(' ')}. Utiliser --preflight, --postinstall ou aucune option.`);
 }
 
+/**
+ * #841 : une erreur levée par l'orchestrateur lui-même (preuve d'arbre invalide, option inconnue, base
+ * introuvable…) n'a pas d'annotation de sous-commande : sa cause est annotée telle quelle en CI.
+ */
+function validatorErrorLines(error, env = process.env) {
+  if (env.GITHUB_ACTIONS !== 'true' || (error && error.annotated)) return null;
+  return [String((error && error.message) || error)];
+}
+
 function main() {
   try {
     const phase = parsePhase(process.argv.slice(2));
@@ -239,6 +252,8 @@ function main() {
     else validateChange();
   } catch (error) {
     console.error(`\n[Validate Change] ❌ ${error.message}`);
+    const lines = validatorErrorLines(error);
+    if (lines) publishFailure('Orchestrateur', lines);
     process.exitCode = error.exitCode || 1;
   }
 }
@@ -251,6 +266,7 @@ module.exports = {
   resolveNpmInvocation,
   resolveBaseSha,
   resolveProvenTree,
+  validatorErrorLines,
   validateChange,
   validatePostinstall,
   validatePreflight,

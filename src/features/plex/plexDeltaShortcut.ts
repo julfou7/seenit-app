@@ -6,6 +6,8 @@ import { extractPlexExternalIds, getStrongPlexSourceIdentity, unwrapPlexMediaIte
  * son empreinte, enregistrée seulement après une synchro entièrement validée, permet de reconnaître qu'elle
  * n'a pas changé. Sans historique nouveau ni état de bibliothèque, et avec chaque titre de la Watchlist déjà
  * suivi, le traitement complet ne changerait rien : la delta s'arrête alors après Plex.
+ * #843 : « déjà suivi » se lit sur la bibliothèque confirmée par le serveur Firestore ; sans elle (`shows` null,
+ * store encore issu du cache local), le traitement complet relit Firestore et décide.
  */
 type LibraryShow = { tmdbId?: unknown; mediaType?: unknown };
 type ResolutionCache = Record<string, { id?: unknown } | null | undefined>;
@@ -57,10 +59,10 @@ export function isUnchangedPlexDelta(input: {
   watchlistComplete: boolean;
   collectionComplete: boolean;
   previousFingerprint: unknown;
-  shows: readonly LibraryShow[];
+  shows: readonly LibraryShow[] | null;
   resolutionCache: ResolutionCache;
 }): boolean {
-  if (!input.delta || !input.watchlistComplete || !input.collectionComplete || !Array.isArray(input.watchlist)) return false;
+  if (!input.delta || !input.watchlistComplete || !input.collectionComplete || !Array.isArray(input.watchlist) || !input.shows) return false;
   if ((input.history?.length || 0) > 0 || (input.libraryWatchStates?.length || 0) > 0) return false;
   if (typeof input.previousFingerprint !== 'string' || plexWatchlistFingerprint(input.watchlist) !== input.previousFingerprint) return false;
   return isPlexWatchlistAlreadyTracked(input.watchlist, input.shows, input.resolutionCache);
