@@ -4,7 +4,7 @@ import { createRequire } from 'node:module';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
-const { extractFailureLines, formatFailureAnnotation } = require('../scripts/validate-change.cjs');
+const { extractFailureLines, formatFailureAnnotation, resolveProvenTree, validatorErrorLines } = require('../scripts/validate-change.cjs');
 
 test('SEENIT-QUALITY-008 une étape rouge publie sa cause exacte en annotation lisible par l’API', () => {
   // Sorties réelles des quatre quarantaines rouges de #809 (31/10/2026).
@@ -38,6 +38,20 @@ test('SEENIT-QUALITY-008 une étape rouge publie sa cause exacte en annotation l
   assert.match(runner, /const annotate = process\.env\.GITHUB_ACTIONS === 'true';/, 'en local, la sortie reste en direct');
   assert.match(runner, /if \(annotate\) reportFailure\(label/);
   assert.match(readFileSync('scripts/pwa-browser-smoke.cjs', 'utf8'), /::error title=PWA Browser Quality Gate::/);
+});
+
+test('SEENIT-QUALITY-008 #841 une erreur levée par le validateur lui-même est aussi annotée', () => {
+  let thrown: Error | undefined;
+  try { resolveProvenTree('pas-un-arbre'); } catch (error) { thrown = error as Error; }
+  assert.ok(thrown, 'une preuve d’arbre mal formée est refusée');
+  assert.deepEqual(validatorErrorLines(thrown, { GITHUB_ACTIONS: 'true' }), [thrown!.message], 'la cause exacte part en annotation');
+  assert.match(formatFailureAnnotation('Orchestrateur', validatorErrorLines(thrown, { GITHUB_ACTIONS: 'true' })), /^::error title=Validate Change — Orchestrateur::Preuve d’arbre pas-un-arbre/);
+  assert.equal(validatorErrorLines(Object.assign(new Error('Tests unitaires a échoué avec le code 1.'), { annotated: true }), { GITHUB_ACTIONS: 'true' }), null, 'une sous-commande déjà annotée ne l’est pas deux fois');
+  assert.equal(validatorErrorLines(thrown, {}), null, 'en local, rien ne change');
+  const runner = readFileSync('scripts/validate-change.cjs', 'utf8');
+  const main = runner.slice(runner.indexOf('function main()'));
+  assert.match(main, /const lines = validatorErrorLines\(error\);\s+if \(lines\) publishFailure\('Orchestrateur', lines\);/);
+  assert.match(runner, /error\.annotated = annotate;/);
 });
 
 test('AGENTS §0.3b documente la lecture des logs par l’API avant toute nouvelle écriture', () => {

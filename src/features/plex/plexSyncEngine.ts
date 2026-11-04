@@ -6,6 +6,7 @@ import { db, auth } from '../../lib/firebase';
 import { collection, doc, writeBatch, getDocs, getDocFromServer, runTransaction, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { tmdb } from '../shows/tmdb';
 import { fetchAuthoritativeShowsForUser, useShowsStore } from '../../store/showsStore';
+import { getServerConfirmedLibrary } from '../shows/serverConfirmedLibrary';
 import { yieldToFrame } from './plexFrameBudget'; import { isUnchangedPlexDelta, plexWatchlistFingerprint } from './plexDeltaShortcut';
 import { announcePlexSyncedItems } from './plexSyncToasts'; import { createPlexSyncId, describePlexCollect, watchPlexCollectProgress } from './plexSyncLiveProgress';
 import { type PlexSyncProgress, useSyncStore } from '../../store/syncStore';
@@ -239,7 +240,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       const hasLibraryWatchStates = Array.isArray(libraryWatchStates) && libraryWatchStates.length > 0;
       const watchlistSnapshotComplete = plexData?.integrity?.watchlistCollectionComplete === true;
 
-      const unchangedDelta = isUnchangedPlexDelta({ delta, history, libraryWatchStates, watchlist, watchlistComplete: watchlistSnapshotComplete, collectionComplete: plexData?.integrity?.collectionComplete === true, previousFingerprint: cloudPlexState.watchlistFingerprint, shows: useShowsStore.getState().shows, resolutionCache: sharedResolutionCache });
+      const unchangedDelta = isUnchangedPlexDelta({ delta, history, libraryWatchStates, watchlist, watchlistComplete: watchlistSnapshotComplete, collectionComplete: plexData?.integrity?.collectionComplete === true, previousFingerprint: cloudPlexState.watchlistFingerprint, shows: getServerConfirmedLibrary(user.uid), resolutionCache: sharedResolutionCache });
       if ((!hasHistory && !hasWatchlist && !hasLibraryWatchStates && !watchlistSnapshotComplete) || unchangedDelta) {
         if (unchangedDelta) appLogger.info('plex', `[Plex Sync] Delta sans nouveauté : Watchlist identique (${watchlist.length} titre(s)), bibliothèque non relue.`);
         const sourcesMsg = visitedSources && visitedSources.length > 0 ? ` (${visitedSources.join(', ')})` : '';
@@ -302,7 +303,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       const resolutionCache = sharedResolutionCache;
       let cacheModified = false;
-      const sessionResolutionPromises = new Map<string, Promise<any>>();
+      const sessionResolutionPromises = new Map<string, ReturnType<typeof resolvePlexItem>>();
 
       const resolveAndCachePlexItem = async (
         cacheKey: string | null,

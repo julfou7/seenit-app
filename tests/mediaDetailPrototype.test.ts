@@ -83,7 +83,7 @@ test('SEENIT-UX-019 le smoke monte les vraies fiches et vérifie leurs parcours'
   assert.match(smoke, /\['mediaDetail', client => testMediaDetailHarness\(client\)\]/);
   assert.match(smoke, /await buildMediaDetailHarness\(root\)/);
   const harness = readFileSync('scripts/media-detail-browser-checks.cjs', 'utf8');
-  for (const step of ['plus d’onglets', 'le bouton or ouvre le prochain épisode', 'genres TMDB traduits en français', 'rôle « Self » traduit et accordé', 'pastilles alignées', 'un seul Netflix', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
+  for (const step of ['Entrée sur Vu ne fait que basculer l’épisode', 'Entrée sur la ligne ouvre l’épisode sans le marquer', 'plus d’onglets', 'le bouton or ouvre le prochain épisode', 'genres TMDB traduits en français', 'rôle « Self » traduit et accordé', 'pastilles alignées', 'un seul Netflix', 'une pastille sélectionne sa saison', 'menu ⋮ : toutes les actions existantes', 'similaires : seulement avec une raison prouvée', 'soirée de trois épisodes', 'masque son résumé', '« Vu, puis E15 » marque et enchaîne', 'réaction enregistrée', 'garde 44 px']) assert.ok(harness.includes(step), step);
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.doesNotMatch(view, /handleTabChange|id="section-about"|>À propos</, 'un seul défilement, sans onglets');
 });

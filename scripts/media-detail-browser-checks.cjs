@@ -37,6 +37,10 @@ async function click(client, expression) {
   await client.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...point, button: 'left', clickCount: 1 });
   await client.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...point, button: 'left', clickCount: 1 });
 }
+async function pressEnter(client) {
+  await client.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' });
+  await client.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 });
+}
 const byText = (selector, text) => `[...document.querySelectorAll(${JSON.stringify(selector)})].find(el=>el.textContent.includes(${JSON.stringify(text)}))`;
 const byLabel = label => `document.querySelector('[aria-label=${JSON.stringify(label)}]')`;
 const geometry = '({overflow:document.documentElement.scrollWidth>innerWidth+1,width:document.documentElement.scrollWidth})';
@@ -68,6 +72,13 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.body.innerText.includes("Saison 1 · 0/13") && ' + byText('button', 'Tout marquer vu'), 'tout marquer non vu puis vu depuis la carte saison');
     await click(client, byLabel('Marquer l’épisode 1 vu'));
     await check(client, 'document.body.innerText.includes("Saison 1 · 1/13") && ' + byLabel('Marquer l’épisode 1 non vu') + '?.getAttribute("aria-pressed")==="true"', 'la coche d’une ligne bascule l’épisode');
+    // #845 : Entrée sur le bouton Vu imbriqué bascule l'épisode sans ouvrir sa fiche ; Entrée sur la ligne l'ouvre.
+    await evaluate(client, `${byLabel('Marquer l’épisode 2 vu')}.focus()`);
+    await pressEnter(client);
+    await check(client, 'document.body.innerText.includes("Saison 1 · 2/13") && !window.__mediaDetail.telemetry.opens.includes("episode:1x2")', 'Entrée sur Vu ne fait que basculer l’épisode');
+    await evaluate(client, 'document.querySelector(\'[aria-label^="Épisode 3 :"]\').focus()');
+    await pressEnter(client);
+    await check(client, 'window.__mediaDetail.telemetry.opens.includes("episode:1x3") && document.body.innerText.includes("Saison 1 · 2/13")', 'Entrée sur la ligne ouvre l’épisode sans le marquer');
     await check(client, byText('a,button,div', 'Inclus dans ton abonnement') + ' && ' + byLabel('Actualiser Plex') + ' && ' + byText('button', 'Sur Julien-NAS'), 'Où regarder en lignes avec Plex et actualisation');
     await check(client, 'document.querySelectorAll(\'[aria-labelledby=detail-cast-title] > button[aria-label^="Ouvrir la fiche"]\').length===6 && ' + byText('button', 'Afficher tout le casting (7)'), 'Personnages : six lignes puis tout le casting');
     await check(client, byText('button', 'Better Call Saul') + ' && document.body.innerText.includes("Dans le même univers")', 'univers TVDB en lignes');

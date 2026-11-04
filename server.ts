@@ -11,6 +11,8 @@ import { mapOrderedWithConcurrency } from "./src/features/runtime/orderedConcurr
 
 // SEENIT-PLEX-012 : délais de collecte sous le timeout Cloud Run (900 s) et sous ceux de l'app (12 min / 45 s).
 const PLEX_FULL_COLLECT_DEADLINE_MS = 10 * 60_000;
+/** Pages de 100 lues au plus dans l'historique PMS d'un serveur (delta et repli de la complète). */
+const PMS_HISTORY_MAX_PAGES = 50;
 /** Élément Plex brut : forme ouverte, lue champ par champ. */
 type PlexRawItem = Record<string, unknown>;
 interface PlexConnectionResource { uri?: string; local?: boolean; relay?: boolean }
@@ -1584,17 +1586,19 @@ async function startServer() {
           let connectionInventoryCount = 0;
           let historyFoundOnConnection = 0;
           const historyHeaders = { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken };
-          const onHistoryPage = (count: number) => syncProgress.serverItems(serverId, count);
+          // #848 : en complète, l'historique PMS (repli sans historique du compte) entre aussi au dénominateur, borné
+          // aux pages réellement lues ; en delta, son totalSize couvre tout l'historique et fausserait le %.
+          const onHistoryPage = (count: number, totalSize?: number) => syncProgress.serverItems(serverId, count, delta || totalSize === undefined ? undefined : Math.min(totalSize, PMS_HISTORY_MAX_PAGES * 100));
 
           if (delta || usePmsHistoryInFull) {
             try {
-              const items = await fetchPlexPages(`${uri}/status/sessions/history/all?sort=viewedAt:desc`, historyHeaders, serverTimeout, 50, delta ? Number(since) || undefined : undefined, undefined, { onPage: onHistoryPage });
+              const items = await fetchPlexPages(`${uri}/status/sessions/history/all?sort=viewedAt:desc`, historyHeaders, serverTimeout, PMS_HISTORY_MAX_PAGES, delta ? Number(since) || undefined : undefined, undefined, { onPage: onHistoryPage });
               connectionHistoryComplete = true;
               for (const it of items) connectionRawItems.push({ raw: it, source: serverName, sourceKind: 'pms-history', serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
               historyFoundOnConnection = items.length;
-            } catch (error: any) {
-              lastFailure = error?.message || error;
-              console.log(`[Plex Sync] Historique PMS inaccessible sur ${serverName}: ${error?.message || error}`);
+            } catch (error: unknown) {
+              // La cause remonte dans la raison du serveur ignoré (log « Serveurs synchronisés … ignorés »).
+              lastFailure = error instanceof Error ? error.message : error;
             }
           }
 
@@ -1605,9 +1609,8 @@ async function startServer() {
               const items = await fetchPlexPages(`${uri}/library/recentlyViewed?includeGuids=1`, historyHeaders, serverTimeout, 10, Number(since) || undefined, undefined, { onPage: onHistoryPage });
               connectionHistoryComplete = true;
               for (const it of items) connectionRawItems.push({ raw: it, source: serverName, sourceKind: 'pms-recent-fallback', serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
-            } catch (error: any) {
-              lastFailure = error?.message || error;
-              console.log(`[Plex Sync] Recently viewed inaccessible sur ${serverName}: ${error?.message || error}`);
+            } catch (error: unknown) {
+              lastFailure = error instanceof Error ? error.message : error;
             }
           }
 
@@ -1954,6 +1957,10 @@ async function startServer() {
         syncProgress.setEnrich(++enrichedCount, allRawItems.length);
         return enriched;
       });
+
+      // #847 : le délai global peut expirer pendant l'enrichissement ; les entrées dont l'état courant n'a pu être lu
+      // sont alors écartées à la normalisation. La collecte reste donc incomplète et le curseur n'est pas validé.
+      if (collectDeadline.aborted) incompleteSources.add('délai de collecte dépassé');
 
       // 5. Normaliser sans aucune déduplication par titre ou année.
       // La déduplication fiable a lieu côté client après résolution du TMDB ID.

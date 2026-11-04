@@ -1112,6 +1112,10 @@
         },
         {
           "file": "tests/plexDeltaShortcut.test.ts",
+          "contains": "SEENIT-PLEX-011 #843 le raccourci ne lit que la bibliothèque confirmée par le serveur Firestore"
+        },
+        {
+          "file": "tests/plexDeltaShortcut.test.ts",
           "contains": "SEENIT-PLEX-011 un titre Watchlist sans TMDB direct est reconnu par le cache de résolution"
         },
         {
@@ -1136,6 +1140,10 @@
         {
           "file": "tests/plexSyncProgress.test.ts",
           "contains": "SEENIT-PLEX-012 calcule un vrai pourcentage, jamais inventé, qui ne recule pas"
+        },
+        {
+          "file": "tests/plexSyncProgress.test.ts",
+          "contains": "SEENIT-PLEX-012 garde le curseur si le délai expire pendant l’enrichissement"
         },
         {
           "file": "tests/plexSyncProgress.test.ts",
@@ -2716,6 +2724,10 @@
           "contains": "SEENIT-QUALITY-008 une étape rouge publie sa cause exacte en annotation lisible par l’API"
         },
         {
+          "file": "tests/ciFailureAnnotations.test.ts",
+          "contains": "SEENIT-QUALITY-008 #841 une erreur levée par le validateur lui-même est aussi annotée"
+        },
+        {
           "file": "tests/ciValidationPerformance.test.ts",
           "contains": "SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exact de confiance"
         },
@@ -2955,6 +2967,10 @@
         {
           "file": "tests/mediaDetailPerformance.test.ts",
           "contains": "SEENIT-PERF-001 réutilise les détails et relations sans nouveau chargement"
+        },
+        {
+          "file": "tests/tmdbDetailsMemoryTtl.test.ts",
+          "contains": "SEENIT-PERF-001 #755 révalide un détail chaud au-delà du TTL"
         },
         {
           "file": "tests/mediaDetailPerformance.test.ts",

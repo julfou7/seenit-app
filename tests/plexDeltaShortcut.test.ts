@@ -52,3 +52,69 @@ test('SEENIT-PLEX-011 le backend lance Watchlist, activité cloud et serveurs en
   assert.match(server, /serversTask\.catch\(\(\) => undefined\)/, 'aucun rejet orphelin si la découverte échoue pendant l’attente');
   assert.match(server, /visitedSources\.unshift\(watchlistVisited\)/, 'la Watchlist reste la première source listée');
 });
+
+test('SEENIT-PLEX-011 #843 le raccourci ne lit que la bibliothèque confirmée par le serveur Firestore', async () => {
+  const { build } = await import('esbuild');
+  const vm = await import('node:vm');
+  const { createRequire } = await import('node:module');
+  const bundle = await build({ stdin: { contents: "export * from './src/store/showsStore.ts'; export { getServerConfirmedLibrary } from './src/features/shows/serverConfirmedLibrary.ts';", resolveDir: process.cwd(), loader: 'ts' }, bundle: true, write: false, platform: 'node', format: 'cjs', external: ['zustand'],
+    plugins: [{ name: 'shows-listener-ports', setup(builder) {
+      builder.onResolve({ filter: /^@capacitor\/(?:app|core)$|^firebase\/firestore$|\/(?:firebase|firebaseErrors|syncStore|logStore|utils)$/ }, args => ({ path: args.path, namespace: 'ports' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: `
+        export const auth={currentUser:{uid:'a'},onAuthStateChanged:()=>{}};
+        export const Capacitor={isNativePlatform:()=>false};export const App={addListener:()=>Promise.resolve({remove(){}})};
+        export const db={}; export const collection=(...x)=>x;export const query=(...x)=>x;
+        export const getDocs=async()=>({docs:[]});export const getDocsFromCache=getDocs;export const getDocsFromServer=getDocs;
+        export const doc=(...x)=>x;export const writeBatch=()=>({set(){},commit:async()=>{}});
+        export const onSnapshot=(_ref,options,next)=>{globalThis.__listener={options,next};return()=>{};};
+        export const handleFirestoreError=()=>{};export const OperationType={};export const useSyncStore={getState:()=>({})};
+        export const appLogger={info(){},warn(){},error(){},debug(){}};export const getNextEpisodeNumber=()=>null;export const checkIsUpToDate=()=>false;
+      ` }));
+    } }],
+  });
+  const timers = new Map<number, () => void>(), idle = new Map<number, () => void>();
+  let sequence = 0;
+  const win = Object.assign(new EventTarget(), { setTimeout: (fn: () => void) => { timers.set(++sequence, fn); return sequence; }, clearTimeout: (id: number) => timers.delete(id),
+    requestIdleCallback: (fn: () => void) => { idle.set(++sequence, fn); return sequence; }, cancelIdleCallback: (id: number) => idle.delete(id) });
+  type ListenerExports = { setupRealtimeShowsListener: (uid: string) => void; getServerConfirmedLibrary: (uid: string) => Array<{ tmdbId: number }> | null; useShowsStore: { getState: () => { shows: unknown[] } } };
+  const bundleModule = { exports: {} as ListenerExports };
+  const sandbox: Record<string, unknown> = { module: bundleModule, require: createRequire(import.meta.url), window: win, document: Object.assign(new EventTarget(), { visibilityState: 'visible' }), Event, CustomEvent, console,
+    setTimeout: win.setTimeout, clearTimeout: win.clearTimeout, localStorage: { getItem: () => null, setItem() {}, removeItem() {} } };
+  vm.runInContext(bundle.outputFiles[0].text, vm.createContext(sandbox));
+  const exports = bundleModule.exports;
+  const flush = () => { for (const pool of [timers, idle]) { const pending = [...pool.values()]; pool.clear(); pending.forEach(fn => fn()); } };
+  const snapshot = (ids: number[], metadata: { fromCache: boolean; hasPendingWrites?: boolean }, changes: number) => ({ metadata: { hasPendingWrites: false, ...metadata },
+    forEach: (fn: (doc: { id: string; data: () => unknown }) => void) => ids.forEach(id => fn({ id: `tv-${id}`, data: () => ({ tmdbId: id, mediaType: 'tv', title: `Série ${id}` }) })),
+    docChanges: () => Array.from({ length: changes }) });
+
+  exports.setupRealtimeShowsListener('a');
+  const listener = sandbox.__listener as { options: { includeMetadataChanges?: boolean }; next: (s: unknown) => void };
+  assert.equal(listener.options.includeMetadataChanges, true, 'le passage cache → serveur est signalé même sans document modifié');
+  const confirmed = () => { const library = exports.getServerConfirmedLibrary('a'); return library ? Array.from(library, show => show.tmdbId) : null; };
+
+  listener.next(snapshot([1, 2], { fromCache: true }, 2));
+  assert.equal(exports.useShowsStore.getState().shows.length, 2, 'premier rendu immédiat depuis le cache local');
+  assert.equal(confirmed(), null, 'un instantané du cache local ne fonde aucune décision');
+  flush();
+  listener.next(snapshot([1, 2], { fromCache: false }, 0));
+  assert.deepEqual(confirmed(), [1, 2], 'confirmation serveur immédiate');
+  assert.equal(timers.size + idle.size, 0, 'sans nouvelle fusion ni sauvegarde de la bibliothèque');
+  assert.equal(exports.getServerConfirmedLibrary('b'), null, 'jamais la bibliothèque d’un autre compte');
+
+  // Un autre appareil supprime la série 2 : tant que l'instantané n'est pas appliqué, rien n'est confirmé.
+  listener.next(snapshot([1], { fromCache: false }, 1));
+  assert.equal(confirmed(), null);
+  flush();
+  assert.deepEqual(confirmed(), [1]);
+  const base = { delta: true, history: [], libraryWatchStates: [], watchlist: [show(1), show(2)], watchlistComplete: true, collectionComplete: true, previousFingerprint: plexWatchlistFingerprint([show(1), show(2)]), resolutionCache: {} };
+  assert.equal(isUnchangedPlexDelta({ ...base, shows: exports.getServerConfirmedLibrary('a') }), false, 'la série supprimée ailleurs mais toujours en Watchlist est réimportée');
+
+  listener.next(snapshot([1, 2], { fromCache: false, hasPendingWrites: true }, 1));
+  flush();
+  assert.equal(confirmed(), null, 'une écriture locale non confirmée ne vaut pas état serveur');
+  assert.equal(isUnchangedPlexDelta({ ...base, shows: null }), false, 'sans bibliothèque confirmée, le traitement complet relit Firestore');
+
+  const engine = readFileSync('src/features/plex/plexSyncEngine.ts', 'utf8');
+  assert.match(engine, /shows: getServerConfirmedLibrary\(user\.uid\)/);
+  assert.doesNotMatch(engine.slice(engine.indexOf('const unchangedDelta'), engine.indexOf('const unchangedDelta') + 400), /useShowsStore/);
+});
