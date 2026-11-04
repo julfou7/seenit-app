@@ -514,6 +514,18 @@ aucun bouton de téléchargement n'est plus affiché dans les fiches. Depuis les
 or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, genres et thèmes sont sous le synopsis, tout est
 traduit (genres, « Self »), Où regarder n'affiche qu'un Netflix, la barre de navigation reste visible sur la
 fiche et une seule fiche acteur est utilisée partout (fiches, Explorer, Moi, À voir).
+Depuis les retours de la v1.4.251 (#857) :
+- la note TMDB, l'âge et le bouton entier **Bande-annonce** sont en tête de fiche, au-dessus de
+  **Marquer vu** (film) ou de la carte de progression (série) ;
+- un film se suit et se marque vu en un clic chacun : **Suivre le film** (puis « ✓ Suivi ») est aussi large
+  que **Marquer vu** ;
+- « Fin à » n'affiche plus l'heure courante ni « Fini X min avant minuit », et la soirée de l'épisode non
+  plus l'heure courante ;
+- le bouton **Vu** des épisodes, en liste comme dans la fiche épisode, est celui de l'Accueil (anneau SeenIt
+  animé) ;
+- un épisode à venir reste net et dit quand il sort (« Demain », « Dans 5 jours », « Dans 12 jours ·
+  16 nov. ») ;
+- la fiche épisode charge avec un squelette à son gabarit actuel.
 
 Les bandes-annonces Film, Série, saisons, Explorer et actualités utilisent le même lecteur. Le nom courant
 et une seule ligne nature/langue restent lisibles dans l'en-tête ; lorsqu'il existe plusieurs vidéos, leur
