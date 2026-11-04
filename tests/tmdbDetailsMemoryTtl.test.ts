@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
 import { PUBLIC_METADATA_CACHE_POLICIES } from '../src/features/shows/publicMetadataCache.ts';
 
 type ShowResult = { ok: boolean; value: { seasons: Array<{ episode_count: number }>; similar?: unknown } };
 type Facade = {
   getShowDetails: (id: number, refresh?: boolean) => Promise<ShowResult>;
   peekMediaDetails: (id: number, type?: string) => ShowResult['value'] | null;
+  isMediaDetailsStale: (id: number, type?: string) => boolean;
+  getMediaDetailsRevalidateAt: (id: number, type?: string) => number | null;
 };
 
 /**
@@ -82,4 +85,33 @@ test('SEENIT-PERF-001 #755 révalide un détail chaud au-delà du TTL en un seul
   ports.episodes = 9;
   assert.equal((await client.getShowDetails(42)).value.seasons[0].episode_count, 9, 'le réseau revenu, la révalidation reprend');
   assert.equal(ports.calls, 4);
+});
+
+test('SEENIT-PERF-001 #851 une fiche restée ouverte au-delà du TTL relit ses détails d’elle-même', async () => {
+  const { clock, ports, exports } = await loadFacade();
+  const client = exports.tmdb;
+  assert.equal(client.getMediaDetailsRevalidateAt(42, 'tv'), null, 'rien à surveiller avant le premier chargement');
+  assert.equal(client.isMediaDetailsStale(42, 'tv'), false);
+  await client.getShowDetails(42);
+  assert.equal(client.getMediaDetailsRevalidateAt(42, 'tv'), clock.now + exports.MEDIA_DETAILS_MEMORY_FRESH_MS, 'la fiche connaît l’échéance de son détail');
+  assert.equal(client.isMediaDetailsStale(42, 'tv'), false);
+  clock.now += exports.MEDIA_DETAILS_MEMORY_FRESH_MS + 1;
+  ports.episodes = 10;
+  assert.equal(client.isMediaDetailsStale(42, 'tv'), true, 'échéance dépassée : la fiche ouverte doit relire');
+  assert.equal(client.peekMediaDetails(42, 'tv')?.seasons[0].episode_count, 6, 'sans relecture, le contenu reste affiché');
+  assert.equal((await client.getShowDetails(42)).value.seasons[0].episode_count, 10);
+  assert.equal(client.isMediaDetailsStale(42, 'tv'), false);
+  assert.equal(client.getMediaDetailsRevalidateAt(42, 'tv'), clock.now + exports.MEDIA_DETAILS_MEMORY_FRESH_MS, 'nouvelle échéance après la relecture');
+
+  // L'écran monté déclenche la relecture : minuteur sur l'échéance et retour au premier plan (heure murale).
+  const screen = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
+  const trigger = readFileSync('src/screens/mediaDetail/useDetailsRevalidation.ts', 'utf8');
+  assert.match(screen, /const detailsRevalidation = useDetailsRevalidation\(effectiveTmdbId, requestedMediaKey, requestedMediaType, tmdbDetails\);/, 'l’échéance est recalculée après chaque nouveau détail');
+  assert.ok(trigger.indexOf('tmdb.isMediaDetailsStale(id, mediaType)') > 0);
+  assert.match(trigger, /window\.setTimeout\(revalidateIfStale, Math\.max\(1000, revalidateAt - Date\.now\(\) \+ 50\)\)/);
+  assert.match(trigger, /document\.addEventListener\('visibilitychange', revalidateIfStale\)/);
+  assert.match(trigger, /document\.removeEventListener\('visibilitychange', revalidateIfStale\)/);
+  assert.match(trigger, /\}, \[tmdbId, mediaKey, mediaType, details\]\);/);
+  const fetchEffect = screen.slice(screen.indexOf('const fetchDetails = async () => {'));
+  assert.match(fetchEffect.slice(0, 2000), /\}, \[effectiveTmdbId, requestedMediaKey, requestedMediaType, detailsRevalidation\]\);/, 'la relecture passe par le chargement réel et sa propagation à la vue');
 });

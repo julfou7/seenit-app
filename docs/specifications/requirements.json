@@ -2973,6 +2973,10 @@
           "contains": "SEENIT-PERF-001 #755 révalide un détail chaud au-delà du TTL"
         },
         {
+          "file": "tests/tmdbDetailsMemoryTtl.test.ts",
+          "contains": "SEENIT-PERF-001 #851 une fiche restée ouverte au-delà du TTL relit ses détails d’elle-même"
+        },
+        {
           "file": "tests/mediaDetailPerformance.test.ts",
           "contains": "SEENIT-PERF-001 sépare les caches movie et tv et borne leur taille"
         },

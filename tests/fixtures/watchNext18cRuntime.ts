@@ -114,6 +114,9 @@ export const tmdb = {
   peekMediaDetails: (id: number) => ({ runtime: durations[id - 100] ?? null, release_date: '2024-01-01', credits: id === 102 ? undefined : {cast: id < 100 ? [{id:501,name:'Sean Astin',character:'Bob',order:0}] : [{id:502,name:'Premier Rôle',order:0},{id:501,name:'Sean Astin',character:'Mikey Walsh',order:1}] } }),
 
   peekRenderableMediaDetails: (id: number) => tmdb.peekMediaDetails(id),
+  // #851 : échéance de révalidation lue par la fiche ouverte.
+  isMediaDetailsStale: () => false,
+  getMediaDetailsRevalidateAt: () => null,
 
   primeMediaRenderSnapshotFromPersistentCache: async () => { telemetry.actorPrimes++; return true; },
 

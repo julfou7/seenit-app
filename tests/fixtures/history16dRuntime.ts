@@ -32,6 +32,9 @@ export const openPlexWatchUrl = async () => { telemetry.playback.push('plex'); }
 const providers = { results: { FR: { link: 'https://www.themoviedb.org/tv/42/watch', flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: 'http://127.0.0.1:4173/__history-provider.svg' }] } } };
 export const tmdb = {
   peekRenderableMediaDetails: (_id: number, type: string) => _id===901 ? {episode_run_time:[29]} : type==='tv' ? {episode_run_time:[47]} : {runtime:169},
+  // #851 : échéance de révalidation lue par la fiche ouverte.
+  isMediaDetailsStale: () => false,
+  getMediaDetailsRevalidateAt: () => null,
   peekWatchProviders: () => providers,
   getWatchProviders: async () => { telemetry.providerRequests++; throw new Error('Requête fournisseur directe interdite'); },
   getEpisodeDetails: async (_id: number, season: number, episode: number) => ({ ok: true, value: { name: episode === 14 ? 'Ozymandias' : 'Confessions', runtime: _id===901 ? episode===1 ? 29 : 30 : 47, still_path: 'http://127.0.0.1:4173/__8f-backdrop.svg', air_date: '2013-01-01', season_number: season, episode_number: episode } }),
