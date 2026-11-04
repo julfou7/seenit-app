@@ -119,3 +119,9 @@ export function upcomingEpisodeLabel(airDate: string, today: string): string {
   const date = new Date(target).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'UTC' });
   return `Dans ${days} jours · ${date}`;
 }
+
+/**
+ * #858 : le bouton Vu attend la vraie mutation (écriture, calcul du prochain épisode) avant son état final ;
+ * il n'anime le succès qu'une fois l'action terminée, et pas si elle renvoie explicitement `false`.
+ */
+export const settleSeenToggle = (result: unknown): Promise<false | undefined> => Promise.resolve(result).then(value => (value === false ? false : undefined));

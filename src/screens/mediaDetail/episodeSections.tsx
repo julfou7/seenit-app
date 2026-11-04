@@ -3,16 +3,17 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
+import { settleSeenToggle } from '../../features/shows/detailPlanning';
 
 /** SEENIT-UX-019 — Sections de la fiche épisode du prototype (« Pellicule + courbe »). */
-export function EpisodeHeaderBlock({ code, title, airLabel, meta, isSeen, isFuture, futureLabel, onToggle }: { code: string; title: string; airLabel: string; meta: string; isSeen: boolean; isFuture: boolean; futureLabel: string; onToggle: () => void }) {
+export function EpisodeHeaderBlock({ code, title, airLabel, meta, isSeen, isFuture, futureLabel, onToggle }: { code: string; title: string; airLabel: string; meta: string; isSeen: boolean; isFuture: boolean; futureLabel: string; onToggle: () => unknown }) {
   const state = isSeen ? '✓ Vu' : isFuture ? futureLabel : 'À voir';
   return <div className="flex items-end gap-3">
     <div className="flex-1 min-w-0 flex flex-col gap-1"><span className="text-[13px] font-extrabold text-[#E5A93D]">{code}</span><h1 className="text-[30px] font-extrabold leading-[1.08] tracking-[-0.03em] text-white">{title}</h1><span className="text-[13px] text-zinc-300">{airLabel}</span>{meta && <span className="text-[13px] text-zinc-400">{meta}</span>}</div>
     {/* #857 : même bouton Vu que l'Accueil (anneau SeenIt animé), plus de pictogramme TV. Un épisode à venir
         ouvre d'abord la confirmation : pas d'animation tant qu'il n'est pas réellement marqué. */}
     <div className="w-[68px] shrink-0 flex flex-col items-center gap-1">
-      <SeenItCheckButton isWatched={isSeen} title={isSeen ? 'Vu · toucher pour annuler' : isFuture ? `Pas encore diffusé · ${futureLabel}` : 'Marquer vu'} onClick={() => { onToggle(); return isFuture && !isSeen ? false : undefined; }} />
+      <SeenItCheckButton isWatched={isSeen} title={isSeen ? 'Vu · toucher pour annuler' : isFuture ? `Pas encore diffusé · ${futureLabel}` : 'Marquer vu'} onClick={() => (isFuture && !isSeen ? (void onToggle(), false) : settleSeenToggle(onToggle()))} />
       <span className={cn('text-[11px] font-extrabold whitespace-nowrap', isSeen ? 'text-[#F2C36B]' : 'text-zinc-400')}>{state}</span>
     </div>
   </div>;
@@ -54,7 +55,7 @@ export function SeasonCurveCard({ label, rankLabel, cells }: { label: string; ra
 }
 
 /** Résumé masqué tant que l'épisode précédent n'est pas vu (anti-spoiler du prototype), révélable au toucher. */
-export function SpoilerSynopsis({ text, hidden, why, onReveal, expanded, onToggle }: { text?: string | null; hidden: boolean; why: string; onReveal: () => void; expanded: boolean; onToggle: () => void }) {
+export function SpoilerSynopsis({ text, hidden, why, onReveal, expanded, onToggle }: { text?: string | null; hidden: boolean; why: string; onReveal: () => void; expanded: boolean; onToggle: () => unknown }) {
   if (!text) return null;
   if (hidden) return <button type="button" onClick={onReveal} className="flex items-center gap-3 p-3.5 rounded-2xl bg-[rgba(24,24,27,0.7)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] text-left"><span className="text-[20px]" aria-hidden="true">🙈</span><span className="flex-1 flex flex-col gap-0.5"><span className="text-[14px] font-bold text-white">Résumé masqué</span><span className="text-[12px] text-zinc-400">{why} · toucher pour afficher</span></span></button>;
   const long = text.length > 220;

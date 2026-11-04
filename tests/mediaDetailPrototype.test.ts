@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { averageRating, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
+import { averageRating, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
 import { buildVerifiedSimilar, directedMovies, movieIdsFromCredits, similarReasonFor } from '../src/features/shows/similarReasons.ts';
 
 test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée', () => {
@@ -135,4 +135,16 @@ test('SEENIT-UX-019 #857 un épisode à venir dit quand il sort, en relatif et d
   assert.match(header, /<SeenItCheckButton isWatched=\{isSeen\}/);
   assert.doesNotMatch(readFileSync('src/screens/mediaDetail/detailUi.tsx', 'utf8'), /SeenItCheckGlyph/, 'le pictogramme TV a disparu');
   assert.doesNotMatch(readFileSync('src/screens/mediaDetail/movieSections.tsx', 'utf8'), /il est \{formatClock|beforeMidnight\} min avant minuit/, 'ni « il est », ni « Fini X min avant minuit »');
+});
+
+test('SEENIT-UX-019 #858 le bouton Vu attend la vraie mutation avant d’annoncer le succès', async () => {
+  let finished = false;
+  const pending = settleSeenToggle(new Promise<void>(resolve => setTimeout(() => { finished = true; resolve(); }, 20)));
+  assert.equal(await pending, undefined);
+  assert.equal(finished, true, 'le bouton reste en attente jusqu’à la fin de l’écriture');
+  assert.equal(await settleSeenToggle(false), false, 'un échec explicite n’anime pas le succès');
+  await assert.rejects(settleSeenToggle(Promise.reject(new Error('Firestore'))), /Firestore/, 'une erreur n’est jamais transformée en succès');
+  assert.match(readFileSync('src/screens/mediaDetail/seriesSections.tsx', 'utf8'), /onClick=\{event => settleSeenToggle\(onToggleEpisode\(event, episode\.episode_number\)\)\}/);
+  assert.match(readFileSync('src/screens/mediaDetail/episodeSections.tsx', 'utf8'), /settleSeenToggle\(onToggle\(\)\)/);
+  assert.match(readFileSync('src/screens/EpisodeDetailModalCore.tsx', 'utf8'), /const handleMainButtonClick = \(\) => \{[\s\S]*?return toggleSeen\(\);/);
 });

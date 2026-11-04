@@ -99,6 +99,10 @@
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 #858 le bouton Vu attend la vraie mutation avant d’annoncer le succès"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules notes TMDB connues"
         },
         {

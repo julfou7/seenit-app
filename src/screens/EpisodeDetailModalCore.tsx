@@ -796,14 +796,13 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
 
   const relativeAirDateLabel = getRelativeAirDateLabel();
 
+  // #858 : la promesse remonte au bouton Vu, qui n'anime le succès qu'une fois le marquage terminé.
   const handleMainButtonClick = () => {
-    if (isSeen) {
-      toggleSeen();
-    } else if (isFutureEpisode) {
+    if (isFutureEpisode && !isSeen) {
       setShowFutureConfirm(true);
-    } else {
-      toggleSeen();
+      return false;
     }
+    return toggleSeen();
   };
 
   const buildRedditQuery = (communitySeriesTitle?: string | null) =>
