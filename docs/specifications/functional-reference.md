@@ -526,6 +526,9 @@ Depuis les retours de la v1.4.251 (#857) :
 - un épisode à venir reste net et dit quand il sort (« Demain », « Dans 5 jours », « Dans 12 jours ·
   16 nov. ») ;
 - la fiche épisode charge avec un squelette à son gabarit actuel.
+Depuis les retours de la v1.4.252 (#859), le film n'a qu'un bouton à états (Suivre le film → Marquer vu → ✓ Vu ·
+annuler) suivi des tuiles diffuseur et Plex comme la série, et le bouton Vu des fiches anime dès le toucher, de
+façon fluide (compositeur), sans s'atténuer pendant l'enregistrement.
 
 Les bandes-annonces Film, Série, saisons, Explorer et actualités utilisent le même lecteur. Le nom courant
 et une seule ligne nature/langue restent lisibles dans l'en-tête ; lorsqu'il existe plusieurs vidéos, leur

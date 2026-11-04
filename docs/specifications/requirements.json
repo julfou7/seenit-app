@@ -103,6 +103,10 @@
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",
+          "contains": "SEENIT-UX-019 #859 film à bouton unique et anneau Vu sur le compositeur"
+        },
+        {
+          "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules notes TMDB connues"
         },
         {

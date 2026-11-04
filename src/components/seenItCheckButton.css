@@ -9,3 +9,32 @@
 @keyframes brandCheckRing { from{stroke-dashoffset:239} to{stroke-dashoffset:0} }
 @keyframes brandCheckTick { 0%{stroke-dashoffset:1;opacity:0} 1%{opacity:1} 100%{stroke-dashoffset:0;opacity:1} }
 @media(prefers-reduced-motion:reduce){.brand-ring-fill,.brand-ring-tick { animation:none!important;transition:none!important; }}
+/* #859 — Mode compositeur (fiches) : pas d'atténuation pendant l'attente ; l'anneau SVG reste en piste grise et
+   la célébration passe par des calques HTML animés uniquement en transform/opacity. */
+.seenit-check--compositor[aria-busy=true]:disabled { opacity:1; cursor:progress; }
+.seenit-check--compositor[data-celebrate=true] .brand-ring-fill,
+.seenit-check--compositor[data-celebrate=true] .brand-ring-tick { opacity:0; animation:none; transition:none; }
+.seenit-check__sweep { position:absolute; left:50%; top:50%; width:42px; height:42px; margin:-21px 0 0 -21px; pointer-events:none; }
+.seenit-check__sweep svg { display:block; width:100%; height:100%; }
+.seenit-check__half { position:absolute; top:0; width:50%; height:100%; overflow:hidden; }
+.seenit-check__half--right { left:50%; }
+.seenit-check__half--left { left:0; }
+.seenit-check__window { position:absolute; top:0; width:100%; height:100%; overflow:hidden; will-change:transform; }
+.seenit-check__half--right .seenit-check__window { left:-100%; transform-origin:100% 50%; animation:seenitSweep 380ms cubic-bezier(.35,0,.7,.9) both; }
+.seenit-check__half--left .seenit-check__window { left:100%; transform-origin:0 50%; animation:seenitSweep 380ms cubic-bezier(.3,.1,.3,1) 380ms both; }
+.seenit-check__ring { position:absolute; top:0; width:200%; height:100%; transform-origin:50% 50%; will-change:transform; }
+.seenit-check__half--right .seenit-check__ring { left:0; animation:seenitSweepCounter 380ms cubic-bezier(.35,0,.7,.9) both; }
+.seenit-check__half--left .seenit-check__ring { left:-100%; animation:seenitSweepCounter 380ms cubic-bezier(.3,.1,.3,1) 380ms both; }
+/* La coche se « dessine » de gauche à droite : la fenêtre glisse, l'encre glisse en sens inverse et reste en place. */
+.seenit-check__tick { position:absolute; inset:0; overflow:hidden; }
+.seenit-check__tick-window { position:absolute; inset:0; overflow:hidden; will-change:transform; animation:seenitTickWipe 240ms ease-out 760ms both; }
+.seenit-check__tick-ink { position:absolute; inset:0; will-change:transform; animation:seenitTickInk 240ms ease-out 760ms both; }
+@keyframes seenitSweep { from { transform:rotate(0); } to { transform:rotate(180deg); } }
+@keyframes seenitSweepCounter { from { transform:rotate(0); } to { transform:rotate(-180deg); } }
+@keyframes seenitTickWipe { from { transform:translateX(-74%); } to { transform:none; } }
+@keyframes seenitTickInk { from { transform:translateX(74%); } to { transform:none; } }
+@media (prefers-reduced-motion:reduce) {
+  .seenit-check__sweep { display:none; }
+  .seenit-check--compositor[data-celebrate=true] .brand-ring-fill,
+  .seenit-check--compositor[data-celebrate=true] .brand-ring-tick { opacity:1; }
+}

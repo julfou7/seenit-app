@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
+import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
 import { settleSeenToggle } from '../../features/shows/detailPlanning';
 
 /** SEENIT-UX-019 — Sections de la fiche épisode du prototype (« Pellicule + courbe »). */
@@ -13,7 +14,7 @@ export function EpisodeHeaderBlock({ code, title, airLabel, meta, isSeen, isFutu
     {/* #857 : même bouton Vu que l'Accueil (anneau SeenIt animé), plus de pictogramme TV. Un épisode à venir
         ouvre d'abord la confirmation : pas d'animation tant qu'il n'est pas réellement marqué. */}
     <div className="w-[68px] shrink-0 flex flex-col items-center gap-1">
-      <SeenItCheckButton isWatched={isSeen} title={isSeen ? 'Vu · toucher pour annuler' : isFuture ? `Pas encore diffusé · ${futureLabel}` : 'Marquer vu'} onClick={() => (isFuture && !isSeen ? (void onToggle(), false) : settleSeenToggle(onToggle()))} />
+      <SeenItCheckButton {...(isFuture && !isSeen ? {} : { className: 'seenit-check--compositor', celebrationLayer: <CompositorCelebration /> })} isWatched={isSeen} title={isSeen ? 'Vu · toucher pour annuler' : isFuture ? `Pas encore diffusé · ${futureLabel}` : 'Marquer vu'} onClick={() => (isFuture && !isSeen ? (void onToggle(), false) : settleSeenToggle(onToggle()))} />
       <span className={cn('text-[11px] font-extrabold whitespace-nowrap', isSeen ? 'text-[#F2C36B]' : 'text-zinc-400')}>{state}</span>
     </div>
   </div>;
