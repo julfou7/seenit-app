@@ -27,7 +27,8 @@ export const PARENTAL_BATCH_MAX_ITEMS = 40;
 export const PARENTAL_BATCH_MAX_CONCURRENT = 24;
 export const PARENTAL_BATCH_STALL_BURST_CONCURRENT = PARENTAL_BATCH_MAX_ITEMS;
 export const PARENTAL_BATCH_STALL_BURST_MS = 1_000;
-export const PARENTAL_BATCH_ITEM_BUDGET_PER_MINUTE = 240;
+// #853 : âges de la page suivante pré-résolus et preuves cinéma partagent ce quota (TMDB tolère ~50 req/s).
+export const PARENTAL_BATCH_ITEM_BUDGET_PER_MINUTE = 480;
 export const PARENTAL_BATCH_PROVIDER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PARENTAL_BATCH_PROVIDER_CACHE_MAX_ENTRIES = 5_000;
 export const PARENTAL_BATCH_MOVIE_DETAILS_SCHEMA = 2;
@@ -141,10 +142,10 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     TVDB_API_KEY: process.env.TVDB_API_KEY,
   }));
   const budgets = new Map<string, { used: number; resetAt: number }>();
-  const providerCache = new Map<string, { details: any; expiresAt: number }>();
+  const providerCache = new Map<string, { details: unknown; expiresAt: number }>();
   let providerCacheCredential = '';
 
-  const readProviderCache = (key: string): any | null => {
+  const readProviderCache = (key: string): unknown => {
     const current = now();
     const entry = providerCache.get(key);
     if (!entry) return null;
@@ -156,7 +157,7 @@ export function registerParentalRatingBatchRoute(app: Application, dependencies:
     providerCache.set(key, entry);
     return entry.details;
   };
-  const writeProviderCache = (key: string, details: any) => {
+  const writeProviderCache = (key: string, details: unknown) => {
     providerCache.delete(key);
     providerCache.set(key, { details, expiresAt: now() + PARENTAL_BATCH_PROVIDER_CACHE_TTL_MS });
     while (providerCache.size > PARENTAL_BATCH_PROVIDER_CACHE_MAX_ENTRIES) {

@@ -58,7 +58,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
   ];
   return <div className="explorer-root relative flex-1 h-full max-w-2xl mx-auto w-full overflow-hidden flex flex-col" data-discover-search-mode={isSearchMode} inert={Boolean(selectedCharacter)}>
     {isOffline && <div className="explorer-offline"><WifiOff size={14} />Mode hors ligne · contenus en cache</div>}
-    <div ref={containerRef} className="explorer-scroll flex-1 overflow-y-auto hide-scrollbar pb-nav">
+    <div ref={containerRef} data-watch-provider-root="" className="explorer-scroll flex-1 overflow-y-auto hide-scrollbar pb-nav">
       {showHeroSurface && loading && !visibleHeroItems.length && <HeroSkeleton />}
       {showHeroSurface && visibleHeroItems.length > 0 && <div className="explorer-hero">
         <div ref={heroCarouselRef} onScroll={handleHeroScroll} className="flex w-full overflow-x-auto snap-x snap-mandatory hide-scrollbar">

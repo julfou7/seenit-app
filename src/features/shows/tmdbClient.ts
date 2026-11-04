@@ -35,6 +35,51 @@ export const EPISODE_DETAILS_CACHE_MAX_ENTRIES = 120;
 export const MEDIA_DETAILS_MEMORY_FRESH_MS = 24 * 60 * 60 * 1000;
 /** Après une révalidation en échec, le contenu connu est resservi sans nouvel appel pendant ce délai. */
 export const MEDIA_DETAILS_REVALIDATION_RETRY_MS = 5 * 60 * 1000;
+/**
+ * #853 — Fraîcheur d'Explorer. Une sortie de la semaine a rarement 50 votes TMDB : les listes de tendance
+ * gardent dès 10 votes. Le complément « populaire » se limite aux films sortis depuis 18 mois et aux séries
+ * dont un épisode a été diffusé ces 60 derniers jours, au lieu de tout le catalogue depuis 2016.
+ */
+export const EXPLORER_TRENDING_MIN_VOTES = 10;
+/** #853 : capacité du cache mémoire des diffuseurs (~10 pages d'Explorer). */
+export const WATCH_PROVIDER_MEMORY_MAX_ENTRIES = 240;
+
+/** Réponse TMDB `watch/providers` telle que lue par l'app (région FR). */
+export interface WatchProviderOffer { provider_id?: number; provider_name?: string; logo_path: string; display_priority?: number; [key: string]: unknown }
+export interface WatchProviderRegion { link?: string; flatrate?: WatchProviderOffer[]; free?: WatchProviderOffer[]; ads?: WatchProviderOffer[]; rent?: WatchProviderOffer[]; buy?: WatchProviderOffer[]; [key: string]: unknown }
+export interface WatchProvidersPayload { id?: number; results?: Record<string, WatchProviderRegion | undefined>; [key: string]: unknown }
+export const EXPLORER_RECENT_MOVIE_MONTHS = 18;
+export const EXPLORER_RECENT_TV_AIR_DAYS = 60;
+
+const isoDay = (date: Date) => date.toISOString().split('T')[0];
+
+/** Identifiants TMDB des plateformes des filtres historiques (une seule copie pour toute la façade). */
+const PLATFORM_ID_MAP: Record<string, string> = { netflix: '8', hbo: '118', disney: '337', apple: '350', prime: '119', canal: '381', max: '1825' };
+
+/** Fenêtre de fraîcheur du complément Explorer, calculée sur la date du jour (clé de cache quotidienne). */
+export function explorerRecencyParams(type: 'tv' | 'movie', now: Date = new Date()): string {
+  const today = isoDay(now);
+  if (type === 'movie') {
+    const since = new Date(now);
+    since.setMonth(since.getMonth() - EXPLORER_RECENT_MOVIE_MONTHS);
+    return `primary_release_date.gte=${isoDay(since)}&primary_release_date.lte=${today}`;
+  }
+  const since = new Date(now.getTime() - EXPLORER_RECENT_TV_AIR_DAYS * 86_400_000);
+  return `air_date.gte=${isoDay(since)}&air_date.lte=${today}`;
+}
+
+/** Tendance du jour d'abord, puis celle de la semaine, sans doublon. */
+export function mergeTrendingWindows<T extends { id?: unknown; media_type?: unknown }>(day: readonly T[], week: readonly T[]): T[] {
+  const seen = new Set<string>();
+  const merged: T[] = [];
+  for (const item of [...day, ...week]) {
+    const key = `${String(item.media_type || '')}:${String(item.id)}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+  return merged;
+}
 
 export interface TmdbEpisodeDetails extends Record<string, unknown> {
   episode_number: number;
@@ -872,9 +917,18 @@ export class TMDBClient {
     }
   }
 
-  private watchProvidersCache = new BoundedCache<string, { data: any; timestamp: number }>(80);
-  private watchProvidersInFlight = new Map<string, Promise<Result<any>>>();
+  private watchProvidersCache = new BoundedCache<string, { data: WatchProvidersPayload; timestamp: number }>(WATCH_PROVIDER_MEMORY_MAX_ENTRIES);
+  private watchProvidersInFlight = new Map<string, Promise<Result<WatchProvidersPayload>>>();
   private watchProviderRequestLimiter = createWatchProviderRequestLimiter();
+  // #853 : les cartes devenues visibles ensemble partagent une requête groupée (module chargé au premier besoin,
+  // hors du point d'entrée de l'app).
+  private watchProviderBatcher: Promise<{ request: (key: string) => Promise<WatchProvidersPayload | null> }> | null = null;
+
+  private requestBatchedWatchProviders(cacheKey: string): Promise<WatchProvidersPayload | null> {
+    this.watchProviderBatcher ||= import('../providers/watchProviderBatchClient').then(module => module.createWatchProviderBatcher<WatchProvidersPayload>());
+    return this.watchProviderBatcher.then(batcher => batcher.request(cacheKey), () => null);
+  }
+
   private episodeDetailsCache = new BoundedCache<string, { data: TmdbEpisodeDetails; timestamp: number }>(EPISODE_DETAILS_CACHE_MAX_ENTRIES);
 
   peekWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): any | null {
@@ -890,7 +944,27 @@ export class TMDBClient {
     return cached.data;
   }
 
-  async getWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<any>> {
+  /** Repli titre par titre (route groupée absente ou entrée manquante), borné à 4 requêtes simultanées. */
+  private fetchSingleWatchProviders(id: number, type: 'tv' | 'movie', cacheKey: string): Promise<Result<WatchProvidersPayload>> {
+    return this.watchProviderRequestLimiter.run(async (): Promise<Result<WatchProvidersPayload>> => {
+      const queuedCache = this.watchProvidersCache.get(cacheKey);
+      if (queuedCache && Date.now() - queuedCache.timestamp < 30 * 60 * 1000) {
+        return ok(queuedCache.data);
+      }
+      const url = new URL(`${this.baseUrl}/${type}/${id}/watch/providers`);
+      const res = await tryCatch(authenticatedFetch(url.toString()));
+      if ('error' in res) return err(res.error);
+      if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
+      const data = await tryCatch(res.value.json() as Promise<WatchProvidersPayload & { status_code?: unknown; status_message?: string }>);
+      if ('error' in data) return err(data.error);
+      if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
+
+      this.watchProvidersCache.set(cacheKey, { data: data.value, timestamp: Date.now() });
+      return ok(data.value);
+    });
+  }
+
+  async getWatchProviders(id: number, type: 'tv' | 'movie' = 'tv'): Promise<Result<WatchProvidersPayload>> {
     const cacheKey = `${type}:${id}`;
     const cached = this.watchProvidersCache.get(cacheKey);
     // Cache for 30 minutes in memory
@@ -901,23 +975,15 @@ export class TMDBClient {
     const existingRequest = this.watchProvidersInFlight.get(cacheKey);
     if (existingRequest) return existingRequest;
 
-    const request = this.watchProviderRequestLimiter.run(async (): Promise<Result<any>> => {
-      const queuedCache = this.watchProvidersCache.get(cacheKey);
-      if (queuedCache && Date.now() - queuedCache.timestamp < 30 * 60 * 1000) {
-        return ok(queuedCache.data);
+    const request = (async (): Promise<Result<WatchProvidersPayload>> => {
+      const numericId = Number(id);
+      const batched = Number.isSafeInteger(numericId) && numericId > 0 ? await this.requestBatchedWatchProviders(`${type}:${numericId}`) : null;
+      if (batched) {
+        this.watchProvidersCache.set(cacheKey, { data: batched, timestamp: Date.now() });
+        return ok(batched);
       }
-
-      const url = new URL(`${this.baseUrl}/${type}/${id}/watch/providers`);
-      const res = await tryCatch(authenticatedFetch(url.toString()));
-      if (!res.ok) return err((res as any).error);
-      if (!res.value.ok) return err(new Error(`TMDB Error: ${res.value.status}`));
-      const data = await tryCatch(res.value.json());
-      if (!data.ok) return err((data as any).error);
-      if (data.value && data.value.status_code) return err(new Error(data.value.status_message || 'TMDB Error'));
-
-      this.watchProvidersCache.set(cacheKey, { data: data.value, timestamp: Date.now() });
-      return data;
-    });
+      return this.fetchSingleWatchProviders(id, type, cacheKey);
+    })();
 
     this.watchProvidersInFlight.set(cacheKey, request);
     try {
@@ -1321,10 +1387,6 @@ export class TMDBClient {
       let urlStr = `${this.baseUrl}/discover/${t}?language=fr-FR&sort_by=vote_average.desc&${voteParam}&vote_average.gte=7.0&${dateParam}&page=${page}`;
 
       if (hasProviders) {
-        const PLATFORM_ID_MAP: Record<string, string> = {
-          'netflix': '8', 'hbo': '118', 'disney': '337', 'apple': '350',
-          'prime': '119', 'canal': '381', 'max': '1825',
-        };
         const tmdbProviderIds = watchProviders.map(p => PLATFORM_ID_MAP[p]).filter(Boolean);
         if (tmdbProviderIds.length > 0) {
           urlStr += `&watch_region=FR&with_watch_providers=${tmdbProviderIds.join('|')}`;
@@ -1357,10 +1419,6 @@ export class TMDBClient {
 
   async getTrending(type: 'tv' | 'movie' | 'all' = 'tv', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
     if (watchProviders && watchProviders.length > 0) {
-      const PLATFORM_ID_MAP: Record<string, string> = {
-        'netflix': '8', 'hbo': '118', 'disney': '337', 'apple': '350',
-        'prime': '119', 'canal': '381', 'max': '1825',
-      };
       const tmdbProviderIds = watchProviders.map(p => PLATFORM_ID_MAP[p]).filter(Boolean);
       if (tmdbProviderIds.length > 0) {
         const providersStr = tmdbProviderIds.join('|');
@@ -1369,8 +1427,8 @@ export class TMDBClient {
             this.getCachedDiscoverResponse(`${this.baseUrl}/discover/tv?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`),
             this.getCachedDiscoverResponse(`${this.baseUrl}/discover/movie?language=fr-FR&sort_by=popularity.desc&watch_region=FR&with_watch_providers=${providersStr}&page=${page}`),
           ]);
-          const tvResults = resTv.ok ? (resTv.value.results || []).map((r: any) => ({ ...r, media_type: 'tv' as const })) : [];
-          const movResults = resMov.ok ? (resMov.value.results || []).map((r: any) => ({ ...r, media_type: 'movie' as const })) : [];
+          const tvResults = resTv.ok ? (resTv.value.results || []).map((r: TMDBMedia) => ({ ...r, media_type: 'tv' as const })) : [];
+          const movResults = resMov.ok ? (resMov.value.results || []).map((r: TMDBMedia) => ({ ...r, media_type: 'movie' as const })) : [];
           const combined = [...tvResults, ...movResults].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
           return ok({ results: filterCredibleMedia(combined, 5) });
         }
@@ -1384,12 +1442,15 @@ export class TMDBClient {
       }
     }
 
-    const url = new URL(`${this.baseUrl}/trending/${type}/week?language=fr-FR&page=${page}`);
-    const jsonRes = await this.getCachedDiscoverResponse(url);
-    if (jsonRes.ok && Array.isArray(jsonRes.value?.results)) {
-      jsonRes.value.results = filterCredibleMedia(jsonRes.value.results, 50);
-    }
-    return jsonRes;
+    // #853 : tendance du jour puis de la semaine, pour que les sorties récentes remontent.
+    const [dayRes, weekRes] = await Promise.all([
+      this.getCachedDiscoverResponse(new URL(`${this.baseUrl}/trending/${type}/day?language=fr-FR&page=${page}`)),
+      this.getCachedDiscoverResponse(new URL(`${this.baseUrl}/trending/${type}/week?language=fr-FR&page=${page}`)),
+    ]);
+    if (!dayRes.ok && !weekRes.ok) return weekRes;
+    const base = weekRes.ok ? weekRes.value : dayRes.ok ? dayRes.value : { results: [] };
+    const merged = mergeTrendingWindows(dayRes.ok ? dayRes.value.results || [] : [], weekRes.ok ? weekRes.value.results || [] : []);
+    return ok({ ...base, results: filterCredibleMedia(merged, EXPLORER_TRENDING_MIN_VOTES) });
   }
 
   async discoverByGenre(type: 'tv' | 'movie', genreId: number, page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
@@ -1398,10 +1459,6 @@ export class TMDBClient {
     let urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&with_genres=${genreId}&vote_count.gte=${minVotes}&page=${page}`;
 
     if (hasProviders) {
-      const PLATFORM_ID_MAP: Record<string, string> = {
-        'netflix': '8', 'hbo': '118', 'disney': '337', 'apple': '350',
-        'prime': '119', 'canal': '381', 'max': '1825',
-      };
       const tmdbProviderIds = watchProviders.map(p => PLATFORM_ID_MAP[p]).filter(Boolean);
       if (tmdbProviderIds.length > 0) {
         urlStr += `&watch_region=FR&with_watch_providers=${tmdbProviderIds.join('|')}`;
@@ -1420,16 +1477,11 @@ export class TMDBClient {
 
   async getPopular(type: 'tv' | 'movie' = 'tv', page: number = 1, watchProviders?: string[]): Promise<Result<SearchResponse>> {
     const hasProviders = watchProviders && watchProviders.length > 0;
-    const minVotes = hasProviders ? 5 : 50;
-    const minDateParam = type === 'tv' ? 'first_air_date.gte=2016-01-01' : 'primary_release_date.gte=2016-01-01';
-    let urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=popularity.desc&vote_count.gte=${minVotes}&page=${page}`;
-    if (!hasProviders) urlStr += `&${minDateParam}`;
+    const minVotes = hasProviders ? 5 : EXPLORER_TRENDING_MIN_VOTES;
+    // #853 : le complément ne remonte que des nouveautés (avec ou sans filtre plateforme), plus le catalogue 2016+.
+    let urlStr = `${this.baseUrl}/discover/${type}?language=fr-FR&sort_by=popularity.desc&vote_count.gte=${minVotes}&page=${page}&${explorerRecencyParams(type)}`;
 
     if (hasProviders) {
-      const PLATFORM_ID_MAP: Record<string, string> = {
-        'netflix': '8', 'hbo': '118', 'disney': '337', 'apple': '350',
-        'prime': '119', 'canal': '381', 'max': '1825',
-      };
       const tmdbProviderIds = watchProviders.map(p => PLATFORM_ID_MAP[p]).filter(Boolean);
       if (tmdbProviderIds.length > 0) {
         urlStr += `&watch_region=FR&with_watch_providers=${tmdbProviderIds.join('|')}`;
@@ -1520,15 +1572,6 @@ export class TMDBClient {
       'Thriller': { movie: [53, 80], tv: [80, 9648] }
     };
 
-    const PLATFORM_ID_MAP: Record<string, string> = {
-      'netflix': '8',
-      'hbo': '118',
-      'disney': '337',
-      'apple': '350',
-      'prime': '119',
-      'canal': '381',
-      'max': '1825',
-    };
 
     const buildUrl = (mediaType: 'tv' | 'movie') => {
       let sortParam = 'popularity.desc';

@@ -56,7 +56,7 @@ function rememberBatchDetails(key: string, details: any, persist = true): void {
     writeParentalRatingCache(id, mediaType, details);
   }
 }
-function readPersistentBatchDetails(identity: BatchIdentity): any | null {
+function readPersistentBatchDetails(identity: BatchIdentity): unknown {
   const cached = readParentalRatingCache(identity.id, identity.mediaType);
   if (!cached) return null;
   rememberBatchDetails(identity.key, cached.data, false);
@@ -204,6 +204,9 @@ export function createProgressiveAgeDiscover(
 ) {
   let currentGeneration = 0;
   const nextRequestController = createSupersedingAbortController();
+  // #853 : âges de la page suivante résolus en tâche de fond, avec leur propre annulation (changement de filtre),
+  // pour que la page atteinte au défilement s'affiche d'un coup au lieu de se remplir carte par carte.
+  let warming: { key: string; page: number; controller: AbortController; done: Promise<void> } | null = null;
   const sourcePagePrefetch = createPagePrefetchWindow<
     Awaited<ReturnType<ProgressiveAgeDiscoverDependencies['discover']>>
   >(AGE_SOURCE_PREFETCH_AHEAD, AGE_SOURCE_PREFETCH_MAX_ENTRIES);
@@ -240,6 +243,10 @@ export function createProgressiveAgeDiscover(
       publishSnapshot({ generation, page, partial: null });
     }
     const sourcePrefetchKey = createSourcePrefetchKey(options, maxAge);
+    if (warming && (warming.key !== sourcePrefetchKey || warming.page < page)) {
+      warming.controller.abort();
+      warming = null;
+    }
     const loadSourcePage = (targetPage: number) => dependencies.discover({
       ...options,
       page: targetPage,
@@ -255,6 +262,12 @@ export function createProgressiveAgeDiscover(
     }
     if (requestSignal.aborted) {
       return baseResult;
+    }
+    // La page était déjà en cours de résolution anticipée : ses preuves arrivent du cache au lieu d'un second flux.
+    if (warming && warming.key === sourcePrefetchKey && warming.page === page) {
+      await warming.done;
+      warming = null;
+      if (requestSignal.aborted) return baseResult;
     }
 
     const accepted = await filterResolvedPrefixes<any, any | null, any>(
@@ -286,6 +299,18 @@ export function createProgressiveAgeDiscover(
     if (pendingSnapshot && !requestSignal.aborted && shouldApplyProgressivePartial(generation, currentGeneration, page)) {
       publishSnapshot(pendingSnapshot);
       pendingSnapshot = null;
+    }
+
+    if (!requestSignal.aborted && generation === currentGeneration && !warming) {
+      const controller = new AbortController();
+      const nextPage = page + 1;
+      const done = sourcePagePrefetch.get(sourcePrefetchKey, nextPage, loadSourcePage).promise
+        .then(async next => {
+          if (controller.signal.aborted || !next.ok || !Array.isArray(next.value?.results) || next.value.results.length === 0) return;
+          await dependencies.resolveBatch(next.value.results, controller.signal);
+        })
+        .catch(() => undefined);
+      warming = { key: sourcePrefetchKey, page: nextPage, controller, done };
     }
 
     return ok({ ...baseResult.value, results: accepted });

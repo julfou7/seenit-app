@@ -8,6 +8,8 @@ const featureFiles = {
     'src/screens/DiscoverHero.tsx',
     'src/components/DiscoverSearchDock.tsx',
     'src/screens/discoverPresentation.tsx',
+    // #853 : chargement des pages d'Explorer extrait de DiscoverScreen.
+    'src/features/discover/explorerHomePages.ts',
   ],
   watchList: [
     'src/screens/WatchListScreen.tsx',

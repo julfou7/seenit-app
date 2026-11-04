@@ -10,7 +10,8 @@ const cssSource = readFileSync(new URL('../src/index.css', import.meta.url), 'ut
 test('SEENIT-PERF-001 libère Explorer dès le trending et borne le premier viewport', () => {
   assert.match(discoverSource, /const DISCOVER_CRITICAL_GRID_ITEMS = 6/);
   assert.match(discoverSource, /const trendAllRes = await trendAllPromise/);
-  assert.match(discoverSource, /if \(trendingList\.length > 0\)[\s\S]*?if \(page === 1\) setHomeLoading\(false\)/);
+  assert.match(discoverSource, /if \(trendingList\.length > 0\) hooks\.onEarlyTrending\?\.\(trendingList\)/);
+  assert.match(discoverSource, /onEarlyTrending: list => \{[\s\S]*?if \(page === 1\) setHomeLoading\(false\)/);
   assert.match(discoverSource, /const visibleHeroItems = criticalHomeSliceActive \? top10\.slice\(0, 1\) : top10/);
   assert.match(discoverSource, /uniqueProcessedResults\.slice\(0, DISCOVER_CRITICAL_GRID_ITEMS\)/);
   assert.match(discoverSource, /if \(isSearchMode \|\| isLoadingMore \|\| loading \|\| criticalHomeSliceActive/);

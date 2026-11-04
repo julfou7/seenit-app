@@ -4,6 +4,7 @@ import {
 } from './mediaProviderBackendCore.ts';
 import { registerCharacterRoutes } from './characterBackend.ts';
 import { registerParentalRatingBatchRoute } from './parentalRatingBatchBackend.ts';
+import { registerWatchProviderBatchRoute } from './watchProviderBatchBackend.ts';
 
 export {
   assertMediaProviderSecrets,
@@ -171,7 +172,7 @@ export function createParentalRatingPrefetchFetch(
     try { payload = JSON.parse(snapshot.body); } catch { return; }
     const ids = Array.isArray(payload?.results)
       ? payload.results
-          .map((item: any) => Number(item?.id))
+          .map((item: { id?: unknown } | null) => Number(item?.id))
           .filter((id: number) => Number.isInteger(id) && id > 0)
           .slice(0, MAX_DISCOVER_RESULTS)
       : [];
@@ -277,6 +278,8 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Medi
     // Explorer warmup turns a one-item prefix into a hidden 20-item fan-out.
     fetch: upstream,
   });
+  // #853 : diffuseurs groupés par écran ; enregistré avant le « 404 » générique de /api/media/*.
+  registerWatchProviderBatchRoute(app, { authenticate: dependencies.authenticate, fetch: upstream, secrets: dependencies.secrets, now: dependencies.now });
   registerCoreMediaProviderRoutes(app, {
     ...dependencies,
     fetch: acceleratedFetch,

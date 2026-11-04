@@ -58,6 +58,8 @@ const TMDB_QUERY = new Set([
   'include_adult', 'region', 'sort_by', 'vote_count.gte', 'vote_average.gte',
   'vote_average.lte', 'primary_release_date.gte', 'primary_release_date.lte',
   'first_air_date.gte', 'first_air_date.lte', 'release_date.gte', 'release_date.lte',
+  // #853 : séries dont un épisode a été diffusé récemment (complément « tendance » d'Explorer).
+  'air_date.gte', 'air_date.lte',
   'with_genres', 'without_genres', 'watch_region', 'with_watch_providers',
   'with_watch_monetization_types', 'with_people', 'with_cast', 'with_release_type',
   'certification_country', 'certification.lte', 'certification.gte', 'with_original_language',
@@ -173,7 +175,10 @@ class ProviderFailure extends Error {
   constructor(status: number) { super('MEDIA_PROVIDER_FAILED'); this.status = status; }
 }
 
-async function readJsonBody(response: Response): Promise<any> {
+/** Corps JSON d'un fournisseur : forme ouverte, lue champ par champ (TMDB, TVDB). */
+interface ProviderPayload { success?: unknown; status_code?: unknown; data?: { token?: unknown; lists?: unknown; entities?: unknown; [key: string]: unknown }; [key: string]: unknown }
+
+async function readJsonBody(response: Response): Promise<ProviderPayload> {
   if (!/^application\/(?:[\w.+-]*\+)?json(?:;|$)/i.test(response.headers.get('content-type') || '')) {
     await response.body?.cancel();
     throw new ProviderFailure(502);

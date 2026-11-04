@@ -203,11 +203,12 @@ test('issue #91 Matrix 1999 : un candidat Discover ne gagne jamais contre la pre
 
 test('issue #91 les listes Explorer ordinaires et Au cinéma passent par le même enrichissement batch', () => {
   const tmdbCore = readFileSync(new URL('../src/features/shows/tmdbCore.ts', import.meta.url), 'utf8');
-  const discoverScreen = readFileSync(new URL('../src/screens/DiscoverScreen.tsx', import.meta.url), 'utf8');
+  // #853 : le chargement des pages d'Explorer vit dans explorerHomePages.
+  const discoverScreen = readFileSync(new URL('../src/features/discover/explorerHomePages.ts', import.meta.url), 'utf8');
 
   assert.match(tmdbCore, /results = await enrichCinemaEvidenceForMediaResults\(results\)/);
   assert.match(tmdbCore, /const enriched = await enrichCinemaEvidenceForMediaResults\(candidates\)/);
   assert.doesNotMatch(tmdbCore, /seenitFrenchTheatrical:\s*true/);
-  assert.match(discoverScreen, /enrichCinemaEvidenceForExplorerLists\(nextPopular, nextTrending\)/);
+  assert.match(discoverScreen, /enrichCinemaEvidenceForExplorerLists\(popular, trending\)/);
   assert.match(discoverScreen, /activeCategory !== 'Au cinéma'/);
 });

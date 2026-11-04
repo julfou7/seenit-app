@@ -23,6 +23,9 @@
 .explorer-chips>button{color:#a1a1aa}
 .explorer-content{padding:8px 8px 20px}
 .explorer-page-sentinel{min-height:32px;text-align:center;padding:12px;font-size:12px;color:#71717a}
+/* #853 : une page déjà préparée arrive avant 250 ms ; le libellé n'apparaît que pour un vrai chargement. */
+.explorer-page-sentinel [role=status]{animation:explorerLoadingReveal 1ms linear 250ms both}
+@keyframes explorerLoadingReveal{from{opacity:0}to{opacity:1}}
 .explorer-search-dock{position:absolute;left:0;right:0;z-index:40;display:flex;gap:8px;padding:24px 12px 0;background:linear-gradient(transparent,#0B0B0Dee 30%,#0B0B0D);align-items:center;pointer-events:none}
 .explorer-search-dock>*{pointer-events:auto}
 .explorer-circle{width:52px;height:52px;flex-shrink:0;border-radius:50%;background:#1C1C1F;border:1px solid #ffffff14;display:grid;place-items:center;color:#d4d4d8;position:relative}
