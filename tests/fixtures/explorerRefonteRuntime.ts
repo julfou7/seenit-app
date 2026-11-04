@@ -31,6 +31,9 @@ const details = (id: number) => Promise.resolve({ ok: true, value: { ...media.fi
 const list = async (_type: unknown = 'all', page = 1) => { telemetry.homePages.push(page); return { ok: true, value: { results: media.map(item=>({...item,id:item.id+(page-1)*100,title:'Page '+page+' | '+item.title,name:'Page '+page+' | '+item.name})), total_pages: 3 } }; };
 export const tmdb = {
   peekRenderableMediaDetails: () => null,
+  // #851 : échéance de révalidation lue par la fiche ouverte.
+  isMediaDetailsStale: () => false,
+  getMediaDetailsRevalidateAt: () => null,
   getPersonDetails: async (id: number) => ({ ok: true, value: { id, name: 'Bob Odenkirk', biography: 'Bob est un acteur.', profile_path: '/bob.svg', known_for_department: 'Acting' } }),
   getPersonCredits: async () => ({ ok: true, value: { cast: [{...media[1],id:7778,title:undefined,name:'Game of Thrones',media_type:'tv',character:'Personnage',episode_count:10}], crew: [] } }),
   getPersonImages: async () => ({ ok: true, value: { profiles: [] } }),

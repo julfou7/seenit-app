@@ -169,7 +169,7 @@ export function isAdultOrParodyMedia(item: unknown): boolean {
 
 const filterCredibleMedia = (results: TMDBMedia[], minVoteCount: number = 50): TMDBMedia[] => {
   if (!Array.isArray(results)) return [];
-  return results.filter((item: any) => {
+  return results.filter((item: TMDBMedia & { known_for_department?: string }) => {
     if (!item) return false;
     if (isAdultOrParodyMedia(item)) return false;
     // Conserver les fiches de personnes
@@ -536,6 +536,17 @@ export class TMDBClient {
   private hasFreshMemoryDetails(cacheKey: string): boolean {
     const revalidateAt = this.detailsRevalidateAt.get(cacheKey);
     return revalidateAt !== undefined && Date.now() < revalidateAt;
+  }
+
+  /** #851 : échéance de révalidation du détail en mémoire (null s'il n'y en a pas), pour la fiche ouverte. */
+  getMediaDetailsRevalidateAt(id: number, type: RelationMediaType = 'tv'): number | null {
+    return this.detailsRevalidateAt.get(`${type}_${Number(id)}`) ?? null;
+  }
+
+  /** #851 : le détail en mémoire a dépassé son échéance ; la prochaine lecture le révalidera. */
+  isMediaDetailsStale(id: number, type: RelationMediaType = 'tv'): boolean {
+    const cacheKey = `${type}_${Number(id)}`;
+    return this.detailsCache.get(cacheKey) !== undefined && !this.hasFreshMemoryDetails(cacheKey);
   }
 
   private async getCachedMediaDetails(id: number, type: RelationMediaType, refresh = false) {

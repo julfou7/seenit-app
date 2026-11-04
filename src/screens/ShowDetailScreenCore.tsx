@@ -6,6 +6,7 @@ import { Capacitor } from '@capacitor/core';
 import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBestLogoPath, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate, scrollAllCarouselsToStart, openExternalUrl, checkIsUpToDate } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { MediaDetailColdShell } from './MediaDetailColdShell';
+import { useDetailsRevalidation } from './mediaDetail/useDetailsRevalidation';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
 import { EpisodeRatingsChart } from '../components/EpisodeRatingsChart';
 import { useShows } from '../hooks/useShows';
@@ -443,6 +444,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     if (mainScrollRef.current) mainScrollRef.current.scrollTo({ top: 0, behavior: 'instant' });
   }, [effectiveTmdbId, requestedMediaKey, requestedMediaType]);
 
+  // #851 : relit le détail d'une fiche restée ouverte au-delà de son TTL (voir useDetailsRevalidation).
+  const detailsRevalidation = useDetailsRevalidation(effectiveTmdbId, requestedMediaKey, requestedMediaType, tmdbDetails);
+
   useEffect(() => {
     if (!effectiveTmdbId || !requestedMediaKey) return;
     let isMounted = true;
@@ -473,7 +477,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       if (res.ok && isCurrentRequest()) setProviders(res.value.results?.FR || []);
     });
     return () => { isMounted = false; };
-  }, [effectiveTmdbId, requestedMediaKey, requestedMediaType]);
+  }, [effectiveTmdbId, requestedMediaKey, requestedMediaType, detailsRevalidation]);
 
   const initialAutoOpenRef = useRef<boolean>(false);
   useEffect(() => { initialAutoOpenRef.current = false; }, [effectiveTmdbId]);
@@ -489,12 +493,12 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           tmdb.getSeasonDetails(effectiveTmdbId, targetSeason).then(res => {
             if (res.ok) {
               setSeasonsCache(prev => ({ ...prev, [targetSeason]: res.value }));
-              const ep = res.value.episodes?.find((x: any) => x.episode_number === initialEpisode);
+              const ep = res.value.episodes?.find((x: { episode_number?: number }) => x.episode_number === initialEpisode);
               if (ep) { setSelectedEpisode({ season: targetSeason, episode: ep }); window.history.pushState({ isEpisodeDetailModal: true }, ''); }
             }
           });
         } else {
-          const ep = seasonsCache[targetSeason].episodes?.find((x: any) => x.episode_number === initialEpisode);
+          const ep = seasonsCache[targetSeason].episodes?.find((x: { episode_number?: number }) => x.episode_number === initialEpisode);
           if (ep) { setSelectedEpisode({ season: targetSeason, episode: ep }); window.history.pushState({ isEpisodeDetailModal: true }, ''); }
         }
       } else if (!seasonsCache[targetSeason]) {
@@ -510,7 +514,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       setActiveTab('episodes');
       setExpandedSeason(initialSeason);
       const tryOpenEpisode = (seasonData: any) => {
-        const ep = seasonData?.episodes?.find((x: any) => x.episode_number === initialEpisode);
+        const ep = seasonData?.episodes?.find((x: { episode_number?: number }) => x.episode_number === initialEpisode);
         if (ep) {
           setSelectedEpisode({ season: initialSeason, episode: ep });
           if (!window.history.state?.isEpisodeDetailModal) window.history.pushState({ isEpisodeDetailModal: true }, '');
