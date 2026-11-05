@@ -6,6 +6,6 @@ test('TNR téléchargements : le poster compact ne cède aucune hauteur aux mét
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
   const css = readFileSync('src/screens/downloads.css', 'utf8');
   assert.match(card, /className="download-card__poster"/);
-  assert.match(css, /\.download-card__poster \{[^}]*width:54px;[^}]*height:80px;[^}]*flex:none;/);
+  assert.match(css, /\.download-card__poster \{[^}]*width:58px;[^}]*height:86px;[^}]*flex:none;/);
   assert.match(css, /\.download-card__poster img \{[^}]*object-fit:contain;/);
 });

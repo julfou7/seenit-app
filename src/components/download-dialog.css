@@ -1,0 +1,32 @@
+.download-dialog-overlay { position:fixed; inset:0; z-index:200; display:flex; align-items:center; justify-content:center; padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(env(safe-area-inset-bottom,0px) + 16px); background:#000b; }
+.download-dialog { width:100%; max-width:420px; max-height:100%; overflow:hidden; display:flex; flex-direction:column; background:#171719; border:1px solid #ffffff12; border-radius:24px; color:#fafafa; box-shadow:0 24px 80px #0008; outline:none; }
+.download-dialog__header { display:flex; align-items:center; gap:12px; flex:none; padding:22px 20px 18px; }
+.download-dialog__poster { width:44px; height:66px; flex:none; border-radius:7px; object-fit:contain; }
+.download-dialog__identity { flex:1; min-width:0; }
+.download-dialog__identity h3 { margin:3px 0; font-size:18px; font-weight:750; line-height:1.3; overflow-wrap:anywhere; }
+.download-dialog__eyebrow { color:#a1a1aa; font-size:11px; font-weight:600; }
+.download-dialog__muted { color:#a1a1aa; font-size:12px; line-height:1.5; }
+.download-dialog__close { display:grid; place-items:center; width:44px; height:44px; flex:none; align-self:flex-start; border-radius:50%; color:#a1a1aa; }
+.download-dialog__close:hover { background:#ffffff08; }
+.download-dialog__content { padding:0 20px 12px; overflow-y:auto; min-height:0; }
+.download-dialog__scope { padding-bottom:20px; }
+.download-dialog__tabs { display:flex; padding:3px; gap:3px; border-radius:12px; background:#0f0f11; }
+.download-dialog__tabs button { flex:1; min-height:44px; font-size:13px; font-weight:600; color:#8b8b94; border-radius:9px; }
+.download-dialog__tabs button[aria-pressed=true] { color:#f2c36b; background:#29251d; }
+.download-dialog__pickers { display:flex; gap:10px; margin-top:10px; }
+.download-dialog__pickers button { flex:1; display:flex; align-items:center; justify-content:space-between; gap:6px; min-height:44px; padding:0 12px; border-radius:10px; background:#ffffff04; border:1px solid #ffffff12; font-size:13px; }
+.download-dialog__quality h4 { font-size:13px; font-weight:600; margin-bottom:12px; color:#d4d4d8; }
+.download-dialog__choices { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
+.download-dialog__choices button { display:flex; align-items:center; gap:12px; min-height:70px; padding:12px; border:1px solid #ffffff12; border-radius:13px; text-align:left; background:#ffffff03; }
+.download-dialog__choices button:hover { border-color:#e5a93d88; background:#e5a93d08; }
+.download-dialog__choices button:disabled { opacity:.45; }
+.download-dialog__quality-icon { display:grid; place-items:center; width:36px; height:36px; color:#f2c36b; border-radius:10px; background:#e5a93d0a; }
+.download-dialog__choices button > span:nth-child(2) { flex:1; }
+.download-dialog__choices strong { display:block; font-size:15px; font-weight:700; }
+.download-dialog__choices small { display:block; font-size:12px; color:#8b8b94; margin-top:2px; }
+.download-dialog__choices button > svg { color:#71717a; }
+.download-dialog__replace { display:flex; align-items:center; gap:10px; min-height:44px; font-size:12px; color:#f2c36b; }
+.download-dialog__manual { border-top:1px solid #ffffff0c; margin-top:20px; }
+.download-dialog__manual-toggle { display:flex; align-items:center; gap:10px; width:100%; min-height:56px; font-size:13px; font-weight:600; color:#a1a1aa; text-align:left; }
+.download-dialog__manual-toggle span { flex:1; }
+.download-dialog button:focus-visible { outline:2px solid #e5a93d; outline-offset:2px; }

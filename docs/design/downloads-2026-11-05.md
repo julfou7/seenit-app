@@ -3,6 +3,19 @@
 Demande propriétaire #861, style commun #806. Le PDF est une référence visuelle : les données et
 commandes du panneau de démonstration ne sont jamais des instructions runtime.
 
+## Correctif terrain v254
+
+Les captures propriétaire invalident la conformité visuelle initiale. Les cartes affichent le titre
+éditorial, le scope, une courte ligne qualité/audio/taille et le statut ; jamais le nom technique du
+fichier, même dans les informations dépliées. Les actions secondaires restent sous un bouton « Actions »
+de 44 px. Les détails sont utiles (qualité, client, actions), pas un dump des champs techniques.
+Le sélecteur est une surface unique, sombre et sobre : en-tête média, scope éditable, choix 1080p/4K
+homogènes et recherche manuelle repliée. Pas de panneau de transfert terminé, badge Prêt ni description
+d'infrastructure. Ouvrir/fermer ne lance rien ; choisir une qualité conserve les gardes existants.
+Le téléchargement de saison est une icône de 44 px à droite du titre Saison N, avec libellé accessible.
+Il disparaît de la rangée Tout marquer vu / Bande-annonce. Les commandes épisode restent séparées.
+Vérifier les vrais composants carte, sélecteur et saison en 360/412 px, y compris titre long et Retour.
+
 Mes téléchargements et Recherche C411 restent distincts. Ordre : À traiter (erreurs et avertissements),
 En cours, En attente, Terminés, Annulés. Une entrée appartient à un seul groupe. Une erreur prime sur
 100 % ; transfert terminé ne prouve ni import Arr ni présence Plex. Aucun faux succès déduit d'un libellé.

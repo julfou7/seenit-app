@@ -63,7 +63,7 @@ test('SEENIT-DOWNLOAD-VISIBILITY-001 verrouille toutes les mentions de télécha
   // #861 remplace l'interdiction de SEENIT-UX-019 pour les lignes de saison seulement.
   const view = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
   assert.equal((view.match(/<Download size=\{18\}[^>]*\/>Téléchargement<\/button>/g) || []).length, 1, 'une seule entrée Téléchargement, dans le menu ⋮');
-  for (const inline of [/Télécharger le film \(1 Clic\)/, /Téléchargement 1-Clic/, /Télécharger la saison/, /Télécharger en 1 clic dans Sonarr/, /LiveDownloadBanner/, /handle1ClickDownload/, /Téléchargement en cours/]) {
+  for (const inline of [/Télécharger le film \(1 Clic\)/, /Téléchargement 1-Clic/, />Télécharger la saison/, /Télécharger en 1 clic dans Sonarr/, /LiveDownloadBanner/, /handle1ClickDownload/, /Téléchargement en cours/]) {
     assert.doesNotMatch(showCoreSource.replace(readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8'), '').replace(readFileSync(new URL('../src/screens/showDetailPresentation.ts', import.meta.url), 'utf8'), ''), inline);
   }
   assert.match(showWrapperSource, /button:has\(svg\.lucide-download\)/);

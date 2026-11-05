@@ -1173,4 +1173,9 @@ Le titre nomme l’œuvre ; le type est dans l’en-tête Android (`subText`), l
 Complément Explorer29/10 (#398/#787) : [fiche personnage](../design/explorer-personnage-2026-10-29.md), reprise exacte sur crédits par épisode, cache public borné, calcul au premier accès uniquement ; progression/favoris isolés par UID. Toasts au-dessus du champ et retour aux résultats avec la même requête, clavier fermé.
 ### Téléchargements — prototype du 5 novembre 2026 (#861)
 
+Correctif terrain v254 : carte sans nom technique ni boutons secondaires permanents ; actions sous
+« … ». Sélecteur de qualité à surface unique, sans jargon ou panneau de transfert terminé ; ouverture
+et fermeture sans commande. Le téléchargement de saison est une icône dans l'en-tête Saison N,
+plus dans la rangée Tout marquer vu / Bande-annonce. Vrais composants vérifiés en 360/412 px.
+
 Les cartes compactes suivent Moi/Réglages : À traiter, En cours, En attente, Terminés puis Annulés. Les erreurs explicites restent prioritaires. Dans la fiche série, le numéro occupe la vignette ; téléchargement et Vu sont des commandes séparées, disponibles selon feature gate et présence réelle. Le bouton ouvre le choix de qualité existant avant toute mutation. Voir le [contrat détaillé](../design/downloads-2026-11-05.md).

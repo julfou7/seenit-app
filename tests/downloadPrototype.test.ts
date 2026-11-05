@@ -7,6 +7,17 @@ import { fetchC411Torrents } from '../src/features/downloads/c411Backend.ts';
 import type { LiveDownloadItem } from '../src/services/sonarrRadarrLive.ts';
 import { isDownloadInHistorySection } from '../src/features/downloads/downloadStatePolicy.ts';
 import { selectArrSeasonReleases } from '../src/features/downloads/seasonReleaseSelection.ts';
+import { hasActiveDownloadInScope } from '../src/features/downloads/downloadSearchGuard.ts';
+
+test('SEENIT-DOWNLOAD-013 le sélecteur reste utilisable après un terminé et bloque seulement le scope actif', () => {
+  const target = { mediaType: 'tv' as const, tmdbId: 99, seasonNumber: 1, episodeNumber: 2 };
+  const completed = { ...target, status: 'completed', progress: 100, importState: 'confirmed' as const };
+  assert.equal(hasActiveDownloadInScope([completed], target), false);
+  assert.equal(hasActiveDownloadInScope([{ ...completed, importState: 'pending' }], target), true);
+  assert.equal(hasActiveDownloadInScope([{ ...completed, status: 'downloading', progress: 40 }], target), true);
+  assert.equal(hasActiveDownloadInScope([{ ...completed, status: 'downloading', progress: 40, episodeNumber: 3 }], target), false);
+  assert.equal(hasActiveDownloadInScope([{ ...completed, status: 'error', errorMessage: 'Import bloqué' }], target), false);
+});
 
 test('SEENIT-DOWNLOAD-013 les groupes sont exclusifs et un import bloqué à 100 reste à traiter', () => {
   const groups = [

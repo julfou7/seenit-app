@@ -2058,3 +2058,9 @@ Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé 
 ### Téléchargements — évolution du 5 novembre 2026
 
 **SEENIT-DOWNLOAD-013** — Le [contrat du prototype](../design/downloads-2026-11-05.md) (#861) complète SEENIT-UX-019 et les invariants DOWNLOAD existants : groupes exclusifs avec erreurs prioritaires, cartes compactes, numéros sur vignettes, commandes épisode de la fiche série sous feature gate. Il remplace l'exclusion des commandes de téléchargement en ligne pour ces lignes seulement. Aucune présence Plex ni réussite d'import n'est déduite du seul pourcentage. Les appels C411 portent le Referer dès la première tentative ; une panne ou une réponse invalide ne devient jamais un résultat vide. Les lancements automatiques utilisent les releases interactives déjà vérifiées, sans seconde recherche. Une saison emploie un pack confirmé ou des épisodes mappés sans doublon ; aucun fichier existant n'est remplacé sans choix manuel explicite. Light est filtré sur sa mention réelle, pas déduit de la taille.
+
+Correctif visuel terrain v254 : aucun nom technique de release dans la carte, même dépliée ; actions
+secondaires sous « … ». Le sélecteur commun expose des choix qualité homogènes, sans jargon
+d'infrastructure ni historique de transfert terminé. L'icône de téléchargement de saison est à droite
+du titre Saison N, jamais dans la rangée Tout marquer vu. Ouverture et fermeture sans mutation,
+choix explicite et gardes de présence/scope inchangés. TNR navigateur sur le vrai DownloadModal.
