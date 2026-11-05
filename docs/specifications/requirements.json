@@ -1,16 +1,20 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.254",
+  "applicationVersion": "1.4.255",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
       "id": "SEENIT-DOWNLOAD-013",
-      "title": "Téléchargements prototype, commandes épisode et lancements sans faux succès",
+      "title": "Téléchargements sobres, sélecteur de qualité, commandes épisode et lancements sans faux succès",
       "targets": [
         "pwa",
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/downloadPrototype.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 le sélecteur reste utilisable après un terminé et bloque seulement le scope actif"
+        },
         {
           "file": "tests/downloadPrototype.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 les groupes sont exclusifs et un import bloqué à 100 reste à traiter"

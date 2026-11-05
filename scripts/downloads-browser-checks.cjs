@@ -6,7 +6,7 @@ async function buildDownloadsHarness(root) {
   const dist = path.join(root, 'dist');
   const runtime = path.join(root, 'tests/fixtures/downloadsRuntime.ts');
   await esbuild.build({ entryPoints: [path.join(root, 'tests/fixtures/downloads.tsx')], outfile: path.join(dist, '__seenit-downloads.js'), bundle: true, platform: 'browser', format: 'iife', target: ['chrome120'], logLevel: 'silent', plugins: [{ name: 'download-ui-ports', setup(builder) {
-    builder.onResolve({ filter: /\/(?:liveDownloadStore|downloadConfigStore|toastStore|showsStore|sonarrRadarr|c411|DownloadConfigSection|AlternativeReleaseModal|DownloadModal|downloadLifecycle|useTabShortcut)$/ }, () => ({ path: runtime }));
+    builder.onResolve({ filter: /\/(?:liveDownloadStore|downloadConfigStore|toastStore|showsStore|sonarrRadarr|c411|DownloadConfigSection|AlternativeReleaseModal|downloadLifecycle|useTabShortcut|useMediaPresence|episodeSeasonPackFallback)$/ }, () => ({ path: runtime }));
   } }] });
   const css = fs.readdirSync(path.join(dist, 'assets')).filter(file => file.endsWith('.css'));
   fs.writeFileSync(path.join(dist, '__seenit-downloads.html'), `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${css.map(file => `<link rel="stylesheet" href="/assets/${file}">`).join('')}<link rel="stylesheet" href="/__seenit-downloads.css"><style>body{margin:0;background:#09090b;color:white}</style></head><body><div id="root"></div><script>window.__downloadErrors=[];addEventListener('error',e=>__downloadErrors.push(e.message));addEventListener('unhandledrejection',e=>__downloadErrors.push(String(e.reason)));</script><script src="/__seenit-downloads.js"></script></body></html>`);
@@ -29,11 +29,17 @@ async function testDownloadsHarness(client, root) {
     await check(client, '[...document.querySelectorAll("section h2")].map(el=>el.textContent).join(";").startsWith("À traiter · 1;En cours · 1;En attente de disponibilité · 1;Terminés · 1")', 'erreurs prioritaires sans doublon');
     await check(client, 'document.documentElement.scrollWidth<=innerWidth && [...document.querySelectorAll(".download-card__poster")].every(el=>el.getBoundingClientRect().height>=60)', 'largeur 360/412 et affiches non rognées');
     await check(client, 'document.body.innerText.includes("Recherche interrompue · disponibilité à vérifier") && !document.body.innerText.includes("Surveillance active")', 'attente sans promesse inventée');
+    await check(client, '!document.querySelector(".download-card__actions") && !document.body.innerText.includes(".1080p")', 'cartes sobres sans dump de release');
+    await evaluate(client, 'document.querySelector(\'[data-download-id="4"] .download-card__more\').click()');
+    await check(client, 'document.querySelector(\'[data-download-id="4"] .download-card__actions\') && !document.body.innerText.includes("Dune.1080p")', 'actions utiles sans nom de fichier même dépliées');
+    await evaluate(client, 'document.querySelector(\'[data-download-id="4"] .download-card__more\').click(); document.querySelector(\'[data-download-id="2"] .download-card__more\').click()');
+    await check(client, 'document.querySelector(\'[data-download-id="2"] .download-card__actions button\')', 'actions actives dépliées');
     await evaluate(client, 'document.querySelector(\'[data-download-id="2"] .download-card__actions button\').click()');
     await check(client, 'document.querySelector("[role=alertdialog]") && document.activeElement.textContent.includes("Garder")', 'confirmation centrée avec focus sûr');
     await check(client, '(()=>{const r=document.querySelector("[role=alertdialog] > div").getBoundingClientRect();return r.top>=16&&r.bottom<=innerHeight-16})()', 'confirmation visible au-dessus du système');
     await evaluate(client, '[...document.querySelectorAll("button")].find(el=>el.textContent.trim()==="Garder").click()');
     await check(client, '!document.querySelector("[role=alertdialog]") && window.__downloads.telemetry.removed.length===0', 'abandon sans suppression');
+    await evaluate(client, 'document.querySelector(\'[data-download-id="2"] .download-card__more\').click()');
     const capture = await client.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
     fs.writeFileSync(path.join(root, 'quality-reports', `downloads-prototype-${width}.png`), Buffer.from(capture.data, 'base64'));
     await evaluate(client, '[...document.querySelectorAll("button")].find(el=>el.textContent.trim()==="Recherche C411").click()');
@@ -46,7 +52,21 @@ async function testDownloadsHarness(client, root) {
     await check(client, 'window.__downloads.telemetry.requested.includes(1)&&!window.__downloads.telemetry.opened.includes("episode:1")', 'télécharger ne déclenche pas l’ouverture');
     await check(client, 'document.querySelector(\'[aria-label="Épisode 3 disponible"]\').disabled && document.querySelector(\'[aria-label^="Téléchargement de l’épisode 2"]\').disabled', 'présent et actif sans double envoi');
     await check(client, 'document.documentElement.scrollWidth<=innerWidth', 'titres et actions épisode sans débordement');
-    reports.push({ width, cards: true, confirmation: true, error: true, episodeActions: true });
+    await check(client, '(()=>{const b=document.querySelector(\'[aria-label="Télécharger la saison 2"]\');const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44&&b.parentElement.parentElement.textContent.includes("Saison 2")&&!b.textContent.trim()})()', 'saison disponible par icône dans son en-tête');
+    await evaluate(client, 'window.__downloads.mount("modal")');
+    await check(client, 'document.querySelector(".download-dialog__choices") && document.querySelectorAll(".download-dialog__choices button").length===2', 'vrai sélecteur de qualité monté');
+    await check(client, '(()=>{const d=document.querySelector(".download-dialog").getBoundingClientRect();return d.top>=16&&d.bottom<=innerHeight-16&&document.documentElement.scrollWidth<=innerWidth})()', 'popup et titre long contenus en 360/412');
+    await check(client, '!document.body.innerText.includes("Sonarr")&&!document.body.innerText.includes("Cible")&&!document.body.innerText.includes("Téléchargement terminé")&&window.__downloads.telemetry.mutations.length===0', 'popup sans jargon ni historique ; ouverture sans mutation');
+    const modalCapture = await client.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    fs.writeFileSync(path.join(root, 'quality-reports', `downloads-dialog-${width}.png`), Buffer.from(modalCapture.data, 'base64'));
+    await evaluate(client, 'document.querySelector(\'[aria-label="Fermer la fenêtre de téléchargement"]\').click()');
+    await check(client, '!document.querySelector(".download-dialog")&&window.__downloads.telemetry.mutations.length===0', 'fermer sans lancer');
+    await evaluate(client, 'window.__downloads.mount("movie-modal")');
+    await check(client, 'document.querySelector(\'[aria-label="Télécharger en 1080p"]\')', 'choix film explicite');
+    await evaluate(client, 'document.querySelector(\'[aria-label="Télécharger en 1080p"]\').click()');
+    await check(client, 'window.__downloads.telemetry.mutations.length===1 && window.__downloads.telemetry.mutations[0].quality==="1080p" && !document.querySelector(".download-dialog")', 'choix qualité unique puis fermeture');
+    await evaluate(client, 'window.__downloads.telemetry.mutations.length=0');
+    reports.push({ width, cards: true, confirmation: true, error: true, episodeActions: true, realQualityDialog: true });
   }
   return reports;
 }

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
 
-export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0 };
+export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }> };
 const sample = (id: string, title: string, status: string, progress = 0): LiveDownloadItem => ({ id, title, movieTitle: title, mediaType: 'movie', tmdbId: Number(id), size: 1200000000, sizeleft: 600000000, status, progress, statusText: status === 'warning' ? 'Manual import required' : 'État confirmé par le client', quality: '1080p', downloadClient: 'Radarr', releaseTitle: `${title}.1080p`, posterPath: '/fixture.jpg', addedAt: Number(id) });
 export const fixtureItems = [sample('1', 'Blade Runner', 'warning', 100), sample('2', 'The Punisher : un très long titre de film à conserver entièrement', 'downloading', 63), { ...sample('3', 'The Boys', 'waiting'), availability: { reason: 'unconfirmed', automatic: false } }, sample('4', 'Dune', 'completed', 100)];
 export const useLiveDownloadStore = create(() => ({ downloads: fixtureItems, fetchDownloads: async () => {}, removeDownload: async (item: LiveDownloadItem) => { telemetry.removed.push(item.id); useLiveDownloadStore.setState(state => ({ downloads: state.downloads.filter(value => value.id !== item.id) })); return true; }, clearAllDownloads: async () => {} }));
@@ -17,8 +17,13 @@ export const formatTorrentSize = formatBytes;
 export const openC411Magnet = async () => false;
 export const DownloadConfigSection = () => null;
 export const AlternativeReleaseModal = () => null;
-export const DownloadModal = () => null;
-export const beginDownloadRequest = () => { throw new Error('mutation inattendue'); };
+export const beginDownloadRequest = (request: { quality: string }) => { telemetry.mutations.push(request); return 'fixture-request'; };
 export const acceptDownloadRequest = () => {};
 export const failDownloadRequest = () => {};
+export const updateDownloadRequest = () => {};
+export const useMediaPresence = () => ({ loading: false, episodesHasFile: {}, seasonsHasFile: {}, radarrHasFile: false, plexInfo: null });
+export const fetchQualityProfiles = async () => [{ id: 1, name: 'HD-1080p' }, { id: 2, name: 'UltraHD-4K' }];
+export const searchAndDownloadInRadarr = async () => ({ success: true, message: 'Demande acceptée', status: 'searching' });
+export const searchAndDownloadInSonarr = searchAndDownloadInRadarr;
+export const downloadEpisodeWithSeasonPackFallback = async () => { throw new Error('Lancement épisode inattendu dans ce contrôle visuel'); };
 export const useTabShortcut = () => {};

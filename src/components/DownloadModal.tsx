@@ -7,20 +7,15 @@ import {
   ChevronRight,
   Copy,
   Download,
-  HardDrive,
-  Layers,
   Loader2,
-  PlaySquare,
-  Radio,
   Search,
-  Tv,
   X
 } from 'lucide-react';
 import { type C411Torrent, formatTorrentSize, openC411Magnet, searchC411Torrents } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useToastStore } from '../store/toastStore';
-import { LiveDownloadBanner } from './LiveDownloadBanner';
+import './download-dialog.css';
 import {
   fetchQualityProfiles,
   pushReleaseDirectly,
@@ -226,19 +221,14 @@ export function DownloadModal({
     : scopeMode === 'episode' ? Boolean(presence.episodesHasFile[`${selectedSeason}x${selectedEpisode}`])
       : scopeMode === 'season' ? Boolean(presence.seasonsHasFile[selectedSeason]) : false;
 
-  const activeDownloads = useMemo(() => {
-    if (mediaType === 'tv') {
-      return useLiveDownloadStore.getState().getShowDownloads(tmdbId, undefined, title);
-    }
-    const movie = useLiveDownloadStore.getState().getMovieDownload(tmdbId, title);
-    return movie ? [movie] : [];
-  }, [downloads, mediaType, tmdbId, title]);
+  const scopeBusy = hasActiveDownloadInScope(downloads, {
+    mediaType, tmdbId: Number(tmdbId), seasonNumber: isTv && scopeMode !== 'all' ? selectedSeason : undefined,
+    episodeNumber: isTv && scopeMode === 'episode' ? selectedEpisode : undefined
+  });
 
   const hasAutomationClient = mediaType === 'tv'
     ? Boolean(config.sonarrUrl && config.sonarrApiKey)
     : Boolean(config.radarrUrl && config.radarrApiKey);
-
-  const automationClientName = mediaType === 'tv' ? 'Sonarr' : 'Radarr';
 
   const showMediaDownloadToast = (action: string, toastType: 'download' | 'success' | 'error' | 'info' = 'download') => {
     const subtitle = mediaType === 'tv'
@@ -590,188 +580,45 @@ export function DownloadModal({
 
   return (
     <DialogLayer onDismiss={onClose} label="Télécharger" historyMode="local" role="dialog"
-      className="fixed inset-0 z-[200] flex items-center justify-center p-3 pt-10 pb-20 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
-
-      onMouseDown={event => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div
-        ref={dialogRef}
-
-
-        aria-labelledby="download-dialog-title"
-        tabIndex={-1}
-        className="relative w-full max-w-md max-h-[88vh] overflow-hidden rounded-3xl border border-zinc-800 bg-zinc-900 shadow-2xl flex flex-col outline-none"
-      >
-        <div className="shrink-0 p-4 border-b border-zinc-800 flex items-center gap-3 bg-zinc-900/95">
-          {posterPath ? (
-            <img
-              src={`https://image.tmdb.org/t/p/w185${posterPath}`}
-              alt={title}
-              className="w-11 h-16 object-cover rounded-xl border border-white/10 bg-zinc-950"
-            />
-          ) : (
-            <div className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-              <Download size={20} />
-            </div>
-          )}
-
-          <div className="flex-1 min-w-0">
-            <h3 id="download-dialog-title" className="font-extrabold text-base text-white truncate">{title}</h3>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              {mediaType === 'tv' ? 'Série' : 'Film'}{year ? ` • ${year}` : ''}
-            </p>
+      className="download-dialog-overlay"
+      onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+      <div ref={dialogRef} aria-labelledby="download-dialog-title" tabIndex={-1} className="download-dialog">
+        <header className="download-dialog__header">
+          {posterPath && <img src={posterPath.startsWith('http') ? posterPath : `https://image.tmdb.org/t/p/w185${posterPath}`} alt="" className="download-dialog__poster" />}
+          <div className="download-dialog__identity">
+            <p className="download-dialog__eyebrow">Télécharger</p>
+            <h3 id="download-dialog-title">{title}</h3>
+            <p className="download-dialog__muted">{isTv ? 'Série' : 'Film'}{year ? ` · ${year}` : ''}</p>
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-11 h-11 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center transition-colors"
-            aria-label="Fermer la fenêtre de téléchargement"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
-          {mediaType === 'tv' && (
-            <section className="rounded-2xl border border-white/8 bg-zinc-950/60 p-3 space-y-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
-                  <Layers size={13} className="text-blue-400" />
-                  Cible
-                </span>
-                <span className="text-[11px] font-bold text-zinc-300">
-                  {scopeMode === 'all'
-                    ? 'Toute la série'
-                    : scopeMode === 'season'
-                      ? `Saison ${selectedSeason}`
-                      : `S${String(selectedSeason).padStart(2, '0')} | E${String(selectedEpisode).padStart(2, '0')}`}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-1 p-1 bg-zinc-900 rounded-xl">
-                {[
-                  { id: 'all' as ScopeMode, label: 'Série', icon: Tv },
-                  { id: 'season' as ScopeMode, label: 'Saison', icon: Layers },
-                  { id: 'episode' as ScopeMode, label: 'Épisode', icon: PlaySquare }
-                ].map(option => {
-                  const Icon = option.icon;
-                  const selected = scopeMode === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => handleScopeChange(option.id)}
-                      className={`min-h-11 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors ${
-                        selected ? 'bg-[#E5A93D] text-black' : 'text-zinc-400 hover:text-white'
-                      }`}
-                    >
-                      <Icon size={12} />
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {scopeMode !== 'all' && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsSeasonPickerOpen(true)}
-                    className="min-h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-bold text-white flex items-center gap-2"
-                  >
-                    {currentSeason.name || `Saison ${selectedSeason}`}
-                    <ChevronDown size={13} className="text-zinc-400" />
-                  </button>
-
-                  {scopeMode === 'episode' && (
-                    <button
-                      type="button"
-                      onClick={() => setIsEpisodePickerOpen(true)}
-                      className="min-h-11 px-3 rounded-xl bg-zinc-900 border border-zinc-700 text-xs font-bold text-white flex items-center gap-2"
-                    >
-                      Épisode {selectedEpisode}
-                      <ChevronDown size={13} className="text-zinc-400" />
-                    </button>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
-
-          <section className="rounded-2xl border border-white/8 bg-zinc-950/60 p-3.5 space-y-3">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h4 className="text-sm font-extrabold text-white">Téléchargement automatique</h4>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
-                  SeenIt transmet la demande à {automationClientName}, puis suit réellement son état.
-                </p>
-              </div>
-              <span className={`text-[10px] font-bold px-2 py-1 rounded-full border ${
-                hasAutomationClient
-                  ? 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20'
-                  : 'text-amber-300 bg-amber-500/10 border-amber-500/20'
-              }`}>
-                {hasAutomationClient ? 'Prêt' : 'À configurer'}
-              </span>
+          <button type="button" onClick={onClose} className="download-dialog__close" aria-label="Fermer la fenêtre de téléchargement"><X size={20} /></button>
+        </header>
+        <div className="download-dialog__content">
+          {isTv && <section className="download-dialog__scope" aria-label="Contenu à télécharger">
+            <div className="download-dialog__tabs">
+              {([{ id: 'all', label: 'Série' }, { id: 'season', label: 'Saison' }, { id: 'episode', label: 'Épisode' }] as const).map(option =>
+                <button key={option.id} type="button" aria-pressed={scopeMode === option.id} onClick={() => handleScopeChange(option.id)}>{option.label}</button>)}
             </div>
-
-            {alreadyAvailable && <label className="flex items-center gap-3 min-h-11 text-sm text-[#F2C36B]"><input type="checkbox" checked={replaceExisting} onChange={event => setReplaceExisting(event.target.checked)} />Remplacer explicitement le fichier disponible</label>}
-            {presence.loading && <p role="status" className="text-xs text-zinc-400">Vérification de la disponibilité…</p>}
-            {hasAutomationClient ? (
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  disabled={isTriggeringAuto || presence.loading || (alreadyAvailable && !replaceExisting)}
-                  onClick={() => handleAutoSearchClient('1080p')}
-                  className="p-3 rounded-2xl border border-blue-500/25 bg-blue-500/8 hover:bg-blue-500/15 text-left transition-colors disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-blue-300">1080p</span>
-                    {isTriggeringAuto ? <Loader2 size={14} className="animate-spin text-blue-300" /> : <ChevronRight size={14} className="text-blue-400" />}
-                  </div>
-                  <p className="text-xs text-zinc-400 mt-1">Préférence HD</p>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={isTriggeringAuto || presence.loading || (alreadyAvailable && !replaceExisting)}
-                  onClick={() => handleAutoSearchClient('4k')}
-                  className="p-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 hover:bg-amber-500/15 text-left transition-colors disabled:opacity-50"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-amber-300">4K / 2160p</span>
-                    {isTriggeringAuto ? <Loader2 size={14} className="animate-spin text-amber-300" /> : <ChevronRight size={14} className="text-amber-400" />}
-                  </div>
-                  <p className="text-xs text-zinc-400 mt-1">Préférence Ultra-HD</p>
-                </button>
-              </div>
-            ) : (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-200 flex gap-2">
-                <AlertCircle size={15} className="shrink-0 mt-0.5" />
-                <span>
-                  Configure {automationClientName} dans Téléchargements → Réglages pour activer le mode 1-clic.
-                </span>
-              </div>
-            )}
+            {scopeMode !== 'all' && <div className="download-dialog__pickers">
+              <button type="button" onClick={() => setIsSeasonPickerOpen(true)}>Saison {selectedSeason}<ChevronDown size={15} /></button>
+              {scopeMode === 'episode' && <button type="button" onClick={() => setIsEpisodePickerOpen(true)}>Épisode {selectedEpisode}<ChevronDown size={15} /></button>}
+            </div>}
+          </section>}
+          <section className="download-dialog__quality" aria-label="Choisir la qualité">
+            <h4>Choisir la qualité</h4>
+            {alreadyAvailable && <label className="download-dialog__replace"><input type="checkbox" checked={replaceExisting} onChange={event => setReplaceExisting(event.target.checked)} />Remplacer le fichier déjà disponible</label>}
+            {presence.loading && <p role="status" className="download-dialog__muted">Vérification de la disponibilité…</p>}
+            {scopeBusy && <p role="status" className="download-dialog__muted">Un téléchargement est déjà en cours pour ce contenu.</p>}
+            {hasAutomationClient ? <div className="download-dialog__choices">
+              {([{ id: '1080p', label: '1080p', hint: 'Full HD' }, { id: '4k', label: '4K', hint: 'Ultra HD · 2160p' }] as const).map(quality =>
+                <button key={quality.id} type="button" aria-label={`Télécharger en ${quality.label}`} disabled={isTriggeringAuto || scopeBusy || presence.loading || (alreadyAvailable && !replaceExisting)} onClick={() => handleAutoSearchClient(quality.id)}>
+                  <span className="download-dialog__quality-icon">{isTriggeringAuto ? <Loader2 size={19} className="animate-spin" /> : <Download size={19} />}</span>
+                  <span><strong>{quality.label}</strong><small>{quality.hint}</small></span><ChevronRight size={18} />
+                </button>)}
+            </div> : <p className="download-dialog__muted">Configure les téléchargements dans les réglages pour choisir une qualité.</p>}
           </section>
-
-          <section className="rounded-2xl border border-white/8 bg-zinc-950/60 overflow-hidden">
-            <button
-              type="button"
-              onClick={() => setManualOpen(value => !value)}
-              className="w-full p-3.5 flex items-center justify-between text-left"
-            >
-              <div className="flex items-center gap-2.5">
-                <Radio size={16} className="text-zinc-400" />
-                <div>
-                  <h4 className="text-xs font-extrabold text-white">Choisir une release manuellement</h4>
-                  <p className="text-xs text-zinc-500 mt-0.5">Recherche C411 avancée</p>
-                </div>
-              </div>
-              <ChevronDown size={15} className={`text-zinc-500 transition-transform ${manualOpen ? 'rotate-180' : ''}`} />
+          <section className="download-dialog__manual">
+            <button type="button" onClick={() => setManualOpen(value => !value)} aria-expanded={manualOpen} className="download-dialog__manual-toggle">
+              <Search size={18} /><span>Choisir une autre version</span><ChevronDown size={16} className={manualOpen ? 'rotate-180' : ''} />
             </button>
 
             {manualOpen && (
@@ -895,11 +742,6 @@ export function DownloadModal({
             </div>
           )}
 
-          {activeDownloads.length > 0 && (
-            <section>
-              <LiveDownloadBanner items={activeDownloads} />
-            </section>
-          )}
         </div>
       </div>
 
