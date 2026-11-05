@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.253",
+  "applicationVersion": "1.4.254",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -2169,6 +2169,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/releaseBotPrWorkflow.test.ts",
+          "contains": "SEENIT-RELEASE-005 conserve le check PR même pour les huit surfaces de version"
+        },
         {
           "file": "tests/releaseFastPath.test.ts",
           "contains": "SEENIT-RELEASE-005 rend l'agent autonome jusqu'au workflow avec fallback navigateur"

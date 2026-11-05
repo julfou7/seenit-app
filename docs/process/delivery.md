@@ -96,6 +96,12 @@ boucle de mise au point distante.
 
 ### Une validation complète par arbre livré (`SEENIT-QUALITY-013`, #85)
 
+Depuis le 05/11/2026, une candidate préparée par #102 est ouverte en PR par le connecteur
+propriétaire et obtient le check `pull_request` sans filtre de chemins. Un succès de job
+`workflow_dispatch` ne satisfait pas les rulesets GitHub : il ne suffit pas pour fusionner.
+Voir la correction #85 / PR #865 dans `ci-validation-fast-paths.md`. Le contrôle de protection
+et la preuve exacte d'arbre restent requis ; aucune validation n'est contournée.
+
 Mesure du 31/10/2026 (v1.4.239) : la candidate de version a été validée deux fois à l'identique, une fois en
 PR et une fois sur `main` (6 min 20 s puis 6 min 25 s). Sur ces 6 min 25 s, le smoke navigateur prenait
 4 min 55 s. La publication elle-même ne prend que 2 min 30 s.

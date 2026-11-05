@@ -190,25 +190,10 @@ async function findCandidatePrs(request, owner, branchName) {
   return Array.isArray(prs) ? prs : [];
 }
 
-async function createCandidatePr(request, { branchName, version, mainSha }) {
-  return request('/pulls', {
-    method: 'POST',
-    body: {
-      title: `chore(release): préparer SeenIt ${version}`,
-      head: branchName,
-      base: MAIN_BRANCH,
-      body: buildCandidatePrBody({ version, mainSha })
-    }
-  });
-}
-
-async function createCandidatePrWithPolicyHandoff(request, options) {
-  try {
-    return { pr: await createCandidatePr(request, options), prHandoff: false };
-  } catch (error) {
-    if (!isActionsPrCreationPolicyError(error)) throw error;
-    return { pr: null, prHandoff: true };
-  }
+async function createCandidatePrWithPolicyHandoff() {
+  // GITHUB_TOKEN suppresses recursive PR events; workflow_dispatch checks are not
+  // eligible for PR rulesets. The connected owner must open the prepared PR.
+  return { pr: null, prHandoff: true };
 }
 
 function findNewCandidateValidationRun(runs, branchSha, previousIds = []) {
@@ -401,13 +386,13 @@ async function runPrepareReleaseControl({ event, token = process.env.GITHUB_TOKE
     `- Branche : \`${branchName}\``,
     `- Commit release-only : \`${candidate.branchSha}\``,
     requiresConnectorPr
-      ? '- PR : non créée par `GITHUB_TOKEN` car la policy du dépôt interdit aux GitHub Actions de créer des pull requests.'
+      ? '- PR : à ouvrir par le connecteur propriétaire ; un workflow_dispatch vert ne satisfait pas le check requis de PR.'
       : `- PR : ${candidate.pr?.html_url || `#${candidate.pr?.number || '?'}`}`,
     validationRun ? `- Validation canonique explicite : ${validationRun.html_url || `run #${validationRun.id}`}` : null,
     '- Portée : exactement 8 surfaces de version, 1 commit, aucun fichier métier.',
     requiresConnectorPr
       ? `- Prochaine action exacte : ouvrir via le connecteur GitHub une PR \`${branchName}\` → \`${MAIN_BRANCH}\`, sans modifier ni recréer la candidate ; attendre sa CI, fusionner si verte, puis \`/release-apk\` sur #102.`
-      : '- Prochaine action exacte : attendre la validation canonique explicite de ce SHA ; fusion interdite tant qu’elle n’est pas verte, puis `/release-apk` sur #102.',
+      : '- Prochaine action exacte : attendre le check Validate Change de pull_request (le dispatch seul ne satisfait pas le ruleset), fusionner si vert, puis `/release-apk` sur #102.',
     seconds === null ? null : `- Demande → ${requiresConnectorPr ? 'handoff PR' : 'PR + validation'} : **${seconds} s**`
   ].filter(Boolean).join('\n'));
 
@@ -450,6 +435,7 @@ module.exports = {
   VALIDATION_WORKFLOW,
   buildCandidateBranchName,
   buildCandidatePrBody,
+  createCandidatePrWithPolicyHandoff,
   deleteRemoteCandidateRef,
   dispatchCandidateValidation,
   evaluateRecyclableRemoteCandidate,

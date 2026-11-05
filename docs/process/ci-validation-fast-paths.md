@@ -57,7 +57,21 @@ Le lint complet conserve son propre `format:check` plus tard dans le parcours. C
 
 TNR terrain à conserver : l'échec du run `41217908650` / job `124586192577` sur la PR #829 provenait uniquement de `src/components/FilterModal.tsx: fin de ligne finale manquante`. Ce type d'erreur ne doit plus attendre le devcontainer puis TypeScript pour être remonté.
 
-## 5. Candidate release-only créée par GitHub Actions
+## 5. Candidate préparée par GitHub Actions, PR ouverte par le connecteur
+
+Correction du 05/11/2026 (#85, PR #865) : le run candidat `42075664015` était vert,
+mais GitHub refusait la fusion avec `Required status check Validate Change is expected`.
+GitHub n'évalue pas les checks de jobs `workflow_dispatch` pour les rulesets de PR.
+Source : https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/troubleshooting-required-status-checks
+
+Le contrôleur prépare toujours un commit avec les huit surfaces. Il n'ouvre plus de PR avec
+`GITHUB_TOKEN` : il renvoie `connector_pr_required` au propriétaire connecté, qui ouvre la PR
+une seule fois. Le workflow `pull_request` ne possède plus de filtre de chemins ; son vrai
+check `Validate Change` doit réussir avant fusion. Aucun bypass, statut fabriqué ou commit
+sans objet n'est autorisé. Une PR existante se réutilise, mais le dispatch seul ne suffit pas.
+La preuve d'arbre permet ensuite de réutiliser la validation sur main, comme auparavant.
+
+### Historique remplacé : filtre release-only (ne plus appliquer)
 
 Le contrôleur #102 valide déjà chaque candidate `release/vX.Y.Z` avec un `workflow_dispatch` explicite de `build-apk.yml` sur le **SHA exact**, `release_apk=false`. Ce run produit le check GitHub Actions `Validate Change` requis par le ruleset `Protect main`.
 

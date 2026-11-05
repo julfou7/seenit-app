@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.253**
+Version applicative : **1.4.254**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1646,6 +1646,11 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   écrasement et tout fichier manquant. Une correction d'une version déjà publiée utilise
   obligatoirement un nouveau patch.
 - **SEENIT-RELEASE-005** — Une demande explicite de publication APK autorise l'agent à fusionner la
+  candidate seulement avec un check requis issu d'un événement PR éligible. Le contrôleur prépare
+  les huit surfaces puis confie l'ouverture de PR au connecteur propriétaire ; le workflow PR
+  ne filtre pas ces surfaces. Un succès `workflow_dispatch` seul ne satisfait pas le ruleset.
+  Cette règle corrige le refus de fusion #865 malgré le run vert 42075664015 (suivi #85).
+  La publication conserve le contrôleur #102 et les protections sans bypass. La
   candidate prête et déclencher lui-même le workflow depuis `main`. Les voies sont essayées dans cet ordre : outil GitHub direct,
   `release:dispatch`/`gh`, puis interface GitHub Actions via navigateur authentifié contrôlable.
   L'absence de CLI ou de token shell ne justifie pas un renvoi vers un clic utilisateur si le navigateur

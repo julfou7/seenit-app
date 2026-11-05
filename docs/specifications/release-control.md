@@ -25,6 +25,16 @@ Seul le propriétaire du dépôt, avec `author_association=OWNER`, est autorisé
 
 ## Préparation connector-only de la candidate
 
+### Check de PR obligatoire — correction du 05/11/2026
+
+Le contrôleur prépare la branche puis retourne toujours `connector_pr_required` si aucune PR
+n'existe. Le connecteur propriétaire ouvre la PR ; `pull_request` valide tous les chemins,
+y compris les huit surfaces de version. Le check requis doit venir de cet événement éligible :
+un job `workflow_dispatch` vert ne satisfait pas le ruleset de PR (refus405 observé sur #865,
+run42075664015). Le dispatch reste une preuve supplémentaire pour une candidate historique,
+jamais un remplacement du check PR. Les descriptions historiques de création bot et de
+dispatch ci-dessous sont supplantées par cette règle ; aucun changement de protection.
+
 Quand aucune candidate compatible n’existe, `/prepare-release-apk` devient le chemin prioritaire. L’absence d’un workspace, de `gh`, d’un token shell ou d’un navigateur authentifié **n’est pas un blocage** et ne justifie plus une reproduction manuelle des huit fichiers. Cette reproduction n’est admise qu’en secours après panne prouvée du contrôleur.
 
 Le job `Prepare Release Candidate` possède `actions: write`, `contents: write`, `pull-requests: write` et `issues: write`. `actions: write` sert exclusivement à déclencher la validation canonique non-release de la candidate ; il n’autorise pas ce job à publier une APK et ne lui donne aucun accès aux secrets de signature Android.
