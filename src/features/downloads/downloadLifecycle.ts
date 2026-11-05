@@ -22,6 +22,7 @@ export interface BeginDownloadRequestInput {
   downloadClient: string;
   statusText?: string;
   releaseTitle?: string;
+  quality?: string;
 }
 
 export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
@@ -38,10 +39,12 @@ export function beginDownloadRequest(input: BeginDownloadRequestInput): string {
     posterPath: input.posterPath,
     backdropPath: input.backdropPath,
     downloadClient: input.downloadClient,
+    importState: /^(Sonarr|Radarr)$/i.test(input.downloadClient) ? 'pending' : undefined,
     progress: 0,
     status: 'submitting',
     statusText: input.statusText || `Demande prise en compte • envoi à ${input.downloadClient}…`,
     releaseTitle: input.releaseTitle || input.title,
+    quality: input.quality,
     addedAt: Date.now(),
     isOptimistic: true,
     isRestored: false

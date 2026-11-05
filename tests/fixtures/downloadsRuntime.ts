@@ -1,0 +1,24 @@
+import { create } from 'zustand';
+import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
+
+export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0 };
+const sample = (id: string, title: string, status: string, progress = 0): LiveDownloadItem => ({ id, title, movieTitle: title, mediaType: 'movie', tmdbId: Number(id), size: 1200000000, sizeleft: 600000000, status, progress, statusText: status === 'warning' ? 'Manual import required' : 'État confirmé par le client', quality: '1080p', downloadClient: 'Radarr', releaseTitle: `${title}.1080p`, posterPath: '/fixture.jpg', addedAt: Number(id) });
+export const fixtureItems = [sample('1', 'Blade Runner', 'warning', 100), sample('2', 'The Punisher : un très long titre de film à conserver entièrement', 'downloading', 63), { ...sample('3', 'The Boys', 'waiting'), availability: { reason: 'unconfirmed', automatic: false } }, sample('4', 'Dune', 'completed', 100)];
+export const useLiveDownloadStore = create(() => ({ downloads: fixtureItems, fetchDownloads: async () => {}, removeDownload: async (item: LiveDownloadItem) => { telemetry.removed.push(item.id); useLiveDownloadStore.setState(state => ({ downloads: state.downloads.filter(value => value.id !== item.id) })); return true; }, clearAllDownloads: async () => {} }));
+const config = { downloadsEnabled: true, isHydrated: true, sonarrUrl: 'https://fixture.example', sonarrApiKey: 'fixture', radarrUrl: 'https://fixture.example', radarrApiKey: 'fixture' };
+export const useDownloadConfigStore = Object.assign(() => config, { getState: () => config });
+export const useToastStore = Object.assign(() => () => {}, { getState: () => ({ showToast: () => {} }) });
+export const useShowsStore = <T,>(selector: (state: { shows: [] }) => T) => selector({ shows: [] });
+export const formatBytes = (size: number) => `${(size / 1000000000).toFixed(1)} Go`;
+export const formatCleanMediaInfo = (item: LiveDownloadItem) => ({ cleanTitle: item.title, subTitle: item.mediaType === 'tv' ? 'S02 | E05' : 'Film', isTv: item.mediaType === 'tv' });
+export const pushReleaseDirectly = async () => { throw new Error('mutation inattendue'); };
+export const searchC411Torrents = async () => { telemetry.searched++; throw new Error('C411 indisponible (503).'); };
+export const formatTorrentSize = formatBytes;
+export const openC411Magnet = async () => false;
+export const DownloadConfigSection = () => null;
+export const AlternativeReleaseModal = () => null;
+export const DownloadModal = () => null;
+export const beginDownloadRequest = () => { throw new Error('mutation inattendue'); };
+export const acceptDownloadRequest = () => {};
+export const failDownloadRequest = () => {};
+export const useTabShortcut = () => {};

@@ -8,6 +8,8 @@ import { assertManualReleaseSearchCurrent, grabManualArrRelease, searchManualArr
 import { samePhysicalDownload } from '../features/downloads/downloadIdentity';
 import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGuard';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
+import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
+import { ReleaseLightFilter } from './ReleaseLightFilter';
 import { beginDownloadRequest, acceptDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 
 export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadItem; onClose: () => void }) {
@@ -15,6 +17,8 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   const showToast = useToastStore(state => state.showToast);
   const [season, setSeason] = useState(item.seasonNumber ?? 1);
   const [audioFilter, setAudioFilter] = useState<'all' | 'vff' | 'vfq'>('all');
+  const [lightFilter, setLightFilter] = useState<LightFilter>('all');
+  const [qualityFilter, setQualityFilter] = useState('all');
   const [session, setSession] = useState<ManualReleaseSearch | null>(null);
   const [selectedKey, setSelectedKey] = useState('');
   const [loading, setLoading] = useState(true);
@@ -40,6 +44,8 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   }, [item.mediaType, item.tmdbId, item.episodeNumber, season, refresh, config.radarrUrl,
     config.radarrApiKey, config.sonarrUrl, config.sonarrApiKey, config.scopeUid]);
   const candidates = (session?.candidates || []).filter(candidate => audioFilter === 'all' || candidate.audio[audioFilter])
+    .filter(candidate => matchesLightFilter(`${candidate.title} ${candidate.quality}`, lightFilter))
+    .filter(candidate => qualityFilter === 'all' || (qualityFilter === '4k' ? /2160|4k|uhd/i.test(`${candidate.title} ${candidate.quality}`) : /1080/i.test(`${candidate.title} ${candidate.quality}`) && !/2160|4k|uhd/i.test(`${candidate.title} ${candidate.quality}`)))
     .map(candidate => ({ ...candidate, current: samePhysicalDownload(item, { downloadId: candidate.infoHash }) }));
   const selected = candidates.find(candidate => candidate.key === selectedKey);
   const submit = async () => {
@@ -83,6 +89,8 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
           <button type="button" aria-label="Fermer" disabled={sending} onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5"><X size={20} /></button>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-b border-white/10 p-3">
+          <select aria-label="Filtrer la qualité" value={qualityFilter} disabled={sending} onChange={event => { setQualityFilter(event.target.value); setSelectedKey(''); }} className="h-11 rounded-lg bg-zinc-800 px-3 text-sm"><option value="all">Toutes les qualités</option><option value="1080p">1080p</option><option value="4k">4K</option></select>
+          <ReleaseLightFilter value={lightFilter} disabled={sending} onChange={value => { setLightFilter(value); setSelectedKey(''); }} />
           {item.mediaType === 'tv' && item.seasonNumber == null && <label className="flex items-center gap-2 text-sm">Saison
             <input aria-label="Saison à rechercher" type="number" min={0} max={999} value={season} disabled={sending}
               onChange={event => setSeason(Math.max(0, Number(event.target.value)))} className="h-11 w-16 rounded-lg bg-zinc-800 px-2" /></label>}

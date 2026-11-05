@@ -372,7 +372,7 @@ public class PlexAvailabilityWorker extends Worker {
         if (title.isEmpty()) title = "Téléchargement";
         String eventKey = clean(message.get("eventKey"), 128);
         int notificationId = notificationId(eventKey, mediaType, tmdbId, season, episode);
-        String compactText = episodeFact("Import terminé", season, episode);
+        String compactText = episodeFact("Import Plex terminé", season, episode);
 
         PendingIntent seenItIntent = buildSeenItPendingIntent(
             context, notificationId, tmdbId, mediaType, season, episode

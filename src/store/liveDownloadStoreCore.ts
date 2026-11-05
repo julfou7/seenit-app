@@ -38,7 +38,7 @@ import {
   shouldResolveMissingDownloadFromHistory
 } from '../features/downloads/downloadHistory';
 import { preferSeenItImagePath } from '../features/downloads/downloadPosterStability';
-import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
+import { isDownloadCompleted, isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
 import { buildLiveDownloadStorageKey, isDownloadRequestScopeCurrent } from '../features/downloads/downloadUserScope';
 import { normalizeUnresolvedQbitScope, shouldSuppressUnresolvedQbit } from '../features/downloads/downloadTransientVisibility';
 import { processTrackedSeasonPackFallbacks, removeTrackedSeasonPack } from '../features/downloads/episodeSeasonPackCleanup';
@@ -343,7 +343,7 @@ function isCancelledDownload(item: LiveDownloadItem): boolean {
 }
 
 function isTerminalDownload(item: LiveDownloadItem): boolean {
-  return isCancelledDownload(item) || item.status === 'completed' || Number(item.progress || 0) >= 100;
+  return isCancelledDownload(item) || isDownloadCompleted(item);
 }
 
 
@@ -468,6 +468,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           progress: item.progress ?? 0,
           status: item.status || 'submitting',
           statusText: item.statusText || 'Demande prise en compte…',
+          importState: item.importState,
           errorMessage: item.errorMessage,
           downloadClient: item.downloadClient || (item.mediaType === 'tv' ? 'Sonarr' : 'Radarr'),
           releaseTitle: item.releaseTitle || item.title,
@@ -602,6 +603,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               const localDownloadId = normalizeDownloadClientId(localItem.downloadId);
               if (cleanedDownloadIds.has(localDownloadId)) {
                 localItem.status = 'completed';
+                localItem.importState = 'confirmed';
                 localItem.progress = 100;
                 localItem.statusText = 'Téléchargement terminé 🍿';
                 localItem.sizeleft = 0;
@@ -675,6 +677,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               if (!serverItem.tmdbId && localMatch.tmdbId) serverItem.tmdbId = localMatch.tmdbId;
               if (!serverItem.tvdbId && localMatch.tvdbId) serverItem.tvdbId = localMatch.tvdbId;
               if (!serverItem.quality && localMatch.quality) serverItem.quality = localMatch.quality;
+              if (!serverItem.importState && localMatch.importState && (samePhysicalDownload(localMatch, serverItem) || sameDownloadRequest(localMatch, serverItem))) serverItem.importState = localMatch.importState;
               if (!serverItem.transferPath && localMatch.transferPath) serverItem.transferPath = localMatch.transferPath;
               if (!serverItem.addedAt && localMatch.addedAt) serverItem.addedAt = localMatch.addedAt;
               if (!serverItem.requestId && localMatch.requestId) serverItem.requestId = localMatch.requestId;
@@ -711,11 +714,14 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               serverItem.quality = extractQualityFromTitle(serverItem.releaseTitle || serverItem.title);
             }
 
-            if (serverItem.progress >= 100 || serverItem.status === 'completed') {
+            if (isDownloadCompleted(serverItem)) {
               serverItem.progress = 100;
               serverItem.status = 'completed';
               serverItem.statusText = 'Téléchargement terminé 🍿';
               serverItem.sizeleft = 0;
+            } else if (serverItem.importState === 'pending' && serverItem.progress >= 100 && !serverItem.errorMessage && serverItem.status !== 'error' && serverItem.status !== 'warning') {
+              serverItem.status = 'importing';
+              serverItem.statusText = 'Transfert terminé · import à confirmer';
             } else {
               markCompletionNotificationEligible(serverItem);
             }
@@ -792,7 +798,8 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             && !serverItems.some(serverItem => sameDownloadIdentity(oldItem, serverItem))
             && shouldResolveMissingDownloadFromHistory(oldItem, historyCheckNow)
           );
-          const historySnapshot = missingActiveItems.length > 0
+          const pendingImports = serverItems.filter(item => item.importState === 'pending' && item.progress >= 100);
+          const historySnapshot = missingActiveItems.length > 0 || pendingImports.length > 0
             ? await fetchRecentDownloadHistory({
                 sonarrUrl: config.sonarrUrl,
                 sonarrApiKey: config.sonarrApiKey,
@@ -806,6 +813,20 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
           if (!isCurrentScope()) return;
 
           const historyResolvedOptimisticIds = new Set<string>();
+          if (historySnapshot) {
+            for (const item of pendingImports) {
+              const outcome = resolveDownloadHistoryOutcome(item, historySnapshot);
+              if (outcome.state === 'completed') {
+                item.importState = 'confirmed';
+                item.status = 'completed';
+                item.statusText = 'Import confirmé';
+                item.errorMessage = undefined;
+              } else if (outcome.state === 'failed') {
+                item.status = 'error';
+                item.errorMessage = outcome.message || 'Import non confirmé';
+              }
+            }
+          }
           const preservedItems: LiveDownloadItem[] = [];
           for (const oldItem of currentDownloads) {
             if (removedSet.has(oldItem.id)) continue;
@@ -854,6 +875,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               sharedRequestsToRetire.set(sharedRequestDocId(oldItem), oldItem);
               preservedItems.push({
                 ...oldItem,
+                importState: 'confirmed',
                 quality: historyOutcome.quality || oldItem.quality,
                 downloadId: historyOutcome.downloadId || oldItem.downloadId,
                 downloadIdAliases: mergeDownloadIdAliases(oldItem, { downloadId: historyOutcome.downloadId }),
@@ -944,11 +966,9 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             const strongIds = [...getStrongPhysicalDownloadIds(a), ...getStrongPhysicalDownloadIds(b)];
             const cancelled = isCancelledDownload(a) || isCancelledDownload(b);
             const cancelledSource = isCancelledDownload(a) ? a : b;
-            const completed = !cancelled && (
-              a.status === 'completed' || Number(a.progress || 0) >= 100
-              || b.status === 'completed' || Number(b.progress || 0) >= 100
-            );
-            const hasError = !cancelled && !completed && (a.status === 'error' || b.status === 'error' || Boolean(a.errorMessage) || Boolean(b.errorMessage));
+            const importState = a.importState === 'confirmed' || b.importState === 'confirmed' ? 'confirmed' : a.importState || b.importState;
+            const hasError = !cancelled && (a.status === 'error' || b.status === 'error' || Boolean(a.errorMessage) || Boolean(b.errorMessage));
+            const completed = !cancelled && !hasError && importState !== 'pending' && (isDownloadCompleted(a) || isDownloadCompleted(b));
             const errorSource = a.status === 'error' || a.errorMessage ? a : b;
             const progress = completed
               ? 100
@@ -977,6 +997,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
                 : undefined,
               releaseTitle: meta.releaseTitle || live.releaseTitle,
               quality: extractQualityFromTitle(meta.releaseTitle || live.releaseTitle, meta.quality || live.quality),
+              importState,
               size: liveWithBestProgress.size > 0 ? liveWithBestProgress.size : meta.size,
               sizeleft: completed ? 0 : cancelled ? cancelledSource.sizeleft : liveWithBestProgress.sizeleft,
               progress,

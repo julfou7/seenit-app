@@ -71,6 +71,21 @@ test('un second appui conserve le requestId, le hash et la progression du transf
   assert.equal(Boolean(store.getState().downloads[0].isOptimistic), false);
   store.setState({ fetchDownloads, isPolling: false });
 });
+
+test('SEENIT-DOWNLOAD-013 le vrai poll attend la preuve import même lorsque le torrent atteint 100', async () => {
+  fixture();
+  state.history = [];
+  state.remotes[0] = { ...(state.remotes[0] as Record<string, unknown>), importState: 'pending' };
+  await store.getState().fetchDownloads();
+  assert.equal(store.getState().downloads[0].importState, 'pending');
+  const now = Date.now();
+  state.history = [{ eventType: 'downloadFolderImported', movie: { tmdbId: 11 }, downloadId: hash, date: new Date(now).toISOString() }];
+  // Un changement de scope transport invalide le cache d'historique de la fixture, sans changer l'identité média.
+  state.scope++;
+  await store.getState().fetchDownloads();
+  assert.equal(store.getState().downloads[0].importState, 'confirmed');
+  assert.equal(store.getState().downloads[0].status, 'completed');
+});
 test('le poll conserve deux transferts dont les hash sont différents', async () => {
   fixture('b'.repeat(40));
   await store.getState().fetchDownloads();

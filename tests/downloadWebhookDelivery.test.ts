@@ -38,14 +38,14 @@ test('SEENIT-NOTIFICATION-003 garde l’import visible et ajoute la vérificatio
   });
   assert.deepEqual(calls[1].notification, presentation.notification);
   assert.equal(calls[1].notification?.title, 'Terrain Movie');
-  assert.equal(calls[1].notification?.body, 'Import terminé');
+  assert.equal(calls[1].notification?.body, 'Import Plex terminé');
   assert.equal(calls[1].data.subText, 'Téléchargement');
   assert.deepEqual(calls[1].options, {
     platform: 'android',
     plexAvailabilityBackground: 'legacy',
   });
   assert.deepEqual(calls[2].notification, presentation.notification);
-  assert.equal(calls[2].notification?.body, 'Import terminé');
+  assert.equal(calls[2].notification?.body, 'Import Plex terminé');
   assert.deepEqual(calls[2].options, { platform: 'web' });
 
   assert.deepEqual(result, {
@@ -113,5 +113,5 @@ test('SEENIT-NOTIFICATION-003 garde le reçu visible quand aucune identité Plex
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].notification?.title, 'Sans TMDB');
-  assert.equal(calls[0].notification?.body, 'Import terminé');
+  assert.equal(calls[0].notification?.body, 'Import Plex terminé');
 });

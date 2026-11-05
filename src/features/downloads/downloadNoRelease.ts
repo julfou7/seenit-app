@@ -1,5 +1,6 @@
 export type DownloadFailureCode = 'no_release';
 import type { DownloadAvailability } from './downloadAvailability.ts';
+import { selectArrSeasonReleases } from './seasonReleaseSelection.ts';
 
 export interface ArrSearchOutcome {
   success: boolean;
@@ -56,19 +57,31 @@ export async function confirmNoArrRelease(read: (path: string) => Promise<unknow
 export async function executeProvenArrSearch(options: {
   queries: string[];
   read: (path: string) => Promise<unknown>;
-  launch: () => Promise<unknown>;
+  launch: (release: ArrRelease) => Promise<unknown>;
   preference?: '1080p' | '4k';
+  allScopes?: boolean;
+  coverSeason?: boolean;
 }): Promise<ArrSearchOutcome> {
   try {
     if (!options.queries.length) return { success: false, message: 'Aucun épisode diffusé à rechercher dans ce scope.' };
+    let launched = 0;
     for (const query of options.queries) {
       const releases = requireArrReleaseArray(await options.read(query));
-      if (releases.some(release => isCompatibleArrRelease(release, options.preference))) {
-        await options.launch();
-        return { success: true, message: 'Release compatible trouvée • recherche lancée.' };
+      const compatible = releases.filter(release => isCompatibleArrRelease(release, options.preference)).sort((a, b) => {
+        const weightA = Number(a.releaseWeight ?? Number.MAX_SAFE_INTEGER), weightB = Number(b.releaseWeight ?? Number.MAX_SAFE_INTEGER);
+        if (weightA !== weightB) return weightA - weightB;
+        return Number(b.customFormatScore || 0) - Number(a.customFormatScore || 0) || Number(b.seeders || 0) - Number(a.seeders || 0);
+      });
+      const selected = options.coverSeason ? selectArrSeasonReleases(compatible) : compatible.slice(0, 1);
+      if (selected.length) {
+        for (const release of selected) {
+          await options.launch(release);
+          launched++;
+        }
+        if (!options.allScopes) return { success: true, message: 'Release compatible envoyée au client.' };
       }
     }
-    return await confirmNoArrRelease(options.read);
+    return launched ? { success: true, message: `${launched} release(s) vérifiée(s) envoyée(s) au client.` } : await confirmNoArrRelease(options.read);
   } catch (error: unknown) {
     return { success: false, message: `Recherche impossible : ${error instanceof Error ? error.message : 'service indisponible'}` };
   }

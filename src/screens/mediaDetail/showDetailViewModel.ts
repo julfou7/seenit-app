@@ -2,6 +2,8 @@ import type React from 'react';
 import type { Show } from '../../types';
 import type { WhereToWatchProvider } from './detailUi';
 import type { TrailerVideo } from '../../features/trailers/trailerPolicy';
+import type { MediaPresenceData } from '../../store/mediaPresenceStore';
+import type { LiveDownloadItem } from '../../services/sonarrRadarr';
 
 /**
  * Modèle passé par ShowDetailScreenCore à ShowDetailView (SEENIT-UX-019), typé champ par champ pour que
@@ -33,7 +35,9 @@ export interface ShowDetailViewModel {
   backdropUrl?: string; posterPath?: string; title: string; releaseYear?: string | number | null;
   collectionData: { parts: RelationPart[] } | null; universeData: { parts: RelationPart[] } | null; collectionLoading: boolean;
   downloadTargetEpisode?: number; downloadTargetSeason?: number;
-  setDownloadTargetEpisode: (value: undefined) => void; setDownloadTargetSeason: (value: undefined) => void;
+  setDownloadTargetEpisode: (value: number | undefined) => void; setDownloadTargetSeason: (value: number | undefined) => void;
+  presence: MediaPresenceData;
+  getEpisodeDownload: (tmdbId?: number | string, tvdbId?: number | string, season?: number, episode?: number) => LiveDownloadItem | null;
   isDownloadModalOpen: boolean; setIsDownloadModalOpen: (open: boolean) => void;
   dropShow: () => unknown; followShow: () => unknown; resumeShow: () => unknown; rewatchShow: () => unknown;
   handleAnimatedBack: () => void; handleDeleteShow: () => unknown; handleShare: () => Promise<unknown> | unknown; handleSyncSingle: () => unknown; handleWatchNextEpisode: () => void;

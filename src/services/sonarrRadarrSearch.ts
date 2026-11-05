@@ -31,137 +31,6 @@ import {
   resolveQualityProfileId,
 } from './sonarrRadarrTransport';
 
-function releaseMatchesQualityPreference(release: ArrRelease, preference?: '1080p' | '4k'): boolean {
-  if (!preference) return true;
-  const qualityName = release?.quality?.quality?.name || release?.quality?.name || '';
-  const resolution = release?.quality?.quality?.resolution || release?.quality?.resolution || '';
-  const haystack = `${qualityName} ${resolution} ${release?.title || ''}`.toLowerCase();
-  if (preference === '4k') return /2160|4k|uhd/.test(haystack);
-  return /1080/.test(haystack) && !/2160|4k|uhd/.test(haystack);
-}
-
-function hasOnlyExistingMediaRejections(release: any): boolean {
-  const rejections = Array.isArray(release?.rejections) ? release.rejections.filter(Boolean) : [];
-  if (!rejections.length) return true;
-  return rejections.every((reason: any) => /existing file/i.test(String(reason)));
-}
-
-function rankInteractiveReleases(releases: any[], preference?: '1080p' | '4k', preferSeasonPack = false): any[] {
-  return releases
-    .filter(release => releaseMatchesQualityPreference(release, preference))
-    .filter(release => release?.approved === true || hasOnlyExistingMediaRejections(release))
-    .sort((a, b) => {
-      if (preferSeasonPack && Boolean(a.fullSeason) !== Boolean(b.fullSeason)) return a.fullSeason ? -1 : 1;
-      if (Boolean(a.approved) !== Boolean(b.approved)) return a.approved ? -1 : 1;
-      const weightA = Number(a.releaseWeight ?? Number.MAX_SAFE_INTEGER);
-      const weightB = Number(b.releaseWeight ?? Number.MAX_SAFE_INTEGER);
-      if (weightA !== weightB) return weightA - weightB;
-      const cfA = Number(a.customFormatScore || 0);
-      const cfB = Number(b.customFormatScore || 0);
-      if (cfA !== cfB) return cfB - cfA;
-      return Number(b.seeders || 0) - Number(a.seeders || 0);
-    });
-}
-
-async function grabFirstWorkingRelease(
-  base: string,
-  headers: Record<string, string>,
-  releases: any[],
-  contextPatch: Record<string, any> = {}
-): Promise<{ success: boolean; release?: any; error?: string }> {
-  let lastError = '';
-  for (const release of releases.slice(0, 1)) {
-    try {
-      await executeArrInteractivePost(`${base}/api/v3/release`, { ...release, ...contextPatch }, headers);
-      return { success: true, release };
-    } catch (error: any) {
-      lastError = error?.message || String(error);
-      // Un timeout peut suivre un grab réussi : aucun autre candidat n'est lancé.
-    }
-  }
-  return { success: false, error: lastError || 'Aucune release compatible n’a pu être lancée.' };
-}
-
-async function forceGrabExistingEpisode(
-  base: string,
-  headers: Record<string, string>,
-  episodeId: number,
-  preference?: '1080p' | '4k'
-): Promise<ArrSearchOutcome> {
-  const releases = await executeArrInteractiveGet(`${base}/api/v3/release?episodeId=${episodeId}`, headers);
-  const ranked = rankInteractiveReleases(requireArrReleaseArray(releases), preference);
-  if (!ranked.length) return confirmNoArrRelease(path => executeGet(`${base}/api/v3/${path}`, headers));
-  const grabbed = await grabFirstWorkingRelease(base, headers, ranked, { episodeId });
-  return grabbed.success
-    ? { success: true, message: 'Le fichier existe déjà : une nouvelle release a été forcée.' }
-    : { success: false, message: grabbed.error || 'Impossible de relancer cet épisode.' };
-}
-
-async function forceGrabExistingSeason(
-  base: string,
-  headers: Record<string, string>,
-  seriesId: number,
-  seasonNumber: number,
-  preference?: '1080p' | '4k'
-): Promise<ArrSearchOutcome> {
-  const releases = await executeArrInteractiveGet(
-    `${base}/api/v3/release?seriesId=${seriesId}&seasonNumber=${seasonNumber}`,
-    headers
-  );
-  const ranked = rankInteractiveReleases(requireArrReleaseArray(releases), preference, true);
-  if (!ranked.length) return confirmNoArrRelease(path => executeGet(`${base}/api/v3/${path}`, headers));
-
-  const seasonPack = ranked.filter(release => release.fullSeason);
-  if (seasonPack.length) {
-    const grabbed = await grabFirstWorkingRelease(base, headers, seasonPack, { seriesId });
-    if (grabbed.success) return { success: true, message: 'La saison existe déjà : un nouveau pack a été forcé.' };
-    return { success: false, message: grabbed.error || 'Résultat du lancement inconnu : vérifiez le client.' };
-  }
-
-  // Pas de pack : on force au maximum une release par épisode depuis le résultat
-  // interactif déjà récupéré, sans relancer une recherche indexer pour chaque épisode.
-  const episodeNumbers = new Set<number>();
-  for (const release of ranked) {
-    const mapped = Array.isArray(release.mappedEpisodeNumbers)
-      ? release.mappedEpisodeNumbers
-      : (Array.isArray(release.episodeNumbers) ? release.episodeNumbers : []);
-    mapped.forEach((n: any) => Number.isFinite(Number(n)) && episodeNumbers.add(Number(n)));
-  }
-
-  let grabbedCount = 0;
-  for (const episodeNumber of Array.from(episodeNumbers).sort((a, b) => a - b)) {
-    const candidates = ranked.filter(release => {
-      if (release.fullSeason) return false;
-      const mapped = Array.isArray(release.mappedEpisodeNumbers)
-        ? release.mappedEpisodeNumbers
-        : (Array.isArray(release.episodeNumbers) ? release.episodeNumbers : []);
-      return mapped.some((n: any) => Number(n) === episodeNumber);
-    });
-    if (!candidates.length) continue;
-    const grabbed = await grabFirstWorkingRelease(base, headers, candidates, { seriesId });
-    if (grabbed.success) grabbedCount++;
-  }
-
-  return grabbedCount > 0
-    ? { success: true, message: `La saison existe déjà : ${grabbedCount} téléchargement(s) ont été forcés.` }
-    : { success: false, message: 'La saison existe déjà mais aucune release n’a pu être relancée.' };
-}
-
-async function forceGrabExistingMovie(
-  base: string,
-  headers: Record<string, string>,
-  movieId: number,
-  preference?: '1080p' | '4k'
-): Promise<ArrSearchOutcome> {
-  const releases = await executeArrInteractiveGet(`${base}/api/v3/release?movieId=${movieId}`, headers);
-  const ranked = rankInteractiveReleases(requireArrReleaseArray(releases), preference);
-  if (!ranked.length) return confirmNoArrRelease(path => executeGet(`${base}/api/v3/${path}`, headers));
-  const grabbed = await grabFirstWorkingRelease(base, headers, ranked, { movieId });
-  return grabbed.success
-    ? { success: true, message: 'Le film existe déjà : une nouvelle release a été forcée.' }
-    : { success: false, message: grabbed.error || 'Impossible de relancer ce film.' };
-}
-
 /**
  * Déclenche une recherche et un ajout automatique de Série dans Sonarr
  */
@@ -177,6 +46,7 @@ async function launchSearchAndDownloadInSonarr(params: {
   qualityProfileId?: number;
   qualityPreference?: '1080p' | '4k';
   ensureOnly?: boolean;
+  replaceExisting?: boolean;
 }): Promise<ArrSearchOutcome & { target?: ExactSonarrSeriesIdentity }> {
   const base = cleanUrl(params.url);
   if (!base || !params.apiKey) {
@@ -298,14 +168,14 @@ async function launchSearchAndDownloadInSonarr(params: {
 
           if (targetEp && targetEp.id) {
             await ensureEpisodeMonitored(targetEp);
-            if (targetEp.hasFile) {
-              return await forceGrabExistingEpisode(base, headers, targetEp.id, params.qualityPreference);
+            if (targetEp.hasFile && params.replaceExisting !== true) {
+              return { success: false, message: 'Cet épisode est déjà disponible. Choisis explicitement une autre version pour le remplacer.' };
             }
             const search = await executeProvenArrSearch({
               queries: [`release?episodeId=${targetEp.id}`],
               read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
               preference: params.qualityPreference,
-              launch: () => executePost(`${base}/api/v3/command`, { name: 'EpisodeSearch', episodeIds: [targetEp.id] }, headers)
+              launch: release => executeArrInteractivePost(`${base}/api/v3/release`, { ...release, episodeId: targetEp.id }, headers)
             });
             if (!search.success) return search;
             return {
@@ -335,8 +205,8 @@ async function launchSearchAndDownloadInSonarr(params: {
           const scopedEpisodes = Array.isArray(seasonEpisodes)
             ? seasonEpisodes.filter(ep => Number(ep.seasonNumber) === Number(params.season))
             : [];
-          if (scopedEpisodes.length > 0 && scopedEpisodes.every(ep => Boolean(ep.hasFile))) {
-            return await forceGrabExistingSeason(base, headers, seriesId, Number(params.season), params.qualityPreference);
+          if (scopedEpisodes.length > 0 && scopedEpisodes.every(ep => Boolean(ep.hasFile)) && params.replaceExisting !== true) {
+            return { success: false, message: 'Cette saison est déjà disponible. Choisis explicitement une autre version pour la remplacer.' };
           }
         } catch (presenceErr) {
           console.warn('[Sonarr] Impossible de vérifier la présence des fichiers de saison:', presenceErr);
@@ -344,9 +214,10 @@ async function launchSearchAndDownloadInSonarr(params: {
 
         const search = await executeProvenArrSearch({
           queries: [`release?seriesId=${seriesId}&seasonNumber=${params.season}`],
+          coverSeason: true,
           read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
           preference: params.qualityPreference,
-          launch: () => executePost(`${base}/api/v3/command`, { name: 'SeasonSearch', seriesId, seasonNumber: params.season }, headers)
+          launch: release => executeArrInteractivePost(`${base}/api/v3/release`, { ...release, seriesId, seasonNumber: params.season }, headers)
         });
         if (!search.success) return search;
         return {
@@ -372,9 +243,11 @@ async function launchSearchAndDownloadInSonarr(params: {
       const allEpisodes = await executeGet(`${base}/api/v3/episode?seriesId=${seriesId}`, headers);
       const search = await executeProvenArrSearch({
         queries: sonarrSeriesSearchQueries(seriesId, allEpisodes),
+        coverSeason: true,
+        allScopes: true,
         read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
         preference: params.qualityPreference,
-        launch: () => executePost(`${base}/api/v3/command`, { name: 'SeriesSearch', seriesId }, headers)
+        launch: release => executeArrInteractivePost(`${base}/api/v3/release`, { ...release, seriesId }, headers)
       });
       if (!search.success) return search;
       return {
@@ -497,7 +370,7 @@ async function launchSearchAndDownloadInSonarr(params: {
               queries: [`release?episodeId=${targetEp.id}`],
               read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
               preference: params.qualityPreference,
-              launch: () => executePost(`${base}/api/v3/command`, { name: 'EpisodeSearch', episodeIds: [targetEp.id] }, headers)
+              launch: release => executeArrInteractivePost(`${base}/api/v3/release`, { ...release, episodeId: targetEp.id }, headers)
             });
             if (!search.success) return search;
             return {
@@ -512,9 +385,10 @@ async function launchSearchAndDownloadInSonarr(params: {
       } else if (isSeasonSearch) {
         const search = await executeProvenArrSearch({
           queries: [`release?seriesId=${created.id}&seasonNumber=${params.season}`],
+          coverSeason: true,
           read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
           preference: params.qualityPreference,
-          launch: () => executePost(`${base}/api/v3/command`, { name: 'SeasonSearch', seriesId: created.id, seasonNumber: params.season }, headers)
+          launch: release => executeArrInteractivePost(`${base}/api/v3/release`, { ...release, seriesId: created.id, seasonNumber: params.season }, headers)
         });
         if (!search.success) return search;
         return {
@@ -525,9 +399,11 @@ async function launchSearchAndDownloadInSonarr(params: {
       const episodes = await executeGet(`${base}/api/v3/episode?seriesId=${created.id}`, headers);
       return executeProvenArrSearch({
         queries: sonarrSeriesSearchQueries(Number(created.id), episodes),
+        coverSeason: true,
+        allScopes: true,
         read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
         preference: params.qualityPreference,
-        launch: () => executePost(`${base}/api/v3/command`, { name: 'SeriesSearch', seriesId: created.id }, headers)
+        launch: release => executeArrInteractivePost(`${base}/api/v3/release`, { ...release, seriesId: created.id }, headers)
       });
     }
 
@@ -558,6 +434,7 @@ async function launchSearchAndDownloadInRadarr(params: {
   qualityProfileId?: number;
   qualityPreference?: '1080p' | '4k';
   ensureOnly?: boolean;
+  replaceExisting?: boolean;
 }): Promise<ArrSearchOutcome & { target?: { movieId: number; tmdbId: number } }> {
   const base = cleanUrl(params.url);
   if (!base || !params.apiKey) {
@@ -616,15 +493,15 @@ async function launchSearchAndDownloadInRadarr(params: {
         }
       }
 
-      if (existingMovie.hasFile) {
-        return await forceGrabExistingMovie(base, headers, existingMovie.id, params.qualityPreference);
+      if (existingMovie.hasFile && params.replaceExisting !== true) {
+        return { success: false, message: 'Ce film est déjà disponible. Choisis explicitement une autre version pour le remplacer.' };
       }
 
       const search = await executeProvenArrSearch({
         queries: [`release?movieId=${existingMovie.id}`],
         read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
         preference: params.qualityPreference,
-        launch: () => executePost(`${base}/api/v3/command`, { name: 'MoviesSearch', movieIds: [existingMovie.id] }, headers)
+        launch: release => executeArrInteractivePost(`${base}/api/v3/release`, { ...release, movieId: existingMovie.id }, headers)
       });
       if (!search.success) return search;
       return {
@@ -720,7 +597,7 @@ async function launchSearchAndDownloadInRadarr(params: {
       queries: [`release?movieId=${created.id}`],
       read: path => executeArrInteractiveGet(`${base}/api/v3/${path}`, headers),
       preference: params.qualityPreference,
-      launch: () => executePost(`${base}/api/v3/command`, { name: 'MoviesSearch', movieIds: [created.id] }, headers)
+      launch: release => executeArrInteractivePost(`${base}/api/v3/release`, { ...release, movieId: created.id }, headers)
     });
   } catch (err: any) {
     console.error('[Radarr Search & Download Error]', err);
@@ -915,7 +792,7 @@ async function launchPushReleaseDirectly(payload: {
 export function searchAndDownloadInSonarr(params: Parameters<typeof launchSearchAndDownloadInSonarr>[0]) {
   const ownerUid = auth.currentUser?.uid;
   const key = JSON.stringify([auth.currentUser?.uid, 'sonarr', cleanUrl(params.url), params.tmdbId,
-    params.season ?? null, params.episode ?? null, params.ensureOnly === true]);
+    params.season ?? null, params.episode ?? null, params.ensureOnly === true, params.replaceExisting === true]);
   return shareDownloadSearch(key, async () => {
     const result = await launchSearchAndDownloadInSonarr(params);
     return result.failureCode === 'no_release'
@@ -925,7 +802,7 @@ export function searchAndDownloadInSonarr(params: Parameters<typeof launchSearch
 
 export function searchAndDownloadInRadarr(params: Parameters<typeof launchSearchAndDownloadInRadarr>[0]) {
   const ownerUid = auth.currentUser?.uid;
-  const key = JSON.stringify([auth.currentUser?.uid, 'radarr', cleanUrl(params.url), params.tmdbId, params.ensureOnly === true]);
+  const key = JSON.stringify([auth.currentUser?.uid, 'radarr', cleanUrl(params.url), params.tmdbId, params.ensureOnly === true, params.replaceExisting === true]);
   return shareDownloadSearch(key, async () => {
     const result = await launchSearchAndDownloadInRadarr(params);
     return result.failureCode === 'no_release'

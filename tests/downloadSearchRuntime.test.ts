@@ -69,9 +69,10 @@ test('les services réels distinguent zéro release, panne et lancement confirm�
     const failed = fixture(path => path.startsWith('release?') ? new Error('HTTP 503') : undefined);
     assert.equal((await run()).failureCode, undefined);
     assert.equal(failed.posts.length, 0);
-    const successful = fixture(path => path.startsWith('release?') ? [{ approved: true, quality: { quality: { resolution: 1080 } } }] : undefined);
+    const successful = fixture(path => path.startsWith('release?') ? [{ approved: true, fullSeason: true, quality: { quality: { resolution: 1080 } } }] : undefined);
     assert.equal((await run()).success, true);
-    assert.equal(successful.posts.at(-1)?.path, 'command');
+    assert.equal(successful.posts.at(-1)?.path, 'release');
+    assert.equal(successful.posts.filter(post => post.path === 'command').length, 0);
   }
 });
 
@@ -81,6 +82,41 @@ test('un nouveau film est ajouté sans recherche concurrente avant la preuve zé
   assert.equal(result.failureCode, 'no_release');
   assert.equal(state.posts.length, 1);
   assert.deepEqual(state.posts[0].body.addOptions, { searchForMovie: false });
+});
+
+test('SEENIT-DOWNLOAD-013 une demande normale ne remplace jamais un fichier existant', async () => {
+  const movie = fixture(path => path === 'movie' ? [{ id: 3, tmdbId: 11, hasFile: true, qualityProfileId: 1 }] : undefined);
+  assert.equal((await runtime.searchAndDownloadInRadarr(params)).success, false);
+  assert.equal(movie.posts.length, 0);
+  const episode = fixture(path => path.startsWith('episode?') ? [{ id: 2, seasonNumber: 1, episodeNumber: 1, hasFile: true, monitored: true }] : undefined);
+  assert.equal((await runtime.searchAndDownloadInSonarr({ ...params, season: 1, episode: 1 })).success, false);
+  assert.equal(episode.posts.length, 0);
+});
+
+test('SEENIT-DOWNLOAD-013 utilise la release vérifiée sans relancer de recherche automatique', async () => {
+  const release = { approved: true, guid: 'exact-guid', indexerId: 7, title: 'Titre.1080p', quality: { quality: { resolution: 1080 } } };
+  const state = fixture(path => path.startsWith('release?') ? [release] : undefined);
+  assert.equal((await runtime.searchAndDownloadInRadarr(params)).success, true);
+  assert.deepEqual(state.posts, [{ path: 'release', body: { ...release, movieId: 3 } }]);
+});
+
+test('SEENIT-DOWNLOAD-013 le remplacement 4K est explicite sans repli 1080p', async () => {
+  const state = fixture(path => path === 'movie' ? [{ id: 3, tmdbId: 11, hasFile: true, qualityProfileId: 1 }]
+    : path.startsWith('release?') ? [{ approved: true, guid: '4k', quality: { quality: { resolution: 2160 } } }] : undefined);
+  assert.equal((await runtime.searchAndDownloadInRadarr({ ...params, replaceExisting: true, qualityPreference: '4k' })).success, true);
+  assert.equal(state.posts.length, 1);
+  assert.equal(state.posts[0].body.guid, '4k');
+  assert.equal(state.calls.filter(path => path.startsWith('release?')).length, 1);
+});
+
+test('SEENIT-DOWNLOAD-013 le parcours épisode réutilise sa première réponse sans recherche concurrente', async () => {
+  const state = fixture(path => path.startsWith('release?') ? [{ approved: true, guid: 'episode', episodeNumbers: [1], quality: { quality: { resolution: 1080 } } }] : undefined);
+  const result = await runtime.downloadEpisodeWithSeasonPackFallback({ ...params, season: 1, episode: 1 });
+  assert.equal(result.success, true);
+  assert.deepEqual(state.calls.filter(path => path.startsWith('release?')), ['release?episodeId=2']);
+  assert.equal(state.posts.length, 1);
+  assert.equal(state.posts[0].path, 'release');
+  assert.equal(state.posts[0].body.episodeId, 2);
 });
 
 test('le fallback réel attend le pack et refuse les réponses invalides ou les pannes', async () => {

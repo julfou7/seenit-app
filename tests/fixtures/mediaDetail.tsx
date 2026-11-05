@@ -56,6 +56,7 @@ function Harness({ kind }: { kind: Kind }) {
     remainingTimeMinutes: (68 - seen.length) * 47, requestedMediaKey: isSeries ? 'tv:1396' : 'movie:693134', resumeShow: () => telemetry.opens.push('resume'), rewatchShow: () => telemetry.opens.push('rewatch'), seasonsCache, seenCount: isSeries ? seen.length : hasSeenMedia ? 1 : 0,
     selectedEpisode, selectedPersonId: null, setDownloadTargetEpisode: () => {}, setDownloadTargetSeason: () => {}, setIsDownloadModalOpen, setIsSynopsisExpanded, setSeasonsCache, setSelectedEpisode, setSelectedPersonId: () => {}, setShowMenu, setTrailerModalVideos,
     show, showMenu, showToast: (message: string) => telemetry.opens.push(`toast:${message}`),
+    presence: { loading: false, hasFile: false, seasonsHasFile: {}, episodesHasFile: {}, lastChecked: 0 }, getEpisodeDownload: () => null,
     sortedProviders: [{ provider_id: 8, provider_name: 'Netflix', logo_path: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' }, { provider_id: 999999, provider_name: 'Plex (Julien-NAS)', isPlex: true, serverName: 'Julien-NAS' }],
     title: isSeries ? 'Breaking Bad' : 'Dune : Deuxième partie', tmdbDetails: isSeries ? seriesDetails : movieDetails,
     toggleEpisodeSeen: (event: { stopPropagation: () => void }, season: number, episode: number) => { event.stopPropagation(); toggleKey(`${season}x${episode}`); },
