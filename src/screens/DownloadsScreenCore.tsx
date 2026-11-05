@@ -1,5 +1,9 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
-import { availabilityHint } from '../features/downloads/downloadAvailability';
+import { DownloadItemCard } from '../components/DownloadItemCard';
+import { downloadGroup } from '../features/downloads/downloadGroups';
+import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
+import { ReleaseLightFilter } from '../components/ReleaseLightFilter';
+import './downloads.css';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
@@ -20,11 +24,8 @@ import {
 } from 'lucide-react';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
-import { useShowsStore } from '../store/showsStore';
 import {
   type LiveDownloadItem,
-  formatBytes,
-  formatCleanMediaInfo,
   pushReleaseDirectly
 } from '../services/sonarrRadarr';
 import { type C411Torrent, formatTorrentSize, openC411Magnet, searchC411Torrents } from '../services/c411';
@@ -41,19 +42,8 @@ import {
   beginDownloadRequest,
   failDownloadRequest
 } from '../features/downloads/downloadLifecycle';
-import {
-  sortDownloadsByAddedAt,
-  truncateDownloadProgressPercent
-} from '../features/downloads/downloadPresentation';
-import {
-  getStableDownloadRenderKey,
-  preferSeenItImagePath,
-  selectStableDownloadPosterPath
-} from '../features/downloads/downloadPosterStability';
-import { findMatchingShowForDownload } from '../features/downloads/downloadIdentity';
-import { isDownloadInHistorySection } from '../features/downloads/downloadStatePolicy';
-import { getReleaseAudio } from '../features/downloads/releaseAudio';
-import { AlternativeReleaseModal } from '../components/AlternativeReleaseModal';
+import { sortDownloadsByAddedAt } from '../features/downloads/downloadPresentation';
+import { getStableDownloadRenderKey } from '../features/downloads/downloadPosterStability';
 import { useTabShortcut } from '../features/navigation/useTabShortcut';
 
 interface Props {
@@ -63,266 +53,6 @@ interface Props {
 
 type ViewMode = 'downloads' | 'search';
 type SearchMediaType = 'all' | 'movie' | 'tv';
-
-function getQualityBadges(quality?: string) {
-  if (!quality) return [] as string[];
-  const q = quality.toUpperCase();
-  const badges: string[] = [];
-
-  if (/2160|4K|UHD/.test(q)) badges.push('4K');
-  else if (/1080/.test(q)) badges.push('1080p');
-  else if (/720/.test(q)) badges.push('720p');
-
-  if (/REMUX/.test(q)) badges.push('REMUX');
-  else if (/BLU.?RAY|BDRIP/.test(q)) badges.push('BluRay');
-  else if (/WEB.?DL|WEBDL|WEBRIP/.test(q)) badges.push('WEB-DL');
-  else if (/HDTV/.test(q)) badges.push('HDTV');
-
-  if (/HDR/.test(q)) badges.push('HDR');
-  else if (/DOLBY.?VISION|DOVI|\bDV\b/.test(q)) badges.push('DV');
-
-  return Array.from(new Set(badges)).slice(0, 3);
-}
-
-function DownloadItemCard({
-  item,
-  onShowClick
-}: {
-  item: LiveDownloadItem;
-  onShowClick?: Props['onShowClick'];
-}) {
-  const [choosingRelease, setChoosingRelease] = useState(false);
-  const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
-  const libraryShow = useShowsStore(state => findMatchingShowForDownload(item, state.shows));
-  const libraryPosterPath = libraryShow?.posterPath || undefined;
-  const preferredPoster = preferSeenItImagePath(item.posterPath, libraryPosterPath);
-
-  const status = String(item.status || '').toLowerCase();
-  const isCompleted = status === 'completed' || item.progress >= 100;
-  const isCancelled = status === 'cancelled';
-  const isError = !isCancelled && (status === 'error' || Boolean(item.errorMessage));
-  const isWarning = !isCancelled && status === 'warning';
-  const isWaiting = status === 'waiting';
-  const isPending = isWaiting || status === 'submitting' || status === 'searching' || status === 'queued';
-  const progress = Math.min(100, Math.max(0, Number(item.progress || 0)));
-  const progressPercent = truncateDownloadProgressPercent(progress);
-  const qualityBadges = getQualityBadges(`${item.quality || ''} ${item.releaseTitle || ''}`);
-  const audioBadge = getReleaseAudio(item.releaseTitle).label;
-  const downloadedBytes = item.size > 0 ? Math.max(0, item.size - item.sizeleft) : 0;
-  const pendingWithoutProgress = isPending && progress <= 0;
-  const progressLabel = isPending
-    ? null
-    : isCancelled
-      ? (progress > 0 ? `${progressPercent}%` : '—')
-      : isCompleted
-        ? '100%'
-        : `${progressPercent}%`;
-
-  const lockedPosterPathRef = useRef<string | undefined>(undefined);
-  lockedPosterPathRef.current = selectStableDownloadPosterPath(
-    lockedPosterPathRef.current,
-    preferredPoster
-  );
-  const stablePosterPath = lockedPosterPathRef.current;
-  const posterSrc = stablePosterPath
-    ? stablePosterPath.startsWith('http')
-      ? stablePosterPath
-      : `https://image.tmdb.org/t/p/w342${stablePosterPath}`
-    : null;
-
-  const effectiveTmdbId = item.tmdbId || (libraryShow?.tmdbId ? Number(libraryShow.tmdbId) : undefined);
-  const canOpenDetails = Boolean(effectiveTmdbId && onShowClick);
-  const openDetails = () => {
-    if (!effectiveTmdbId || !onShowClick) return;
-    onShowClick(effectiveTmdbId, item.mediaType);
-  };
-
-  const accent = isCancelled
-    ? 'text-zinc-400'
-    : isError
-      ? 'text-red-300'
-      : isWarning
-        ? 'text-amber-300'
-        : isCompleted
-          ? 'text-emerald-300'
-          : 'text-cyan-300';
-
-  const progressBar = isCancelled
-    ? 'bg-zinc-600'
-    : isError
-      ? 'bg-red-500'
-      : isWarning
-        ? 'bg-amber-400'
-        : isCompleted
-          ? 'bg-gradient-to-r from-emerald-500 via-emerald-400 to-emerald-300'
-          : 'bg-gradient-to-r from-cyan-500 via-sky-400 to-cyan-300';
-
-  const statusLabel = isCancelled
-    ? 'Annulé'
-    : isError
-      ? 'Erreur'
-      : isWarning
-        ? 'En attente'
-        : isCompleted
-          ? 'Terminé'
-          : 'Téléchargement';
-
-  const pendingLabel = isWaiting ? item.statusText || 'En attente de disponibilité' : status === 'searching'
-    ? 'Recherche en cours'
-    : 'Préparation du téléchargement';
-  const pendingHint = isWaiting ? availabilityHint(item.availability) : status === 'searching'
-    ? 'Sélection de la meilleure release disponible'
-    : 'Connexion au client de téléchargement';
-
-  const hasTransferMeta = item.size > 0
-    || Boolean(item.speedFormatted)
-    || Boolean(item.timeleft && item.timeleft !== '--');
-
-  return (
-    <div
-      onClick={canOpenDetails ? openDetails : undefined}
-      className={`group relative isolate min-h-[116px] overflow-hidden rounded-2xl bg-zinc-900/60 shadow-[0_12px_30px_rgba(0,0,0,0.20)] ${canOpenDetails ? 'cursor-pointer active:scale-[0.995]' : ''}`}
-    >
-      <div className="pointer-events-none absolute inset-0 z-20 rounded-2xl ring-1 ring-inset ring-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.08)]" />
-      <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-br from-white/[0.035] via-transparent to-black/10" />
-
-      <div className="relative z-10 flex min-h-[116px] items-stretch">
-        <div className="flex w-[92px] shrink-0 flex-col overflow-hidden bg-zinc-950">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              openDetails();
-            }}
-            className="relative min-h-0 flex-1 overflow-hidden bg-zinc-950"
-          >
-            {posterSrc ? (
-              <img
-                src={posterSrc}
-                alt={cleanTitle}
-                className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                loading={isCompleted ? 'lazy' : 'eager'}
-                decoding="async"
-              />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-                {isTv ? <Tv size={24} className="text-indigo-400" /> : <Film size={24} className="text-rose-400" />}
-              </div>
-            )}
-          </button>
-          <div className={`flex h-[22px] shrink-0 items-center justify-center gap-1 text-[8px] font-extrabold uppercase tracking-wide text-white ${isTv ? 'bg-indigo-600' : 'bg-rose-600'}`}>
-            {isTv ? <Tv size={9} /> : <Film size={9} />}
-            <span>{isTv ? 'Série' : 'Film'}</span>
-          </div>
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-col justify-center px-3 py-2.5">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              openDetails();
-            }}
-            className="block min-w-0 max-w-full text-left"
-          >
-            <h3 className="line-clamp-2 text-[15px] font-black leading-[1.15] text-[#E5A93D]">{cleanTitle}</h3>
-            {subTitle && <p className="mt-0.5 line-clamp-1 text-[10px] font-semibold text-zinc-400">{subTitle}</p>}
-          </button>
-
-          {(qualityBadges.length > 0 || audioBadge) && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {qualityBadges.map((badge, index) => (
-                <span
-                  key={badge}
-                  className={`rounded-md border px-1.5 py-0.5 text-[9px] font-black tracking-wide ${
-                    index === 0
-                      ? 'border-cyan-400/20 bg-cyan-400/[0.08] text-cyan-300'
-                      : 'border-white/10 bg-white/[0.045] text-zinc-300'
-                  }`}
-                >
-                  {badge}
-                </span>
-              ))}
-              {audioBadge && <span className="rounded-md border border-violet-400/20 bg-violet-400/10 px-1.5 py-0.5 text-[9px] font-bold text-violet-200">{audioBadge}</span>}
-            </div>
-          )}
-
-          {pendingWithoutProgress ? (
-            <div className="mt-2 flex min-w-0 items-center gap-2 rounded-xl border border-cyan-400/10 bg-cyan-400/[0.055] px-2.5 py-2">
-              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-400/10 text-cyan-300 ring-1 ring-cyan-300/10">
-                {isWaiting ? <Clock3 size={13} /> : status === 'searching' ? <Search size={13} /> : <Loader2 size={13} className="animate-spin" />}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-[11px] font-bold text-cyan-200">{pendingLabel}</div>
-                <div className={`${isWaiting ? 'leading-relaxed' : 'truncate'} text-[10px] text-zinc-400`}>{pendingHint}</div>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="mt-2 flex items-end justify-between gap-3">
-                <div className={`flex min-w-0 items-center gap-1.5 text-[11px] font-bold ${accent}`}>
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${isCancelled ? 'bg-zinc-500' : isCompleted ? 'bg-emerald-400' : isError ? 'bg-red-400' : isWarning ? 'bg-amber-400' : 'bg-cyan-400'}`} />
-                  <span className="truncate">{statusLabel}</span>
-                </div>
-                {progressLabel && <span className={`shrink-0 text-sm font-black tabular-nums ${accent}`}>{progressLabel}</span>}
-              </div>
-
-              <div className="relative mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/[0.07] ring-1 ring-white/[0.03]">
-                <div
-                  className={`h-full rounded-full transition-[width] duration-500 ease-out ${progressBar}`}
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-
-              {hasTransferMeta && (
-                <div className="mt-1.5 flex items-center justify-between gap-2 text-[9px] text-zinc-400">
-                  <div className="flex min-w-0 items-center gap-1.5 tabular-nums">
-                    {item.size > 0 && (
-                      <>
-                        <HardDrive size={10} className="shrink-0 text-zinc-500" />
-                        <span className="truncate">{formatBytes(downloadedBytes)} / {formatBytes(item.size)}</span>
-                      </>
-                    )}
-                  </div>
-
-                  {!isCompleted && !isCancelled && !isError && (
-                    <div className="flex shrink-0 items-center gap-2 tabular-nums">
-                      {item.speedFormatted && (
-                        <span className="flex items-center gap-1 font-semibold text-zinc-300">
-                          <Download size={10} className="text-cyan-400" />
-                          {item.speedFormatted}
-                        </span>
-                      )}
-                      {item.timeleft && item.timeleft !== '--' && (
-                        <span className="flex items-center gap-1 text-zinc-400">
-                          <Clock3 size={10} />
-                          {item.timeleft}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-
-          {item.errorMessage && (
-            <p className="mt-2 rounded-lg border border-red-500/15 bg-red-500/[0.07] px-2 py-1.5 text-[9px] leading-snug text-red-300">
-              {item.errorMessage}
-            </p>
-          )}
-          {item.tmdbId && (isCompleted || isError || isCancelled || isWaiting) && (
-            <button type="button" onClick={event => { event.stopPropagation(); setChoosingRelease(true); }}
-              className="mt-2 flex min-h-11 items-center gap-1.5 rounded-lg border border-white/10 px-2 text-[11px] font-semibold text-zinc-200">
-              <Search size={14} />Chercher une autre release
-            </button>
-          )}
-        </div>
-      </div>
-      {choosingRelease && <AlternativeReleaseModal item={item} onClose={() => setChoosingRelease(false)} />}
-    </div>
-  );
-}
 
 export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const {
@@ -350,10 +80,12 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMediaType, setSelectedMediaType] = useState<SearchMediaType>('all');
   const [selectedQuality, setSelectedQuality] = useState<'all' | '2160p' | '1080p' | '720p'>('all');
+  const [lightFilter, setLightFilter] = useState<LightFilter>('all');
   const [sortBy, setSortBy] = useState<'seeders' | 'size' | 'date'>('seeders');
   const [torrents, setTorrents] = useState<C411Torrent[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [sendingTorrentId, setSendingTorrentId] = useState<number | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
@@ -383,10 +115,12 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
       setSearchQuery('');
       setSelectedMediaType('all');
       setSelectedQuality('all');
+      setLightFilter('all');
       setSortBy('seeders');
       setTorrents([]);
       setIsSearching(false);
       setHasSearched(false);
+      setSearchError(null);
       setSendingTorrentId(null);
       setCopiedHash(null);
       requestAnimationFrame(scrollToTop);
@@ -409,22 +143,22 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
 
   const activeDownloads = useMemo(
     () => sortDownloadsByAddedAt(
-      downloads.filter(item => item.status !== 'waiting' && item.status !== 'completed' && item.status !== 'cancelled' && item.status !== 'error' && item.progress < 100),
+      downloads.filter(item => downloadGroup(item) === 'active'),
       'asc'
     ),
     [downloads]
   );
   const errorDownloads = useMemo(
-    () => sortDownloadsByAddedAt(downloads.filter(item => isDownloadInHistorySection(item, 'error')), 'desc'),
+    () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'attention'), 'desc'),
     [downloads]
   );
-  const waitingDownloads = useMemo(() => sortDownloadsByAddedAt(downloads.filter(item => item.status === 'waiting'), 'asc'), [downloads]);
+  const waitingDownloads = useMemo(() => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'waiting'), 'asc'), [downloads]);
   const cancelledDownloads = useMemo(
-    () => sortDownloadsByAddedAt(downloads.filter(item => isDownloadInHistorySection(item, 'cancelled')), 'desc'),
+    () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'cancelled'), 'desc'),
     [downloads]
   );
   const completedDownloads = useMemo(
-    () => sortDownloadsByAddedAt(downloads.filter(item => isDownloadInHistorySection(item, 'completed')), 'desc'),
+    () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'completed'), 'desc'),
     [downloads]
   );
 
@@ -434,6 +168,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
 
     const requestId = ++searchRequestRef.current;
     setIsSearching(true);
+    setSearchError(null);
     try {
       const results = await searchC411Torrents({
         query,
@@ -446,14 +181,14 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
       if (searchRequestRef.current !== requestId) return;
       setTorrents([]);
       setHasSearched(true);
-      showToast(error instanceof Error ? error.message : 'C411 est momentanément indisponible.', 'error');
+      setSearchError(error instanceof Error ? error.message : 'C411 est momentanément indisponible.');
     } finally {
       if (searchRequestRef.current === requestId) setIsSearching(false);
     }
   };
 
   const filteredTorrents = useMemo(() => {
-    let list = [...torrents];
+    let list = torrents.filter(torrent => matchesLightFilter(`${torrent.name} ${torrent.quality || ''}`, lightFilter));
 
     if (selectedQuality !== 'all') {
       list = list.filter(torrent => {
@@ -473,14 +208,11 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     });
 
     return list;
-  }, [torrents, selectedQuality, sortBy]);
+  }, [torrents, selectedQuality, lightFilter, sortBy]);
 
   const performRemove = async (item: LiveDownloadItem) => {
     const status = String(item.status || '').toLowerCase();
-    const wasActive = status !== 'completed'
-      && status !== 'cancelled'
-      && status !== 'error'
-      && Number(item.progress || 0) < 100;
+    const wasActive = downloadGroup(item) === 'active';
 
     const success = await removeDownload(item);
     showToast({
@@ -493,10 +225,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   };
 
   const handleRemove = (item: LiveDownloadItem) => {
-    const isActive = item.status !== 'completed'
-      && item.status !== 'cancelled'
-      && item.status !== 'error'
-      && Number(item.progress || 0) < 100;
+    const isActive = downloadGroup(item) === 'active';
     if (isActive || item.status === 'waiting') {
       setPendingCancellation(item);
       return;
@@ -627,12 +356,11 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const renderSection = (
     title: string,
     items: LiveDownloadItem[],
-    tone: string,
     clearSection?: 'completed' | 'cancelled' | 'error'
   ) => (
-    <section className="space-y-2">
+    <section className={`downloads-section${title === 'À traiter' ? ' downloads-section--attention' : ''}`}>
       <div className="flex items-center justify-between px-0.5">
-        <h2 className={`text-xs font-black uppercase tracking-wider ${tone}`}>{title} • {items.length}</h2>
+        <h2>{title} · {items.length}</h2>
         {clearSection && (
           <button
             type="button"
@@ -647,11 +375,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
         )}
       </div>
       {items.map(item => {
-        const itemStatus = String(item.status || '').toLowerCase();
-        const isActive = itemStatus !== 'completed'
-          && itemStatus !== 'cancelled'
-          && itemStatus !== 'error'
-          && Number(item.progress || 0) < 100;
+        const isActive = downloadGroup(item) === 'active' || downloadGroup(item) === 'waiting';
 
         return (
           <SwipeableCard
@@ -664,7 +388,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
               tone: 'rose'
             }}
           >
-            <DownloadItemCard item={item} onShowClick={onShowClick} />
+            <DownloadItemCard item={item} onShowClick={onShowClick} onRemove={() => handleRemove(item)} />
           </SwipeableCard>
         );
       })}
@@ -672,16 +396,13 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   );
 
   return (
-    <div ref={screenRootRef} className="flex-1 min-h-0 flex flex-col bg-premium-ambient text-white overflow-hidden">
-      <div className="shrink-0 px-4 pt-4 pb-3 border-b border-white/5 bg-zinc-950/70 backdrop-blur-xl space-y-3">
+    <div ref={screenRootRef} className="downloads-page flex-1 min-h-0 flex flex-col text-white overflow-hidden">
+      <div className="shrink-0 px-4 pt-4 pb-3 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-black tracking-tight">Téléchargements</h1>
-            <p className="text-[11px] text-zinc-400">
-              {viewMode === 'downloads' ? 'Suivi en temps réel' : 'Recherche manuelle C411'}
-            </p>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
               onClick={() => void fetchDownloads()}
@@ -703,9 +424,11 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-zinc-900/90 border border-white/5">
+        <div className="downloads-segments" role="tablist" aria-label="Téléchargements">
           <button
             type="button"
+            role="tab"
+            aria-selected={viewMode === 'downloads'}
             onClick={() => setViewMode('downloads')}
             className={`py-2 rounded-lg text-xs font-bold ${viewMode === 'downloads' ? 'bg-zinc-700 text-white' : 'text-zinc-400'}`}
           >
@@ -713,6 +436,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={viewMode === 'search'}
             onClick={() => setViewMode('search')}
             className={`py-2 rounded-lg text-xs font-bold ${viewMode === 'search' ? 'bg-zinc-700 text-white' : 'text-zinc-400'}`}
           >
@@ -721,7 +446,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-3.5 pb-28">
+      <div className="downloads-content flex-1 overflow-y-auto px-4 py-3.5">
         {viewMode === 'downloads' ? (
           <div className="space-y-4">
             {!isConfigured && (
@@ -738,11 +463,11 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
               </button>
             )}
 
-            {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, 'text-zinc-400')}
-            {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads, 'text-amber-300')}
-            {errorDownloads.length > 0 && renderSection('En erreur', errorDownloads, 'text-red-400', 'error')}
-            {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'text-zinc-500', 'cancelled')}
-            {completedDownloads.length > 0 && renderSection('Terminés', completedDownloads, 'text-zinc-500', 'completed')}
+            {errorDownloads.length > 0 && renderSection('À traiter', errorDownloads, 'error')}
+            {activeDownloads.length > 0 && renderSection('En cours', activeDownloads)}
+            {waitingDownloads.length > 0 && renderSection('En attente de disponibilité', waitingDownloads)}
+            {completedDownloads.length > 0 && renderSection('Terminés', completedDownloads, 'completed')}
+            {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'cancelled')}
 
             {!downloads.length && (
               <div className="py-16 flex flex-col items-center text-center gap-3 text-zinc-500">
@@ -838,6 +563,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
               ))}
             </div>
 
+            <ReleaseLightFilter value={lightFilter} onChange={setLightFilter} />
             <div className="flex items-center gap-1.5">
               <span className="text-xs uppercase font-black text-zinc-500">Tri</span>
               {(['seeders', 'size', 'date'] as const).map(sort => (
@@ -916,6 +642,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
                   );
                 })}
               </div>
+            ) : searchError ? (
+              <div role="alert" className="py-10 space-y-3 text-center text-sm text-zinc-300"><p>{searchError}</p><button type="button" onClick={() => void performSearch()} className="min-h-11 px-4 rounded-xl border border-white/15">Réessayer</button></div>
             ) : hasSearched ? (
               <div className="py-14 text-center text-xs text-zinc-500">Aucune release trouvée.</div>
             ) : (
@@ -929,7 +657,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
 
       {pendingCancellation && (
         <DialogLayer onDismiss={() => setPendingCancellation(null)} label="Annuler le téléchargement" historyMode="local" role="alertdialog"
-          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/75 p-4"
+          className="fixed inset-0 z-[300] flex items-center justify-center bg-black/75 p-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]"
 
           onMouseDown={event => {
             if (event.target === event.currentTarget) setPendingCancellation(null);
@@ -940,7 +668,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
 
             aria-labelledby="cancel-download-title"
             aria-describedby="cancel-download-description"
-            className="w-full max-w-sm rounded-3xl border border-white/10 bg-zinc-950 p-5 shadow-2xl"
+            className="w-full max-w-sm max-h-full overflow-y-auto rounded-3xl border border-white/10 bg-zinc-950 p-5 shadow-2xl"
             onKeyDown={event => {
               if (event.key === 'Escape') setPendingCancellation(null);
             }}

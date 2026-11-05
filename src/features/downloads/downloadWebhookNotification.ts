@@ -158,7 +158,7 @@ export function buildDownloadWebhookPresentation(
     eventType,
     notification: {
       title: mediaTitle,
-      body: episodeCode ? `${episodeCode} · Import terminé` : 'Import terminé'
+      body: episodeCode ? `${episodeCode} · Import Plex terminé` : 'Import Plex terminé'
     },
     data,
     plexAvailabilityData

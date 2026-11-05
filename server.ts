@@ -40,6 +40,7 @@ import {
   selectUserNotificationDevices
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
+import { fetchC411Torrents } from "./src/features/downloads/c411Backend.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { downloadServiceTimeoutMs } from "./src/features/downloads/downloadServiceTimeout.ts";
 import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
@@ -1263,7 +1264,7 @@ async function startServer() {
 
             const payload = await response.json();
             if (Array.isArray(payload?.errors) && payload.errors.length > 0) {
-              throw new Error(payload.errors.map((error: any) => error?.message || 'GraphQL error').join(' | '));
+              throw new Error(payload.errors.map((error: unknown) => error && typeof error === 'object' && 'message' in error ? String(error.message) : 'GraphQL error').join(' | '));
             }
 
             const history = payload?.data?.user?.watchHistory;
@@ -2335,55 +2336,7 @@ async function startServer() {
         AbortSignal.timeout(8000)
       ]);
 
-      const c411Url = `https://c411.org/api/torrents?${searchParams.toString()}`;
-      const response = await fetch(c411Url, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'application/json',
-          'User-Agent': 'SeenIt-App'
-        },
-        signal: c411Signal()
-      });
-
-      if (!response.ok) {
-        // Fallback sans filtre de sous-catégorie
-        const fallbackUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(effectiveQuery)}&page=1&perPage=100&viewMode=flat&category=1&page=1&perPage=100&viewMode=flat`;
-        const fbRes = await fetch(fallbackUrl, {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Accept': 'application/json',
-            'User-Agent': 'SeenIt-App',
-            'Referer': 'https://c411.org/torrents'
-          },
-          signal: c411Signal()
-        });
-        if (!fbRes.ok) {
-          return res.json({ torrents: [] });
-        }
-        const fbData = await fbRes.json();
-        return res.json({ torrents: fbData.data || [] });
-      }
-
-      const data = await response.json();
-      let torrents = data.data || [];
-
-      // Si aucun résultat avec la sous-catégorie, tentative élargie
-      if (torrents.length === 0) {
-        const broadUrl = `https://c411.org/api/torrents?name=${encodeURIComponent(effectiveQuery)}`;
-        const broadRes = await fetch(broadUrl, {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Accept': 'application/json',
-            'User-Agent': 'SeenIt-App',
-            'Referer': 'https://c411.org/torrents'
-          },
-          signal: c411Signal()
-        });
-        if (broadRes.ok) {
-          const broadData = await broadRes.json();
-          torrents = broadData.data || [];
-        }
-      }
+      const torrents = await fetchC411Torrents({ apiKey, query: effectiveQuery, searchParams, signal: c411Signal });
 
       return res.json({ torrents });
     } catch (error: unknown) {

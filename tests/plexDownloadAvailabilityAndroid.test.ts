@@ -88,7 +88,7 @@ test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et un
   assert.ok(worker.includes('.setSmallIcon(R.drawable.ic_stat_seenit)'));
   assert.ok(worker.includes('.setSubText("Téléchargement")'));
   assert.ok(worker.includes('.setSubText("Plex")'));
-  assert.ok(worker.includes('episodeFact("Import terminé", season, episode)'));
+  assert.ok(worker.includes('episodeFact("Import Plex terminé", season, episode)'));
   assert.ok(worker.includes('episodeFact("Disponible dans Plex", season, episode)'));
   assert.doesNotMatch(worker, /✅|🚀/u);
   assert.ok(worker.includes('notificationId(eventKey, mediaType, tmdbId, season, episode)'));

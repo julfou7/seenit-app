@@ -1,5 +1,7 @@
 # Registre des audits SeenIt
 
+Téléchargements : [refonte prototype et matrice du backlog du 5 novembre](./downloads-2026-11-05.md), #861.
+
 TV V4 : [correctifs et limites des retours du28octobre](./tv-retours-2026-10-28.md), #295 / #738,
 fiches, calques Tizen4, thèmes, bibliothèque, installation0.4.3 et Netflix non validé.
 

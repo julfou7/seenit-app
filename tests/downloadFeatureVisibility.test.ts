@@ -60,14 +60,16 @@ test('SEENIT-DOWNLOAD-VISIBILITY-001 verrouille toutes les mentions de télécha
   const liveStoreSource = readFileSync(new URL('../src/store/liveDownloadStore.ts', import.meta.url), 'utf8');
   const presenceSource = readFileSync(new URL('../src/store/mediaPresenceStore.ts', import.meta.url), 'utf8');
 
-  // SEENIT-UX-019 : les fiches refaites n'exposent plus de surface de téléchargement en ligne. Le seul
-  // accès est l'entrée existante « Téléchargement » du menu ⋮ (icône lucide-download, donc masquée par le gate).
+  // #861 remplace l'interdiction de SEENIT-UX-019 pour les lignes de saison seulement.
   const view = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
   assert.equal((view.match(/<Download size=\{18\}[^>]*\/>Téléchargement<\/button>/g) || []).length, 1, 'une seule entrée Téléchargement, dans le menu ⋮');
   for (const inline of [/Télécharger le film \(1 Clic\)/, /Téléchargement 1-Clic/, /Télécharger la saison/, /Télécharger en 1 clic dans Sonarr/, /LiveDownloadBanner/, /handle1ClickDownload/, /Téléchargement en cours/]) {
     assert.doesNotMatch(showCoreSource.replace(readFileSync(new URL('../src/screens/ShowDetailScreenCore.tsx', import.meta.url), 'utf8'), '').replace(readFileSync(new URL('../src/screens/showDetailPresentation.ts', import.meta.url), 'utf8'), ''), inline);
   }
   assert.match(showWrapperSource, /button:has\(svg\.lucide-download\)/);
+  assert.match(view, /const downloadsEnabled = useDownloadConfigStore\(isDownloadFeatureEnabled\)/);
+  assert.match(view, /onDownloadEpisode=\{downloadsEnabled \?/);
+  assert.match(view, /onDownloadSeason=\{downloadsEnabled \?/);
   assert.match(liveStoreSource, /downloads:\s*\[\]/);
 
   // Détail épisode : plus de bouton Télécharger ni de bannière live ; le gate reste en place.

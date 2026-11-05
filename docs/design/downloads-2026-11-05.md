@@ -1,0 +1,37 @@
+# Téléchargements — prototype du 5 novembre 2026
+
+Demande propriétaire #861, style commun #806. Le PDF est une référence visuelle : les données et
+commandes du panneau de démonstration ne sont jamais des instructions runtime.
+
+Mes téléchargements et Recherche C411 restent distincts. Ordre : À traiter (erreurs et avertissements),
+En cours, En attente, Terminés, Annulés. Une entrée appartient à un seul groupe. Une erreur prime sur
+100 % ; transfert terminé ne prouve ni import Arr ni présence Plex. Aucun faux succès déduit d'un libellé.
+
+Cartes #141417, titres blancs 800 sur deux lignes, sous-textes #8b8b94, progression or, erreurs avec
+liseré rouge discret et message actionnable. Les terminés sont condensés avec fiche, autre release et
+retrait. Cibles 44 px, safe areas, focus sûr des confirmations, reduced-motion. Aucun polling ajouté.
+L'attente automatique n'est annoncée qu'avec preuve de surveillance Arr/RSS.
+
+Cette demande remplace l'interdiction des commandes en ligne de SEENIT-UX-019 pour les épisodes de
+la fiche série : numéro sur la vignette, titre sur deux lignes, commande téléchargement distincte de Vu
+et de l'ouverture. Feature gate personnel obligatoire. Fichier présent : aucune action normale ;
+transfert actif : progression sans double lancement ; futur : date sans téléchargement immédiat.
+Le bouton ouvre le parcours de qualité existant : aucun envoi avant choix explicite.
+Le choix 1080p/4K est conservé dans l'intention et visible dans la file. Une carte à traiter ou en
+attente donne aussi accès à Changer la qualité avec le même scope. En présence d'un fichier, un
+remplacement exige de cocher explicitement cette intention puis de choisir sa qualité ; aucune
+rétrogradation ni nouvelle tentative après un POST ambigu. Le bouton de saison ne prétend pas
+« N restants » depuis le seul compteur Vu : les états de visionnage et de fichiers sont différents.
+
+Identité TMDB + scope saison/épisode et preuve physique uniquement. Erreur C411/Arr, absence de release,
+import et présence Plex restent distincts. Demandes/suppressions durables et convergence par UID.
+Une file Arr porte importState=pending ; 100 % n'en fait pas un terminé. L'historique exact ou la
+vérification du fichier cible Sonarr peut confirmer l'import. Cette lecture réutilise le cache
+d'historique borné (8 s), sans nouveau timer par carte ni requête par épisode.
+Backlog : #293 #427 #428 #429 #430 #583 #591 #638 #656 #661 #664 #669 #801 #637, images #443/#778.
+Chaque clôture exige ses propres tests et le terrain lorsqu'il est requis.
+
+Le reçu de l'événement Download porte désormais le texte « Import Plex terminé » (#801), y compris
+dans le worker natif. Cette copie produit ne constitue pas une preuve d'indexation Plex : seul le
+contrôle exact existant autorise « Disponible dans Plex ». Identifiant, canal, cache d'images et
+isolation UID sont conservés ; le visuel de ce reçu doit encore être vérifié séparément sur One UI.

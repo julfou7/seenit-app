@@ -48,6 +48,8 @@ export interface LiveDownloadItem {
   speedFormatted?: string;
   status: 'downloading' | 'queued' | 'paused' | 'completed' | 'warning' | 'error' | string;
   statusText: string;
+  /** 100 % du transfert ne prouve pas l'import *Arr. */
+  importState?: 'pending' | 'confirmed';
   errorMessage?: string;
   downloadClient?: string;
   releaseTitle?: string;
@@ -420,7 +422,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
         const epTitle = epNum ? `S${seasonNum}E${epNum}` : `Saison ${seasonNum}`;
         const epName = rec.episode?.title || undefined;
 
-        const posterImg = rec.series?.images?.find((i: any) => i.coverType === 'poster');
+        const posterImg = rec.series?.images?.find((i: { coverType?: string }) => i.coverType === 'poster');
         const posterUrl = posterImg?.remoteUrl || (posterImg?.url ? `${sonarrBase}${posterImg.url}` : undefined);
         const qualityName = extractQualityFromTitle(rec.title, rec.quality?.quality?.name);
 
@@ -447,6 +449,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           speedBytesPerSec: timeleftSeconds > 0 && leftSize > 0 ? Math.round(leftSize / timeleftSeconds) : 0,
           speedFormatted: timeleftSeconds > 0 && leftSize > 0 ? formatSpeed(Math.round(leftSize / timeleftSeconds)) : '',
           status: statusInfo.status,
+          importState: 'pending',
           statusText: statusInfo.status === 'downloading' ? `Téléchargement ${progress}%` : statusInfo.statusText,
           errorMessage: statusInfo.errorMessage,
           downloadClient: rec.downloadClient || 'Sonarr',
@@ -524,6 +527,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           speedBytesPerSec: timeleftSeconds > 0 && leftSize > 0 ? Math.round(leftSize / timeleftSeconds) : 0,
           speedFormatted: timeleftSeconds > 0 && leftSize > 0 ? formatSpeed(Math.round(leftSize / timeleftSeconds)) : '',
           status: statusInfo.status,
+          importState: 'pending',
           statusText: statusInfo.status === 'downloading' ? `Téléchargement ${progress}%` : statusInfo.statusText,
           errorMessage: statusInfo.errorMessage,
           downloadClient: rec.downloadClient || 'Radarr',

@@ -37,6 +37,11 @@ import {
 import { resolveEffectiveQualityProfileId } from '../features/downloads/qualityProfileSelection';
 import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
 import { availabilityHint, type DownloadAvailability } from '../features/downloads/downloadAvailability';
+import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGuard';
+import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
+import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
+import { ReleaseLightFilter } from './ReleaseLightFilter';
+import { useMediaPresence } from '../hooks/useMediaPresence';
 
 export interface SeasonInfo {
   season_number: number;
@@ -92,6 +97,7 @@ export function DownloadModal({
 }: DownloadModalProps) {
   const isTv = mediaType === 'tv';
   const config = useDownloadConfigStore();
+  const presence = useMediaPresence({ tmdbId, tvdbId, imdbId, title, year, mediaType, enabled: isOpen });
   const showToast = useToastStore(state => state.showToast);
   const downloads = useLiveDownloadStore(state => state.downloads);
 
@@ -106,15 +112,18 @@ export function DownloadModal({
   const [actionMessage, setActionMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const [manualOpen, setManualOpen] = useState(false);
+  const [replaceExisting, setReplaceExisting] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [torrents, setTorrents] = useState<C411Torrent[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [selectedQuality, setSelectedQuality] = useState<'all' | '2160p' | '1080p' | '720p'>('all');
+  const [lightFilter, setLightFilter] = useState<LightFilter>('all');
   const [sortBy, setSortBy] = useState<'seeders' | 'size' | 'date'>('seeders');
   const [sendingTorrentId, setSendingTorrentId] = useState<number | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const autoInFlightRef = useRef(false);
 
   const getGeneratedQuery = (mode: ScopeMode, season: number, episode: number) => {
     const base = title.trim();
@@ -145,6 +154,7 @@ export function DownloadModal({
     setSearchQuery(getGeneratedQuery(initialMode, season, episode));
     setActionMessage(null);
     setManualOpen(false);
+    setReplaceExisting(false);
     setTorrents([]);
     setHasSearched(false);
     setIsTriggeringAuto(false);
@@ -174,7 +184,7 @@ export function DownloadModal({
       if (result.ok && result.value && Array.isArray(result.value.seasons)) {
         const seasons = result.value.seasons
           .filter((season: { season_number: number }) => season.season_number > 0)
-          .map((season: any) => ({
+          .map((season: { season_number: number; episode_count?: number; name?: string }) => ({
             season_number: season.season_number,
             episode_count: season.episode_count || 1,
             name: season.name || `Saison ${season.season_number}`
@@ -211,6 +221,10 @@ export function DownloadModal({
   );
 
   const maxEpisodes = Math.max(currentSeason.episode_count || 1, 1);
+  const alreadyAvailable = mediaType === 'movie'
+    ? Boolean(presence.radarrHasFile || presence.plexInfo?.available)
+    : scopeMode === 'episode' ? Boolean(presence.episodesHasFile[`${selectedSeason}x${selectedEpisode}`])
+      : scopeMode === 'season' ? Boolean(presence.seasonsHasFile[selectedSeason]) : false;
 
   const activeDownloads = useMemo(() => {
     if (mediaType === 'tv') {
@@ -238,6 +252,7 @@ export function DownloadModal({
   };
 
   const handleScopeChange = (mode: ScopeMode, season = selectedSeason, episode = selectedEpisode) => {
+    setReplaceExisting(false);
     const targetSeason = availableSeasons.find(item => item.season_number === season);
     const episodeMax = Math.max(targetSeason?.episode_count || 24, 1);
     const adjustedEpisode = Math.min(episode, episodeMax);
@@ -251,9 +266,20 @@ export function DownloadModal({
   };
 
   const handleAutoSearchClient = async (qualityPreference: '1080p' | '4k') => {
-    if (isTriggeringAuto) return;
-
     const isTv = mediaType === 'tv';
+    if (autoInFlightRef.current || !isDownloadFeatureEnabled(useDownloadConfigStore.getState())) return;
+    if (presence.loading || (alreadyAvailable && !replaceExisting)) {
+      setActionMessage({ text: presence.loading ? 'Vérification de la disponibilité en cours.' : 'Déjà disponible. Choisis explicitement une autre release pour remplacer le fichier.', type: 'info' });
+      return;
+    }
+    if (hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, {
+      mediaType, tmdbId: Number(tmdbId), seasonNumber: isTv && scopeMode !== 'all' ? selectedSeason : undefined,
+      episodeNumber: isTv && scopeMode === 'episode' ? selectedEpisode : undefined
+    })) {
+      setActionMessage({ text: 'Une demande est déjà en cours pour ce média.', type: 'info' });
+      return;
+    }
+
     const client = isTv ? 'Sonarr' : 'Radarr';
     const hasClient = isTv
       ? Boolean(config.sonarrUrl && config.sonarrApiKey)
@@ -267,6 +293,7 @@ export function DownloadModal({
     }
 
     setIsTriggeringAuto(true);
+    autoInFlightRef.current = true;
     setActionMessage(null);
 
     const qualityLabel = qualityPreference === '4k' ? '4K' : '1080p';
@@ -292,7 +319,8 @@ export function DownloadModal({
       posterPath,
       downloadClient: client,
       statusText: 'Demande prise en compte • préparation du téléchargement…',
-      releaseTitle: `${displayTitle} • ${qualityLabel}`
+      releaseTitle: `${displayTitle} • ${qualityLabel}`,
+      quality: qualityLabel
     });
 
     showMediaDownloadToast(`Recherche ${qualityLabel} en cours…`, 'download');
@@ -336,6 +364,7 @@ export function DownloadModal({
               season: selectedSeason,
               episode: selectedEpisode,
               qualityPreference,
+              replaceExisting,
               qualityProfileId: effectiveProfileId,
               qbittorrentUrl: config.qbittorrentUrl,
               qbittorrentUsername: config.qbittorrentUsername,
@@ -350,6 +379,7 @@ export function DownloadModal({
               imdbId: verifiedImdbId,
               season: scopeMode === 'all' ? undefined : selectedSeason,
               qualityPreference,
+              replaceExisting,
               qualityProfileId: effectiveProfileId
             })
         : await searchAndDownloadInRadarr({
@@ -359,6 +389,7 @@ export function DownloadModal({
             tmdbId,
             year,
             qualityPreference,
+            replaceExisting,
             qualityProfileId: effectiveProfileId
           });
 
@@ -389,6 +420,7 @@ export function DownloadModal({
       failDownloadRequest(requestId, message);
       showMediaDownloadToast(message, 'error');
     } finally {
+      autoInFlightRef.current = false;
       setIsTriggeringAuto(false);
     }
   };
@@ -532,7 +564,7 @@ export function DownloadModal({
   };
 
   const filteredTorrents = useMemo(() => {
-    let list = [...torrents];
+    let list = torrents.filter(torrent => matchesLightFilter(`${torrent.name} ${torrent.quality || ''}`, lightFilter));
 
     if (selectedQuality !== 'all') {
       list = list.filter(torrent => {
@@ -552,7 +584,7 @@ export function DownloadModal({
     });
 
     return list;
-  }, [torrents, selectedQuality, sortBy]);
+  }, [torrents, selectedQuality, lightFilter, sortBy]);
 
   if (!isOpen) return null;
 
@@ -686,11 +718,13 @@ export function DownloadModal({
               </span>
             </div>
 
+            {alreadyAvailable && <label className="flex items-center gap-3 min-h-11 text-sm text-[#F2C36B]"><input type="checkbox" checked={replaceExisting} onChange={event => setReplaceExisting(event.target.checked)} />Remplacer explicitement le fichier disponible</label>}
+            {presence.loading && <p role="status" className="text-xs text-zinc-400">Vérification de la disponibilité…</p>}
             {hasAutomationClient ? (
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  disabled={isTriggeringAuto}
+                  disabled={isTriggeringAuto || presence.loading || (alreadyAvailable && !replaceExisting)}
                   onClick={() => handleAutoSearchClient('1080p')}
                   className="p-3 rounded-2xl border border-blue-500/25 bg-blue-500/8 hover:bg-blue-500/15 text-left transition-colors disabled:opacity-50"
                 >
@@ -703,7 +737,7 @@ export function DownloadModal({
 
                 <button
                   type="button"
-                  disabled={isTriggeringAuto}
+                  disabled={isTriggeringAuto || presence.loading || (alreadyAvailable && !replaceExisting)}
                   onClick={() => handleAutoSearchClient('4k')}
                   className="p-3 rounded-2xl border border-amber-500/25 bg-amber-500/8 hover:bg-amber-500/15 text-left transition-colors disabled:opacity-50"
                 >
@@ -768,6 +802,7 @@ export function DownloadModal({
                 </form>
 
                 <div className="flex flex-wrap items-center gap-1.5">
+                  <ReleaseLightFilter value={lightFilter} onChange={setLightFilter} />
                   {(['all', '2160p', '1080p', '720p'] as const).map(quality => (
                     <button
                       key={quality}

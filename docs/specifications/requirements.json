@@ -4,6 +4,40 @@
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
+      "id": "SEENIT-DOWNLOAD-013",
+      "title": "Téléchargements prototype, commandes épisode et lancements sans faux succès",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadPrototype.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 les groupes sont exclusifs et un import bloqué à 100 reste à traiter"
+        },
+        {
+          "file": "tests/downloadPrototype.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 un épisode vu ne prouve jamais sa présence et un transfert terminé reste téléchargeable"
+        },
+        {
+          "file": "tests/downloadPrototype.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 Light dépend de la release explicite, jamais de son poids ni de HDR"
+        },
+        {
+          "file": "tests/downloadPrototype.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 C411 transmet Referer dès le premier appel et distingue panne et catalogue vide"
+        },
+        {
+          "file": "tests/downloadSearchRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 une demande normale ne remplace jamais un fichier existant"
+        },
+        {
+          "file": "tests/downloadSearchRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 utilise la release vérifiée sans relancer de recherche automatique"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-TV-003",
       "title": "Calendrier Sport gratuit sans score obligatoire, normalisé et mis en cache",
       "targets": [

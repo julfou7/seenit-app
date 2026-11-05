@@ -24,7 +24,7 @@ test('SEENIT-NOTIFICATION-005 unifie les textes sans emoji ni code répété', (
   assert.equal((episode.body.match(/S\d+ \| E\d+/g) || []).length, 1);
   assert.equal(episode.detailText?.split('\n').length, 2);
   assert.equal(download.notification.title, show.title);
-  assert.equal(download.notification.body, 'S00 | E01 · Import terminé');
+  assert.equal(download.notification.body, 'S00 | E01 · Import Plex terminé');
   for (const text of [episode.summaryText, episode.body, episode.detailText, download.notification.body]) {
     assert.doesNotMatch(text || '', /\p{Extended_Pictographic}/u);
   }

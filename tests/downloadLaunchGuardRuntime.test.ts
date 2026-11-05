@@ -25,12 +25,12 @@ test('deux appuis simultanés sur le film lancent une seule commande Radarr', as
   const result = await Promise.all([runtime.searchAndDownloadInRadarr({ ...params, qualityPreference: '4k' }),
     runtime.searchAndDownloadInRadarr({ ...params, qualityPreference: '1080p' })]);
   assert.ok(result.every(r => r.success));
-  assert.deepEqual(posts, [{ name: 'MoviesSearch', movieIds: [3] }]);
+  assert.deepEqual(posts, [{ approved: true, title: 'Exact.2160p', quality: { quality: { resolution: 2160 } }, movieId: 3 }]);
 });
 test('un grab Radarr ambigu ne lance jamais la release suivante', async () => {
   const posts: unknown[] = [];
   state.get = async url => url.endsWith('/movie')
-    ? [{ id: 3, tmdbId: 11, hasFile: true, qualityProfileId: 1 }]
+    ? [{ id: 3, tmdbId: 11, hasFile: false, qualityProfileId: 1 }]
     : [{ title: 'Release.A.1080p', approved: true }, { title: 'Release.B.1080p', approved: true }];
   state.post = async (_url, body) => { posts.push(body); throw new Error('timeout après grab'); };
   const result = await runtime.searchAndDownloadInRadarr({ url: 'https://arr-two.example', apiKey: 'fixture', title: 'Canonique',

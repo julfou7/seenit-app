@@ -9,6 +9,7 @@ import {
   loginQBittorrent,
   searchAndDownloadInSonarr
 } from '../../services/sonarrRadarr';
+import { executePut, executeArrInteractivePost } from '../../services/sonarrRadarrTransport';
 import { tmdb } from '../shows/tmdb';
 import { normalizeDownloadClientId } from './downloadIdentity';
 import {
@@ -25,7 +26,7 @@ import {
   type TorrentFileLike
 } from './episodePackSelection';
 import { registerTrackedSeasonPack } from './episodeSeasonPackCleanup';
-import { confirmNoArrRelease, requireArrReleaseArray, type DownloadFailureCode } from './downloadNoRelease';
+import { confirmNoArrRelease, isCompatibleArrRelease, requireArrReleaseArray, type DownloadFailureCode } from './downloadNoRelease';
 import { enableArrAvailabilityWatch } from '../../services/arrAvailabilityWatch';
 import type { DownloadAvailability } from './downloadAvailability';
 
@@ -40,6 +41,7 @@ export interface EpisodeDownloadWithFallbackParams {
   episode: number;
   qualityProfileId?: number;
   qualityPreference?: '1080p' | '4k';
+  replaceExisting?: boolean;
   qbittorrentUrl?: string;
   qbittorrentUsername?: string;
   qbittorrentPassword?: string;
@@ -62,7 +64,7 @@ export interface EpisodeDownloadWithFallbackResult {
 
 interface SonarrTarget {
   series: any;
-  episode: any;
+  episode: { id: number; hasFile?: boolean };
 }
 
 interface TransferCandidate {
@@ -528,6 +530,11 @@ export async function downloadEpisodeWithSeasonPackFallback(
     if (!target) return { success: false, message: 'Sonarr n’a pas confirmé l’épisode exact.' };
   }
 
+  if (target.episode.hasFile && params.replaceExisting !== true) return { success: false, message: 'Cet épisode est déjà disponible. Choisis explicitement son remplacement.' };
+  if (params.qualityProfileId && target.series.qualityProfileId !== params.qualityProfileId) {
+    try { await executePut(`${base}/api/v3/series`, { ...target.series, qualityProfileId: params.qualityProfileId }, sonarrHeaders); }
+    catch { return { success: false, message: 'Impossible de confirmer le profil de qualité Sonarr.' }; }
+  }
   let episodeReleases: any[];
   try {
     const response = await interactiveGet(`${base}/api/v3/release?episodeId=${target.episode.id}`, sonarrHeaders);
@@ -540,20 +547,13 @@ export async function downloadEpisodeWithSeasonPackFallback(
   }
 
   if (hasCompatibleIndividualEpisodeRelease(episodeReleases, params.qualityPreference)) {
-    const normalResult = await searchAndDownloadInSonarr({
-      url: params.url,
-      apiKey: params.apiKey,
-      title: params.title,
-      tmdbId: params.tmdbId,
-      tvdbId: params.tvdbId,
-      imdbId: params.imdbId,
-      season: params.season,
-      episode: params.episode,
-      qualityProfileId: params.qualityProfileId,
-      qualityPreference: params.qualityPreference
-    });
-    if (normalResult.success || normalResult.failureCode !== 'no_release') {
-      return { ...normalResult, status: normalResult.success ? 'searching' : undefined };
+    const selected = episodeReleases.find(release => isCompatibleArrRelease(release, params.qualityPreference));
+    if (!selected) return { success: false, message: 'Aucune release individuelle approuvée.' };
+    try {
+      await executeArrInteractivePost(`${base}/api/v3/release`, { ...selected, episodeId: target.episode.id }, sonarrHeaders);
+      return { success: true, status: 'queued', message: 'Release de l’épisode envoyée au client.' };
+    } catch (error: unknown) {
+      return { success: false, message: `Résultat du lancement inconnu : ${error instanceof Error ? error.message : 'service indisponible'}. Vérifie le client avant de réessayer.` };
     }
   }
 

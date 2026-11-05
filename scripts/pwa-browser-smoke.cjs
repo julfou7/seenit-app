@@ -17,6 +17,7 @@ const { testTerrain220Harness } = require('./home-terrain220-browser-checks.cjs'
 const { testTerrain221Harness } = require('./home-terrain221-browser-checks.cjs');
 const { buildHomeHarness, testHomeHarness } = require('./home-a-voir-browser-checks.cjs');
 const { buildMediaDetailHarness, testMediaDetailHarness } = require('./media-detail-browser-checks.cjs');
+const { buildDownloadsHarness, testDownloadsHarness } = require('./downloads-browser-checks.cjs');
 const { testHomePerformanceHarness } = require('./home-performance-browser-checks.cjs');
 const { testHomeUnseenHarness } = require('./home-unseen-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
@@ -531,6 +532,7 @@ function buildLaneGroups(config) {
       ['homeTerrain222', client => testTerrain222Harness(client, root)],
       ['homeTerrain223', client => testTerrain223Harness(client, root)],
       ['mediaDetail', client => testMediaDetailHarness(client)],
+      ['downloads', client => testDownloadsHarness(client, root)],
     ],
     [
       ['homeTerrain224', client => testTerrain224Harness(client, root)],
@@ -629,6 +631,7 @@ async function main() {
     await buildSearchKeyboardHarness(root);
     await buildHomeHarness(root);
     await buildMediaDetailHarness(root);
+    await buildDownloadsHarness(root);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -666,6 +669,7 @@ async function main() {
       homeTerrain222: merged.homeTerrain222,
       homeTerrain223: merged.homeTerrain223,
       mediaDetail: merged.mediaDetail,
+      downloads: merged.downloads,
       homeTerrain224: merged.homeTerrain224,
       homeTerrain226: merged.homeTerrain226,
       homeTerrain227: merged.homeTerrain227,

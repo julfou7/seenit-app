@@ -182,7 +182,7 @@ export function shouldResolveMissingDownloadFromHistory(
   optimisticDelayMs = 3_000
 ): boolean {
   const status = String(item.status || '').toLowerCase();
-  if (status === 'completed' || status === 'cancelled' || Number(item.progress || 0) >= 100
+  if ((item.importState !== 'pending' && (status === 'completed' || Number(item.progress || 0) >= 100)) || status === 'cancelled'
       || (status === 'error' && item.isOptimistic)) {
     return false;
   }
