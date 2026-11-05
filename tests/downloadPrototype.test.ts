@@ -6,7 +6,7 @@ import { matchesLightFilter } from '../src/features/downloads/releaseQuality.ts'
 import { fetchC411Torrents } from '../src/features/downloads/c411Backend.ts';
 import type { LiveDownloadItem } from '../src/services/sonarrRadarrLive.ts';
 import { isDownloadInHistorySection } from '../src/features/downloads/downloadStatePolicy.ts';
-import { selectArrSeasonReleases } from '../src/features/downloads/downloadNoRelease.ts';
+import { selectArrSeasonReleases } from '../src/features/downloads/seasonReleaseSelection.ts';
 
 test('SEENIT-DOWNLOAD-013 les groupes sont exclusifs et un import bloqué à 100 reste à traiter', () => {
   const groups = [

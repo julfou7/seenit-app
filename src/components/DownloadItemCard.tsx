@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { lazy, Suspense, useRef, useState } from 'react';
 import { Film, Search, Trash2, Tv, ChevronDown } from 'lucide-react';
 import { useShowsStore } from '../store/showsStore';
 import { formatBytes, formatCleanMediaInfo, type LiveDownloadItem } from '../services/sonarrRadarr';
@@ -8,8 +8,8 @@ import { truncateDownloadProgressPercent } from '../features/downloads/downloadP
 import { downloadGroup, downloadProblem } from '../features/downloads/downloadGroups';
 import { availabilityHint } from '../features/downloads/downloadAvailability';
 import { getReleaseAudio } from '../features/downloads/releaseAudio';
-import { AlternativeReleaseModal } from './AlternativeReleaseModal';
-import { DownloadModal } from './DownloadModal';
+const AlternativeReleaseModal = lazy(() => import('./AlternativeReleaseModal').then(module => ({ default: module.AlternativeReleaseModal })));
+const DownloadModal = lazy(() => import('./DownloadModal').then(module => ({ default: module.DownloadModal })));
 
 export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDownloadItem; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: () => void }) {
   const [choosingRelease, setChoosingRelease] = useState(false);
@@ -51,7 +51,9 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
       <button type="button" aria-expanded={details} onClick={() => setDetails(!details)}><ChevronDown size={15} />Détails</button>
     </div>
     {details && <div className="download-card__details"><p>{item.releaseTitle || 'Release non résolue'}</p><p>{item.downloadClient || 'Client non précisé'}</p>{item.errorMessage && <p>{item.errorMessage}</p>}</div>}
-    {choosingRelease && <AlternativeReleaseModal item={item} onClose={() => setChoosingRelease(false)} />}
-    {choosingQuality && item.tmdbId && <DownloadModal isOpen onClose={() => setChoosingQuality(false)} title={item.movieTitle || item.seriesTitle || cleanTitle} mediaType={item.mediaType} tmdbId={item.tmdbId} tvdbId={item.tvdbId} imdbId={item.imdbId} posterPath={poster.current} initialSeason={item.seasonNumber} initialEpisode={item.episodeNumber} />}
+    <Suspense fallback={<p role="status" className="download-card__meta">Ouverture du sélecteur…</p>}>
+      {choosingRelease && <AlternativeReleaseModal item={item} onClose={() => setChoosingRelease(false)} />}
+      {choosingQuality && item.tmdbId && <DownloadModal isOpen onClose={() => setChoosingQuality(false)} title={item.movieTitle || item.seriesTitle || cleanTitle} mediaType={item.mediaType} tmdbId={item.tmdbId} tvdbId={item.tvdbId} imdbId={item.imdbId} posterPath={poster.current} initialSeason={item.seasonNumber} initialEpisode={item.episodeNumber} />}
+    </Suspense>
   </article>;
 }

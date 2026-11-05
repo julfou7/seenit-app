@@ -1,5 +1,6 @@
 export type DownloadFailureCode = 'no_release';
 import type { DownloadAvailability } from './downloadAvailability.ts';
+import { selectArrSeasonReleases } from './seasonReleaseSelection.ts';
 
 export interface ArrSearchOutcome {
   success: boolean;
@@ -29,24 +30,6 @@ export function isCompatibleArrRelease(release: ArrRelease, preference?: '1080p'
   const quality = release.quality?.quality || release.quality;
   const text = `${quality?.name || ''} ${quality?.resolution || ''} ${release.title || ''}`;
   return preference === '4k' ? /2160|4k|uhd/i.test(text) : /1080/i.test(text) && !/2160|4k|uhd/i.test(text);
-}
-
-/** Un pack confirmé ou une release par épisode mappé, depuis la même réponse interactive. */
-export function selectArrSeasonReleases(releases: ArrRelease[]): ArrRelease[] {
-  const pack = releases.find(release => release.fullSeason === true);
-  if (pack) return [pack];
-  const covered = new Set<number>();
-  return releases.filter(release => {
-    const values = release.mappedEpisodeNumbers ?? release.episodeNumbers;
-    if (!Array.isArray(values) || !values.length) throw new Error('Le service ne précise pas les épisodes couverts par la release.');
-    const episodes = values.map(Number);
-    if (episodes.some(number => !Number.isInteger(number) || number < 1)) throw new Error('Épisodes de release invalides.');
-    if (episodes.every(number => covered.has(number))) return false;
-    // Deux packs partiels qui se chevauchent ne sont pas envoyés aveuglément ensemble.
-    if (episodes.some(number => covered.has(number))) return false;
-    episodes.forEach(number => covered.add(number));
-    return true;
-  });
 }
 
 function record(value: unknown): Record<string, unknown> | null {

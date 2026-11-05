@@ -15,7 +15,6 @@ import { syncSingleItem } from '../hooks/useDetailsSyncWorker';
 import { auth, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { TrailerModal } from '../components/TrailerModal';
-import { DownloadModal } from '../components/DownloadModal';
 import { useShowsStore } from '../store/showsStore';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
