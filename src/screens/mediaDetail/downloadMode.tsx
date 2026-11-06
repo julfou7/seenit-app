@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Download } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { EpisodeDownloadPresentation } from '../../features/downloads/episodeDownloadPresentation';
@@ -61,7 +62,9 @@ export function DownloadModeBanner({ season, states, progress, picked, allPicked
 }
 
 export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise }: { title: string; detail: string; enabled: boolean; onLaunch: (quality: '1080p' | '4k') => void; onPrecise?: () => void }) {
-  return <div role="region" aria-label="Lancer le téléchargement" className="fixed inset-x-2.5 bottom-[calc(10px+env(safe-area-inset-bottom,0px))] z-[170] max-w-md mx-auto rounded-3xl bg-[rgba(22,22,26,0.96)] backdrop-blur-xl p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.13),0_14px_34px_rgba(0,0,0,0.6)] animate-in fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
+  // La fiche vit dans un contexte d'empilement (z-150) sous la navigation (z-160) : la barre passe par un
+  // portail sur document.body pour recouvrir réellement la navigation et recevoir les appuis.
+  const bar = <div role="region" aria-label="Lancer le téléchargement" className="fixed inset-x-2.5 bottom-[calc(10px+env(safe-area-inset-bottom,0px))] z-[170] max-w-md mx-auto rounded-3xl bg-[rgba(22,22,26,0.96)] backdrop-blur-xl p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.13),0_14px_34px_rgba(0,0,0,0.6)] animate-in fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
     <div className="flex items-baseline justify-between gap-3 px-1">
       <strong className="min-w-0 truncate text-[15px] font-extrabold text-white">{title}</strong>
       {onPrecise && <button type="button" onClick={onPrecise} disabled={!enabled} className="shrink-0 min-h-8 text-[13px] font-bold text-zinc-400 disabled:opacity-40">Version précise ›</button>}
@@ -72,6 +75,7 @@ export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise }:
       <button type="button" disabled={!enabled} onClick={() => onLaunch('4k')} className="flex-1 h-12 rounded-[14px] bg-zinc-800 text-zinc-100 text-[16px] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] active:scale-[0.98] disabled:text-zinc-500">4K</button>
     </div>
   </div>;
+  return typeof document === 'undefined' ? bar : createPortal(bar, document.body);
 }
 
 /** Contrôle de droite en mode : sélection (or) ou état du téléchargement, à la place du Vu. */

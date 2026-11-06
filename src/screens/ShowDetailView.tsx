@@ -126,9 +126,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const modeToday = getTodayStr();
   const modeSeason = selectedSeason?.season_number ?? null;
   const episodePresentation = (episode: number, aired: boolean) => episodeDownloadPresentation(episode, aired, Boolean(modeSeason !== null && model.presence.episodesHasFile?.[`${modeSeason}x${episode}`]), modeSeason !== null ? model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, modeSeason, episode) : null);
-  const modeStates = useMemo(() => modeSeason === null ? [] : seasonModeStates(selectedEpisodes, episode => Boolean(show?.seenEpisodes?.includes(`${modeSeason}x${episode}`)), episodePresentation, modeToday),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedEpisodes, show?.seenEpisodes, modeSeason, model.presence.episodesHasFile, model.getEpisodeDownload, modeToday]);
+  // Pas de mémorisation : la file en direct (lue par une fonction stable du store) doit être relue à chaque rendu.
+  const modeStates = modeSeason === null ? [] : seasonModeStates(selectedEpisodes, episode => Boolean(show?.seenEpisodes?.includes(`${modeSeason}x${episode}`)), episodePresentation, modeToday);
   const selectableEpisodes = modeStates.filter(entry => isEpisodeSelectable(entry.state)).map(entry => entry.episode);
   const activeDownloads = modeStates.filter(entry => entry.state === 'active').length;
   const enterDownloadMode = () => {

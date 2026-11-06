@@ -12,8 +12,8 @@ const launch = readFileSync('src/features/downloads/downloadLaunch.ts', 'utf8');
 async function loadMode() {
   const bundle = await build({ entryPoints: ['src/screens/mediaDetail/downloadMode.tsx'], bundle: true, write: false, platform: 'node', format: 'cjs',
     plugins: [{ name: 'mode-ports', setup(builder) {
-      builder.onResolve({ filter: /^(?:react(?:\/jsx-runtime)?|lucide-react)$|\/lib\/utils$/ }, args => ({ path: args.path, namespace: 'ports' }));
-      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="f";export const Download=()=>null;export const cn=(...a)=>a.filter(Boolean).join(" ");export default {};' }));
+      builder.onResolve({ filter: /^(?:react(?:\/jsx-runtime)?|react-dom|lucide-react)$|\/lib\/utils$/ }, args => ({ path: args.path, namespace: 'ports' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="f";export const Download=()=>null;export const cn=(...a)=>a.filter(Boolean).join(" ");export const createPortal=(n)=>n;export default {};' }));
     } }] });
   const module = { exports: {} as Record<string, unknown> };
   vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module, exports: module.exports }));
@@ -48,6 +48,12 @@ test('SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la saison change
   assert.match(view, /useEffect\(\(\) => \{ setPickedEpisodes\(new Set\(\)\); \}, \[modeSeason\]\);/);
   assert.match(view, /window\.addEventListener\('app-close-modals', close\);/);
   assert.match(view, /\{downloadMode && canUseDownloadMode && <DownloadModeBar /);
+  // La barre d'action recouvre réellement la navigation (z-160) : portail hors du contexte z-150 de la fiche.
+  const mode = readFileSync('src/screens/mediaDetail/downloadMode.tsx', 'utf8');
+  assert.match(mode, /return typeof document === 'undefined' \? bar : createPortal\(bar, document\.body\);/);
+  assert.match(mode, /z-\[170\]/);
+  // Les états du bandeau sont relus à chaque rendu (la file en direct change sans changer de fonction).
+  assert.doesNotMatch(view, /const modeStates = useMemo/);
 });
 
 test('SEENIT-DOWNLOAD-014 #879 le lancement garde les gardes de la popup et une seule voie Sonarr', () => {
