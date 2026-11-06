@@ -269,13 +269,17 @@ leurs bibliothèques en parallèle, ne se relance plus d'elle-même et s'arrête
 
 L’écran comporte trois panneaux indépendants **À regarder**, **À venir** et **Historique**. Le scroll
 ne change jamais d’onglet ; aucun swipe ne navigue entre panneaux. Le header `seenit●` conserve l’état
-de synchronisation et ouvre les Notifications avec une cloche et un point or si non lu. La feuille réunit
-les preuves Plex en cache, rappels du jour, téléchargements terminés, dates films confirmées, actualités
-et mise à jour. Tout marquer lu conserve l’état par compte ; les actualités réutilisent les préférences
-cloud existantes. Ouvrir un média et marquer Vu restent des actions séparées.
-La présence globale d’une série dans Plex ne produit pas de notification pour son épisode de reprise
-et ne propose pas Vu : ce cache ne contient aucune preuve par épisode. Les films disponibles gardent
-leur action Vu ; les rappels et actualités des séries restent visibles.
+de synchronisation et ouvre les Notifications avec une cloche et un point or si non lu. Depuis #876,
+c’est une page plein écran au contrat des Réglages (navigation conservée, Retour) qui réunit les
+preuves Plex en cache, rappels du jour, téléchargements terminés, dates films confirmées, actualités
+et mise à jour. Titres de films/séries en or ; une notification non lue a un fond plein et un point or
+sur son image. Aucun bouton par notification : toucher ouvre la fiche et marque lu, glisser vers la
+droite retire (action Retirer focalisable pour le clavier/TalkBack). Retirer la dernière notification,
+Tout marquer lu ou changer d'onglet ferme la page. Tout marquer lu conserve l’état par compte ; les actualités réutilisent
+les préférences cloud existantes. Marquer Vu se fait depuis la fiche du média.
+La présence globale d’une série dans Plex ne produit pas de notification pour son épisode de reprise :
+ce cache ne contient aucune preuve par épisode. Les films disponibles gardent leur notification ; les
+rappels et actualités des séries restent visibles.
 
 ### 5.1 À Regarder
 

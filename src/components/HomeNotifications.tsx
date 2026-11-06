@@ -1,6 +1,6 @@
 import { collectDeliveredNotifications, formatNotificationEpisodeCodes, NOTIFICATION_INBOX_FIELD, type InboxNotification } from '../features/notifications/notificationInbox';
-import { useEffect, useRef, useState } from 'react';
-import { Bell, CheckCheck, X } from 'lucide-react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { Bell } from 'lucide-react';
 import { collection, query, orderBy, limit, getDocs, getDoc, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import type { Show } from '../types';
 import { auth, db } from '../lib/firebase';
@@ -12,15 +12,14 @@ import type { LiveDownloadItem } from '../services/sonarrRadarr';
 import { getUpcomingEpisodeInfo } from './cards/UpcomingShowCard';
 import { canOfferPlexWatchedAction } from '../features/watchlist/homePresentation';
 import { getTodayStr } from '../lib/utils';
-import { DialogLayer } from './ui/DialogLayer';
-import { SeenItCheckButton } from './SeenItCheckButton';
 import { useToastStore } from '../store/toastStore';
-import { HomeNoticeSwipe } from './cards/HomeNoticeSwipe';
-import { imageUrl } from '../features/watchlist/seriesCardPresentation';
+import type { Notice } from './HomeNotificationsPage';
 
-interface Notice { id: string; title: string; detail: string; show?: Show; newsId?: string; update?: boolean; mark?: boolean }
 interface News { id: string; showId: string; message: string; description?: string }
-export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; onOpen: (id: string, type?: 'tv' | 'movie') => void; onSeen: (show: Show) => void | boolean | Promise<void | boolean> }) {
+// Chargée à la première ouverture : la page (cadre Réglages, cartes, glissement) reste hors du chargement d'À voir.
+const HomeNotificationsPage = lazy(() => import('./HomeNotificationsPage').then(module => ({ default: module.HomeNotificationsPage })));
+/** #876 — Page Notifications : aucune action par carte ; toucher ouvre, glisser à droite retire, la page se ferme seule une fois vide. */
+export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (id: string, type?: 'tv' | 'movie') => void }) {
   const uid = auth.currentUser?.uid;
   const showsRef = useRef(shows); showsRef.current = shows;
   const collectingUid = useRef<string | null>(null);
@@ -40,8 +39,10 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
   useEffect(() => {
     const timer = setInterval(() => setClock(Date.now()), 60_000);
     const reset = () => setOpen(false);
+    // La navigation reste visible sous la page : changer d'onglet la ferme comme toute superposition.
     window.addEventListener('watchlist-reset-all', reset);
-    return () => { clearInterval(timer); window.removeEventListener('watchlist-reset-all', reset); };
+    window.addEventListener('app-close-modals', reset);
+    return () => { clearInterval(timer); window.removeEventListener('watchlist-reset-all', reset); window.removeEventListener('app-close-modals', reset); };
   }, []);
   useEffect(() => {
     let current = true;
@@ -91,7 +92,7 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
   for (const show of userShows) {
     if (show.isArchived || show.status === 'dropped') continue;
     const available = plex[getPlexMediaKey(show.tmdbId, show.mediaType, uid)];
-    if (canOfferPlexWatchedAction(show.mediaType, available?.available === true, show.seenEpisodes.includes('movie'))) notices.push({ id: `plex:${show.id}:movie`, title: show.title, detail: 'Disponible sur Plex', show, mark: true });
+    if (canOfferPlexWatchedAction(show.mediaType, available?.available === true, show.seenEpisodes.includes('movie'))) notices.push({ id: `plex:${show.id}:movie`, title: show.title, detail: 'Disponible sur Plex', show });
     const upcoming = getUpcomingEpisodeInfo(show);
     if (upcoming && show.notificationsEnabled && upcoming.air_date === today) notices.push({ id: `reminder:${show.id}:${today}`, title: show.title, detail: 'Rappel de sortie · aujourd’hui', show });
     if (show.mediaType === 'movie' && upcoming && show.firstAirDate && show.firstAirDate >= today) notices.push({ id: `date:${show.id}:${show.firstAirDate}`, title: show.title, detail: `Sortie confirmée · ${new Date(`${show.firstAirDate}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`, show });
@@ -149,20 +150,15 @@ export function HomeNotifications({ shows, onOpen, onSeen }: { shows: Show[]; on
     setDismissed(nextDismissed);
     writeUserScopedJson(uid, 'home_dismissed_notifications', nextDismissed);
     void markRead(visibleNotices);
+    setOpen(false);
+  };
+  const openNotice = (notice: Notice) => {
+    void markRead([notice]); setOpen(false);
+    if (notice.update) useUpdateStore.getState().requestUpdateModal(); else if (notice.show) onOpen(notice.show.id, notice.show.mediaType);
   };
   return <>
     <button type="button" className="home-notification-bell" aria-label={`Notifications${unread.length ? `, ${unread.length} non lues` : ''}`} aria-haspopup="dialog" onClick={() => setOpen(true)}><Bell size={22} />{unread.length > 0 && <span>{unread.length > 99 ? '99+' : unread.length}</span>}</button>
-    {open && <DialogLayer label="Notifications" onDismiss={() => setOpen(false)} className="fixed inset-0 bg-black/65 flex items-end sm:items-center justify-center p-3">
-      <section className="home-notifications"><header><h2>Notifications</h2><button type="button" aria-label="Fermer les notifications" data-dialog-initial-focus onClick={() => setOpen(false)}><X size={20} /></button></header>
-        {unread.length > 0 && <button type="button" className="home-notifications__read" onClick={markAllRead}><CheckCheck size={16} />Tout marquer lu</button>}
-        {loading && <p role="status">Chargement des notifications…</p>}
-        {!loading && !visibleNotices.length && <p>Aucune notification pour le moment.</p>}
-        <div className="home-notifications__list">{visibleNotices.map(notice => <HomeNoticeSwipe key={notice.id} onDismiss={() => dismiss(notice)}><div data-notice-id={notice.id} className={`home-notice${isRead(notice) ? ' home-notice--read' : ''}`}>
-          <button type="button" onClick={() => { void markRead([notice]); setOpen(false); if (notice.update) useUpdateStore.getState().requestUpdateModal(); else if (notice.show) onOpen(notice.show.id, notice.show.mediaType); }}><span className="home-notice__image" aria-hidden="true">{notice.show?.posterPath ? <img src={imageUrl(notice.show.backdropPath || notice.show.posterPath, 'w300')!} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /> : <Bell size={23} />}</span><span className="home-notice__text"><strong>{!isRead(notice) && <i className="home-notice__dot" />}{notice.title}</strong><small>{notice.detail}</small></span></button>
-          {notice.mark && notice.show && <span data-notice-action><SeenItCheckButton size={28} title={`Marquer ${notice.title} comme vu`} onClick={async () => { if (await onSeen(notice.show!) !== false) await markRead([notice]); }} /></span>}
-          <button type="button" data-notice-action className="home-notice__dismiss" aria-label={`Retirer la notification ${notice.title}`} onClick={() => dismiss(notice)}><X size={16} /></button>
-        </div></HomeNoticeSwipe>)}</div>
-      </section>
-    </DialogLayer>}
+    {open && <Suspense fallback={null}><HomeNotificationsPage notices={visibleNotices} unreadCount={unread.length} loading={loading} isRead={isRead}
+      onClose={() => setOpen(false)} onMarkAll={markAllRead} onOpenNotice={openNotice} onDismiss={dismiss} /></Suspense>}
   </>;
 }

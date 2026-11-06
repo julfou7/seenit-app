@@ -30,18 +30,20 @@ async function testTerrain227Harness(client,root){const reports=[];for(const wid
  assertLoadMoreSpacing(spacing);
  fs.writeFileSync(path.join(root,'quality-reports',`terrain227-list-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
  await evaluate(client,'window.__homeAVoir.clearDismissed();document.querySelector(".home-notification-bell").focus();document.querySelector(".home-notification-bell").click()');
- await check(client,`document.querySelectorAll('.home-notice').length>0 && !document.querySelector('.home-notifications [role=status]')`,'notifications prêtes');
+ await check(client,`document.querySelectorAll('.home-notice').length>0 && !document.querySelector('.home-notifications-page [role=status]')`,'notifications prêtes');
  for(let n=0;n<100&&await evaluate(client,'!!document.querySelector(".home-notice__dismiss")');n++){
   await evaluate(client,'window.__homeAVoir.clear();document.querySelector(".home-notice__dismiss").click()');await pause(30);
  }
- await check(client,`!document.querySelector('.home-notifications') && document.activeElement===document.querySelector('.home-notification-bell')`,'dernière retirée ferme et restitue le focus');
+ await check(client,`!document.querySelector('.home-notifications-page') && document.activeElement===document.querySelector('.home-notification-bell')`,'dernière retirée ferme et restitue le focus');
  await evaluate(client,'window.__homeAVoir.toasts().find(t=>t.onUndo)?.onUndo()');
  await evaluate(client,'document.querySelector(".home-notification-bell").click()');
  await check(client,`document.querySelectorAll('.home-notice').length===1`,'Annuler restaure sans perte');
- await evaluate(client,'document.querySelector(".home-notice__dismiss").click()');await check(client,`!document.querySelector('.home-notifications')`,'dernier retrait après Annuler');
+ await evaluate(client,'document.querySelector(".home-notice__dismiss").click()');await check(client,`!document.querySelector('.home-notifications-page')`,'dernier retrait après Annuler');
  await evaluate(client,'document.querySelector(".home-notification-bell").click()');
- await check(client,`document.querySelector('.home-notifications')?.textContent.includes('Aucune notification')`,'boîte déjà vide reste consultable');
- await evaluate(client,'document.querySelector("[aria-label=\\"Fermer les notifications\\"]").click()');
+ // #876 : page Notifications au contrat des sous-pages Réglages ; vide, elle reste ouverte et Retour la ferme.
+ await check(client,`document.querySelector('.home-notifications-page')?.textContent.includes('Tu es à jour')`,'boîte déjà vide reste consultable');
+ await evaluate(client,'document.querySelector(".home-notifications-page").closest(".reg-page").querySelector(".reg-back").click()');
+ await check(client,`!document.querySelector('.home-notifications-page')`,'Retour ferme la page vide');
  if(width===360){
   await evaluate(client,'window.__terrain224.splash.open(true)');await check(client,`document.querySelector('.seenit-brand-splash__episodes')`,'splash');
   // Terrain v1.4.248 : l'anneau disparaissait puis réapparaissait d'un coup quand le fil principal montait l'app.

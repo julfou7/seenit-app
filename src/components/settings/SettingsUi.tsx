@@ -1,6 +1,7 @@
 import { useRef, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import { DialogLayer } from '../ui/DialogLayer';
+import '../../screens/reglages.css';
 
 export type SettingsTone = 'ok' | 'warn' | 'error' | 'busy';
 

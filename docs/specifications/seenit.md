@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.256**
+Version applicative : **1.4.257**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1203,6 +1203,10 @@ pour le cache des sagas et univers.
   deux états ouvre la fiche SeenIt exacte. Après preuve Plex, l'affiche issue de la correspondance PMS
   exacte suit le même contrat visuel : `largeIcon` carré en contain dans l'état replié, BigPicture
   centré en contain dans l'état développé et `largeIcon` masqué dans ce style pour éviter le doublon.
+  **Cible #443 (`USR-2026-11-06-004`), non encore livrée** : l'état développé affichera l'image paysage
+  exacte du média (backdrop du film, image de l'épisode ou de la série) au lieu de répéter l'affiche ;
+  l'affiche portrait reste la vignette repliée et ne redevient la grande image en contain que si aucune
+  image paysage n'est connue. Jusqu'à cette livraison, le contrat contain ci-dessus reste celui du runtime.
   Le fallback texte reste fonctionnel, et l'action « Ouvrir dans Plex » n'est exposée que si le slug
   Plex Discover est résolu strictement depuis ce TMDB ID ;
   elle ouvre `https://watch.plex.tv/movie|show/<slug>`, application Plex puis Web, sans fallback
@@ -1444,11 +1448,17 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   total fournisseur, de finale et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
   jamais des preuves de visionnage. La section des séries anciennes conserve seulement le texte discret de récence, sans aucun badge.
 - **SEENIT-UX-018** — L’accueil À voir suit `docs/design/home-a-voir.md` : trois panneaux indépendants
-  À regarder, À venir et Historique, sans changement au scroll ni swipe entre panneaux. Le header
-  seenit● ouvre une feuille Notifications, avec état non lu isolé par compte et Tout marquer lu.
+  À regarder, À venir et Historique, sans changement au scroll ni swipe entre panneaux. La cloche du
+  header seenit● ouvre la **page** Notifications (#876) : sous-page plein écran au contrat des Réglages
+  (entrée 18 px + fondu 180 ms, Retour, bord gauche, navigation conservée), état non lu isolé par compte
+  et Tout marquer lu. Aucune action n’est affichée par notification : la toucher la marque lue et ouvre
+  sa fiche exacte, la glisser vers la droite la retire (sortie de 220 ms, immédiate en mouvement réduit,
+  Annuler conservé) et une action Retirer focalisable reste disponible au clavier et à TalkBack.
+  Retirer la dernière notification visible ou utiliser Tout marquer lu ferme automatiquement la page ;
+  changer d'onglet depuis la navigation la ferme aussi, sans réouverture au retour sur À voir.
   Une disponibilité Plex globale de série ne prouve jamais la disponibilité de l’épisode de reprise :
-  sans preuve Plex par épisode, elle ne crée ni notification épisode ni action Vu. Les films dont
-  l’identité exacte est disponible conservent leur notification et leur action réversible.
+  sans preuve Plex par épisode, elle ne crée aucune notification épisode. Les films dont l’identité
+  exacte est disponible conservent leur notification ; Vu se marque depuis leur fiche.
   À regarder conserve trois sections distinctes (Continuer, Nouveautés, Pas vu depuis un moment),
   chacune en rail de six cartes puis tuile Voir en liste et liste par douze via la bascule à deux icônes. Les badges
   statut sans emoji sont à côté du code épisode ; le rappel de sortie utilise une pastille rectangulaire J-X (auj. aujourd’hui), sans cercle de progression ni badge de statut dans À venir.
@@ -1508,6 +1518,17 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   plein écran et paysage seulement après action utilisateur lorsque les API navigateur le permettent ;
   tout refus laisse le lecteur utilisable. Le desktop conserve la modal normale. Aucun changement
   d'identité média ni de position de la fiche n'est introduit.
+- **SEENIT-UX-020** — Règles visuelles durables du 06/11/2026 (`USR-2026-11-06-002`, `USR-2026-11-06-003`,
+  détail dans `docs/specifications/ux-reference.md` §9). Tout titre de film ou de série s'affiche en or
+  `#F2C36B` sur toutes les surfaces PWA/APK (cartes, grilles, listes, rails, fiches, recherche,
+  téléchargements, notifications in-app), y compris une fois lu ; les titres d'épisode, personnes,
+  personnages, noms de releases et notifications système Android en sont exclus, et le terme d'une
+  recherche est souligné plutôt que recoloré. Toute pagination progressive réutilise `HomeLoadMore`
+  (pastille de liste ou tuile de fin de carrousel, trois prochaines vignettes, « Afficher N de plus » /
+  « Afficher les N » / « Afficher la dernière » et « X en attente ») ; aucun bouton texte de pagination
+  séparé. **État : cible partiellement livrée.** À regarder, l'Historique et la page Notifications
+  respectent déjà ces deux règles ; leur généralisation reste suivie par #874 (titres) et #873
+  (Afficher plus). Une surface encore non conforme est un écart connu, jamais une règle alternative.
 
 ## 10. Performance et résilience
 

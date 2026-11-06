@@ -141,7 +141,9 @@ test('#809 Tout marquer lu masque la liste en une seule écriture sans toast ind
   assert.match(notifications, /\.\.\.visibleNotices\.map\(notice => notice\.id\)/);
   assert.match(notifications, /writeUserScopedJson\(uid, 'home_dismissed_notifications', nextDismissed\)/);
   assert.match(notifications, /void markRead\(visibleNotices\)/);
-  assert.match(notifications, /onClick=\{markAllRead\}><CheckCheck/);
+  // #876 : le bouton vit dans la page chargée à la demande et reçoit markAllRead.
+  assert.match(notifications, /onMarkAll=\{markAllRead\}/);
+  assert.match(readFileSync('src/components/HomeNotificationsPage.tsx', 'utf8'), /onClick=\{onMarkAll\}><CheckCheck/);
   assert.doesNotMatch(notifications, /void markRead\(notices\)/);
   const bulk = notifications.slice(notifications.indexOf('const markAllRead'), notifications.indexOf('return <>'));
   assert.doesNotMatch(bulk, /dismiss\(/);

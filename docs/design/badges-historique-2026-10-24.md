@@ -31,7 +31,7 @@ Tous les codes épisode s'écrivent `S05 | E14` : saison et épisode sur deux ch
 
 ## Badges (ruban B07)
 
-Une série affiche au plus un badge, en ruban diagonal dans le coin de l'affiche, sans emoji. Le badge n'apparaît que s'il reste un épisode à voir. Texte de 10 caractères maximum, sinon il est coupé par le bord de l'affiche.
+Une série affiche au plus un badge, en bandeau horizontal compact au bas de l'affiche, sans emoji (ruban diagonal d'origine remplacé au terrain 224, voir `marque-2026-10-25.md`). Le badge n'apparaît que s'il reste un épisode à voir. Texte court (10 caractères visés), contenu dans la largeur de l'affiche.
 
 ### Règles et couleurs
 
@@ -50,7 +50,7 @@ Deux autres badges, « En pause » et « Jamais commencée », ne servent que da
 
 | Endroit | Forme | Valeurs |
 | --- | --- | --- |
-| Carte 8f (À regarder, Nouveautés, À venir) | Ruban dans l'affiche (86 × 129 px, rayon 12 px, overflow hidden) | top 10 px, left −26 px, largeur 110 px, rotate(−38°), padding 3 px 0, 9 px / 900, majuscules, letter-spacing 0.06em, centré, ombre 0 2px 8px rgba(0,0,0,0.5) |
+| Carte 8f (À regarder, Nouveautés, Pas vu depuis, À venir) | Bandeau au bas de l'affiche (86 × 129 px, rayon 12 px, overflow hidden) | bottom 0, left 0, pleine largeur, hauteur 17 px, padding 2 px 3 px, sans rotation, 8 px / 900, majuscules, letter-spacing 0.025em, centré, ombre 0 2px 8px rgba(0,0,0,0.5) ; même géométrie que le bandeau de l'Historique. Implémentation : `.series-ribbon` (bloc « Terrain224 ») dans `src/components/cards/seriesEpisodeCard.css` |
 | Grande carte du haut (hero « Ce soir » et hero classique) | Ruban dans le coin haut gauche de l'image, l'image coupe ce qui dépasse | top 14 px, left −30 px, largeur 130 px, 10 px, padding 4 px 0 ; aucun badge une fois l'épisode vu |
 | Affichage en liste | Étiquette compacte sous les métadonnées | hauteur 20 px, padding 0 10 px, rotate(−6°) depuis la gauche, même police et mêmes couleurs |
 
@@ -131,7 +131,7 @@ La section distingue maintenant les séries commencées puis arrêtées de celle
 | 60 à 364 jours | Mois arrondis (jours ÷ 30,44) | 74 j → « 2 MOIS » ; 92 j → « 3 MOIS » |
 | 365 jours et plus | Années, avec ½ au-delà de 6 mois de reste | 400 j → « 1 AN » ; 560 j → « 1 AN ½ » |
 
-- Placement et dimensions : comme les autres badges (ruban sur l'affiche de la carte 8f, étiquette compacte en liste). Pas d'animation.
+- Placement et dimensions : comme les autres badges (bandeau au bas de l'affiche de la carte 8f, étiquette compacte en liste). Pas d'animation.
 - Icônes en SVG 8 × 8 px, couleur du texte, 4 px avant le texte : pause = deux barres 2,5 × 8 (viewBox 10), rayon 1 ; signet = contour 1,4 px.
 - Sous-titre de la section : « En pause ou jamais commencées, depuis plus de 2 mois ».
 - La pastille grise « ⏸ depuis 3 mois » de la version précédente est abandonnée.

@@ -301,6 +301,21 @@ pas les pixels d'une capture particulière.
 Ces règles décrivent le runtime commun PWA/APK. Les captures 360/412 px, le clavier, le texte agrandi
 et TalkBack restent des preuves à produire sur la candidate de release, pas des règles alternatives.
 
+## 9. Règles visuelles durables — 6 novembre 2026
+
+Cibles décidées par le propriétaire (`USR-2026-11-06-002`, `USR-2026-11-06-003`), pas encore toutes livrées :
+
+- **Titres média en or.** Tout titre de film ou de série s'affiche en `#F2C36B`, quelle que soit la
+  surface (cartes, grilles, listes, rails, fiches, recherche, téléchargements, notifications in-app).
+  Les titres d'épisode, personnes, personnages, noms de releases et notifications système Android en
+  sont exclus. Dans une recherche, le titre reste en or et le terme cherché est souligné (#874).
+- **Un seul « Afficher plus ».** Toute pagination progressive utilise le motif `HomeLoadMore` :
+  pastille de 52 px en liste ou tuile en fin de carrousel, trois vignettes rondes des prochains
+  éléments, libellé « Afficher N de plus » / « Afficher les N » / « Afficher la dernière », et
+  « X en attente » pour le total restant. Aucun bouton texte de pagination séparé (#873).
+
+Référence visuelle : canvas Design SeenIt (composant « Afficher plus » et écrans recréés).
+
 ## Téléchargements — choix d'une autre release (#661)
 
 La section **En attente** (#664) conserve les demandes sans transfert, y compris après redémarrage.

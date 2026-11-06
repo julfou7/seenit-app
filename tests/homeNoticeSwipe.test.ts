@@ -11,7 +11,8 @@ test('SEENIT-UX-018 le swipe retire une notification sans confondre scroll clic 
     } }],
   });
   const module = { exports: {} as { HomeNoticeSwipe: (props: { children: string; onDismiss: () => void }) => { props: Record<string, (event: unknown) => void> } } };
-  vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module }));
+  // #876 : la carte sort d'abord de l'écran ; le minuteur est exécuté immédiatement pour vérifier le retrait.
+  vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module, setTimeout: (callback: () => void) => { callback(); return 0; } }));
   for (const gesture of [
     { dx: 71, dy: 0, dismissed: 0 }, { dx: 100, dy: 0, dismissed: 1 },
     { dx: -100, dy: 0, dismissed: 0 }, { dx: -10, dy: 100, dismissed: 0 },
