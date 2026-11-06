@@ -1227,7 +1227,8 @@ async function startServer() {
           return typeof userData?.uuid === 'string' && userData.uuid.trim()
             ? userData.uuid.trim()
             : null;
-        } catch (error: any) {
+        } catch (error: unknown) {
+          if (!(error instanceof Error)) return null;
           console.log(`[Plex Sync] Plex account UUID unavailable: ${error?.message || error}`);
           return null;
         }
