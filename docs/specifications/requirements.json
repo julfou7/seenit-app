@@ -120,6 +120,28 @@
       ]
     },
     {
+      "id": "SEENIT-UX-020",
+      "title": "Titres média en or et un seul contrôle « Afficher plus » sur toutes les surfaces",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/durableVisualRules.test.ts",
+          "contains": "SEENIT-UX-020 le contrat canonique, la référence UX et le registre portent les mêmes règles visuelles"
+        },
+        {
+          "file": "tests/durableVisualRules.test.ts",
+          "contains": "SEENIT-UX-020 HomeLoadMore reste le contrôle de pagination livré sur À regarder et l’Historique"
+        },
+        {
+          "file": "tests/durableVisualRules.test.ts",
+          "contains": "SEENIT-UX-020 les titres média déjà livrés en or le restent, même lus"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-019",
       "title": "Fiches série, film et épisode au style du prototype, en un seul défilement",
       "targets": [
@@ -1792,6 +1814,10 @@
         {
           "file": "tests/downloadNotificationPoster.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 #801 le vrai dispatcher transmet seulement la référence image au reçu natif"
+        },
+        {
+          "file": "tests/durableVisualRules.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 #443 la cible paysage est tracée sans remplacer le contrat runtime contain"
         },
         {
           "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
