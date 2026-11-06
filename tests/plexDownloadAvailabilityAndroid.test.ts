@@ -19,6 +19,28 @@ const app = readFileSync('src/App.tsx', 'utf8');
 const showDetail = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
 const plexStorage = readFileSync('src/features/plex/plexStorage.ts', 'utf8');
 
+test('SEENIT-NOTIFICATION-003 #801 branche le cache privé et le contrôle natif du vrai reçu import', () => {
+  const cache = readFileSync('android/app/src/main/java/com/seenit/app/NotificationPosterCache.java', 'utf8');
+  const nativeContract = readFileSync('android/app/src/androidTest/java/com/seenit/app/ImportNotificationImageContract.java', 'utf8');
+  const upgrade = readFileSync('android/app/src/androidTest/java/com/seenit/app/UpgradeContractInstrumentedTest.java', 'utf8');
+  assert.match(server, /resolvePoster: resolveDownloadNotificationPoster/);
+  assert.match(worker, /applyPoster\(builder, NotificationPosterCache\.read\(context, message\.get\("posterUrl"\)\), compactText\)/);
+  assert.match(worker, /attempt <= 3 && NotificationPosterCache\.warm/);
+  assert.match(worker, /postImportNotification\(getApplicationContext\(\), receipt, true\)/);
+  assert.match(worker, /if \(updateOnly && !visible\) return/);
+  assert.match(worker, /"plex"\.equals\(active\.getNotification\(\)\.extras\.getString\("downloadPhase"\)\)/);
+  assert.match(cache, /notification-media\//);
+  assert.match(cache, /16777619/);
+  assert.match(cache, /512 \* 1024/);
+  assert.match(cache, /setInstanceFollowRedirects\(false\)/);
+  assert.doesNotMatch(cache, /Base64|X-Plex-Token/);
+  assert.match(upgrade, /ImportNotificationImageContract\.verify\(context\)/);
+  assert.match(nativeContract, /PlexAvailabilityWorker\.buildImportNotification\(context, message\)/);
+  assert.match(nativeContract, /getLargeIcon\(\)/);
+  assert.match(nativeContract, /Notification\.EXTRA_PICTURE/);
+  assert.match(nativeContract, /assertNull\(rich\.extras\.getParcelable\("android.largeIcon.big"\)\)/);
+});
+
 test('SEENIT-UX-018 les deux notifications natives Plex exposent leur identité au fil sans token', () => {
   const start = worker.indexOf('private static Bundle inboxExtras');
   const payload = worker.slice(start, worker.indexOf('static void showImportNotification', start));

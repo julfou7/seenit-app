@@ -1173,6 +1173,10 @@ Le titre nomme l’œuvre ; le type est dans l’en-tête Android (`subText`), l
 Complément Explorer29/10 (#398/#787) : [fiche personnage](../design/explorer-personnage-2026-10-29.md), reprise exacte sur crédits par épisode, cache public borné, calcul au premier accès uniquement ; progression/favoris isolés par UID. Toasts au-dessus du champ et retour aux résultats avec la même requête, clavier fermé.
 ### Téléchargements — prototype du 5 novembre 2026 (#861)
 
+Notification import #801 : l'affiche du média exact est attachée au reçu « Import Plex terminé »
+depuis le cache privé Android, enrichi par le worker sans changer l'identifiant ni sonner à nouveau.
+La confirmation « Disponible dans Plex » exige toujours la preuve de copie exacte indépendante.
+
 Correctif terrain v254 : carte sans nom technique ni boutons secondaires permanents ; actions sous
 « … ». Sélecteur de qualité à surface unique, sans jargon ou panneau de transfert terminé ; ouverture
 et fermeture sans commande. Le téléchargement de saison est une icône dans l'en-tête Saison N,

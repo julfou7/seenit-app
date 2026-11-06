@@ -1,5 +1,7 @@
 # Registre des audits SeenIt
 
+Notifications import #801 : [affiche, cache privé et contrôle natif du 6 novembre](./notification-import-poster-2026-11-06.md), baseline f9db3015.
+
 Téléchargements : [refonte prototype et matrice du backlog du 5 novembre](./downloads-2026-11-05.md), #861.
 
 TV V4 : [correctifs et limites des retours du28octobre](./tv-retours-2026-10-28.md), #295 / #738,

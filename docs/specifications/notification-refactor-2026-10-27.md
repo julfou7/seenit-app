@@ -62,6 +62,17 @@ Les déclencheurs métier existants restent inchangés. Nouvel épisode/saison, 
 
 ## Images et petite icône
 
+Correctif #801 : le reçu « Import Plex terminé » utilise lui aussi une affiche exacte, sans attendre
+que Plex indexe la copie. Le backend résout `movie|tv + TMDB ID` (cache mémoire borné, aucun accès
+Firestore supplémentaire) et transmet seulement une URL TMDB w342, sans secret ni octets d'image.
+Le service Android lit d'abord le cache privé `notification-media` partagé avec les rappels ; le worker
+le matérialise si nécessaire, puis enrichit silencieusement le même reçu avant de chercher la preuve
+Plex. Seuls des fichiers bornés sont décodés, les URL distantes sont strictement autorisées et aucun
+bitmap ne passe dans WorkManager/Binder. Cache absent/corrompu ou réseau KO : reçu texte conservé.
+La vérification du propriétaire précède l'affichage et est refaite après le réseau. La présence d'une
+affiche TMDB ne prouve aucune disponibilité Plex. Un contrôle Android natif couvre les styles,
+dimensions, cache froid/corrompu et absence de doublon ; One UI réel reste à confirmer sur téléphone.
+
 Le pipeline `notificationMedia.ts` + patch Capacitor reste inchangé sur ses invariants : fichiers privés persistants, cache valide prioritaire, téléchargements coalescés et bornés, aucun bitmap/Base64 dans Binder/AlarmManager, décodage au moment de la livraison, poster compact en contain, un seul visuel développé, fallback texte sûr.
 
 La petite icône est `ic_stat_seenit`, monochrome blanc/transparent. Elle est imposée pour notifications locales, worker téléchargements/Plex, mises à jour et comme fallback FCM Android. `ic_stat_notification` n'est pas réintroduite.

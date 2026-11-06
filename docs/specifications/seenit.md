@@ -1184,12 +1184,16 @@ pour le cache des sagas et univers.
 - Les notifications système de fin de téléchargement proviennent des webhooks Sonarr/Radarr.
   Le polling local affiche uniquement un toast SeenIt afin d'éviter les doublons.
 - **SEENIT-NOTIFICATION-003** — Un événement Sonarr/Radarr `Download` prouve uniquement que l'import
-  Arr est terminé ; il ne prouve jamais à lui seul que Plex a indexé le média. La PWA et les APK legacy
-  reçoivent un reçu FCM visible dont le statut reste strictement « Import terminé », sans annoncer une
+    Arr est terminé. Le reçu « Import Plex terminé » porte l'affiche TMDB exacte dès le cache disponible,
+    enrichie silencieusement par le worker sur le même identifiant avant la recherche Plex (#801).
+    Cache privé partagé, URL w342 autorisée et bornée, UID revalidé après réseau, contain compact/déplié
+    et fallback texte sont obligatoires ; l'affiche ne constitue pas une preuve de disponibilité.
+    Il ne prouve jamais à lui seul que Plex a indexé le média. La PWA et les APK legacy
+    reçoivent un reçu FCM visible dont le statut reste strictement « Import Plex terminé », sans annoncer une
   vérification Plex qu'ils ne lanceront pas. Sur un Android ayant confirmé la capability
   `plexAvailabilityBackgroundV1`, le backend envoie à la place un message data-only haute priorité :
   le service natif affiche immédiatement une notification média locale dont le titre est le nom du média
-  et le statut « Import terminé », puis lance la vérification Plex bornée. Le même
+    et le statut « Import Plex terminé », puis lance la vérification Plex bornée. Le même
   identifiant de notification est réutilisé ; une preuve Plex exacte met donc cet élément à jour vers
   « Disponible dans Plex » au lieu d'empiler une seconde alerte. Si la preuve n'arrive jamais, le reçu
   d'import reste visible. Le téléphone compare l'empreinte du UID actif, conserve le jeton Plex uniquement

@@ -44,6 +44,8 @@ import { fetchC411Torrents } from "./src/features/downloads/c411Backend.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { downloadServiceTimeoutMs } from "./src/features/downloads/downloadServiceTimeout.ts";
 import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
+import { createDownloadNotificationPosterResolver } from './src/features/downloads/downloadNotificationPoster.ts';
+const resolveDownloadNotificationPoster = createDownloadNotificationPosterResolver();
 import { processDownloadFailureNotification } from "./src/features/downloads/downloadFailureNotificationBackend.ts";
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
 import { normalizePlexAvailabilityTraceBatch } from "./src/features/notifications/plexAvailabilityDiagnostics.ts";
@@ -2751,6 +2753,7 @@ async function startServer() {
         ownerUidHash,
         presentation,
         sendPush: sendPushToUserDevices,
+        resolvePoster: resolveDownloadNotificationPoster,
         traceId,
       });
 
