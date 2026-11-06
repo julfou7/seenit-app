@@ -1,9 +1,8 @@
 import { DialogLayer } from './ui/DialogLayer';
-import React, { useState, useEffect } from 'react';
+import React, { lazy, Suspense, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useUpdateStore } from '../store/updateStore';
 import { downloadAndInstallApk, UpdateProgress } from '../services/appUpdater';
-import { ReleaseChangelogViewer } from './ChangelogViewer';
 import {
   Download,
   Sparkles,
@@ -16,6 +15,9 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { cn } from '../lib/utils';
+
+// Notes de version chargées à l'ouverture de la mise à jour : le rendu Markdown reste hors du bundle de démarrage.
+const ReleaseChangelogViewer = lazy(() => import('./ChangelogViewer').then(module => ({ default: module.ReleaseChangelogViewer })));
 
 export function AppUpdateBanner() {
   const { latestRelease, hasUpdate, checkForUpdates, dismissUpdate, updateModalRequestId } = useUpdateStore();
@@ -209,7 +211,7 @@ export function AppUpdateBanner() {
               </div>
 
               <div className="bg-black/40 border border-white/5 rounded-2xl p-4 max-h-80 sm:max-h-[28rem] md:max-h-[32rem] overflow-y-auto custom-scrollbar">
-                <ReleaseChangelogViewer release={latestRelease} />
+                <Suspense fallback={<p className="text-zinc-500">Chargement des notes…</p>}><ReleaseChangelogViewer release={latestRelease} /></Suspense>
               </div>
 
               {/* Download Progress / Status Bar if active */}
