@@ -39,8 +39,10 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
   useEffect(() => {
     const timer = setInterval(() => setClock(Date.now()), 60_000);
     const reset = () => setOpen(false);
+    // La navigation reste visible sous la page : changer d'onglet la ferme comme toute superposition.
     window.addEventListener('watchlist-reset-all', reset);
-    return () => { clearInterval(timer); window.removeEventListener('watchlist-reset-all', reset); };
+    window.addEventListener('app-close-modals', reset);
+    return () => { clearInterval(timer); window.removeEventListener('watchlist-reset-all', reset); window.removeEventListener('app-close-modals', reset); };
   }, []);
   useEffect(() => {
     let current = true;

@@ -31,6 +31,10 @@ test('SEENIT-UX-018 #876 la page se ferme seule après la dernière notification
   assert.match(autoClose, /else if \(!loading && hadVisibleNotices\.current\) setOpen\(false\);/);
   const markAll = source.slice(source.indexOf('const markAllRead'), source.indexOf('const openNotice'));
   assert.match(markAll, /void markRead\(visibleNotices\);\s*setOpen\(false\);/);
+  // Changer d'onglet (navigation visible sous la page) la ferme : À voir reste monté et ne la rouvre pas au retour.
+  assert.match(source, /window\.addEventListener\('app-close-modals', reset\);/);
+  assert.match(source, /window\.removeEventListener\('app-close-modals', reset\);/);
+  assert.match(source, /const reset = \(\) => setOpen\(false\);/);
   // Toucher une notification la marque lue, ferme la page et ouvre la fiche exacte.
   const openNotice = source.slice(source.indexOf('const openNotice'), source.indexOf('return <>'));
   assert.match(openNotice, /void markRead\(\[notice\]\); setOpen\(false\);/);

@@ -274,8 +274,8 @@ c’est une page plein écran au contrat des Réglages (navigation conservée, R
 preuves Plex en cache, rappels du jour, téléchargements terminés, dates films confirmées, actualités
 et mise à jour. Titres de films/séries en or ; une notification non lue a un fond plein et un point or
 sur son image. Aucun bouton par notification : toucher ouvre la fiche et marque lu, glisser vers la
-droite retire (action Retirer focalisable pour le clavier/TalkBack). Retirer la dernière notification ou
-Tout marquer lu ferme la page. Tout marquer lu conserve l’état par compte ; les actualités réutilisent
+droite retire (action Retirer focalisable pour le clavier/TalkBack). Retirer la dernière notification,
+Tout marquer lu ou changer d'onglet ferme la page. Tout marquer lu conserve l’état par compte ; les actualités réutilisent
 les préférences cloud existantes. Marquer Vu se fait depuis la fiche du média.
 La présence globale d’une série dans Plex ne produit pas de notification pour son épisode de reprise :
 ce cache ne contient aucune preuve par épisode. Les films disponibles gardent leur notification ; les

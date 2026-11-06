@@ -1454,7 +1454,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   et Tout marquer lu. Aucune action n’est affichée par notification : la toucher la marque lue et ouvre
   sa fiche exacte, la glisser vers la droite la retire (sortie de 220 ms, immédiate en mouvement réduit,
   Annuler conservé) et une action Retirer focalisable reste disponible au clavier et à TalkBack.
-  Retirer la dernière notification visible ou utiliser Tout marquer lu ferme automatiquement la page.
+  Retirer la dernière notification visible ou utiliser Tout marquer lu ferme automatiquement la page ;
+  changer d'onglet depuis la navigation la ferme aussi, sans réouverture au retour sur À voir.
   Une disponibilité Plex globale de série ne prouve jamais la disponibilité de l’épisode de reprise :
   sans preuve Plex par épisode, elle ne crée aucune notification épisode. Les films dont l’identité
   exacte est disponible conservent leur notification ; Vu se marque depuis leur fiche.
