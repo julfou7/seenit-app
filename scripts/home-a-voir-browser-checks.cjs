@@ -61,13 +61,17 @@ async function testHomeHarness(client, root) {
     await check(client,'document.querySelectorAll("#home-panel-history [data-history-row]").length>10','suite historique');
     fs.writeFileSync(path.join(root,'quality-reports',`home-history-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await click(client,'.home-notification-bell');
-    await check(client,'document.querySelector(".home-notifications") && document.querySelectorAll(".home-notice").length>=2','feuille notifications réelles');
-    await check(client,'!document.querySelector(".home-notice button[aria-label=\\"Marquer Stranger Things comme vu\\"]") && document.querySelector(".home-notice button[aria-label=\\"Marquer The Punisher : One Last Kill comme vu\\"]")','la vraie feuille refuse Vu pour une série partielle et conserve le film Plex exact');
+    await check(client,'document.querySelector(".home-notifications-page") && document.querySelectorAll(".home-notice").length>=2','page notifications réelles');
+    // #876 : aucune action Vu par notification ; une série partielle ne crée aucune notification Plex et le film Plex exact garde la sienne.
+    await check(client,'!document.querySelector(".home-notifications-page button[aria-label$=\\"comme vu\\"]") && ![...document.querySelectorAll("[data-notice-id^=\\"plex:\\"] strong")].some(e=>e.textContent==="Stranger Things") && [...document.querySelectorAll("[data-notice-id^=\\"plex:\\"] strong")].some(e=>e.textContent==="The Punisher : One Last Kill")','la vraie page refuse Vu, ignore la série partielle et conserve le film Plex exact');
     fs.writeFileSync(path.join(root,'quality-reports',`home-notifications-${width}.png`),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
     await evaluate(client,'window.__homeAVoir.clear()');
     const notice='[data-notice-id="update:1.4.999"]';
     await evaluate(client,'window.__noticeCount=document.querySelectorAll(".home-notice").length;window.__noticeOpens=window.__homeAVoir.telemetry.opens.length');
-    await click(client,notice+' .home-notice__dismiss');
+    // Retirer est réservé au clavier et à TalkBack (sr-only, visible au focus) : focus puis Entrée.
+    await evaluate(client,`document.querySelector(${JSON.stringify(notice+' .home-notice__dismiss')}).focus()`);
+    await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r'});
+    await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
     await check(client,'!document.querySelector(\'[data-notice-id="update:1.4.999"]\') && document.querySelectorAll(".home-notice").length===window.__noticeCount-1','retirer une seule notification par bouton');
     await evaluate(client,'window.__homeAVoir.toasts().find(toast=>toast.onUndo)?.onUndo()');
     await check(client,'document.querySelectorAll(".home-notice").length===window.__noticeCount','Annuler restaure la notification');
@@ -75,16 +79,16 @@ async function testHomeHarness(client, root) {
     await client.send('Input.dispatchMouseEvent',{type:'mousePressed',...swipe,button:'left',clickCount:1});
     for(let distance=20;distance<=110;distance+=15) await client.send('Input.dispatchMouseEvent',{type:'mouseMoved',x:swipe.x+distance,y:swipe.y,button:'left',buttons:1});
     await client.send('Input.dispatchMouseEvent',{type:'mouseReleased',x:swipe.x+110,y:swipe.y,button:'left',clickCount:1});
-    await check(client,'!document.querySelector(\'[data-notice-id="update:1.4.999"]\') && document.querySelector(".home-notifications") && window.__homeAVoir.telemetry.opens.length===window.__noticeOpens','swipe droit retire une notification sans ouvrir sa fiche');
+    await check(client,'!document.querySelector(\'[data-notice-id="update:1.4.999"]\') && document.querySelector(".home-notifications-page") && window.__homeAVoir.telemetry.opens.length===window.__noticeOpens','swipe droit retire une notification sans ouvrir sa fiche');
     await client.send('Page.reload');
     await check(client,'document.querySelector(".home-notification-bell")','remontage après retrait');
     await click(client,'.home-notification-bell');
-    await check(client,'document.querySelector(".home-notifications") && !document.querySelector(\'[data-notice-id="update:1.4.999"]\')','le retrait individuel persiste après remontage');
+    await check(client,'document.querySelector(".home-notifications-page") && !document.querySelector(\'[data-notice-id="update:1.4.999"]\')','le retrait individuel persiste après remontage');
     if (await evaluate(client,'Boolean(document.querySelector(".home-notifications__read"))')) await click(client,'.home-notifications__read');
     await check(client,'!document.querySelector(".home-notification-bell > span")','Tout marquer lu acquitté');
     await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
     await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
-    await check(client,'!document.querySelector(".home-notifications")','Échap ferme la feuille');
+    await check(client,'!document.querySelector(".home-notifications-page")','Échap ferme la page');
     await click(client,'#home-tab-watch_next');
     await check(client,'document.querySelector("#home-tab-watch_next").getAttribute("aria-selected")==="true" && window.__homeErrors.length===0','retour À regarder sans erreur');
     if (width===412) {
