@@ -5,7 +5,7 @@ import { useToastStore, ToastMessageObj } from '../store/toastStore';
 import { useShowActions } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
 import { SeenItGlyph } from './SeenItLogo';
-import { isDownloadToastPresentation } from '../features/toasts/toastPresentation';
+import { isDownloadToastPresentation, toastDetailLine } from '../features/toasts/toastPresentation';
 import { useLogStore } from '../store/logStore';
 import {
   dispatchToastMediaNavigation,
@@ -305,8 +305,8 @@ export function ToastContainer() {
   // Le titre d'un média reste en or (SEENIT-UX-020) ; un titre système reste blanc.
   const isMediaTitle = Boolean(hasPoster || show || navigationTarget);
   const displayTitle = parsed.title && isPlexToast ? parsed.title.replace(/^PLEX\s*•\s*/i, '') : parsed.title;
-  const detail = (parsed.action || (typeof message === 'string' ? message : '')).replace(/\s*\n+\s*/g, ' · ');
-  const episodeBand = parsed.subtitle?.replace(/S(\d+)\s*\|\s*E(\d+)/i, (_m, season: string, episode: string) => `S${season.padStart(2, '0')}E${episode.padStart(2, '0')}`);
+  // Code d'épisode sur l'affiche, contexte du sous-titre et action réunis sur la ligne de détail.
+  const { episodeBand, detail } = toastDetailLine({ subtitle: parsed.subtitle, action: parsed.action || (typeof message === 'string' ? message : ''), hasPoster });
 
   return (
     <AnimatePresence>
@@ -351,7 +351,7 @@ export function ToastContainer() {
               <div className="w-14 shrink-0 relative bg-zinc-800 self-stretch">
                 <img src={posterUrl!} alt="" className="w-full h-full object-cover object-center" />
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent from-40% to-zinc-900" />
-                {episodeBand && episodeBand.length < 12 && (
+                {episodeBand && (
                   <span className="absolute inset-x-0 bottom-0 h-[18px] grid place-items-center bg-black/80 text-[10px] font-extrabold tracking-wide text-amber-300">{episodeBand}</span>
                 )}
               </div>

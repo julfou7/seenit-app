@@ -4,6 +4,8 @@ import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updat
 import { resolveEffectiveQualityProfileId } from './qualityProfileSelection';
 import { downloadEpisodeWithSeasonPackFallback } from './episodeSeasonPackFallback';
 import { availabilityHint, type DownloadAvailability } from './downloadAvailability';
+import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
+import { auth } from '../../lib/firebase';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
 
 export type DownloadQualityChoice = '1080p' | '4k';
@@ -172,4 +174,42 @@ export async function launchArrDownload({ config, mediaType, title, year, tmdbId
     failDownloadRequest(requestId, message);
     notify(message, 'error');
   }
+}
+
+type ToastKind = 'download' | 'success' | 'error' | 'info';
+
+export interface ArrEpisodeBatch extends Omit<ArrDownloadLaunch, 'config' | 'mediaType' | 'season' | 'episode' | 'notify' | 'onStarted' | 'replaceExisting'> {
+  season: number;
+  episodes: readonly number[];
+  /** Configuration courante, relue avant chaque épisode. */
+  readConfig: () => DownloadConfig;
+  /** Garde d'appel par épisode : fichier présent ou demande active dans le même périmètre. */
+  skip: (episode: number) => boolean;
+  notify: (episode: number, action: string, toastType?: ToastKind) => void;
+  /** Compte courant ; par défaut l'utilisateur Firebase connecté. */
+  readOwner?: () => string | undefined;
+  launch?: (input: ArrDownloadLaunch) => Promise<void>;
+}
+
+const sonarrTarget = (config: DownloadConfig) => `${config.sonarrUrl || ''}\n${config.sonarrApiKey || ''}`;
+
+/**
+ * #879 — Lot d'épisodes du mode téléchargement. Le lot reste attaché au compte, au gate personnel et au
+ * serveur Sonarr qui l'ont lancé : ils sont relus avant chaque épisode et le lot s'arrête net si l'un
+ * d'eux change (déconnexion, changement de compte, téléchargements désactivés, autre serveur), sans
+ * jamais créer de demande au nom d'un autre compte. Rien n'est remplacé (replaceExisting reste faux).
+ */
+export async function launchArrEpisodeBatch({ season, episodes, readConfig, skip, notify, readOwner = () => auth.currentUser?.uid, launch = launchArrDownload, ...media }: ArrEpisodeBatch): Promise<{ launched: number; interrupted: boolean }> {
+  const owner = readOwner();
+  const initial = readConfig();
+  let launched = 0;
+  if (!owner || !isDownloadFeatureEnabled(initial)) return { launched, interrupted: true };
+  for (const episode of episodes) {
+    const config = readConfig();
+    if (readOwner() !== owner || !isDownloadFeatureEnabled(config) || sonarrTarget(config) !== sonarrTarget(initial)) return { launched, interrupted: true };
+    if (skip(episode)) continue;
+    await launch({ ...media, config, mediaType: 'tv', season, episode, notify: (action, toastType) => notify(episode, action, toastType) });
+    launched += 1;
+  }
+  return { launched, interrupted: false };
 }

@@ -160,26 +160,26 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     const config = useDownloadConfigStore.getState();
     if (!isDownloadFeatureEnabled(config)) return;
     // Chargé au premier lancement : les services Sonarr restent hors du chunk de la fiche.
-    const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
+    const { launchArrEpisodeBatch } = await import('../features/downloads/downloadLaunch');
     if (model.presence.loading) { showToast('Vérification de la disponibilité en cours.', 'info'); return; }
     if (!(config.sonarrUrl && config.sonarrApiKey)) { useToastStore.getState().showToast({ title, action: 'Sonarr n’est pas configuré pour ce média.', posterPath: show?.posterPath }, 'error'); return; }
     const episodes = pickedList;
+    const season = modeSeason;
     exitDownloadMode();
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
     const single = episodes.length === 1;
     if (!single) useToastStore.getState().showToast({ title, action: `${episodes.length} épisodes · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
-    for (const episode of episodes) {
-      if (model.presence.episodesHasFile?.[`${modeSeason}x${episode}`]) continue;
-      if (model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: modeSeason, episodeNumber: episode })) continue;
-      const subtitle = `S${modeSeason} | E${episode}`;
-      await launchArrDownload({
-        config, mediaType: 'tv', title, year, tmdbId: effectiveTmdbId,
-        tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId,
-        posterPath: show?.posterPath || undefined, season: modeSeason, episode, qualityPreference: quality,
-        // Un épisode : tous les messages ; plusieurs : seulement les erreurs (le bilan reste dans Téléchargements).
-        notify: (action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle, action, posterPath: show?.posterPath }, toastType); }
-      });
-    }
+    // Le lot relit compte, gate et serveur Sonarr avant chaque épisode et s'arrête si l'un d'eux change.
+    await launchArrEpisodeBatch({
+      title, year, tmdbId: effectiveTmdbId,
+      tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId,
+      posterPath: show?.posterPath || undefined, season, episodes, qualityPreference: quality,
+      readConfig: () => useDownloadConfigStore.getState(),
+      // Mêmes gardes que la popup : un fichier présent n'est jamais remplacé, pas de double lancement.
+      skip: episode => Boolean(model.presence.episodesHasFile?.[`${season}x${episode}`]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
+      // Un épisode : tous les messages ; plusieurs : seulement les erreurs (le bilan reste dans Téléchargements).
+      notify: (episode, action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: show?.posterPath }, toastType); }
+    });
   };
   const openPreciseVersion = () => {
     if (modeSeason === null || !pickedList.length) return;

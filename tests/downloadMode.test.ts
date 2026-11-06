@@ -61,14 +61,56 @@ test('SEENIT-DOWNLOAD-014 #879 le lancement garde les gardes de la popup et une 
   assert.match(body, /if \(!isDownloadFeatureEnabled\(config\)\) return;/);
   assert.match(body, /if \(model\.presence\.loading\) \{/);
   assert.match(body, /if \(!\(config\.sonarrUrl && config\.sonarrApiKey\)\)/);
-  assert.match(body, /if \(model\.presence\.episodesHasFile\?\.\[`\$\{modeSeason\}x\$\{episode\}`\]\) continue;/, 'un fichier présent n’est jamais remplacé');
-  assert.match(body, /if \(model\.hasActiveDownloadInScope\?\.\(\{ mediaType: 'tv', tmdbId: Number\(effectiveTmdbId\), seasonNumber: modeSeason, episodeNumber: episode \}\)\) continue;/, 'pas de double lancement');
+  assert.match(body, /skip: episode => Boolean\(model\.presence\.episodesHasFile\?\.\[`\$\{season\}x\$\{episode\}`\]\)/, 'un fichier présent n’est jamais remplacé');
+  assert.match(body, /\|\| Boolean\(model\.hasActiveDownloadInScope\?\.\(\{ mediaType: 'tv', tmdbId: Number\(effectiveTmdbId\), seasonNumber: season, episodeNumber: episode \}\)\)/, 'pas de double lancement');
+  assert.match(body, /readConfig: \(\) => useDownloadConfigStore\.getState\(\),/, 'configuration relue avant chaque épisode');
   assert.match(readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8'), /hasActiveDownloadInScope: scope => hasActiveDownloadInScope\(useLiveDownloadStore\.getState\(\)\.downloads, scope\)/, 'même garde que la popup, fournie par le cœur');
-  assert.match(body, /await launchArrDownload\(\{/);
+  assert.match(body, /await launchArrEpisodeBatch\(\{/);
   assert.doesNotMatch(body, /replaceExisting: true/);
+  assert.match(launch, /await launch\(\{ \.\.\.media, config, mediaType: 'tv', season, episode,/);
   // La popup et le mode partagent le même lancement (demande durable, profil, pack de saison).
   assert.match(modal, /await launchArrDownload\(\{/);
   assert.match(launch, /const requestId = beginDownloadRequest\(\{/);
   assert.match(launch, /await downloadEpisodeWithSeasonPackFallback\(\{/);
   assert.match(launch, /resolveEffectiveQualityProfileId\(profiles, qualityPreference\)/);
+});
+
+async function loadBatch() {
+  const bundle = await build({ entryPoints: ['src/features/downloads/downloadLaunch.ts'], bundle: true, write: false, platform: 'node', format: 'cjs',
+    plugins: [{ name: 'launch-ports', setup(builder) {
+      builder.onResolve({ filter: /\/(?:shows\/tmdb|services\/sonarrRadarr|downloadLifecycle|qualityProfileSelection|episodeSeasonPackFallback|downloadAvailability|lib\/firebase)$/ }, args => ({ path: args.path, namespace: 'ports' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const tmdb={};export const fetchQualityProfiles=0,searchAndDownloadInRadarr=0,searchAndDownloadInSonarr=0,acceptDownloadRequest=0,beginDownloadRequest=0,failDownloadRequest=0,updateDownloadRequest=0,resolveEffectiveQualityProfileId=0,downloadEpisodeWithSeasonPackFallback=0,availabilityHint=0;export const auth={currentUser:null};' }));
+    } }] });
+  const module = { exports: {} as Record<string, unknown> };
+  vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module, exports: module.exports }));
+  return module.exports as { launchArrEpisodeBatch: (batch: Record<string, unknown>) => Promise<{ launched: number; interrupted: boolean }> };
+}
+
+test('SEENIT-DOWNLOAD-014 #879 un lot d’épisodes s’arrête dès que le compte, le gate ou le serveur Sonarr change', async () => {
+  const { launchArrEpisodeBatch } = await loadBatch();
+  const base = { downloadsEnabled: true, isHydrated: true, sonarrUrl: 'http://sonarr', sonarrApiKey: 'k' };
+  const run = async (episodes: number[], change: (state: { owner?: string; config: Record<string, unknown> }) => void, skip: (episode: number) => boolean = () => false) => {
+    const state: { owner?: string; config: Record<string, unknown> } = { owner: 'uid-a', config: { ...base } };
+    const launched: Array<{ season: number; episode: number; mediaType: string; replaceExisting?: boolean; owner?: string }> = [];
+    const notices: string[] = [];
+    const result = await launchArrEpisodeBatch({ title: 'Série', tmdbId: 1, season: 2, episodes, qualityPreference: '1080p',
+      readConfig: () => state.config, readOwner: () => state.owner, skip,
+      notify: (episode: number, action: string) => notices.push(`${episode}:${action}`),
+      launch: async (input: { season: number; episode: number; mediaType: string; replaceExisting?: boolean; notify: (action: string) => void }) => { launched.push({ season: input.season, episode: input.episode, mediaType: input.mediaType, replaceExisting: input.replaceExisting, owner: state.owner }); input.notify('lancé'); change(state); } });
+    return { result: { ...result }, launched, notices };
+  };
+  // Lot nominal : les épisodes gardés par l'appelant sont sautés, rien n'est remplacé.
+  const nominal = await run([1, 2, 3], () => {}, episode => episode === 2);
+  assert.deepEqual(nominal.result, { launched: 2, interrupted: false });
+  assert.deepEqual(nominal.launched, [{ season: 2, episode: 1, mediaType: 'tv', replaceExisting: undefined, owner: 'uid-a' }, { season: 2, episode: 3, mediaType: 'tv', replaceExisting: undefined, owner: 'uid-a' }]);
+  assert.deepEqual(nominal.notices, ['1:lancé', '3:lancé']);
+  // Changement de compte, déconnexion, gate coupé ou autre serveur pendant le premier épisode : arrêt net.
+  for (const change of [(s: { owner?: string }) => { s.owner = 'uid-b'; }, (s: { owner?: string }) => { s.owner = undefined; }, (s: { config: Record<string, unknown> }) => { s.config = { ...base, downloadsEnabled: false }; }, (s: { config: Record<string, unknown> }) => { s.config = { ...base, sonarrUrl: 'http://autre' }; }]) {
+    const stopped = await run([1, 2, 3], change as never);
+    assert.deepEqual(stopped.result, { launched: 1, interrupted: true });
+    assert.deepEqual(stopped.launched.map(entry => entry.owner), ['uid-a'], 'aucune demande au nom d’un autre compte');
+  }
+  // Sans compte au départ : rien n'est lancé.
+  const anonymous = await launchArrEpisodeBatch({ title: 'Série', season: 1, episodes: [1], qualityPreference: '4k', readConfig: () => base, readOwner: () => undefined, skip: () => false, notify: () => {}, launch: async () => { throw new Error('ne doit pas lancer'); } });
+  assert.deepEqual({ ...anonymous }, { launched: 0, interrupted: true });
 });

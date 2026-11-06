@@ -26,6 +26,10 @@
         {
           "file": "tests/downloadMode.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 le lancement garde les gardes de la popup et une seule voie Sonarr"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 un lot d’épisodes s’arrête dès que le compte, le gate ou le serveur Sonarr change"
         }
       ]
     },
@@ -2344,6 +2348,10 @@
         {
           "file": "tests/plexToastSummary.test.ts",
           "contains": "SEENIT-UX-004 le bilan final Plex utilise la bande Plex, un titre et une ligne de détail"
+        },
+        {
+          "file": "tests/plexToastSummary.test.ts",
+          "contains": "SEENIT-UX-004 #878 le sous-titre d’un toast n’est jamais perdu : code d’épisode sur l’affiche, contexte dans le détail"
         }
       ]
     },
