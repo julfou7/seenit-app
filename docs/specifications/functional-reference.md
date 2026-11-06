@@ -514,7 +514,11 @@ diffuseur/Plex, **Moyenne par saison**, pastilles de saison, barres de notes et 
 sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L'épisode ajoute la soirée de
 trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
 et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮ ;
-aucun bouton de téléchargement n'est plus affiché dans les fiches. Depuis les retours de la v1.4.247, le bouton
+hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Une série
+n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office,
+bandeau de saison, barre 1080p / 4K à la place de la navigation). Dans la liste d'une saison, un épisode vu
+a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »
+à droite, sans bouton Vu. Depuis les retours de la v1.4.247, le bouton
 or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, genres et thèmes sont sous le synopsis, tout est
 traduit (genres, « Self »), Où regarder n'affiche qu'un Netflix, la barre de navigation reste visible sur la
 fiche et une seule fiche acteur est utilisée partout (fiches, Explorer, Moi, À voir).

@@ -1,12 +1,13 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
-import React, { lazy, Suspense, useMemo } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Heart, MoreVertical, Play, RefreshCw, RotateCcw, Ban, Trash2, Download, Share2 } from 'lucide-react';
-import { cn, openExternalUrl } from '../lib/utils';
+import { cn, getTodayStr, openExternalUrl } from '../lib/utils';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonProfile as PersonDetailModal } from '../components/PersonProfile';
 import { TrailerModal } from '../components/TrailerModal';
 import { useShowsStore } from '../store/showsStore';
+import { useToastStore } from '../store/toastStore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
@@ -21,6 +22,9 @@ import { CastRows, RelationList, RelationsLoading, ThemesCard } from './mediaDet
 import { SeasonAverageChart, SeasonPanel, SeasonPills, SeriesProgressCard, seasonsOf } from './mediaDetail/seriesSections';
 import { MovieEndCard, VerifiedSimilarRail } from './mediaDetail/movieSections';
 import type { ShowDetailViewModel } from './mediaDetail/showDetailViewModel';
+import { DownloadModeBanner, DownloadModeBar, DownloadModeToggle, isEpisodeSelectable, seasonModeStates } from './mediaDetail/downloadMode';
+import { episodeDownloadPresentation } from '../features/downloads/episodeDownloadPresentation';
+import type { DownloadQualityChoice } from '../features/downloads/downloadLaunch';
 
 interface ShowDetailViewProps {
   model: ShowDetailViewModel;
@@ -115,6 +119,75 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
 
   const selectedSeason = seasons.find(season => season.season_number === expandedSeason) || null;
   const selectedEpisodes = selectedSeason ? seasonsCache[selectedSeason.season_number]?.episodes || null : null;
+  // #879 — Mode téléchargement : la fiche reste propre, la sélection d'épisodes est une surcouche.
+  const [downloadMode, setDownloadMode] = useState(false);
+  const [pickedEpisodes, setPickedEpisodes] = useState<Set<number>>(() => new Set());
+  const canUseDownloadMode = isSeries && downloadsEnabled && Boolean(effectiveTmdbId);
+  const modeToday = getTodayStr();
+  const modeSeason = selectedSeason?.season_number ?? null;
+  const episodePresentation = (episode: number, aired: boolean) => episodeDownloadPresentation(episode, aired, Boolean(modeSeason !== null && model.presence.episodesHasFile?.[`${modeSeason}x${episode}`]), modeSeason !== null ? model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, modeSeason, episode) : null);
+  const modeStates = useMemo(() => modeSeason === null ? [] : seasonModeStates(selectedEpisodes, episode => Boolean(show?.seenEpisodes?.includes(`${modeSeason}x${episode}`)), episodePresentation, modeToday),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedEpisodes, show?.seenEpisodes, modeSeason, model.presence.episodesHasFile, model.getEpisodeDownload, modeToday]);
+  const selectableEpisodes = modeStates.filter(entry => isEpisodeSelectable(entry.state)).map(entry => entry.episode);
+  const activeDownloads = modeStates.filter(entry => entry.state === 'active').length;
+  const enterDownloadMode = () => {
+    if (!canUseDownloadMode) return;
+    const next = nextEp && nextEp.season_number === modeSeason && selectableEpisodes.includes(nextEp.episode_number) ? [nextEp.episode_number] : [];
+    setPickedEpisodes(new Set(next));
+    setDownloadMode(true);
+  };
+  const exitDownloadMode = () => { setDownloadMode(false); setPickedEpisodes(new Set()); };
+  const toggleDownloadMode = () => (downloadMode ? exitDownloadMode() : enterDownloadMode());
+  const togglePickedEpisode = (episode: number) => setPickedEpisodes(previous => { const next = new Set(previous); if (next.has(episode)) next.delete(episode); else next.add(episode); return next; });
+  const allPicked = selectableEpisodes.length > 0 && selectableEpisodes.every(episode => pickedEpisodes.has(episode));
+  // Changer de saison vide la sélection (la barre d'action ne vise qu'une saison).
+  useEffect(() => { setPickedEpisodes(new Set()); }, [modeSeason]);
+  // Changer d'onglet ferme le mode comme toute superposition.
+  useEffect(() => {
+    const close = () => { setDownloadMode(false); setPickedEpisodes(new Set()); };
+    window.addEventListener('app-close-modals', close);
+    return () => window.removeEventListener('app-close-modals', close);
+  }, []);
+  const episodeCode = (season: number, episode: number) => `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
+  const pickedList = [...pickedEpisodes].sort((a, b) => a - b);
+  const pickedTitle = !pickedList.length ? 'Coche des épisodes' : pickedList.length === 1 && modeSeason !== null
+    ? `${episodeCode(modeSeason, pickedList[0])} · ${selectedEpisodes?.find((entry: { episode_number: number; name?: string }) => entry.episode_number === pickedList[0])?.name || `Épisode ${pickedList[0]}`}`
+    : `${pickedList.length} épisodes`;
+  const pickedDetail = !pickedList.length ? 'Touche un épisode pour le cocher.' : pickedList.length === 1 ? 'En quelle qualité ?' : `Saison ${modeSeason} · en quelle qualité ?`;
+  /** Lance les épisodes cochés avec les mêmes gardes que la popup : rien n'est remplacé ni relancé en double. */
+  const launchPickedEpisodes = async (quality: DownloadQualityChoice) => {
+    if (modeSeason === null || !pickedList.length || !effectiveTmdbId) return;
+    const config = useDownloadConfigStore.getState();
+    if (!isDownloadFeatureEnabled(config)) return;
+    // Chargé au premier lancement : les services Sonarr restent hors du chunk de la fiche.
+    const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
+    if (model.presence.loading) { showToast('Vérification de la disponibilité en cours.', 'info'); return; }
+    if (!(config.sonarrUrl && config.sonarrApiKey)) { useToastStore.getState().showToast({ title, action: 'Sonarr n’est pas configuré pour ce média.', posterPath: show?.posterPath }, 'error'); return; }
+    const episodes = pickedList;
+    exitDownloadMode();
+    const qualityLabel = quality === '4k' ? '4K' : '1080p';
+    const single = episodes.length === 1;
+    if (!single) useToastStore.getState().showToast({ title, action: `${episodes.length} épisodes · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
+    for (const episode of episodes) {
+      if (model.presence.episodesHasFile?.[`${modeSeason}x${episode}`]) continue;
+      if (model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: modeSeason, episodeNumber: episode })) continue;
+      const subtitle = `S${modeSeason} | E${episode}`;
+      await launchArrDownload({
+        config, mediaType: 'tv', title, year, tmdbId: effectiveTmdbId,
+        tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId,
+        posterPath: show?.posterPath || undefined, season: modeSeason, episode, qualityPreference: quality,
+        // Un épisode : tous les messages ; plusieurs : seulement les erreurs (le bilan reste dans Téléchargements).
+        notify: (action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle, action, posterPath: show?.posterPath }, toastType); }
+      });
+    }
+  };
+  const openPreciseVersion = () => {
+    if (modeSeason === null || !pickedList.length) return;
+    const first = pickedList[0];
+    exitDownloadMode();
+    openEpisodeDownload(modeSeason, first);
+  };
   const seasonVideos = selectedSeason ? (seasonsCache[selectedSeason.season_number]?.videos?.results || []).filter((video: { site?: string }) => video.site === 'YouTube') : [];
   const castPayloadKnown = isSeries ? Boolean(tmdbDetails?.aggregate_credits || tmdbDetails?.credits) : Boolean(tmdbDetails?.credits);
   const cast = (tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast || []);
@@ -140,7 +213,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           {effectiveTmdbId && <button type="button" onClick={() => { setShowMenu(false); void handleShare(); }} className={cn(menuItem, 'text-zinc-100')}><Share2 size={18} className="text-zinc-400" />Partager la fiche</button>}
           {show && <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleSyncSingle(); }} disabled={isSyncingSingle} className={cn(menuItem, 'text-[#F2C36B] disabled:opacity-50')}><RefreshCw size={18} className={cn(isSyncingSingle && 'animate-spin')} />Synchroniser {isSeries ? 'la série' : 'le film'}</button>}
           {/* Accès existant aux téléchargements, inchangé (SEENIT-DOWNLOAD-VISIBILITY-001) */}
-          {(!movieAvailable && (isSeries || !model.presence.loading)) ? <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={18} className="text-zinc-400" />Téléchargement</button> : <button type="button" disabled={model.presence.loading} onClick={() => { setShowMenu(false); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={18} className="text-zinc-400" />{model.presence.loading ? 'Vérification de la disponibilité…' : 'Disponible · autre version'}</button>}
+          {(!movieAvailable && (isSeries || !model.presence.loading)) ? <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); if (canUseDownloadMode) { enterDownloadMode(); return; } setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={18} className="text-zinc-400" />Téléchargement</button> : <button type="button" disabled={model.presence.loading} onClick={() => { setShowMenu(false); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={18} className="text-zinc-400" />{model.presence.loading ? 'Vérification de la disponibilité…' : 'Disponible · autre version'}</button>}
           {show && <>
             {show.isArchived ? <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? rewatchShow() : toggleMovieSeen(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Revoir la série' : 'Revoir le film'}</button>
               : show.status === 'dropped' ? <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? resumeShow() : togglePlanToWatchMovie(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Reprendre la série' : 'Ajouter à ma liste'}</button>
@@ -163,7 +236,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
             {hasTrailer && <button type="button" onClick={() => setTrailerModalVideos(ytVideos)} className="inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-[#18181b] px-2.5 text-[12px] font-bold text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"><Play size={12} className="fill-current" />Bande-annonce</button>}
           </>}
         </div>
-        {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}</SeriesProgressCard>
+        {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}{canUseDownloadMode && show && <DownloadModeToggle active={downloadMode} badge={activeDownloads} onToggle={toggleDownloadMode} />}</SeriesProgressCard>
           : <div className="flex gap-2">{movieCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}</div>}
         {!isSeries && !hasSeenMedia && !isUnreleased && !isAtCinema && <MovieEndCard runtime={tmdbDetails?.runtime} />}
 
@@ -173,9 +246,9 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         {isSeries && <>
           <SeasonAverageChart averages={averages} />
           <SeasonPills seasons={seasons} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }} />
+          {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={() => setPickedEpisodes(allPicked ? new Set() : new Set(selectableEpisodes))} onExit={exitDownloadMode} />}
           {selectedSeason && <SeasonPanel season={selectedSeason} episodes={selectedEpisodes} show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
-            onDownloadEpisode={downloadsEnabled ? episode => openEpisodeDownload(selectedSeason.season_number, episode) : undefined}
-            onDownloadSeason={downloadsEnabled ? () => openEpisodeDownload(selectedSeason.season_number) : undefined}
+            downloadMode={canUseDownloadMode ? { active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode } : null}
             episodesHasFile={model.presence.episodesHasFile}
             getEpisodeDownload={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)} />}
         </>}
@@ -189,6 +262,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         {!isSeries && <VerifiedSimilarRail movie={tmdbDetails} excludedIds={collectionIds} onOpen={movieId => onShowClick && onShowClick(movieId, 'movie')} />}
         {!isSeries && <CastRows cast={cast} isSeries={false} totalEpisodes={0} loading={!tmdbDetails || !castPayloadKnown} onOpenPerson={openPersonModal} />}
         <RedditSection query={isSeries ? `${redditVisibleTitle} series discussion` : redditMovieQuery} resolveQuery={isSeries ? undefined : resolveRedditMovieQuery} isLocked={false} title="Discussions Reddit" description="Retrouvez les avis, théories et spoilers de la communauté." />
+        {downloadMode && <div aria-hidden="true" className="h-24" />}
       </div>
 
       {selectedEpisode && <EpisodeDetailModal show={show} season={selectedEpisode.season} episode={selectedEpisode.episode} tmdbShowTitle={tmdbDetails?.name || tmdbDetails?.title} tmdbShowId={effectiveTmdbId}
@@ -198,6 +272,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       {selectedPersonId && <PersonDetailModal personId={selectedPersonId} hint={(() => { const member = cast.find((entry: { id: number }) => entry.id === selectedPersonId); return member ? { name: member.name, profile_path: member.profile_path, character: member.roles?.[0]?.character || member.character } : undefined; })()} origin={show || (effectiveTmdbId ? { id: '', userId: '', tmdbId: Number(effectiveTmdbId), title, mediaType: isSeries ? 'tv' : 'movie', posterPath: posterPath || null, backdropPath: backdropUrl || null, status: 'plan_to_watch', seenEpisodes: [], episodeRecords: {}, isArchived: false, createdAt: 0, updatedAt: 0 } as unknown as typeof show : null)}
         onClose={() => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); }}
         onShowClick={(tmdbId, type) => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) || (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) || (show?.id && String(show.id) === String(tmdbId)); if (!isSameShow && onShowClick) setTimeout(() => onShowClick(tmdbId, type || 'movie'), 50); }} />}
+      {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={openPreciseVersion} />}
       {trailerModalVideos && <TrailerModal videos={trailerModalVideos} onClose={() => setTrailerModalVideos(null)} />}
       {isDownloadModalOpen && <Suspense fallback={<span role="status">Ouverture du téléchargement…</span>}><DownloadModal isOpen={isDownloadModalOpen} onClose={() => { setIsDownloadModalOpen(false); setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); }} title={title} originalTitle={tmdbDetails?.original_title || tmdbDetails?.original_name || show?.originalTitle} year={(tmdbDetails?.release_date || tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4)} mediaType={isSeries ? 'tv' : 'movie'} tmdbId={effectiveTmdbId} tvdbId={tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId} imdbId={tmdbDetails?.external_ids?.imdb_id || show?.imdbId} posterPath={posterPath || tmdbDetails?.poster_path || show?.posterPath} initialSeason={downloadTargetSeason} initialEpisode={downloadTargetEpisode} totalSeasons={tmdbDetails?.number_of_seasons || seasons.length || 1} seasonsData={tmdbDetails?.seasons} onSuccessToast={(msg) => showToast(msg, 'success', show || undefined)} /></Suspense>}
     </div>

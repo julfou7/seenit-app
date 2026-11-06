@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Check, Download, Loader2, Play } from 'lucide-react';
+import { Play } from 'lucide-react';
 import { episodeDownloadPresentation } from '../../features/downloads/episodeDownloadPresentation';
 import type { LiveDownloadItem } from '../../services/sonarrRadarr';
 import { type Show } from '../../types';
@@ -8,6 +8,8 @@ import { averageRating, formatRating, ratingBarHeight, settleSeenToggle, upcomin
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
+import { SeenItWatchedStamp } from '../../components/cards/SeenItWatchedStamp';
+import { EpisodeModeControl, EpisodePassiveChip, isEpisodeSelectable, type EpisodeModeState } from './downloadMode';
 
 type SeasonMeta = { season_number: number; episode_count?: number; air_date?: string | null; vote_average?: number; name?: string };
 type EpisodeData = { id?: number; episode_number: number; name?: string; still_path?: string | null; air_date?: string | null; runtime?: number | null; vote_average?: number };
@@ -69,7 +71,7 @@ export function SeasonPills({ seasons, show, selected, onSelect }: { seasons: re
  * Saison sélectionnée : barres de notes TMDB par épisode (or = vu, contour blanc = prochain), moyenne,
  * « Tout marquer vu / non vu » et bande-annonce de saison, puis les lignes d'épisode.
  */
-export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, onToggleSeason, onToggleEpisode, onOpenEpisode, onSeasonTrailer, onDownloadEpisode, onDownloadSeason, episodesHasFile, getEpisodeDownload }: { season: SeasonMeta; episodes: readonly EpisodeData[] | null; show: Show | null | undefined; nextKey: string | null; runtimeFallback: number; onToggleSeason: (event: React.MouseEvent) => void; onToggleEpisode: (event: React.MouseEvent, episode: number) => unknown; onOpenEpisode: (episode: EpisodeData) => void; onSeasonTrailer?: () => void; onDownloadEpisode?: (episode: number) => void; onDownloadSeason?: () => void; episodesHasFile?: Record<string, boolean>; getEpisodeDownload?: (episode: number) => LiveDownloadItem | null }) {
+export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, onToggleSeason, onToggleEpisode, onOpenEpisode, onSeasonTrailer, episodesHasFile, getEpisodeDownload, downloadMode }: { season: SeasonMeta; episodes: readonly EpisodeData[] | null; show: Show | null | undefined; nextKey: string | null; runtimeFallback: number; onToggleSeason: (event: React.MouseEvent) => void; onToggleEpisode: (event: React.MouseEvent, episode: number) => unknown; onOpenEpisode: (episode: EpisodeData) => void; onSeasonTrailer?: () => void;  episodesHasFile?: Record<string, boolean>; getEpisodeDownload?: (episode: number) => LiveDownloadItem | null; downloadMode?: { active: boolean; picked: ReadonlySet<number>; onToggle: (episode: number) => void } | null }) {
   const number = season.season_number, count = season.episode_count || 0, today = getTodayStr();
   const seen = seenInSeason(show, number);
   const future = count === 0 || Boolean(season.air_date && season.air_date > today) || (episodes ? episodes.length > 0 && episodes.every(episode => episode.air_date && episode.air_date > today) : false);
@@ -79,7 +81,7 @@ export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, 
   const isSeen = (episode: number) => Boolean(show?.seenEpisodes?.includes(`${number}x${episode}`));
   return <section id={`season-panel-${number}`} className="flex flex-col gap-1" aria-label={`Saison ${number}`}>
     <DetailCard className="px-3.5 py-3 flex flex-col gap-2.5">
-      <div className="flex justify-between items-center gap-2"><span className="text-[16px] font-bold text-white">Saison {number}{count > 0 ? ` · ${seen}/${count}` : ''}</span><div className="flex items-center gap-1">{mean !== null && <span className="text-[13px] text-zinc-400">moyenne <b className="text-white">{formatRating(mean)}</b></span>}{onDownloadSeason && !future && <button type="button" onClick={onDownloadSeason} aria-label={`Télécharger la saison ${number}`} className="w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-full text-[#F2C36B] hover:bg-white/5"><Download size={18} /></button>}</div></div>
+      <div className="flex justify-between items-center gap-2"><span className="text-[16px] font-bold text-white">Saison {number}{count > 0 ? ` · ${seen}/${count}` : ''}</span><div className="flex items-center gap-1">{mean !== null && <span className="text-[13px] text-zinc-400">moyenne <b className="text-white">{formatRating(mean)}</b></span>}</div></div>
       {future ? <p className="text-[13px] text-zinc-400">Saison annoncée{season.air_date ? ` · prochainement, le ${formatAirDateSafe(season.air_date, 'long')}` : ' · les épisodes arrivent bientôt'}</p>
         : episodes ? <div className="h-10 flex items-end gap-0.5" aria-hidden="true">{episodes.map(episode => { const key = `${number}x${episode.episode_number}`; const watched = isSeen(episode.episode_number); const aired = !episode.air_date || episode.air_date <= today; return <span key={`bar-${key}`} className="flex-1 rounded-[2px]" style={{ height: `${ratingBarHeight(episode.vote_average, ratings)}px`, background: watched ? '#E5A93D' : 'transparent', boxShadow: key === nextKey ? 'inset 0 0 0 2px #fff' : watched ? 'none' : `inset 0 0 0 1.5px ${aired ? '#a1a1aa' : '#3f3f46'}` }} />; })}</div>
         : <div className="h-10 rounded bg-zinc-800/60 animate-pulse" aria-hidden="true" />}
@@ -94,17 +96,28 @@ export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, 
         const aired = !episode.air_date || episode.air_date <= today;
         // #857 : à venir = ligne nette (plus de demi-grisé) et libellé relatif, daté au-delà de 7 jours.
         const relative = !aired && episode.air_date ? upcomingEpisodeLabel(episode.air_date, today) : null;
+        // #879 : à droite, le délai seul (« Dans 8 jours ») ; la date de sortie passe sous le titre.
+        const until = relative ? relative.split(' · ')[0] : null;
+        const releaseDay = !aired && episode.air_date ? new Date(`${episode.air_date}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : null;
+        const watchedAt = watched ? Number(show?.episodeRecords?.[key]?.watchedAt) : NaN;
+        const watchedOn = watched && Number.isFinite(watchedAt) && watchedAt > 0 ? `Vu le ${new Date(watchedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : null;
         const runtime = episode.runtime || runtimeFallback;
         const download = episodeDownloadPresentation(episode.episode_number, aired, Boolean(episodesHasFile?.[key]), getEpisodeDownload?.(episode.episode_number));
+        // #879 : état unique de l'épisode pour le mode téléchargement et les pastilles passives.
+        const live = getEpisodeDownload?.(episode.episode_number);
+        const modeState: EpisodeModeState = watched ? 'seen' : download.kind;
+        const inMode = Boolean(downloadMode?.active);
+        const picked = Boolean(downloadMode?.picked.has(episode.episode_number));
+        const selectable = inMode && isEpisodeSelectable(modeState);
+        const activate = () => { if (!inMode) onOpenEpisode(episode); else if (selectable) downloadMode!.onToggle(episode.episode_number); };
         // #845 : seule la ligne elle-même ouvre l'épisode au clavier ; Entrée sur le bouton Vu imbriqué ne fait que le basculer.
-        return <div key={`ep-${key}`} role="button" tabIndex={0} onClick={() => onOpenEpisode(episode)} onKeyDown={event => { if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); onOpenEpisode(episode); }} aria-label={`Épisode ${episode.episode_number} : ${episode.name || ''}`} className={cn('flex items-center gap-2 min-h-[62px] py-1.5 pl-2.5 pr-1.5 rounded-[14px] cursor-pointer', isNext ? 'bg-[rgba(229,169,61,0.08)] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)]' : watched ? '' : 'bg-white/[0.03]', !aired && 'shadow-[inset_0_0_0_1px_rgba(229,169,61,0.28)]')}>
-          <span className="relative w-[76px] h-[47px] rounded-lg overflow-hidden bg-zinc-800 shrink-0">{episode.still_path && <img src={`https://image.tmdb.org/t/p/w300${episode.still_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" style={{ opacity: watched ? 0.55 : 1 }} />}<span aria-hidden="true" className="absolute bottom-0 left-0 rounded-tr-md bg-black/80 px-1.5 py-0.5 text-[11px] font-bold text-white">E{episode.episode_number}</span></span>
-          <span className="flex-1 min-w-0 flex flex-col gap-[3px]"><span className={cn('text-[14px] leading-[1.35] font-bold line-clamp-2 break-words decoration-[1.5px]', watched ? 'text-zinc-500 line-through' : 'text-white')}>{episode.name || `Épisode ${episode.episode_number}`}</span><span className="text-[12px] text-zinc-400">{relative ? <b className="text-[#F2C36B]">{relative}</b> : <>{episode.vote_average ? <b className={watched ? 'text-zinc-500' : 'text-white'}>★ {formatRating(Number(episode.vote_average))}</b> : null}{episode.vote_average ? ' · ' : ''}{runtime} min{isNext ? ' · prochain' : ''}</>}</span></span>
-          {onDownloadEpisode && <button type="button" title={download.label} aria-label={download.label} disabled={download.disabled} onClick={event => { event.stopPropagation(); onDownloadEpisode(episode.episode_number); }} className={cn('w-11 h-11 shrink-0 grid place-items-center rounded-xl', download.kind === 'attention' ? 'text-red-400' : download.kind === 'present' ? 'text-[#F2C36B]' : 'text-zinc-400')}>
-            {download.kind === 'present' ? <Check size={18} /> : download.kind === 'active' ? <Loader2 size={18} className="animate-spin motion-reduce:animate-none" /> : download.kind === 'attention' ? <AlertCircle size={18} /> : download.kind === 'future' ? <span aria-hidden="true">—</span> : <Download size={18} />}
-          </button>}
+        return <div key={`ep-${key}`} role="button" tabIndex={0} onClick={activate} onKeyDown={event => { if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); activate(); }} aria-label={`Épisode ${episode.episode_number} : ${episode.name || ''}`} className={cn('flex items-center gap-2 min-h-[62px] py-1.5 pl-2.5 pr-1.5 rounded-[14px] cursor-pointer', isNext || picked ? 'bg-[rgba(229,169,61,0.08)] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)]' : watched ? '' : aired ? 'bg-white/[0.03]' : 'seenit-episode--upcoming bg-[repeating-linear-gradient(135deg,#141417_0_6px,#101013_6px_12px)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)]')}>
+          <span className="relative w-[76px] h-[47px] rounded-lg overflow-hidden bg-zinc-800 shrink-0">{episode.still_path && <img src={`https://image.tmdb.org/t/p/w300${episode.still_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" style={{ opacity: watched ? 0.55 : 1, filter: watched ? 'grayscale(1)' : undefined }} />}{watched && <SeenItWatchedStamp className="seenit-watched-stamp--mini" />}{downloadMode && !inMode && <EpisodePassiveChip state={modeState} progress={live?.progress} />}{downloadMode && modeState === 'active' && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-black/60"><i className="block h-full bg-zinc-100" style={{ width: `${Math.max(0, Math.min(100, Number(live?.progress) || 0))}%` }} /></span>}<span aria-hidden="true" className="absolute bottom-0 left-0 rounded-tr-md bg-black/80 px-1.5 py-0.5 text-[11px] font-bold text-white">E{episode.episode_number}</span></span>
+          <span className="flex-1 min-w-0 flex flex-col gap-[3px]"><span className={cn('text-[14px] leading-[1.35] font-bold line-clamp-2 break-words decoration-[1.5px]', watched ? 'text-zinc-500 line-through' : 'text-white')}>{episode.name || `Épisode ${episode.episode_number}`}</span><span className="text-[12px] text-zinc-400">{watchedOn ? <span className="text-zinc-500">{watchedOn}</span> : releaseDay ? <span>{releaseDay}</span> : <>{episode.vote_average ? <b className={watched ? 'text-zinc-500' : 'text-white'}>★ {formatRating(Number(episode.vote_average))}</b> : null}{episode.vote_average ? ' · ' : ''}{runtime} min{isNext ? ' · prochain' : ''}</>}</span></span>
           {/* #857 : même bouton Vu que l'Accueil ; #859 : animation au toucher, dessinée par le compositeur. */}
-          {aired && <SeenItCheckButton className="seenit-check--compositor" celebrationLayer={<CompositorCelebration />} isWatched={watched} title={watched ? `Marquer l’épisode ${episode.episode_number} non vu` : `Marquer l’épisode ${episode.episode_number} vu`} onClick={event => settleSeenToggle(onToggleEpisode(event, episode.episode_number))} />}
+          {!aired && until && <span className="shrink-0 pr-2 text-[12.5px] font-extrabold text-sky-300 whitespace-nowrap">{until}</span>}
+          {aired && inMode && <EpisodeModeControl episode={episode.episode_number} state={modeState} picked={picked} progress={live?.progress} onToggle={() => downloadMode!.onToggle(episode.episode_number)} />}
+          {aired && !inMode && <SeenItCheckButton className="seenit-check--compositor" celebrationLayer={<CompositorCelebration />} isWatched={watched} title={watched ? `Marquer l’épisode ${episode.episode_number} non vu` : `Marquer l’épisode ${episode.episode_number} vu`} onClick={event => settleSeenToggle(onToggleEpisode(event, episode.episode_number))} />}
         </div>;
       })}</div>}
   </section>;
