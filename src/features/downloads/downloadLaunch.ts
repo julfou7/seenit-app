@@ -19,6 +19,7 @@ export type DownloadActionResult = {
   status?: 'searching' | 'queued';
   fallbackUsed?: boolean;
   downloadId?: string;
+  packEpisodes?: number[];
 };
 
 export interface ArrDownloadLaunch {
@@ -36,6 +37,8 @@ export interface ArrDownloadLaunch {
   episode?: number;
   qualityPreference: DownloadQualityChoice;
   replaceExisting?: boolean;
+  /** Autres épisodes de la même saison du lot, sélectionnés dans le pack si le repli l'utilise. */
+  packEpisodes?: number[];
   notify: (action: string, toastType?: 'download' | 'success' | 'error' | 'info') => void;
   onStarted?: () => void;
 }
@@ -46,7 +49,7 @@ export interface ArrDownloadLaunch {
  * le pack de saison et échecs explicites. Les gardes d'appel (configuration, demande active dans le même
  * périmètre, fichier présent) restent à la charge de l'appelant, avant tout lancement.
  */
-export async function launchArrDownload({ config, mediaType, title, year, tmdbId, tvdbId, imdbId, posterPath, season, episode, qualityPreference, replaceExisting = false, notify, onStarted }: ArrDownloadLaunch): Promise<void> {
+export async function launchArrDownload({ config, mediaType, title, year, tmdbId, tvdbId, imdbId, posterPath, season, episode, qualityPreference, replaceExisting = false, packEpisodes, notify, onStarted }: ArrDownloadLaunch): Promise<number[]> {
   const isTv = mediaType === 'tv';
   const scopeMode: 'all' | 'season' | 'episode' = !isTv || season === undefined ? 'all' : episode === undefined ? 'season' : 'episode';
   const client = isTv ? 'Sonarr' : 'Radarr';
@@ -119,6 +122,7 @@ export async function launchArrDownload({ config, mediaType, title, year, tmdbId
             episode: episode!,
             qualityPreference,
             replaceExisting,
+            packEpisodes,
             qualityProfileId: effectiveProfileId,
             qbittorrentUrl: config.qbittorrentUrl,
             qbittorrentUsername: config.qbittorrentUsername,
@@ -163,6 +167,7 @@ export async function launchArrDownload({ config, mediaType, title, year, tmdbId
       if (result.fallbackUsed) {
         notify(statusText, 'download');
       }
+      return result.packEpisodes || [];
     } else {
       failDownloadRequest(requestId, result.message, result.failureCode, result.availability);
       notify(result.failureCode === 'no_release'
@@ -174,6 +179,7 @@ export async function launchArrDownload({ config, mediaType, title, year, tmdbId
     failDownloadRequest(requestId, message);
     notify(message, 'error');
   }
+  return [];
 }
 
 type ToastKind = 'download' | 'success' | 'error' | 'info';
@@ -188,7 +194,8 @@ export interface ArrEpisodeBatch extends Omit<ArrDownloadLaunch, 'config' | 'med
   notify: (episode: number, action: string, toastType?: ToastKind) => void;
   /** Compte courant ; par défaut l'utilisateur Firebase connecté. */
   readOwner?: () => string | undefined;
-  launch?: (input: ArrDownloadLaunch) => Promise<void>;
+  /** Renvoie les autres épisodes du lot que le pack de saison a couverts. */
+  launch?: (input: ArrDownloadLaunch) => Promise<number[] | void>;
 }
 
 const sonarrTarget = (config: DownloadConfig) => `${config.sonarrUrl || ''}\n${config.sonarrApiKey || ''}`;
@@ -198,18 +205,24 @@ const sonarrTarget = (config: DownloadConfig) => `${config.sonarrUrl || ''}\n${c
  * serveur Sonarr qui l'ont lancé : ils sont relus avant chaque épisode et le lot s'arrête net si l'un
  * d'eux change (déconnexion, changement de compte, téléchargements désactivés, autre serveur), sans
  * jamais créer de demande au nom d'un autre compte. Rien n'est remplacé (replaceExisting reste faux).
+ * Les épisodes suivants du lot sont proposés au repli : si un pack de saison sert, ils y sont
+ * sélectionnés ensemble et ne sont pas relancés ensuite.
  */
 export async function launchArrEpisodeBatch({ season, episodes, readConfig, skip, notify, readOwner = () => auth.currentUser?.uid, launch = launchArrDownload, ...media }: ArrEpisodeBatch): Promise<{ launched: number; interrupted: boolean }> {
   const owner = readOwner();
   const initial = readConfig();
   let launched = 0;
   if (!owner || !isDownloadFeatureEnabled(initial)) return { launched, interrupted: true };
-  for (const episode of episodes) {
+  const covered = new Set<number>();
+  for (const [index, episode] of episodes.entries()) {
+    if (covered.has(episode)) continue;
     const config = readConfig();
     if (readOwner() !== owner || !isDownloadFeatureEnabled(config) || sonarrTarget(config) !== sonarrTarget(initial)) return { launched, interrupted: true };
     if (skip(episode)) continue;
-    await launch({ ...media, config, mediaType: 'tv', season, episode, notify: (action, toastType) => notify(episode, action, toastType) });
+    const packEpisodes = episodes.slice(index + 1).filter(next => !covered.has(next) && !skip(next));
+    const inPack = await launch({ ...media, config, mediaType: 'tv', season, episode, packEpisodes, notify: (action, toastType) => notify(episode, action, toastType) });
     launched += 1;
+    for (const extra of inPack || []) if (packEpisodes.includes(extra)) covered.add(extra);
   }
   return { launched, interrupted: false };
 }

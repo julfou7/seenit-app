@@ -10,6 +10,7 @@ import {
   registerTrackedSeasonPack,
   removeTrackedSeasonPack,
   resetTrackedSeasonPacksInMemory,
+  saveTrackedSeasonPacks,
   type TrackedSeasonPackFallback
 } from '../src/features/downloads/episodeSeasonPackCleanup.ts';
 
@@ -282,4 +283,50 @@ test('processTrackedSeasonPackFallbacks détecte l’import et nettoie automatiq
   const stored = getTrackedSeasonPacks('uid-worker');
   assert.equal(stored[0].cleanedUp, true);
   assert.equal(typeof stored[0].cleanedAt, 'number');
+});
+
+test('SEENIT-DOWNLOAD-014 #879 un pack partagé par un lot n’est retiré qu’après l’import de tous ses épisodes', async () => {
+  registerTrackedSeasonPack({
+    downloadId: 'batch-pack-hash',
+    seriesId: 60,
+    seasonNumber: 2,
+    episodeNumber: 1,
+    episodeId: 601,
+    extraEpisodes: [{ episodeNumber: 2, episodeId: 602 }, { episodeNumber: 3 }],
+    title: 'Show Lot'
+  }, 'uid-batch');
+
+  const imported = new Set<number>([601]);
+  const deleted: string[] = [];
+  const transport = {
+    get: async (url: string) => {
+      const direct = url.match(/\/api\/v3\/episode\/(\d+)$/);
+      if (direct) return { id: Number(direct[1]), hasFile: imported.has(Number(direct[1])) };
+      if (url.includes('/api/v3/episode?seriesId=60')) return [{ seasonNumber: 2, episodeNumber: 3, hasFile: imported.has(603) }];
+      if (url.includes('/api/v3/queue')) return { records: [{ id: 91, downloadId: 'batch-pack-hash' }] };
+      return [];
+    },
+    del: async (url: string) => { deleted.push(url); return {}; },
+    post: async () => ({})
+  };
+  const config = { sonarrUrl: 'http://localhost:8989', sonarrApiKey: 'apikey', qbittorrentUrl: 'http://localhost:8080' };
+  const run = async () => {
+    // Lever la temporisation entre deux vérifications pour rejouer le cycle du worker.
+    saveTrackedSeasonPacks(getTrackedSeasonPacks('uid-batch').map(pack => ({ ...pack, lastCheckedAt: undefined })), 'uid-batch');
+    return processTrackedSeasonPackFallbacks(config, 'uid-batch', transport);
+  };
+
+  // Premier épisode importé seulement : le torrent continue pour les épisodes 2 et 3.
+  assert.equal((await run()).cleanedFallbacks.length, 0);
+  imported.add(602);
+  assert.equal((await run()).cleanedFallbacks.length, 0);
+  assert.deepEqual(deleted, []);
+  assert.equal(getTrackedSeasonPacks('uid-batch')[0].cleanedUp, false);
+
+  // Tous importés (l'épisode 3 sans identifiant passe par la liste de la série) : le pack est retiré.
+  imported.add(603);
+  const done = await run();
+  assert.equal(done.cleanedFallbacks.length, 1);
+  assert.deepEqual(done.removedQueueIds, [91]);
+  assert.equal(getTrackedSeasonPacks('uid-batch')[0].cleanedUp, true);
 });

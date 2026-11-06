@@ -45,6 +45,12 @@ export interface EpisodeDownloadWithFallbackParams {
   qbittorrentUrl?: string;
   qbittorrentUsername?: string;
   qbittorrentPassword?: string;
+  /**
+   * #879 — Autres épisodes de la même saison demandés dans le même lot. Si le pack de saison est utilisé,
+   * leurs fichiers sont sélectionnés ensemble dans ce transfert exactement identifié (jamais un torrent
+   * préexistant), au lieu d'un repli indépendant par épisode qui ne garderait que le premier.
+   */
+  packEpisodes?: number[];
 }
 
 export interface EpisodeDownloadWithFallbackResult {
@@ -60,11 +66,16 @@ export interface EpisodeDownloadWithFallbackResult {
   episodeId?: number;
   season?: number;
   episode?: number;
+  /** Épisodes du lot sélectionnés en plus dans le même pack. */
+  packEpisodes?: number[];
 }
+
+interface SonarrEpisodeLike { id: number; seasonNumber?: number; episodeNumber?: number; hasFile?: boolean }
 
 interface SonarrTarget {
   series: any;
-  episode: { id: number; hasFile?: boolean };
+  episode: SonarrEpisodeLike;
+  episodes: SonarrEpisodeLike[];
 }
 
 interface TransferCandidate {
@@ -149,7 +160,7 @@ async function postService(
     signal: AbortSignal.timeout(timeoutMs + 3000)
   });
   const raw = await response.text();
-  let json: any = {};
+  let json: { ok?: boolean; error?: string; message?: string; status?: number; data?: unknown } = {};
   try { json = JSON.parse(raw); } catch {}
   if (json.ok && !json.error) return json.data;
   throw new Error(json.message || json.error || `Erreur proxy ${json.status || response.status}`);
@@ -183,7 +194,7 @@ async function resolveExactTarget(
             && Number(item?.episodeNumber) === Number(params.episode)
           )
         : null;
-      if (episode?.id) return { series, episode };
+      if (episode?.id) return { series, episode, episodes: episodes as SonarrEpisodeLike[] };
     }
     if (attempt < attempts - 1) await delay(500 * (attempt + 1));
   }
@@ -418,15 +429,16 @@ async function fetchQbitFiles(
   }));
 }
 
-async function selectOnlyEpisodeInQbit(
+async function selectEpisodesInQbit(
   params: EpisodeDownloadWithFallbackParams,
   qHeaders: Record<string, string>,
-  downloadId: string
-): Promise<{ success: boolean; selectedFile?: string; error?: string }> {
+  downloadId: string,
+  extraEpisodes: readonly number[] = []
+): Promise<{ success: boolean; selectedFile?: string; packEpisodes: number[]; error?: string }> {
   const pauseBody = `hashes=${encodeURIComponent(downloadId)}`;
   const paused = await tryQbitAction(params, qHeaders, ['stop', 'pause'], pauseBody);
   if (!paused) {
-    return { success: false, error: 'SeenIt n’a pas pu mettre le pack en pause avant la sélection des fichiers.' };
+    return { success: false, packEpisodes: [], error: 'SeenIt n’a pas pu mettre le pack en pause avant la sélection des fichiers.' };
   }
 
   let files: TorrentFileLike[] = [];
@@ -440,6 +452,7 @@ async function selectOnlyEpisodeInQbit(
   if (selection.targetIndexes.length !== 1 || selection.ambiguous || selection.extraEpisodeNumbers.length > 0) {
     return {
       success: false,
+      packEpisodes: [],
       error: selection.ambiguous
         ? 'Plusieurs fichiers du pack correspondent à l’épisode demandé.'
         : selection.extraEpisodeNumbers.length > 0
@@ -448,8 +461,20 @@ async function selectOnlyEpisodeInQbit(
     };
   }
 
-  const targetIndex = selection.targetIndexes[0];
-  const unwanted = files.map(file => file.index).filter(index => index !== targetIndex);
+  // Épisodes du même lot : chacun doit désigner son propre fichier, unique et distinct ; sinon il reste
+  // hors du pack et suit son propre parcours. Les règles de sélection sont celles de l'épisode principal.
+  const kept = new Set<number>([selection.targetIndexes[0]]);
+  const packEpisodes: number[] = [];
+  for (const extra of extraEpisodes) {
+    const extraSelection = selectEpisodeFiles(files, Number(params.season), extra);
+    if (extraSelection.targetIndexes.length !== 1 || extraSelection.ambiguous || extraSelection.extraEpisodeNumbers.length > 0) continue;
+    if (kept.has(extraSelection.targetIndexes[0])) continue;
+    kept.add(extraSelection.targetIndexes[0]);
+    packEpisodes.push(extra);
+  }
+
+  const targetIndexes = Array.from(kept);
+  const unwanted = files.map(file => file.index).filter(index => !kept.has(index));
   if (unwanted.length > 0) {
     await qbitAction(
       params,
@@ -462,22 +487,22 @@ async function selectOnlyEpisodeInQbit(
     params,
     qHeaders,
     'filePrio',
-    `hash=${encodeURIComponent(downloadId)}&id=${targetIndex}&priority=1`
+    `hash=${encodeURIComponent(downloadId)}&id=${encodeURIComponent(targetIndexes.join('|'))}&priority=1`
   );
 
   const verifiedFiles = await fetchQbitFiles(params, qHeaders, downloadId);
-  const targetVerified = verifiedFiles.some(file => file.index === targetIndex && Number(file.priority || 0) > 0);
-  const unwantedStillEnabled = verifiedFiles.some(file => file.index !== targetIndex && Number(file.priority || 0) > 0);
-  if (!targetVerified || unwantedStillEnabled) {
-    return { success: false, selectedFile: selection.targetNames[0], error: 'qBittorrent n’a pas confirmé la sélection exclusive de l’épisode.' };
+  const targetsVerified = targetIndexes.every(index => verifiedFiles.some(file => file.index === index && Number(file.priority || 0) > 0));
+  const unwantedStillEnabled = verifiedFiles.some(file => !kept.has(file.index) && Number(file.priority || 0) > 0);
+  if (!targetsVerified || unwantedStillEnabled) {
+    return { success: false, packEpisodes: [], selectedFile: selection.targetNames[0], error: 'qBittorrent n’a pas confirmé la sélection exclusive des épisodes demandés.' };
   }
 
   const resumed = await tryQbitAction(params, qHeaders, ['start', 'resume'], pauseBody);
   if (!resumed) {
-    return { success: false, selectedFile: selection.targetNames[0], error: 'Épisode sélectionné mais reprise qBittorrent impossible.' };
+    return { success: false, packEpisodes: [], selectedFile: selection.targetNames[0], error: 'Épisode sélectionné mais reprise qBittorrent impossible.' };
   }
 
-  return { success: true, selectedFile: selection.targetNames[0] };
+  return { success: true, packEpisodes, selectedFile: selection.targetNames[0] };
 }
 
 export async function downloadEpisodeWithSeasonPackFallback(
@@ -587,10 +612,10 @@ export async function downloadEpisodeWithSeasonPackFallback(
   try {
     qHeaders = await qbitHeaders(params);
     beforeQbit = await fetchQbitTorrents(params, qHeaders);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       success: false,
-      message: `Un pack Saison ${params.season} est disponible, mais SeenIt ne peut pas piloter qBittorrent : ${error?.message || 'connexion impossible'}. Aucun pack n’a été lancé.`
+      message: `Un pack Saison ${params.season} est disponible, mais SeenIt ne peut pas piloter qBittorrent : ${(error instanceof Error && error.message) || 'connexion impossible'}. Aucun pack n’a été lancé.`
     };
   }
 
@@ -687,7 +712,16 @@ export async function downloadEpisodeWithSeasonPackFallback(
     };
   }
 
-  const selection = await selectOnlyEpisodeInQbit(params, qHeaders, transfer.downloadId);
+  // Épisodes du lot encore sans fichier dans Sonarr : un épisode déjà présent n'est jamais réactivé.
+  const seasonEpisodes = target.episodes;
+  const extraEpisodes = Array.from(new Set((params.packEpisodes || []).map(Number)))
+    .filter(extra => Number.isInteger(extra) && extra !== Number(params.episode))
+    .filter(extra => seasonEpisodes.some(item =>
+      Number(item?.seasonNumber) === Number(params.season)
+      && Number(item?.episodeNumber) === extra
+      && item?.hasFile !== true
+    ));
+  const selection = await selectEpisodesInQbit(params, qHeaders, transfer.downloadId, extraEpisodes);
   if (!selection.success) {
     await removeSonarrTransfer(base, sonarrHeaders, transfer.queueIds);
     await removeExactQbitTorrent(params, qHeaders, transfer.downloadId);
@@ -703,10 +737,16 @@ export async function downloadEpisodeWithSeasonPackFallback(
     episodeId: Number(target.episode.id),
     seasonNumber: Number(params.season),
     episodeNumber: Number(params.episode),
-    title: params.title
+    title: params.title,
+    extraEpisodes: selection.packEpisodes.map(extra => ({
+      episodeNumber: extra,
+      episodeId: seasonEpisodes.find(item => Number(item?.seasonNumber) === Number(params.season) && Number(item?.episodeNumber) === extra)?.id
+    }))
   });
 
-  const code = `S${String(params.season).padStart(2, '0')}E${String(params.episode).padStart(2, '0')}`;
+  const episodeCode = (episodeNumber: number) => `S${String(params.season).padStart(2, '0')}E${String(episodeNumber).padStart(2, '0')}`;
+  const code = episodeCode(Number(params.episode));
+  const selectedCodes = [code, ...selection.packEpisodes.map(episodeCode)];
   return {
     success: true,
     fallbackUsed: true,
@@ -717,6 +757,9 @@ export async function downloadEpisodeWithSeasonPackFallback(
     episodeId: Number(target.episode.id),
     season: params.season,
     episode: params.episode,
-    message: `Aucune release ${code} isolée • pack Saison ${params.season} utilisé, seul ${code} sera téléchargé.`
+    packEpisodes: selection.packEpisodes,
+    message: selection.packEpisodes.length
+      ? `Aucune release ${code} isolée • pack Saison ${params.season} utilisé, seuls ${selectedCodes.join(', ')} seront téléchargés.`
+      : `Aucune release ${code} isolée • pack Saison ${params.season} utilisé, seul ${code} sera téléchargé.`
   };
 }

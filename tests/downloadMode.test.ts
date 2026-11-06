@@ -114,3 +114,16 @@ test('SEENIT-DOWNLOAD-014 #879 un lot d’épisodes s’arrête dès que le comp
   const anonymous = await launchArrEpisodeBatch({ title: 'Série', season: 1, episodes: [1], qualityPreference: '4k', readConfig: () => base, readOwner: () => undefined, skip: () => false, notify: () => {}, launch: async () => { throw new Error('ne doit pas lancer'); } });
   assert.deepEqual({ ...anonymous }, { launched: 0, interrupted: true });
 });
+
+test('SEENIT-DOWNLOAD-014 #879 le lot propose ses épisodes suivants au pack et ne relance pas ceux qu’il a couverts', async () => {
+  const { launchArrEpisodeBatch } = await loadBatch();
+  const config = { downloadsEnabled: true, isHydrated: true, sonarrUrl: 'http://sonarr', sonarrApiKey: 'k' };
+  const calls: Array<{ episode: number; packEpisodes: number[] }> = [];
+  const result = await launchArrEpisodeBatch({ title: 'Série', tmdbId: 1, season: 1, episodes: [1, 2, 3, 4, 6], qualityPreference: '1080p',
+    readConfig: () => config, readOwner: () => 'uid-a', skip: (episode: number) => episode === 4, notify: () => {},
+    // Le premier épisode passe par un pack qui couvre 2 et 3 (et prétend couvrir 9, hors lot : ignoré).
+    launch: async (input: { episode: number; packEpisodes: number[] }) => { calls.push({ episode: input.episode, packEpisodes: [...input.packEpisodes] }); return input.episode === 1 ? [2, 3, 9] : []; } });
+  assert.deepEqual({ ...result }, { launched: 2, interrupted: false });
+  assert.deepEqual(calls, [{ episode: 1, packEpisodes: [2, 3, 6] }, { episode: 6, packEpisodes: [] }], 'un épisode gardé n’est jamais proposé au pack, un épisode couvert n’est pas relancé');
+  assert.match(launch, /packEpisodes,\n\s+qualityProfileId: effectiveProfileId,/, 'la voie partagée transmet le lot au repli');
+});

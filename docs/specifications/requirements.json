@@ -30,6 +30,18 @@
         {
           "file": "tests/downloadMode.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 un lot d’épisodes s’arrête dès que le compte, le gate ou le serveur Sonarr change"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 le lot propose ses épisodes suivants au pack et ne relance pas ceux qu’il a couverts"
+        },
+        {
+          "file": "tests/downloadSearchRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 un pack de saison sert tout le lot : les épisodes demandés sont sélectionnés ensemble dans le transfert exact"
+        },
+        {
+          "file": "tests/episodeSeasonPackCleanup.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 un pack partagé par un lot n’est retiré qu’après l’import de tous ses épisodes"
         }
       ]
     },

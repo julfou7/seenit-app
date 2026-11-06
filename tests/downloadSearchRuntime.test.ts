@@ -16,7 +16,7 @@ const bundle = await build({
       if (args.path === 'firebase') return { contents: `export const auth={get currentUser(){return {uid:globalThis.__seenitDownloadFixture?.scopeUid}}};` };
       if (args.path === 'apiAuth') return { contents: `export const authenticatedFetch=()=>{throw new Error('transport inattendu')};` };
       if (args.path === 'capacitor') return { contents: `export const Capacitor={isNativePlatform:()=>false};export const CapacitorHttp={};` };
-      if (args.path === 'episodeSeasonPackCleanup') return { contents: `export const registerTrackedSeasonPack=()=>{};` };
+      if (args.path === 'episodeSeasonPackCleanup') return { contents: `export const registerTrackedSeasonPack=entry=>globalThis.__seenitDownloadFixture?.track?.(entry);` };
       return { contents: `const ports=()=>globalThis.__seenitDownloadFixture;
         export const cleanUrl=url=>url.endsWith('/')?url.slice(0,-1):url;
         export const executeGet=(...args)=>ports().get(...args);
@@ -127,5 +127,69 @@ test('le fallback réel attend le pack et refuse les réponses invalides ou les 
   for (const failed of [new Error('timeout pack'), '<html>']) {
     fixture(path => path.includes('seasonNumber=1') ? failed : undefined);
     assert.equal((await runtime.downloadEpisodeWithSeasonPackFallback({ ...params, season: 1, episode: 1 })).failureCode, undefined);
+  }
+});
+
+test('SEENIT-DOWNLOAD-014 #879 un pack de saison sert tout le lot : les épisodes demandés sont sélectionnés ensemble dans le transfert exact', async () => {
+  const hash = 'a'.repeat(40);
+  const names = ['Serie.S01E01.1080p.mkv', 'Serie.S01E02.1080p.mkv', 'Serie.S01E03.1080p.mkv', 'Serie.S01E04.1080p.mkv', 'Serie.S01E05.1080p.mkv', 'Sample/serie.sample.mkv'];
+  const priorities = names.map(() => 1);
+  const episodes = [1, 2, 3, 4, 5].map(number => ({ id: 100 + number, seasonNumber: 1, episodeNumber: number, monitored: true, hasFile: number === 4, airDateUtc: '2020-01-01' }));
+  let grabbed = false;
+  const tracked: Array<Record<string, unknown>> = [];
+  const filePrio: string[] = [];
+  const previousFetch = globalThis.fetch;
+  // Transport qBittorrent / Sonarr en POST (réseau local) : le pack n'apparaît qu'après son lancement.
+  globalThis.fetch = (async (url: string, init: { body?: string }) => {
+    const body = String(init?.body || '');
+    if (url.endsWith('/api/v3/release')) grabbed = true;
+    if (url.endsWith('/api/v2/torrents/filePrio')) {
+      filePrio.push(decodeURIComponent(body));
+      const params = new URLSearchParams(body);
+      for (const index of String(params.get('id')).split('|')) priorities[Number(index)] = Number(params.get('priority'));
+    }
+    return { ok: true, status: 200, text: async () => '{}' };
+  }) as unknown as typeof fetch;
+  (globalThis as Record<string, unknown>).__seenitDownloadFixture = {
+    scopeUid: `fixture-${++fixtureScope}`,
+    track: (entry: Record<string, unknown>) => tracked.push(entry),
+    get: async (url: string) => {
+      if (url.includes('/api/v2/torrents/info')) return grabbed ? [{ hash }] : [{ hash: 'b'.repeat(40) }];
+      if (url.includes('/api/v2/torrents/files')) return names.map((name, index) => ({ index, name, size: 1, priority: priorities[index] }));
+      const path = url.split('/api/v3/')[1];
+      if (path === 'series') return [{ id: 1, title: 'Titre Sonarr', tvdbId: 123, qualityProfileId: 1 }];
+      if (path.startsWith('episode?')) return episodes;
+      if (path.startsWith('release?episodeId=')) return [];
+      if (path.startsWith('release?seriesId=1&seasonNumber=1')) return [{ guid: 'pack', title: 'Serie.S01.1080p', fullSeason: true, approved: true, infoHash: hash, quality: { quality: { name: 'WEBDL-1080p', resolution: 1080 } } }];
+      if (path.startsWith('queue?')) return grabbed ? [{ id: 50, seriesId: 1, seasonNumber: 1, downloadId: hash.toUpperCase() }] : [];
+      return [];
+    },
+    post: async () => ({}),
+    searchSonarr: runtime.searchAndDownloadInSonarr
+  };
+  try {
+    // L'épisode 4 a déjà son fichier : il n'est jamais réactivé ; le doublon et l'épisode principal sont ignorés.
+    const result = await runtime.downloadEpisodeWithSeasonPackFallback({ ...params, tvdbId: 123, season: 1, episode: 1, packEpisodes: [2, 3, 4, 2, 1], qbittorrentUrl: 'http://qbit.local' });
+    assert.equal(result.success, true, result.message);
+    assert.equal(result.fallbackUsed, true);
+    assert.deepEqual(result.packEpisodes, [2, 3]);
+    assert.match(result.message, /seuls S01E01, S01E02, S01E03 seront téléchargés/);
+    // Seuls les fichiers des épisodes demandés restent actifs dans le pack exact.
+    assert.deepEqual(priorities, [1, 1, 1, 0, 0, 0]);
+    assert.deepEqual(filePrio, [`hash=${hash}&id=3|4|5&priority=0`, `hash=${hash}&id=0|1|2&priority=1`]);
+    assert.equal(tracked.length, 1);
+    assert.equal(tracked[0].episodeNumber, 1);
+    assert.deepEqual(tracked[0].extraEpisodes, [{ episodeNumber: 2, episodeId: 102 }, { episodeNumber: 3, episodeId: 103 }]);
+
+    // Sans lot, le parcours d'un épisode reste inchangé : seul son fichier est sélectionné.
+    grabbed = false; priorities.fill(1); filePrio.length = 0; tracked.length = 0;
+    const single = await runtime.downloadEpisodeWithSeasonPackFallback({ ...params, tvdbId: 123, season: 1, episode: 2, qbittorrentUrl: 'http://qbit.local' });
+    assert.equal(single.success, true, single.message);
+    assert.deepEqual(single.packEpisodes, []);
+    assert.match(single.message, /seul S01E02 sera téléchargé/);
+    assert.deepEqual(priorities, [0, 1, 0, 0, 0, 0]);
+    assert.deepEqual(tracked[0].extraEpisodes, []);
+  } finally {
+    globalThis.fetch = previousFetch;
   }
 });
