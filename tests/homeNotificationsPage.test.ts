@@ -13,6 +13,8 @@ test('SEENIT-UX-018 #876 la cloche ouvre une page Notifications au contrat des s
   assert.match(source, /lazy\(\(\) => import\('\.\/HomeNotificationsPage'\)/, 'la page reste hors du chargement d’À voir');
   assert.match(source, /onClose=\{\(\) => setOpen\(false\)\} onMarkAll=\{markAllRead\} onOpenNotice=\{openNotice\} onDismiss=\{dismiss\}/);
   assert.doesNotMatch(source + page, /<DialogLayer/, 'plus de feuille modale qui masque la navigation');
+  // Le cadre partagé porte sa feuille : la page reste opaque et mise en forme même si le Profil n'a jamais été chargé.
+  assert.match(readFileSync('src/components/settings/SettingsUi.tsx', 'utf8'), /^import '\.\.\/\.\.\/screens\/reglages\.css';$/m);
   assert.match(css, /\.home-notifications-page \.home-notice \.home-notice__text strong \{[^}]*color:#f2c36b/, 'titre média en or, même lu');
 });
 
