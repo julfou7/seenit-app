@@ -239,11 +239,12 @@ export function ToastContainer() {
     }
   };
 
-  const renderIcon = () => {
+  const renderIcon = (size = 14) => {
+    const glyph = size + 3;
     if (parsed.iconSymbol) {
       return (
         <SeenItGlyph
-          size={17}
+          size={glyph}
           symbol={parsed.iconSymbol}
           color="gold"
           glow={false}
@@ -253,38 +254,46 @@ export function ToastContainer() {
       );
     }
     if (isDownloadToast) {
-      return <SeenItGlyph size={17} symbol="download" color="blue" glow={false} idPrefix="toast-dl" className="shrink-0" />;
+      return <SeenItGlyph size={glyph} symbol="download" color="blue" glow={false} idPrefix="toast-dl" className="shrink-0" />;
     }
     if (isPlexToast) {
-      return <PlexLogo className="w-4 h-4 text-[#E5A93D] shrink-0" />;
+      return <PlexLogo className={cn('shrink-0 text-[#E5A93D]', size > 14 ? 'w-6 h-6' : 'w-4 h-4')} />;
     }
     if (isReminderToast) {
       const isOff = parsed.action?.toLowerCase().includes('désactivé') || parsed.action?.toLowerCase().includes('retiré');
       return isOff ? (
-        <BellOff size={14} className="shrink-0 text-amber-400" />
+        <BellOff size={size} className="shrink-0 text-amber-400" />
       ) : (
-        <Bell size={14} className="shrink-0 text-amber-400 fill-amber-400" />
+        <Bell size={size} className="shrink-0 text-amber-400 fill-amber-400" />
       );
     }
     if (isFavoriteToast) {
       const isOff = parsed.action?.toLowerCase().includes('retiré');
       return isOff ? (
-        <HeartOff size={14} className="shrink-0 text-rose-500" />
+        <HeartOff size={size} className="shrink-0 text-rose-500" />
       ) : (
-        <Heart size={14} className="shrink-0 text-rose-500 fill-rose-500" />
+        <Heart size={size} className="shrink-0 text-rose-500 fill-rose-500" />
       );
     }
     const iconClass = cn("shrink-0", getAccentColor());
     switch (type) {
-      case 'download': return <SeenItGlyph size={17} symbol="download" color="blue" glow={false} idPrefix="toast-dl-type" className="shrink-0" />;
-      case 'archive': return <Archive size={14} className={iconClass} />;
-      case 'unfollow': return <Trash2 size={14} className={iconClass} />;
-      case 'dropped': return <Ban size={14} className={iconClass} />;
-      case 'follow': return <Clock size={14} className={iconClass} />;
-      case 'success': return <SeenItGlyph size={15} symbol="check" glow={false} idPrefix="toast-seenit" className="shrink-0" />;
-      case 'error': return <AlertCircle size={14} className={iconClass} />;
-      default: return <Info size={14} className={iconClass} />;
+      case 'download': return <SeenItGlyph size={glyph} symbol="download" color="blue" glow={false} idPrefix="toast-dl-type" className="shrink-0" />;
+      case 'archive': return <Archive size={size} className={iconClass} />;
+      case 'unfollow': return <Trash2 size={size} className={iconClass} />;
+      case 'dropped': return <Ban size={size} className={iconClass} />;
+      case 'follow': return <Clock size={size} className={iconClass} />;
+      case 'success': return <SeenItGlyph size={size + 1} symbol="check" glow={false} idPrefix="toast-seenit" className="shrink-0" />;
+      case 'error': return <AlertCircle size={size} className={iconClass} />;
+      default: return <Info size={size} className={iconClass} />;
     }
+  };
+
+  // #878 : bande gauche teintée selon l'action quand le toast ne vise pas un média.
+  const getBandClass = () => {
+    if (parsed.iconSymbol || isPlexToast || isReminderToast || type === 'success') return 'bg-[#3A2C10]';
+    if (isDownloadToast || type === 'download' || type === 'follow') return 'bg-[#0E2A3A]';
+    if (type === 'error' || isFavoriteToast || type === 'unfollow') return 'bg-[#3F1820]';
+    return 'bg-[#26262B]';
   };
 
   const hasPoster = Boolean(parsed.posterPath);
@@ -293,6 +302,11 @@ export function ToastContainer() {
         ? parsed.posterPath
         : `https://image.tmdb.org/t/p/w185${parsed.posterPath.startsWith('/') ? '' : '/'}${parsed.posterPath}`)
     : null;
+  // Le titre d'un média reste en or (SEENIT-UX-020) ; un titre système reste blanc.
+  const isMediaTitle = Boolean(hasPoster || show || navigationTarget);
+  const displayTitle = parsed.title && isPlexToast ? parsed.title.replace(/^PLEX\s*•\s*/i, '') : parsed.title;
+  const detail = (parsed.action || (typeof message === 'string' ? message : '')).replace(/\s*\n+\s*/g, ' · ');
+  const episodeBand = parsed.subtitle?.replace(/S(\d+)\s*\|\s*E(\d+)/i, (_m, season: string, episode: string) => `S${season.padStart(2, '0')}E${episode.padStart(2, '0')}`);
 
   return (
     <AnimatePresence>
@@ -329,178 +343,88 @@ export function ToastContainer() {
             navigationTarget ? "cursor-pointer" : "cursor-grab",
           )}
         >
-          {hasPoster ? (
-            /* Rich Media Toast with Poster */
-            <div className="w-full relative overflow-hidden bg-zinc-900/95 backdrop-blur-xl border border-white/15 rounded-2xl shadow-[0_16px_40px_rgba(0,0,0,0.85)] flex items-stretch">
+          {/* #878 : une seule forme, taille fixe (76 px), quel que soit le message. */}
+          <div data-toast-card className="seenit-toast w-full relative overflow-hidden h-[76px] min-h-[64px] bg-zinc-900/95 backdrop-blur-xl rounded-[18px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_16px_40px_rgba(0,0,0,0.8)] flex items-stretch">
 
-              {/* Full Poster on the left with gradient fade into background */}
-              <div className="w-16 sm:w-20 shrink-0 relative bg-zinc-800 self-stretch min-h-[64px]">
-                <img
-                  src={posterUrl!}
-                  alt={parsed.title || "Affiche"}
-                  className="w-full h-full object-cover object-center"
-                />
-                {/* Smooth gradient blend into the toast card */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-zinc-900/40 to-zinc-900" />
-              </div>
-
-              {/* Content Area */}
-              <div className="flex-1 py-2.5 px-3 flex flex-col justify-center min-w-0">
-                {/* Title + Subtitle */}
-                {(parsed.title || parsed.subtitle) && (
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 leading-tight mb-1">
-                    {parsed.title && (
-                      <span className={cn("font-bold text-[13px] sm:text-sm line-clamp-2 break-words max-w-full", getAccentColor())}>
-                        {parsed.title}
-                      </span>
-                    )}
-                    {parsed.subtitle && parsed.subtitle !== parsed.action && parsed.subtitle.length < 35 && (
-                      <span className="text-[10px] font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded-md shrink-0">
-                        {parsed.subtitle}
-                      </span>
-                    )}
-                  </div>
+            {/* Bande gauche de 56 px : affiche du média, sinon couleur et icône de l'action. */}
+            {hasPoster ? (
+              <div className="w-14 shrink-0 relative bg-zinc-800 self-stretch">
+                <img src={posterUrl!} alt="" className="w-full h-full object-cover object-center" />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent from-40% to-zinc-900" />
+                {episodeBand && episodeBand.length < 12 && (
+                  <span className="absolute inset-x-0 bottom-0 h-[18px] grid place-items-center bg-black/80 text-[10px] font-extrabold tracking-wide text-amber-300">{episodeBand}</span>
                 )}
+              </div>
+            ) : (
+              <div className={cn('w-14 shrink-0 grid place-items-center self-stretch', getBandClass())} aria-hidden="true">
+                {renderIcon(22)}
+              </div>
+            )}
 
-                {/* Action Text */}
-                <div className="flex items-center gap-1.5 text-zinc-300 text-xs font-normal leading-snug">
-                  {renderIcon()}
-                  <span className="line-clamp-2 break-words text-zinc-300 font-medium">
-                    {parsed.action}
+            {/* Texte : titre sur deux lignes au plus, détail sur une ligne. */}
+            <div className="flex-1 py-2.5 pl-3 pr-2.5 flex flex-col justify-center min-w-0 gap-0.5">
+              {displayTitle ? (
+                <>
+                  <span className={cn('text-[15px] leading-tight font-extrabold line-clamp-2 break-words', isMediaTitle ? 'text-[#F2C36B]' : 'text-zinc-100')}>
+                    {displayTitle}
                   </span>
-                </div>
-              </div>
-
-              {/* Actions Button Area */}
-              {(hasUndoAction || canSkipPlexQueue) && (
-                <div className="flex items-center gap-2 shrink-0 pr-3 py-2.5">
-                  {hasUndoAction && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUndo();
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-xs font-bold border border-amber-500/30 shadow-sm transition-all cursor-pointer touch-manipulation select-none"
-                      title="Annuler l'action"
-                    >
-                      <RotateCcw size={12} className="stroke-[2.5]" />
-                      <span>Annuler</span>
-                    </button>
+                  {detail && (
+                    <span className="flex items-center gap-1.5 min-w-0 text-[13.5px] font-semibold text-zinc-200">
+                      {hasPoster && renderIcon()}
+                      <span className="truncate">{detail}</span>
+                    </span>
                   )}
-                  {canSkipPlexQueue && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSkipFollowingPlexToasts();
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      className="px-2.5 py-1.5 rounded-xl bg-white/8 hover:bg-white/12 active:scale-95 text-zinc-200 text-[11px] font-bold border border-white/15 transition-all cursor-pointer touch-manipulation select-none"
-                      title={`Ignorer ${queuedPlexCount} notification(s) Plex suivante(s)`}
-                    >
-                      Ignorer les suivants
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Dynamic Progress Bar */}
-              <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-white/5 overflow-hidden">
-                <div
-                  key={currentToast?.id || (typeof message === 'string' ? message : parsed.action)}
-                  className={cn(
-                    "h-full w-full origin-left animate-toast-progress",
-                    getProgressColor()
-                  )}
-                />
-              </div>
-            </div>
-          ) : (
-            /* Floating Compact Pill for Simple & System Notifications */
-            <div className="relative overflow-hidden bg-zinc-900/95 backdrop-blur-2xl border border-white/15 rounded-2xl sm:rounded-full shadow-[0_14px_40px_rgba(0,0,0,0.85)] px-3.5 py-2 sm:px-4 sm:py-2.5 flex items-center gap-2.5 w-full sm:w-auto max-w-full">
-
-              {/* Icon badge - Solid 100% Opaque for Plex, Amber for Reminder, Rose for Favorite */}
-              {isPlexToast ? (
-                <div className="w-6 h-6 rounded-full bg-[#E5A93D] text-zinc-950 flex items-center justify-center shrink-0 font-black shadow-md shadow-amber-500/20">
-                  <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-zinc-950">
-                    <path d="M4 2h7.5l7.5 10-7.5 10H4l7.5-10L4 2z" />
-                  </svg>
-                </div>
-              ) : isReminderToast ? (
-                <div className="w-6 h-6 rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0 text-amber-400 shadow-md shadow-amber-500/20">
-                  {renderIcon()}
-                </div>
-              ) : isFavoriteToast ? (
-                <div className="w-6 h-6 rounded-full bg-rose-500/15 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-500 shadow-md shadow-rose-500/20">
-                  {renderIcon()}
-                </div>
+                </>
               ) : (
-                <div className="w-6 h-6 rounded-full bg-white/10 border border-white/10 flex items-center justify-center shrink-0 text-zinc-300">
-                  {renderIcon()}
-                </div>
+                <span className="text-[15px] leading-tight font-extrabold text-zinc-100 line-clamp-2 break-words">{detail}</span>
               )}
-
-              {/* Message text with auto-fitting width */}
-              <div className="flex flex-col justify-center min-w-0">
-                {parsed.title && (
-                  <span className={cn("font-bold text-[12px] leading-tight line-clamp-1 mb-0.5", getAccentColor())}>
-                    {parsed.title}
-                  </span>
-                )}
-                <span className="text-zinc-100 text-[12px] sm:text-xs font-semibold leading-snug whitespace-normal break-words">
-                  {parsed.action || (typeof message === 'string' ? message : '')}
-                </span>
-              </div>
-
-              {/* Actions */}
-              {(hasUndoAction || canSkipPlexQueue) && (
-                <div className="flex items-center gap-1.5 shrink-0 ml-auto">
-                  {hasUndoAction && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleUndo();
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-xs font-bold border border-amber-500/30 shadow-sm transition-all cursor-pointer shrink-0"
-                      title="Annuler"
-                    >
-                      <RotateCcw size={11} className="stroke-[2.5]" />
-                      <span>Annuler</span>
-                    </button>
-                  )}
-                  {canSkipPlexQueue && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSkipFollowingPlexToasts();
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      className="px-2.5 py-1 rounded-full bg-white/8 hover:bg-white/12 active:scale-95 text-zinc-200 text-[11px] font-bold border border-white/15 transition-all cursor-pointer shrink-0"
-                      title={`Ignorer ${queuedPlexCount} notification(s) Plex suivante(s)`}
-                    >
-                      Ignorer les suivants
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {/* Dynamic Progress Bar along bottom */}
-              <div className="absolute bottom-0 left-4 right-4 h-[2px] bg-white/5 overflow-hidden rounded-full">
-                <div
-                  key={currentToast?.id || (typeof message === 'string' ? message : parsed.action)}
-                  className={cn(
-                    "h-full w-full origin-left animate-toast-progress",
-                    getProgressColor()
-                  )}
-                />
-              </div>
             </div>
-          )}
+
+            {/* Un seul bouton de 104 px : Annuler, sinon Ignorer les suivants (file Plex). */}
+            {(hasUndoAction || canSkipPlexQueue) && (
+              <div className="flex items-center gap-1.5 shrink-0 ml-auto pr-3">
+                {hasUndoAction ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUndo();
+                    }}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="w-[104px] h-11 flex items-center justify-center gap-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-300 text-sm font-extrabold shadow-[inset_0_0_0_1px_rgba(245,158,11,0.3)] transition-all cursor-pointer touch-manipulation select-none"
+                    title="Annuler l'action"
+                  >
+                    <RotateCcw size={15} className="stroke-[2.5]" />
+                    <span>Annuler</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSkipFollowingPlexToasts();
+                    }}
+                    onTouchStart={(e) => e.stopPropagation()}
+                    className="w-[104px] h-11 px-2 rounded-xl bg-white/8 hover:bg-white/12 active:scale-95 text-zinc-100 text-[12.5px] leading-tight font-bold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)] transition-all cursor-pointer touch-manipulation select-none"
+                    title={`Ignorer ${queuedPlexCount} notification(s) Plex suivante(s)`}
+                  >
+                    Ignorer les suivants
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Barre de temps : la couleur de l'action, jamais le titre. */}
+            <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/5 overflow-hidden">
+              <div
+                key={currentToast?.id || (typeof message === 'string' ? message : parsed.action)}
+                className={cn(
+                  "h-full w-full origin-left animate-toast-progress",
+                  getProgressColor()
+                )}
+              />
+            </div>
+          </div>
         </motion.div>
       )}
     </AnimatePresence>

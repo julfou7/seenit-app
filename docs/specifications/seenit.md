@@ -1337,18 +1337,23 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   affiché jusqu'à ce que la prochaine vue soit prête. Une fiche média n'empile pas plusieurs animations
   d'entrée : son conteneur porte l'unique transition, y compris lorsque le premier contenu affiché est
   un shell froid.
-- **SEENIT-UX-004** — Un toast mobile long utilise toute la largeur utile disponible, revient à la
-  ligne sans troncature et reste au-dessus de la navigation basse et de la safe area. La règle vaut
-  pour la PWA et l'APK, notamment pour la synchronisation Plex. Pendant une synchronisation longue,
-  le bandeau Plex indique la phase réellement connue et la durée écoulée, sans inventer de pourcentage.
-  Les toasts unitaires Plex d'un même lot peuvent être abandonnés via « Ignorer les suivants » : cette
-  action purge uniquement les notifications Plex encore en file et conserve le bilan final ainsi que
-  les notifications des autres fonctionnalités. Le bilan final Plex n'est jamais rendu comme une seule
-  phrase dense : il utilise un bloc Plex visuellement distinct, un titre « Synchronisation Plex terminée »
-  puis des lignes séparées pour les serveurs scannés et le couple `vus / non vus`, avec un pictogramme ou
-  logo Plex de taille suffisante pour identifier immédiatement la source. Dans tous les textes français
-  destinés à l'utilisateur, l'état inverse de « vu » est nommé **« non vu »** ; le terme « dé-vu » n'est
-  plus utilisé.
+- **SEENIT-UX-004** — Tous les toasts partagent une forme unique et une **taille fixe** (#878) : toute la
+  largeur utile moins 12 px de chaque côté, 76 px de haut, au-dessus de la navigation basse et de la
+  safe area, en PWA comme en APK. Le texte s'adapte à la boîte, jamais l'inverse : titre sur deux lignes
+  au plus, détail sur une ligne, un texte plus long est coupé par « … ». La bande gauche de 56 px montre
+  l'affiche du média quand l'action vise un film ou une série (code épisode en bandeau), sinon une bande
+  teintée portant l'icône de l'action (or pour Plex et les succès, rose pour une erreur, neutre pour une
+  information). Le titre d'un média reste en or (`SEENIT-UX-020`) ; la couleur de l'action passe par
+  l'icône et la barre de temps, jamais par le titre. Un seul bouton de 104 px : « Annuler », sinon
+  « Ignorer les suivants » sur un toast Plex en file. Un retrait qui vise un média (notification retirée)
+  transmet ce média au toast pour que l'utilisateur voie ce qui a été retiré. Glisser vers le bas ferme
+  le toast. Pendant une synchronisation longue, le bandeau Plex indique la phase réellement connue et
+  la durée écoulée, sans inventer de pourcentage. Les toasts unitaires Plex d'un même lot peuvent être
+  abandonnés via « Ignorer les suivants » : cette action purge uniquement les notifications Plex encore
+  en file et conserve le bilan final ainsi que les notifications des autres fonctionnalités. Le bilan
+  final Plex utilise la bande Plex, le titre « Synchronisation terminée » et une ligne de détail qui
+  réunit les serveurs scannés et le couple `vus / non vus`. Dans tous les textes français destinés à
+  l'utilisateur, l'état inverse de « vu » est nommé **« non vu »** ; le terme « dé-vu » n'est plus utilisé.
 - **SEENIT-UX-005** — Sur un onglet déjà actif, un appui simple ferme exactement le niveau visible
   courant sans effacer l'état racine ; à la racine il remonte en haut doucement sans vider les filtres.
   Deux appuis sur ce même onglet en moins de 350 ms réinitialisent

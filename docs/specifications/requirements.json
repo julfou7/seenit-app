@@ -2277,7 +2277,7 @@
     },
     {
       "id": "SEENIT-UX-004",
-      "title": "Toasts mobiles longs lisibles et bilan Plex multi-lignes contrôlable",
+      "title": "Toasts à taille unique, bande média ou action, et bilan Plex contrôlable",
       "targets": [
         "pwa",
         "apk"
@@ -2285,7 +2285,7 @@
       "tests": [
         {
           "file": "tests/toastLayout.test.ts",
-          "contains": "SEENIT-UX-004 les toasts longs reviennent à la ligne sans troncature sur mobile"
+          "contains": "SEENIT-UX-004 #878 tous les toasts ont la même taille et coupent le texte au lieu de grandir"
         },
         {
           "file": "tests/toastLayout.test.ts",
@@ -2317,7 +2317,7 @@
         },
         {
           "file": "tests/plexToastSummary.test.ts",
-          "contains": "SEENIT-UX-004 le bilan final Plex utilise un bloc multi-lignes avec identité Plex"
+          "contains": "SEENIT-UX-004 le bilan final Plex utilise la bande Plex, un titre et une ligne de détail"
         }
       ]
     },
