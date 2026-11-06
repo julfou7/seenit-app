@@ -37,6 +37,8 @@ test('SEENIT-NOTIFICATION-003 et #443 appliquent le même contain au post-import
     /Math\.min\([\s\S]*?targetWidth \/ \(float\) source\.getWidth\(\)[\s\S]*?targetHeight \/ \(float\) source\.getHeight\(\)/
   );
   assert.doesNotMatch(plexWorker, /Bitmap\.createScaledBitmap\(/);
-  assert.ok(plexWorker.includes('if (poster != null) {'));
+  assert.ok(plexWorker.includes('if (poster == null) return;'));
+  assert.ok(plexWorker.includes('applyPoster(builder, NotificationPosterCache.read(context, message.get("posterUrl")), compactText)'));
+  assert.ok(plexWorker.includes('applyPoster(builder, poster, "La copie exacte est maintenant indexée par Plex.")'));
   assert.ok(plexWorker.includes('.setStyle(new NotificationCompat.BigTextStyle().bigText(compactText))'));
 });

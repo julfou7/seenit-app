@@ -103,6 +103,7 @@ public class UpgradeContractInstrumentedTest {
         assertEquals(PROBE_VALUE, new String(persisted, StandardCharsets.UTF_8));
 
         assertNativeContracts(context);
+        ImportNotificationImageContract.verify(context);
     }
 
 

@@ -37,6 +37,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -78,6 +79,7 @@ public class PlexAvailabilityWorker extends Worker {
             .putString("title", clean(message.get("title"), 180))
             .putString("eventKey", eventKey)
             .putString("traceId", traceId)
+            .putString("posterUrl", NotificationPosterCache.allowed(message.get("posterUrl")) ? message.get("posterUrl") : "")
             .build();
 
         Constraints constraints = new Constraints.Builder()
@@ -130,6 +132,18 @@ public class PlexAvailabilityWorker extends Worker {
         }
 
         try {
+            // Le visuel public n'est pas une preuve Plex. Enrichir le reçu avant toute recherche PMS.
+            String posterUrl = getInputData().getString("posterUrl");
+            if (attempt <= 3 && NotificationPosterCache.warm(getApplicationContext(), posterUrl)) {
+                Map<String, String> receipt = new HashMap<>();
+                for (String key : new String[] { "ownerUidHash", "title", "mediaType", "eventKey", "posterUrl" }) {
+                    receipt.put(key, getInputData().getString(key));
+                }
+                receipt.put("tmdbId", String.valueOf(tmdbId));
+                receipt.put("season", String.valueOf(season));
+                receipt.put("episode", String.valueOf(episode));
+                postImportNotification(getApplicationContext(), receipt, true);
+            }
             AvailabilityMatch match = findAvailabilityMatch(credentials.token, tmdbId, mediaType, season, episode);
             if (match != null) {
                 recordDiagnostic("plex_check", "available", attempt);
@@ -349,7 +363,7 @@ public class PlexAvailabilityWorker extends Worker {
         }
     }
 
-    private static Bundle inboxExtras(String ownerUidHash, int tmdbId, String mediaType, int season, int episode) {
+    private static Bundle inboxExtras(String ownerUidHash, int tmdbId, String mediaType, int season, int episode, String phase) {
         Bundle extras = new Bundle();
         extras.putString("ownerUidHash", ownerUidHash);
         extras.putInt("tmdbId", tmdbId);
@@ -357,12 +371,39 @@ public class PlexAvailabilityWorker extends Worker {
         extras.putInt("season", season);
         extras.putInt("episode", episode);
         extras.putString("type", "PLEX_AVAILABLE");
+        extras.putString("downloadPhase", phase);
         return extras;
     }
 
     static void showImportNotification(Context context, Map<String, String> message) {
+        postImportNotification(context, message, false);
+    }
+
+    private static void postImportNotification(Context context, Map<String, String> message, boolean updateOnly) {
         ensureChannel(context);
         if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return;
+        Credentials owner = PlexBackgroundCredentialStore.read(context);
+        if (owner == null || !owner.uidHash.equals(message.get("ownerUidHash"))) return;
+        int id = notificationId(message.get("eventKey"), message.get("mediaType"), positiveInt(message.get("tmdbId")),
+            nonNegativeInt(message.get("season")), positiveInt(message.get("episode")));
+        boolean visible = false;
+        NotificationManager manager = context.getSystemService(NotificationManager.class);
+        if (manager == null) return;
+        for (android.service.notification.StatusBarNotification active : manager.getActiveNotifications()) {
+            if (active.getId() != id) continue;
+            if ("plex".equals(active.getNotification().extras.getString("downloadPhase"))) return;
+            visible = true;
+        }
+        if (updateOnly && !visible) return; // Ne pas ressusciter un reçu balayé pendant le chargement de l'image.
+        NotificationCompat.Builder builder = buildImportNotification(context, message);
+        try {
+            NotificationManagerCompat.from(context).notify(id, builder.build());
+        } catch (SecurityException ignored) {
+            // La permission Android reste sous le contrôle de l'utilisateur.
+        }
+    }
+
+    static NotificationCompat.Builder buildImportNotification(Context context, Map<String, String> message) {
 
         String mediaType = "movie".equals(message.get("mediaType")) ? "movie" : "tv";
         int tmdbId = positiveInt(message.get("tmdbId"));
@@ -379,7 +420,7 @@ public class PlexAvailabilityWorker extends Worker {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .addExtras(inboxExtras(message.get("ownerUidHash"), tmdbId, mediaType, season, episode))
+            .addExtras(inboxExtras(message.get("ownerUidHash"), tmdbId, mediaType, season, episode, "import"))
             .setSmallIcon(R.drawable.ic_stat_seenit)
             .setSubText("Téléchargement")
             .setContentTitle(title)
@@ -390,11 +431,8 @@ public class PlexAvailabilityWorker extends Worker {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS);
 
-        try {
-            NotificationManagerCompat.from(context).notify(notificationId, builder.build());
-        } catch (SecurityException ignored) {
-            // La permission Android reste sous le contrôle de l'utilisateur.
-        }
+        applyPoster(builder, NotificationPosterCache.read(context, message.get("posterUrl")), compactText);
+        return builder;
     }
 
     private String showPlexAvailableNotification(AvailabilityMatch match, String plexToken) {
@@ -417,7 +455,7 @@ public class PlexAvailabilityWorker extends Worker {
         );
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
-            .addExtras(inboxExtras(getInputData().getString("ownerUidHash"), tmdbId, mediaType, season, episode))
+            .addExtras(inboxExtras(getInputData().getString("ownerUidHash"), tmdbId, mediaType, season, episode, "plex"))
             .setSmallIcon(R.drawable.ic_stat_seenit)
             .setSubText("Plex")
             .setContentTitle(title)
@@ -429,18 +467,8 @@ public class PlexAvailabilityWorker extends Worker {
             .setCategory(NotificationCompat.CATEGORY_STATUS);
 
         Bitmap poster = fetchPosterBitmap(match);
-        if (poster != null) {
-            Bitmap largeIcon = fitPosterInside(poster, 160, 160);
-            Bitmap bigPicture = fitPosterInside(poster, 512, 288);
-            builder.setLargeIcon(largeIcon);
-            builder.setStyle(
-                new NotificationCompat.BigPictureStyle()
-                    .bigPicture(bigPicture)
-                    .bigLargeIcon((Bitmap) null)
-                    .setSummaryText("La copie exacte est maintenant indexée par Plex.")
-            );
-            poster.recycle();
-        }
+        if (poster == null) poster = NotificationPosterCache.read(context, getInputData().getString("posterUrl"));
+        applyPoster(builder, poster, "La copie exacte est maintenant indexée par Plex.");
 
         String discoverUrl = resolvePlexDiscoverUrl(plexToken, tmdbId, mediaType);
         if (discoverUrl != null) {
@@ -456,11 +484,25 @@ public class PlexAvailabilityWorker extends Worker {
         }
 
         try {
+            Credentials currentOwner = PlexBackgroundCredentialStore.read(context);
+            if (currentOwner == null || !currentOwner.uidHash.equals(getInputData().getString("ownerUidHash"))) return "uid_changed";
             NotificationManagerCompat.from(context).notify(notificationId, builder.build());
             return "shown";
         } catch (SecurityException ignored) {
             return "security_error";
         }
+    }
+
+    private static void applyPoster(NotificationCompat.Builder builder, Bitmap poster, String summary) {
+        if (poster == null) return;
+        Bitmap largeIcon = fitPosterInside(poster, 160, 160);
+        Bitmap bigPicture = fitPosterInside(poster, 512, 288);
+        builder.setLargeIcon(largeIcon);
+        builder.setStyle(new NotificationCompat.BigPictureStyle()
+            .bigPicture(bigPicture)
+            .bigLargeIcon((Bitmap) null)
+            .setSummaryText(summary));
+        poster.recycle();
     }
 
     private static PendingIntent buildSeenItPendingIntent(

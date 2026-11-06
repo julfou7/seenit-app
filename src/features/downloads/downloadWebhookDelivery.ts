@@ -30,12 +30,14 @@ export async function deliverDownloadWebhookPresentation({
   presentation,
   sendPush,
   traceId,
+  resolvePoster,
 }: {
   uid: string;
   ownerUidHash: string;
   presentation: DownloadWebhookDeliveryPresentation;
   sendPush: DownloadPushSender;
   traceId?: string;
+  resolvePoster?: (tmdbId: number, mediaType: string) => Promise<string | undefined>;
 }): Promise<{
   delivered: number;
   invalidTokensRemoved: number;
@@ -60,10 +62,15 @@ export async function deliverDownloadWebhookPresentation({
   // Sur Android capable, un seul signal data-only haute priorité affiche immédiatement
   // le reçu d'import local puis met à jour cette même notification après preuve Plex.
   // Les APK legacy et la PWA conservent le reçu FCM visible classique.
+  let posterUrl: string | undefined;
+  try {
+    posterUrl = await resolvePoster?.(Number(presentation.plexAvailabilityData.tmdbId), presentation.plexAvailabilityData.mediaType);
+  } catch { /* L'image ne conditionne jamais la livraison. */ }
   const [plexCheckDelivery, androidLegacyDelivery, webDelivery] = await Promise.all([
     sendPush(uid, null, {
       ...presentation.plexAvailabilityData,
       ownerUidHash,
+      ...(posterUrl ? { posterUrl } : {}),
       ...(traceId ? { traceId } : {}),
     }, {
       platform: 'android',

@@ -44,6 +44,8 @@ import { fetchC411Torrents } from "./src/features/downloads/c411Backend.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { downloadServiceTimeoutMs } from "./src/features/downloads/downloadServiceTimeout.ts";
 import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
+import { createDownloadNotificationPosterResolver } from './src/features/downloads/downloadNotificationPoster.ts';
+const resolveDownloadNotificationPoster = createDownloadNotificationPosterResolver();
 import { processDownloadFailureNotification } from "./src/features/downloads/downloadFailureNotificationBackend.ts";
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
 import { normalizePlexAvailabilityTraceBatch } from "./src/features/notifications/plexAvailabilityDiagnostics.ts";
@@ -695,7 +697,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.255',
+        'X-Plex-Version': '1.4.256',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -1225,7 +1227,8 @@ async function startServer() {
           return typeof userData?.uuid === 'string' && userData.uuid.trim()
             ? userData.uuid.trim()
             : null;
-        } catch (error: any) {
+        } catch (error: unknown) {
+          if (!(error instanceof Error)) return null;
           console.log(`[Plex Sync] Plex account UUID unavailable: ${error?.message || error}`);
           return null;
         }
@@ -2751,6 +2754,7 @@ async function startServer() {
         ownerUidHash,
         presentation,
         sendPush: sendPushToUserDevices,
+        resolvePoster: resolveDownloadNotificationPoster,
         traceId,
       });
 

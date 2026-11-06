@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.255",
+  "applicationVersion": "1.4.256",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -1781,6 +1781,14 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/downloadNotificationPoster.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 #801 le vrai dispatcher transmet seulement la référence image au reçu natif"
+        },
+        {
+          "file": "tests/plexDownloadAvailabilityAndroid.test.ts",
+          "contains": "SEENIT-NOTIFICATION-003 #801 branche le cache privé et le contrôle natif du vrai reçu import"
+        },
         {
           "file": "tests/downloadPlexAvailabilityNotification.test.ts",
           "contains": "SEENIT-NOTIFICATION-003 réserve la vérification Plex au signal Android capable"
