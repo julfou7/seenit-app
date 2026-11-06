@@ -107,7 +107,7 @@ export function WatchListView({ model }: WatchListViewProps) {
     <div id="watchlist-container" className="home-watchlist flex-1 overflow-y-auto text-white pb-nav">
       <header className="home-header">
         <div className="home-header__top"><span className="home-wordmark"><img src="/brand/seenit-logo-sombre.svg" alt="SeenIt" width="148" height="48" /></span>
-          <div className="home-header__tools"><HomeSyncIndicator /><HomeNotifications key={auth.currentUser?.uid || 'anonymous'} shows={allShows} onOpen={onShowClick} onSeen={show => show.mediaType === 'movie' ? markMovieAsSeen(show) : markNextEpisodeAsSeen(show)} /></div>
+          <div className="home-header__tools"><HomeSyncIndicator /><HomeNotifications key={auth.currentUser?.uid || 'anonymous'} shows={allShows} onOpen={onShowClick} /></div>
         </div>
         <div className="home-tabs" role="tablist" aria-label="À voir">
           {HOME_TABS.map((tab, index) => <button key={tab.id} ref={element => { tabButtons.current[index] = element; }} type="button" id={`home-tab-${tab.id}`} role="tab" aria-selected={activeTab === tab.id} aria-controls={`home-panel-${tab.id}`} tabIndex={activeTab === tab.id ? 0 : -1} onClick={() => scrollToSection(refs[tab.id], tab.id)} onKeyDown={event => {

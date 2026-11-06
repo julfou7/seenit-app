@@ -194,6 +194,14 @@
           "contains": "SEENIT-UX-018 le swipe retire une notification sans confondre scroll clic et action métier"
         },
         {
+          "file": "tests/homeNotificationsPage.test.ts",
+          "contains": "SEENIT-UX-018 #876 la page se ferme seule après la dernière notification retirée ou Tout marquer lu"
+        },
+        {
+          "file": "tests/homeNotificationsPage.test.ts",
+          "contains": "SEENIT-UX-018 #876 aucune action visible par notification ; Retirer reste accessible sans geste"
+        },
+        {
           "file": "tests/terrain224Motion.test.ts",
           "contains": "SEENIT-UX-018 Continuer suit le dernier visionnage et un Vu annulé rend la série à Nouveautés"
         },

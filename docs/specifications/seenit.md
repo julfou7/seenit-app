@@ -1444,11 +1444,16 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   total fournisseur, de finale et de dernière saison avant suppression du cache déprécié ; ces métadonnées ne sont
   jamais des preuves de visionnage. La section des séries anciennes conserve seulement le texte discret de récence, sans aucun badge.
 - **SEENIT-UX-018** — L’accueil À voir suit `docs/design/home-a-voir.md` : trois panneaux indépendants
-  À regarder, À venir et Historique, sans changement au scroll ni swipe entre panneaux. Le header
-  seenit● ouvre une feuille Notifications, avec état non lu isolé par compte et Tout marquer lu.
+  À regarder, À venir et Historique, sans changement au scroll ni swipe entre panneaux. La cloche du
+  header seenit● ouvre la **page** Notifications (#876) : sous-page plein écran au contrat des Réglages
+  (entrée 18 px + fondu 180 ms, Retour, bord gauche, navigation conservée), état non lu isolé par compte
+  et Tout marquer lu. Aucune action n’est affichée par notification : la toucher la marque lue et ouvre
+  sa fiche exacte, la glisser vers la droite la retire (sortie de 220 ms, immédiate en mouvement réduit,
+  Annuler conservé) et une action Retirer focalisable reste disponible au clavier et à TalkBack.
+  Retirer la dernière notification visible ou utiliser Tout marquer lu ferme automatiquement la page.
   Une disponibilité Plex globale de série ne prouve jamais la disponibilité de l’épisode de reprise :
-  sans preuve Plex par épisode, elle ne crée ni notification épisode ni action Vu. Les films dont
-  l’identité exacte est disponible conservent leur notification et leur action réversible.
+  sans preuve Plex par épisode, elle ne crée aucune notification épisode. Les films dont l’identité
+  exacte est disponible conservent leur notification ; Vu se marque depuis leur fiche.
   À regarder conserve trois sections distinctes (Continuer, Nouveautés, Pas vu depuis un moment),
   chacune en rail de six cartes puis tuile Voir en liste et liste par douze via la bascule à deux icônes. Les badges
   statut sans emoji sont à côté du code épisode ; le rappel de sortie utilise une pastille rectangulaire J-X (auj. aujourd’hui), sans cercle de progression ni badge de statut dans À venir.
