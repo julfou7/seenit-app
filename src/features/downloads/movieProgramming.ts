@@ -74,10 +74,11 @@ export async function programArrMovie({ title, tmdbId, imdbId, year, qualityPref
 
     // `ensureOnly` peut ajouter le film (surveillé, sans recherche) : la portée est relue juste avant.
     if (!stillOwned()) return { ...result, interrupted: true };
-    const ensured = await io.ensureMovie({ url: initial.radarrUrl, apiKey: initial.radarrApiKey, title, tmdbId, imdbId, year, qualityProfileId: profileId, qualityPreference, ensureOnly: true });
+    // La garde est aussi relue par le service juste avant l'ajout effectif (POST), après ses lectures.
+    const ensured = await io.ensureMovie({ url: initial.radarrUrl, apiKey: initial.radarrApiKey, title, tmdbId, imdbId, year, qualityProfileId: profileId, qualityPreference, ensureOnly: true, canWrite: stillOwned });
+    if (!stillOwned()) return { ...result, interrupted: true };
     const movieId = ensured.success ? ensured.target?.movieId : undefined;
     if (!movieId) return { ...result, failure: ensured.message || 'Radarr n’a pas confirmé le film exact.' };
-    if (!stillOwned()) return { ...result, interrupted: true };
 
     const movie = await io.get(`${base}/api/v3/movie/${movieId}`, headers) as RadarrMovie | null;
     if (!movie || Number(movie.tmdbId) !== Number(tmdbId)) return { ...result, failure: 'Radarr n’a pas confirmé le film exact.' };

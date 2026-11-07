@@ -84,6 +84,23 @@ test('un nouveau film est ajouté sans recherche concurrente avant la preuve zé
   assert.deepEqual(state.posts[0].body.addOptions, { searchForMovie: false });
 });
 
+test('SEENIT-DOWNLOAD-014 un ajout Radarr ou Sonarr relit la portée juste avant le POST et n’écrit rien si elle a changé', async () => {
+  // Les lectures (liste, lookup, dossiers racines) se font, puis la garde de l'appelant refuse l'écriture.
+  const movie = fixture(path => path === 'movie' ? [] : path.startsWith('movie/lookup?') ? [{ tmdbId: 11, title: 'Titre Radarr' }] : path === 'rootfolder' ? [{ path: '/media', accessible: true }] : undefined);
+  const refusedMovie = await runtime.searchAndDownloadInRadarr({ ...params, ensureOnly: true, canWrite: () => false });
+  assert.equal(refusedMovie.success, false);
+  assert.equal(movie.posts.length, 0);
+  assert.ok(movie.calls.includes('rootfolder'), 'la garde est relue après les lectures, juste avant l’ajout');
+  const series = fixture(path => path === 'series' ? [] : path.startsWith('series/lookup?') ? [{ tvdbId: 123, title: 'Titre Sonarr', seasons: [{ seasonNumber: 1 }] }] : path === 'rootfolder' ? [{ path: '/media', accessible: true }] : undefined);
+  const refusedSeries = await runtime.searchAndDownloadInSonarr({ ...params, season: 1, episode: 1, ensureOnly: true, canWrite: () => false });
+  assert.equal(refusedSeries.success, false);
+  assert.equal(series.posts.length, 0);
+  // Garde vraie : l'ajout a bien lieu (le comportement nominal reste inchangé).
+  const allowed = fixture(path => path === 'movie' ? [] : path.startsWith('movie/lookup?') ? [{ tmdbId: 11, title: 'Titre Radarr' }] : path === 'rootfolder' ? [{ path: '/media', accessible: true }] : undefined);
+  await runtime.searchAndDownloadInRadarr({ ...params, ensureOnly: true, canWrite: () => true });
+  assert.equal(allowed.posts.filter(post => post.path === 'movie').length, 1);
+});
+
 test('SEENIT-DOWNLOAD-013 une demande normale ne remplace jamais un fichier existant', async () => {
   const movie = fixture(path => path === 'movie' ? [{ id: 3, tmdbId: 11, hasFile: true, qualityProfileId: 1 }] : undefined);
   assert.equal((await runtime.searchAndDownloadInRadarr(params)).success, false);

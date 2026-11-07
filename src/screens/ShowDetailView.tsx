@@ -201,7 +201,18 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     if (!effectiveTmdbId) return;
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
     if (model.hasActiveDownloadInScope?.({ mediaType: 'movie', tmdbId: Number(effectiveTmdbId) })) { useToastStore.getState().showToast({ title, action: 'Déjà en cours de téléchargement.', posterPath: show?.posterPath }, 'info'); return; }
-    if (!filmUpcoming) { useToastStore.getState().showToast({ title, action: `Recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download'); await model.launchMovieDownload?.(quality); return; }
+    if (!filmUpcoming) {
+      // Même voie que la popup (launchArrDownload) : profil Radarr configuré pour la qualité choisie,
+      // demande durable et échecs explicites ; présence vérifiée d'abord, un fichier n'est jamais remplacé.
+      const config = useDownloadConfigStore.getState();
+      const posterPath = show?.posterPath || tmdbDetails?.poster_path || undefined;
+      const notify = (action: string, kind: 'download' | 'success' | 'error' | 'info' = 'download') => useToastStore.getState().showToast({ title, action, posterPath }, kind);
+      if (!isDownloadFeatureEnabled(config) || !config.radarrUrl || !config.radarrApiKey) { notify('Configure Radarr dans les réglages des téléchargements.', 'error'); return; }
+      if (model.presence.loading) { notify('Vérification de la disponibilité en cours, réessaie dans un instant.', 'info'); return; }
+      const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
+      await launchArrDownload({ config, mediaType: 'movie', title, year: releaseYear || undefined, tmdbId: effectiveTmdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, posterPath, qualityPreference: quality, notify });
+      return;
+    }
     const { programArrMovie } = await import('../features/downloads/movieProgramming');
     const outcome = await programArrMovie({ title, tmdbId: effectiveTmdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, year: releaseYear ? Number(releaseYear) : undefined, qualityPreference: quality, readConfig: () => useDownloadConfigStore.getState() });
     if (outcome.interrupted) return;

@@ -40,6 +40,9 @@ test('DlFilm programmer un film à venir : surveillé dans la qualité choisie, 
   assert.equal(radarr.ensure.length, 1);
   assert.equal(radarr.ensure[0].ensureOnly, true, 'ajout éventuel sans recherche automatique');
   assert.equal(radarr.ensure[0].qualityProfileId, 9);
+  // La garde de portée est transmise au service, qui la relit juste avant d'ajouter le film.
+  assert.equal(typeof radarr.ensure[0].canWrite, 'function');
+  assert.equal((radarr.ensure[0].canWrite as () => boolean)(), true);
   const puts = radarr.calls.filter(call => call.method === 'PUT');
   assert.deepEqual(puts.map(call => [call.url, call.body?.monitored, call.body?.qualityProfileId]), [['http://radarr/api/v3/movie/40', true, 9]]);
   // En PWA, chaque appel passe par le proxy serveur (SEENIT-SECURITY-001).
@@ -64,6 +67,7 @@ test('DlFilm programmer : un changement de compte ou de serveur arrête tout san
   const readConfig = () => (++reads > 2 ? { ...config, radarrUrl: 'http://autre' } : config);
   const result = await movieModule.programArrMovie({ title: 'Avatar', tmdbId: 83533, qualityPreference: '1080p', readConfig, readOwner: () => 'u1', io: radarr.io });
   assert.equal(result.interrupted, true);
+  assert.equal((radarr.ensure[0].canWrite as () => boolean)(), false, 'la garde transmise voit le changement de serveur');
   assert.equal(radarr.calls.filter(call => call.method === 'PUT').length, 0);
   const disabled = await movieModule.programArrMovie({ title: 'Avatar', tmdbId: 83533, qualityPreference: '1080p', readConfig: () => ({ ...config, downloadsEnabled: false }), readOwner: () => 'u1', io: radarr.io });
   assert.equal(disabled.interrupted, true);
@@ -91,4 +95,13 @@ test('DlFilm annuler une programmation : déconnexion, gate coupé ou autre serv
     assert.deepEqual(result, { done: false, interrupted: true }, change);
     assert.equal(radarr.calls.filter(call => call.method === 'PUT').length, 0, change);
   }
+});
+
+test('DlFilm télécharger un film sorti passe par la voie de la popup (profil Radarr configuré)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  assert.match(view, /await launchArrDownload\(\{ config, mediaType: 'movie',/);
+  assert.doesNotMatch(view, /launchMovieDownload/);
+  const launch = readFileSync('src/features/downloads/downloadLaunch.ts', 'utf8');
+  assert.match(launch, /qualityPreference === '4k' \? config\.radarr4kProfileId : config\.radarr1080pProfileId/);
 });

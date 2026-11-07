@@ -47,6 +47,8 @@ async function launchSearchAndDownloadInSonarr(params: {
   qualityPreference?: '1080p' | '4k';
   ensureOnly?: boolean;
   replaceExisting?: boolean;
+  /** Relu juste avant d'ajouter la série : compte, gate et serveur toujours ceux de l'appelant. */
+  canWrite?: () => boolean;
 }): Promise<ArrSearchOutcome & { target?: ExactSonarrSeriesIdentity }> {
   const base = cleanUrl(params.url);
   if (!base || !params.apiKey) {
@@ -293,7 +295,7 @@ async function launchSearchAndDownloadInSonarr(params: {
     // Déterminer le meilleur chemin racine valide
     let rootFolderPath = '';
     if (rootFolders.length > 0) {
-      const accessibleFolder = rootFolders.find((rf: any) => rf.accessible !== false && rf.path);
+      const accessibleFolder = rootFolders.find((rf: { accessible?: boolean; path?: string }) => rf.accessible !== false && rf.path);
       rootFolderPath = accessibleFolder ? accessibleFolder.path : rootFolders[0].path;
     } else if (Array.isArray(seriesList) && seriesList.length > 0) {
       const sWithRoot = seriesList.find((s: any) => s.rootFolderPath);
@@ -322,7 +324,7 @@ async function launchSearchAndDownloadInSonarr(params: {
     // Ajouter la série dans Sonarr avec recherche ciblée
     const addPayload: any = {
       title: lookupResult.title,
-      seasons: Array.isArray(lookupResult.seasons) ? lookupResult.seasons.map((s: any) => ({
+      seasons: Array.isArray(lookupResult.seasons) ? lookupResult.seasons.map((s: { seasonNumber?: number }) => ({
         ...s,
         monitored: (!isEpisodeSearch && !isSeasonSearch) || (isSeasonSearch && Number(s.seasonNumber) === Number(params.season)) || (isEpisodeSearch && Number(s.seasonNumber) === Number(params.season))
       })) : [],
@@ -343,6 +345,7 @@ async function launchSearchAndDownloadInSonarr(params: {
     if (lookupResult.seriesType) addPayload.seriesType = lookupResult.seriesType;
     if (lookupResult.overview) addPayload.overview = lookupResult.overview;
 
+    if (params.canWrite && !params.canWrite()) return { success: false, message: 'La configuration a changé : rien n’a été ajouté.' };
     const created = await executePost(`${base}/api/v3/series`, addPayload, headers);
 
     if (created && created.id) {
@@ -435,6 +438,8 @@ async function launchSearchAndDownloadInRadarr(params: {
   qualityPreference?: '1080p' | '4k';
   ensureOnly?: boolean;
   replaceExisting?: boolean;
+  /** Relu juste avant d'ajouter le film : compte, gate et serveur toujours ceux de l'appelant. */
+  canWrite?: () => boolean;
 }): Promise<ArrSearchOutcome & { target?: { movieId: number; tmdbId: number } }> {
   const base = cleanUrl(params.url);
   if (!base || !params.apiKey) {
@@ -546,7 +551,7 @@ async function launchSearchAndDownloadInRadarr(params: {
 
     let rootFolderPath = '';
     if (rootFolders.length > 0) {
-      const accessibleFolder = rootFolders.find((rf: any) => rf.accessible !== false && rf.path);
+      const accessibleFolder = rootFolders.find((rf: { accessible?: boolean; path?: string }) => rf.accessible !== false && rf.path);
       rootFolderPath = accessibleFolder ? accessibleFolder.path : rootFolders[0].path;
     } else if (Array.isArray(moviesList) && moviesList.length > 0) {
       const mWithRoot = moviesList.find((m: any) => m.rootFolderPath);
@@ -584,6 +589,7 @@ async function launchSearchAndDownloadInRadarr(params: {
     };
     if (lookupResult.overview) addPayload.overview = lookupResult.overview;
 
+    if (params.canWrite && !params.canWrite()) return { success: false, message: 'La configuration a changé : rien n’a été ajouté.' };
     const created: { id?: number; tmdbId?: number } = await executePost(`${base}/api/v3/movie`, addPayload, headers);
     if (!created?.id) return { success: false, message: 'Radarr n’a pas confirmé l’ajout du film exact.' };
     if (params.ensureOnly) {

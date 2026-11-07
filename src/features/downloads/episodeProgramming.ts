@@ -86,10 +86,11 @@ export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season
 
     // `ensureOnly` peut ajouter la série : la portée est relue juste avant cette écriture.
     if (!stillOwned()) return { ...result, interrupted: true };
-    const ensured = await io.ensureSeries({ url: initial.sonarrUrl, apiKey: initial.sonarrApiKey, title, tmdbId, tvdbId, imdbId, season, episode: episodes[0], qualityProfileId: profileId, qualityPreference, ensureOnly: true });
+    // La garde est aussi relue par le service juste avant l'ajout effectif (POST), après ses lectures.
+    const ensured = await io.ensureSeries({ url: initial.sonarrUrl, apiKey: initial.sonarrApiKey, title, tmdbId, tvdbId, imdbId, season, episode: episodes[0], qualityProfileId: profileId, qualityPreference, ensureOnly: true, canWrite: stillOwned });
+    if (!stillOwned()) return { ...result, interrupted: true };
     const seriesId = ensured.success ? ensured.target?.seriesId : undefined;
     if (!seriesId) return { ...result, failure: ensured.message || 'Sonarr n’a pas confirmé la série exacte.' };
-    if (!stillOwned()) return { ...result, interrupted: true };
 
     // La qualité choisie s'applique à la série, comme pour un téléchargement immédiat.
     const series = await io.get(`${base}/api/v3/series/${seriesId}`, headers) as SonarrSeries | null;
