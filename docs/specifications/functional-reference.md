@@ -358,12 +358,15 @@ annulation.
 ### 5.3 Historique et actualités
 
 - L'[historique mixte](../design/history-16d.md) suit la liste compacte de la SPEC accueil v3 : un bloc arrondi, films et épisodes triés depuis leurs `watchedAt`, sans groupes de date ni barres de progression. La date courte apparaît dans chaque ligne (ce soir aujourd’hui) ; une heure inconnue reste inconnue.
-- « Marquer comme non vu » retire uniquement la progression ciblée et propose Annuler. Son enregistrement
+- « Marquer non vu » retire uniquement la progression ciblée et propose Annuler. Son enregistrement
   ne dépend d'aucun appel TMDB ; le prochain épisode conserve les compteurs déjà connus de sa saison.
   Un échec d'écriture est signalé explicitement, sans annoncer une suppression réussie.
 - Films et épisodes ont la même ligne (minimum 76 px), vignette still/backdrop 92×52, titre or, code/date et titre d’épisode, pastille SeenIt or 26 px. Un film n’affiche ni année ni mention Film. Le tap ouvre
-  l'épisode exact ou le film ; l'appui long/menu clavier propose Non vu (confirmation et Annuler),
-  Changer la date/heure (heure facultative et Annuler), Revoir et Ouvrir la série.
+  l'épisode exact ou le film ; la pastille, l'appui long ou le clavier ouvrent un menu ancré sous la ligne
+  (encadrée d'or, sans feuille du bas) : Changer la date ou l'heure (« Aujourd'hui à 07:41 », réglée dans
+  le menu : Aujourd'hui / Hier / Avant-hier / Autre jour, heure par pas de 15 min ou vide), Revoir, Ouvrir
+  la série, puis Marquer non vu en rose, sans confirmation : la ligne disparaît et le toast « Retiré de
+  l'historique » propose Annuler, qui restaure la date exacte.
 - La liste affiche dix entrées puis Voir plus avec le nombre restant (dix maximum par lot). Les heures connues sont conservées dans les libellés accessibles et l’édition.
 - Le fil Actualités, désormais dans la feuille Notifications, affiche les événements non lus de séries encore présentes : nouvelle saison,
   diffusion, renouvellement/annulation et informations générées par le worker de détails.

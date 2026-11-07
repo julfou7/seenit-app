@@ -97,11 +97,16 @@ test('SEENIT-UX-015 expose la liste compacte v3 et conserve les actions d’hist
   assert.match(source, /<HistoryEntryRow/);
   assert.doesNotMatch(source, /<SeriesEpisodeCard|displayedGroups|collectionParts/);
   assert.doesNotMatch(source, /CheckCircle2|RotateCcw/);
-  assert.match(source, /Marquer non vu/);
-  assert.match(source, /Changer la date\/heure/);
-  assert.match(source, /Revoir/);
+  assert.match(source, /onRewatch: \(\) => onRewatch\(item, show, effectiveProviderName\)/);
   assert.match(source, /history-entry-list/);
-  assert.match(source, /label: 'Marquer non vu', onSelect: \(\) => setUnseenModalItem\(target\)/);
+  // #9 Historique : actions (maquette validée le 07/11) — menu ancré, plus de confirmation rouge.
+  const row = readFileSync(new URL('../src/components/HistoryEntryRow.tsx', import.meta.url), 'utf8');
+  assert.match(row, /Changer la date ou l’heure/);
+  assert.match(row, /Marquer non vu<\/strong><small className="text-\[12\.5px\] text-zinc-400">Annulable quelques secondes/);
+  assert.match(row, /role="menu"/);
+  assert.doesNotMatch(row, /items-end/, 'plus de feuille du bas');
+  assert.doesNotMatch(source, /alertdialog|Oui, marquer non vu/, 'plus de confirmation rouge');
+  assert.match(source, /onUnseen: \(\) => onUnseen\(item\)/);
   assert.match(source, /onOpen=\{handleRowClick\}/);
 
   const card = readFileSync(new URL('../src/components/cards/SeriesEpisodeCard.tsx', import.meta.url), 'utf8');

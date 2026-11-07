@@ -1525,9 +1525,14 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   changement d'heure. Le still de l’épisode et le backdrop du film utilisent leurs identités
   exactes et les enrichissements passifs bornés existants. Aucune collection n’est demandée pour
   une progression retirée. La pastille est un repère vu, l’heure reste dans le libellé accessible ;
-  un tap ouvre l'épisode ou le film, l'appui long/clavier ouvre Non vu, Date/heure, Revoir et Série.
-  Non vu conserve la confirmation et Annuler ; la correction de date préserve les métadonnées et
-  offre Annuler. Revoir réutilise le diffuseur/cache déjà résolu, sans requête fournisseur directe.
+  un tap ouvre l'épisode ou le film ; la pastille, l'appui long ou le clavier ouvrent un menu ancré
+  sous la ligne, encadrée d'or (maquette « 9 · Historique : actions » validée le 07/11, plus de feuille
+  du bas) : Changer la date ou l'heure (avec la date courante, « Aujourd'hui à 07:41 »), Revoir,
+  Ouvrir la série, puis, séparé et en rose, Marquer non vu. La date se change dans le menu
+  (Aujourd'hui, Hier, Avant-hier, Autre jour ; heure par pas de 15 min, vide = inconnue) et
+  Enregistrer propose Annuler. Marquer non vu n'ouvre plus de confirmation : la ligne disparaît et le
+  toast d'épisode « Retiré de l'historique » propose Annuler, qui restaure la date exacte ; la
+  correction de date préserve les métadonnées. Revoir réutilise le diffuseur/cache déjà résolu, sans requête fournisseur directe.
   Les épisodes présents sous des clés legacy sont normalisés par saison/épisode sans doublon ;
   une preuve explicitement retirée de seenEpisodes ne réapparaît pas depuis un record orphelin.
 - **SEENIT-UX-012** — Un dialogue nommé utilise une pile commune : Échap, Retour Android et appui

@@ -39,10 +39,9 @@ async function testHomePerformanceHarness(root, client) {
     assert.deepEqual(warm.errors,[]);
     const pendingBefore=await evaluate(client,'parseInt(document.querySelector("#home-panel-history .home-load-more>span:last-child").textContent,10)');
     await evaluate(client,'document.querySelector("#home-panel-history .history-entry__action-column button").click()');
-    await wait(client,'Boolean([...document.querySelectorAll("[role=dialog] button")].find(b=>b.textContent==="Marquer non vu"))');
-    await evaluate(client,'[...document.querySelectorAll("[role=dialog] button")].find(b=>b.textContent==="Marquer non vu").click()');
-    await wait(client,'Boolean(document.querySelector("[role=alertdialog]"))');
-    await evaluate(client,'[...document.querySelectorAll("[role=alertdialog] button")].find(b=>b.textContent==="Oui, marquer non vu").click()');
+    // #9 Historique : menu ancré ; « Marquer non vu » agit sans confirmation (Annuler dans le toast).
+    await wait(client,'Boolean([...document.querySelectorAll("[data-history-menu] button")].find(b=>b.textContent.startsWith("Marquer non vu")))');
+    await evaluate(client,'[...document.querySelectorAll("[data-history-menu] button")].find(b=>b.textContent.startsWith("Marquer non vu")).click()');
     await wait(client,`parseInt(document.querySelector('#home-panel-history .home-load-more>span:last-child').textContent,10)===${pendingBefore-1}`);
     return {views:6300,switches:30,periodClassifications:cold.calls,coldAndSwitchMs:Date.now()-started,heap:warm.heap,renderedRows:warm.rows};
   } finally { await client.send('Emulation.setCPUThrottlingRate',{rate:1}); }
