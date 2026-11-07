@@ -24,6 +24,10 @@
           "contains": "DlFilm annuler une programmation : le film exact n’est plus surveillé, rien n’est supprimé"
         },
         {
+          "file": "tests/movieProgramming.test.ts",
+          "contains": "DlFilm annuler une programmation : déconnexion, gate coupé ou autre serveur pendant la lecture, aucune écriture"
+        },
+        {
           "file": "tests/preciseVersion.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 version précise : une page, la même voie d’envoi que la popup"
         },

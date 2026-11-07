@@ -17,7 +17,7 @@ const bundle = await build({ entryPoints: ['src/features/downloads/movieProgramm
 type Call = { method: string; url: string; body?: Record<string, unknown> };
 const movieModule = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`) as {
   programArrMovie: (request: Record<string, unknown>) => Promise<{ programmed: boolean; present: boolean; failure?: string; interrupted: boolean }>;
-  unprogramArrMovie: (request: Record<string, unknown>) => Promise<{ done: boolean; failure?: string }>;
+  unprogramArrMovie: (request: Record<string, unknown>) => Promise<{ done: boolean; failure?: string; interrupted?: boolean }>;
 };
 
 const config = { downloadsEnabled: true, radarrUrl: 'http://radarr/', radarrApiKey: 'k' };
@@ -71,11 +71,24 @@ test('DlFilm programmer : un changement de compte ou de serveur arrête tout san
 
 test('DlFilm annuler une programmation : le film exact n’est plus surveillé, rien n’est supprimé', async () => {
   const radarr = fakeRadarr({ id: 40, tmdbId: 83533, monitored: true, hasFile: false });
-  assert.deepEqual(await movieModule.unprogramArrMovie({ tmdbId: 83533, readConfig: () => config, io: radarr.io }), { done: true });
+  assert.deepEqual(await movieModule.unprogramArrMovie({ tmdbId: 83533, readConfig: () => config, readOwner: () => 'u1', io: radarr.io }), { done: true });
   assert.deepEqual(radarr.calls.filter(call => call.method === 'PUT').map(call => [call.url, call.body?.monitored]), [['http://radarr/api/v3/movie/40', false]]);
   assert.ok(radarr.calls.every(call => isAllowedServiceProxyPath(call.url, call.method)));
   const present = fakeRadarr({ id: 40, tmdbId: 83533, monitored: true, hasFile: true });
-  const kept = await movieModule.unprogramArrMovie({ tmdbId: 83533, readConfig: () => config, io: present.io });
+  const kept = await movieModule.unprogramArrMovie({ tmdbId: 83533, readConfig: () => config, readOwner: () => 'u1', io: present.io });
   assert.equal(kept.done, false);
   assert.equal(present.calls.filter(call => call.method === 'PUT').length, 0);
+});
+
+test('DlFilm annuler une programmation : déconnexion, gate coupé ou autre serveur pendant la lecture, aucune écriture', async () => {
+  for (const change of ['owner', 'gate', 'server'] as const) {
+    const radarr = fakeRadarr({ id: 40, tmdbId: 83533, monitored: true, hasFile: false });
+    let changed = false;
+    const io = { get: async (url: string) => { const value = await radarr.io.get(url); changed = true; return value; }, put: radarr.io.put };
+    const readConfig = () => changed && change === 'gate' ? { ...config, downloadsEnabled: false } : changed && change === 'server' ? { ...config, radarrUrl: 'http://autre' } : config;
+    const readOwner = () => (changed && change === 'owner' ? undefined : 'u1');
+    const result = await movieModule.unprogramArrMovie({ tmdbId: 83533, readConfig, readOwner, io });
+    assert.deepEqual(result, { done: false, interrupted: true }, change);
+    assert.equal(radarr.calls.filter(call => call.method === 'PUT').length, 0, change);
+  }
 });

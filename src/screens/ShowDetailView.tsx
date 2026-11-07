@@ -215,6 +215,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     if (filmState === 'programmed' && effectiveTmdbId) {
       const { unprogramArrMovie } = await import('../features/downloads/movieProgramming');
       const outcome = await unprogramArrMovie({ tmdbId: effectiveTmdbId, readConfig: () => useDownloadConfigStore.getState() });
+      if (outcome.interrupted) return;
       toast({ title, action: outcome.done ? 'N’est plus programmé.' : outcome.failure || 'Annulation non confirmée.', posterPath: show?.posterPath }, outcome.done ? 'info' : 'error');
       if (outcome.done) void refreshPlexAvailability();
       return;

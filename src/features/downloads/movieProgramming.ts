@@ -96,9 +96,15 @@ export async function programArrMovie({ title, tmdbId, imdbId, year, qualityPref
  * Annuler la programmation d'un film depuis sa fiche : Radarr ne le surveille plus. Le film est retrouvé
  * par son TMDB exact ; rien n'est supprimé, et un film déjà présent n'est jamais modifié.
  */
-export async function unprogramArrMovie({ tmdbId, readConfig, io = defaultIo }: { tmdbId: number | string; readConfig: () => DownloadConfig; io?: Pick<MovieProgrammingIo, 'get' | 'put'> }): Promise<{ done: boolean; failure?: string }> {
+export async function unprogramArrMovie({ tmdbId, readConfig, readOwner = () => auth.currentUser?.uid, io = defaultIo }: { tmdbId: number | string; readConfig: () => DownloadConfig; readOwner?: () => string | undefined; io?: Pick<MovieProgrammingIo, 'get' | 'put'> }): Promise<{ done: boolean; failure?: string; interrupted?: boolean }> {
+  const owner = readOwner();
   const config = readConfig();
-  if (!isDownloadFeatureEnabled(config) || !config.radarrUrl || !config.radarrApiKey || !(Number(tmdbId) > 0)) return { done: false, failure: 'Radarr n’est pas configuré.' };
+  if (!owner || !isDownloadFeatureEnabled(config) || !config.radarrUrl || !config.radarrApiKey || !(Number(tmdbId) > 0)) return { done: false, failure: 'Radarr n’est pas configuré.' };
+  // Comme la programmation : l'écriture reste attachée au compte, au gate et au serveur qui l'ont demandée.
+  const stillOwned = () => {
+    const current = readConfig();
+    return readOwner() === owner && isDownloadFeatureEnabled(current) && radarrTarget(current) === radarrTarget(config);
+  };
   const base = cleanUrl(config.radarrUrl);
   const headers = { 'X-Api-Key': config.radarrApiKey, 'Content-Type': 'application/json', Accept: 'application/json' };
   try {
@@ -107,7 +113,10 @@ export async function unprogramArrMovie({ tmdbId, readConfig, io = defaultIo }: 
     const movie = (list as RadarrMovie[]).find(entry => Number(entry.tmdbId) === Number(tmdbId));
     if (!movie?.id) return { done: true };
     if (movie.hasFile === true) return { done: false, failure: 'Le film est déjà présent : rien n’a été modifié.' };
-    if (movie.monitored === true) await io.put(`${base}/api/v3/movie/${movie.id}`, { ...movie, monitored: false }, headers);
+    if (movie.monitored === true) {
+      if (!stillOwned()) return { done: false, interrupted: true };
+      await io.put(`${base}/api/v3/movie/${movie.id}`, { ...movie, monitored: false }, headers);
+    }
     return { done: true };
   } catch (error: unknown) {
     return { done: false, failure: (error instanceof Error && error.message) || 'Impossible de joindre Radarr.' };
