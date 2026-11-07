@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
+import { isAllowedServiceProxyPath } from '../src/features/downloads/downloadBackendSecurity.ts';
 
 // Vrai module du calendrier : seuls les transports et le gate sont remplacés.
 const bundle = await build({ entryPoints: ['src/features/downloads/programmedCalendar.ts'], bundle: true, platform: 'node', format: 'esm', write: false,
@@ -48,6 +49,8 @@ test('SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sa
   assert.equal(result.items[2].date, '2026-12-17', 'la sortie future la plus proche, pas le cinéma passé');
   assert.deepEqual(result.failures, []);
   assert.ok(urls.every(url => url.includes('unmonitored=false')));
+  // En PWA, le calendrier passe par le proxy serveur : chaque URL émise doit y être acceptée.
+  assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), urls.join(' '));
   // Panne d'une source : signalée, jamais confondue avec « rien de programmé ».
   const down = await calendar.fetchProgrammedCalendar(config, { now, io: { ...io, get: async (url: string) => { if (url.startsWith('http://sonarr')) throw new Error('503'); return io.get(url); } } });
   assert.deepEqual([down.failures, down.items.map(item => item.id)], [['Sonarr'], [9]]);
@@ -62,10 +65,12 @@ test('SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sa
 
 test('SEENIT-DOWNLOAD-013 #879 Annuler une programmation retire seulement la surveillance', async () => {
   const puts: Array<{ url: string; body: Record<string, unknown> }> = [];
-  const io = { get: async (url: string) => ({ id: Number(url.split('/').pop()), monitored: true, title: 'x' }), put: async (url: string, body: Record<string, unknown>) => { puts.push({ url, body }); } };
+  const gets: string[] = [];
+  const io = { get: async (url: string) => { gets.push(url); return { id: Number(url.split('/').pop()), monitored: true, title: 'x' }; }, put: async (url: string, body: Record<string, unknown>) => { puts.push({ url, body }); } };
   await calendar.unprogramItem(config, { kind: 'episode', id: 801, seriesId: 5 }, io);
   await calendar.unprogramItem(config, { kind: 'movie', id: 9 }, io);
   assert.deepEqual(puts.map(put => [put.url, put.body.monitored, put.body.title]), [['http://sonarr/api/v3/episode/801', false, 'x'], ['http://radarr/api/v3/movie/9', false, 'x']]);
+  assert.ok(gets.every(url => isAllowedServiceProxyPath(url, 'GET')) && puts.every(put => isAllowedServiceProxyPath(put.url, 'PUT')), 'déprogrammer passe le proxy PWA');
   await assert.rejects(calendar.unprogramItem({ ...config, downloadsEnabled: false }, { kind: 'movie', id: 9 }, io));
   assert.equal(calendar.programmedDateLabel(undefined, now), 'Date à venir');
   assert.equal(calendar.programmedDateLabel('2026-11-08T12:00:00Z', now), 'Demain');

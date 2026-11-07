@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.269",
+  "applicationVersion": "1.4.270",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -80,6 +80,14 @@
         {
           "file": "tests/programmedCalendar.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sans fichier, triés par date"
+        },
+        {
+          "file": "tests/recentImports.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : imports réels des 7 derniers jours, groupés par série, doublons et grabs ignorés"
+        },
+        {
+          "file": "tests/recentImports.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : un terminé n’est couvert que par le même TMDB et le même épisode, jamais par le titre"
         },
         {
           "file": "tests/downloadSeasonGroups.test.ts",
@@ -1441,6 +1449,14 @@
         {
           "file": "tests/downloadBackendSecurity.test.ts",
           "contains": "le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"
+        },
+        {
+          "file": "tests/episodeProgramming.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 programmer surveille seulement les épisodes à venir demandés, sans rien rechercher"
+        },
+        {
+          "file": "tests/recentImports.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : imports réels des 7 derniers jours, groupés par série, doublons et grabs ignorés"
         }
       ]
     },

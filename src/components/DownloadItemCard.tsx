@@ -22,33 +22,47 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
   const src = poster.current ? poster.current.startsWith('http') ? poster.current : `https://image.tmdb.org/t/p/w185${poster.current}` : null;
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
   const group = downloadGroup(item);
-  const attention = group === 'attention', terminal = group === 'completed' || group === 'cancelled';
+  const attention = group === 'attention', waiting = group === 'waiting', terminal = group === 'completed' || group === 'cancelled';
+  // Maquette DlOngletSuivi : « à régler » couvre l'échec et la release pas encore trouvée.
+  const toFix = attention || waiting;
   const progress = truncateDownloadProgressPercent(Math.min(100, Math.max(0, Number(item.progress) || 0)));
   const problem = downloadProblem(item.errorMessage || item.statusText);
   const id = item.tmdbId || library?.tmdbId;
   const audio = getReleaseAudio(item.releaseTitle).label;
-  const meta = [item.quality, audio, item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
-  const label = attention ? problem.title : group === 'waiting' ? 'En attente de disponibilité' : group === 'cancelled' ? 'Annulé' : group === 'completed' ? 'Terminé' : item.importState === 'pending' && progress >= 100 ? 'Transfert terminé · import à confirmer' : item.status === 'searching' ? 'Recherche en cours' : item.status === 'submitting' ? 'Envoi au client' : item.status === 'paused' ? 'En pause' : `${progress} %`;
-  return <article className={`download-card${attention ? ' download-card--attention' : ''}${terminal ? ' download-card--terminal' : ''}`} data-download-id={item.id}>
+  const scope = isTv ? subTitle : ['Film', item.quality].filter(Boolean).join(' · ');
+  const meta = [isTv ? item.quality : '', audio, item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
+  const label = attention ? problem.title : waiting ? 'En attente de disponibilité' : group === 'cancelled' ? 'Annulé' : group === 'completed' ? 'Terminé' : item.importState === 'pending' && progress >= 100 ? 'Transfert terminé · import à confirmer' : item.status === 'searching' ? 'Recherche en cours' : item.status === 'submitting' ? 'Envoi au client' : item.status === 'paused' ? 'En pause' : item.status === 'queued' ? 'En file d’attente' : null;
+  const showTrack = group === 'active' && !(item.importState === 'pending' && progress >= 100) && (label === null || progress > 0);
+  return <article className={`download-card${toFix ? ' download-card--attention' : ''}${terminal ? ' download-card--terminal' : ''}`} data-download-id={item.id}>
     <div className="download-card__head">
       <button type="button" className="download-card__poster" disabled={!id || !onShowClick} aria-label={`Ouvrir ${cleanTitle}`} onClick={() => id && onShowClick?.(id, item.mediaType)}>
         {src && !posterFailed ? <img src={src} alt="" loading="lazy" decoding="async" onError={() => setPosterFailed(true)} /> : isTv ? <Tv size={22} /> : <Film size={22} />}
       </button>
       <div className="download-card__body">
         <button type="button" className="download-card__title" disabled={!id || !onShowClick} onClick={() => id && onShowClick?.(id, item.mediaType)}>{cleanTitle}</button>
-        {subTitle && <p className="download-card__scope">{subTitle}</p>}
-        <p className="download-card__meta">{meta}</p>
-        <p className={`download-card__status${attention ? ' is-error' : ''}`}>{group === 'completed' && <CheckCircle2 size={14} aria-hidden="true" />}{label}</p>
-        {group === 'active' && <><div role="progressbar" aria-label="Progression du transfert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="download-card__progress"><span style={{ width: `${progress}%` }} /></div><p className="download-card__meta">{[item.speedFormatted, item.timeleft && item.timeleft !== '--' ? item.timeleft : ''].filter(Boolean).join(' · ')}</p></>}
+        {scope && <p className="download-card__scope">{scope}</p>}
+        {meta && <p className="download-card__meta">{meta}</p>}
+        {label && <p className={`download-card__status${attention ? ' is-error' : ''}`}>{group === 'completed' && <CheckCircle2 size={14} aria-hidden="true" />}{label}</p>}
+        {toFix && <p className="download-card__hint">{attention ? problem.hint : availabilityHint(item.availability)}</p>}
       </div>
       <button type="button" className="download-card__more" aria-label={`Actions pour ${cleanTitle}`} aria-expanded={details} onClick={() => setDetails(!details)}><MoreHorizontal size={20} /></button>
     </div>
-    {attention && <p className="download-card__hint">{problem.hint}</p>}
-    {group === 'waiting' && <p className="download-card__hint">{availabilityHint(item.availability)}</p>}
+    {/* Maquette : la barre or court en bas du billet, avec le pourcentage et le temps restant. */}
+    {showTrack && <div className="download-card__track">
+      <div role="progressbar" aria-label="Progression du transfert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="download-card__progress"><span style={{ width: `${progress}%` }} /></div>
+      <strong>{progress} %</strong>
+      {item.timeleft && item.timeleft !== '--' && <span>≈ {item.timeleft}</span>}
+    </div>}
+    {/* Une carte à régler montre ses deux actions sans passer par « … ». */}
+    {toFix && <div className="download-card__quick">
+      {item.tmdbId && <button type="button" onClick={() => setChoosingRelease(true)}>Choisir une version</button>}
+      <button type="button" onClick={onRemove} aria-label={`Retirer ${cleanTitle}`}>Retirer</button>
+    </div>}
     {details && <div className="download-card__actions">
-      {item.tmdbId && (attention || (terminal && details) || group === 'waiting') && <button type="button" onClick={() => setChoosingRelease(true)}><Search size={15} />Autre version</button>}
-      {item.tmdbId && (attention || group === 'waiting') && <button type="button" onClick={() => setChoosingQuality(true)}>Changer la qualité</button>}
-      {(!terminal || details) && <button type="button" onClick={onRemove} aria-label={`${terminal || attention ? 'Retirer' : 'Annuler'} ${cleanTitle}`}><Trash2 size={15} />{terminal || attention ? 'Retirer' : 'Annuler'}</button>}
+      {item.tmdbId && terminal && <button type="button" onClick={() => setChoosingRelease(true)}><Search size={15} />Autre version</button>}
+      {item.tmdbId && toFix && <button type="button" onClick={() => setChoosingQuality(true)}>Changer la qualité</button>}
+      {!toFix && <button type="button" onClick={onRemove} aria-label={`${terminal ? 'Retirer' : 'Annuler'} ${cleanTitle}`}><Trash2 size={15} />{terminal ? 'Retirer' : 'Annuler'}</button>}
+      {item.speedFormatted && group === 'active' && <p className="download-card__meta">{item.speedFormatted}</p>}
     </div>}
     <Suspense fallback={<p role="status" className="download-card__meta">Ouverture du sélecteur…</p>}>
       {choosingRelease && <AlternativeReleaseModal item={item} onClose={() => setChoosingRelease(false)} />}

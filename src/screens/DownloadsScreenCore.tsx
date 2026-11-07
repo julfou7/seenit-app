@@ -2,6 +2,8 @@ import { DialogLayer } from '../components/ui/DialogLayer';
 import { DownloadItemCard } from '../components/DownloadItemCard';
 import { SeasonDownloadCard } from '../components/SeasonDownloadCard';
 import { ProgrammedSection } from '../components/ProgrammedSection';
+import { RecentImportsRail, useRecentImports } from '../components/RecentImportsRail';
+import { coveredByRecentImport } from '../features/downloads/recentImports';
 import { groupSeasonDownloads } from '../features/downloads/downloadSeriesGroups';
 import { downloadGroup } from '../features/downloads/downloadGroups';
 import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
@@ -18,7 +20,6 @@ import {
   HardDrive,
   Clock3,
   Loader2,
-  RefreshCw,
   Search,
   Settings,
   Trash2,
@@ -60,7 +61,6 @@ type SearchMediaType = 'all' | 'movie' | 'tv';
 export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const {
     downloads,
-    fetchDownloads,
     removeDownload,
     clearAllDownloads
   } = useLiveDownloadStore();
@@ -165,6 +165,29 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'completed'), 'desc'),
     [downloads]
   );
+  // Maquette DlOngletSuivi : « Téléchargés » montre les imports réels des 7 derniers jours ; un téléchargement
+  // terminé déjà présent dans cette rangée (TMDB et épisode exacts) n'est pas répété dans « Terminés ».
+  const recentImports = useRecentImports(programmedRefresh);
+  const listedCompleted = useMemo(
+    () => recentImports.loaded ? completedDownloads.filter(item => !coveredByRecentImport(recentImports.items, item)) : [],
+    [completedDownloads, recentImports]
+  );
+  // Sans bouton Actualiser (maquette : deux boutons ronds tiennent en 360 px) : Programmés et Téléchargés
+  // se rechargent quand un téléchargement change d'état et quand l'app revient au premier plan.
+  const transitions = `${activeDownloads.length}:${completedDownloads.length}:${errorDownloads.length}`;
+  const lastTransitions = useRef(transitions);
+  useEffect(() => {
+    if (lastTransitions.current === transitions) return;
+    lastTransitions.current = transitions;
+    setProgrammedRefresh(key => key + 1);
+  }, [transitions]);
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') setProgrammedRefresh(key => key + 1); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, []);
+  const toFixDownloads = useMemo(() => [...errorDownloads, ...waitingDownloads], [errorDownloads, waitingDownloads]);
+  const subtitle = [activeDownloads.length ? `${activeDownloads.length} en cours` : '', toFixDownloads.length ? `${toFixDownloads.length} à régler` : ''].filter(Boolean).join(' · ') || 'Rien en cours';
 
   const performSearch = async () => {
     const query = searchQuery.trim();
@@ -363,9 +386,9 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     clearSection?: 'completed' | 'cancelled' | 'error',
     groupSeasons = false
   ) => (
-    <section className={`downloads-section${title === 'À traiter' ? ' downloads-section--attention' : ''}`}>
+    <section className={`downloads-section${title === 'À régler' ? ' downloads-section--attention' : ''}`}>
       <div className="flex items-center justify-between px-0.5">
-        <h2>{title} · {items.length}</h2>
+        <h2>{title}</h2>
         {clearSection && (
           <button
             type="button"
@@ -405,54 +428,33 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
 
   return (
     <div ref={screenRootRef} className="downloads-page flex-1 min-h-0 flex flex-col text-white overflow-hidden">
-      <div className="shrink-0 px-4 pt-4 pb-3 space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-black tracking-tight">Téléchargements</h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-1.5">
+      <header className="downloads-header">
+        <div className="downloads-header__row">
+          <h1>Téléchargements</h1>
+          <div className="downloads-header__actions">
             <button
               type="button"
-              onClick={() => { void fetchDownloads(); setProgrammedRefresh(key => key + 1); }}
-              className="w-11 h-11 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
-              title="Actualiser"
-              aria-label="Actualiser les téléchargements"
+              onClick={() => setViewMode(viewMode === 'search' ? 'downloads' : 'search')}
+              aria-pressed={viewMode === 'search'}
+              title="Recherche avancée"
+              aria-label="Recherche avancée"
             >
-              <RefreshCw size={16} />
+              <Search size={18} />
             </button>
             <button
               type="button"
               onClick={() => setShowConfiguration(true)}
-              className="w-11 h-11 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
               title="Réglages"
               aria-label="Ouvrir les réglages de téléchargement"
             >
-              <Settings size={16} />
+              <Settings size={18} />
             </button>
           </div>
         </div>
-
-        <div className="downloads-segments" role="tablist" aria-label="Téléchargements">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'downloads'}
-            onClick={() => setViewMode('downloads')}
-            className={`py-2 rounded-lg text-xs font-bold ${viewMode === 'downloads' ? 'bg-zinc-700 text-white' : 'text-zinc-400'}`}
-          >
-            Mes téléchargements
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={viewMode === 'search'}
-            onClick={() => setViewMode('search')}
-            className={`py-2 rounded-lg text-xs font-bold ${viewMode === 'search' ? 'bg-zinc-700 text-white' : 'text-zinc-400'}`}
-          >
-            Recherche C411
-          </button>
-        </div>
-      </div>
+        {viewMode === 'downloads'
+          ? <p className="downloads-subtitle">{subtitle}</p>
+          : <button type="button" className="downloads-back" onClick={() => setViewMode('downloads')}><ArrowLeft size={16} aria-hidden="true" />Mes téléchargements</button>}
+      </header>
 
       <div className="downloads-content flex-1 overflow-y-auto px-4 py-3.5">
         {viewMode === 'downloads' ? (
@@ -471,15 +473,15 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
               </button>
             )}
 
-            {errorDownloads.length > 0 && renderSection('À traiter', errorDownloads, 'error')}
+            {toFixDownloads.length > 0 && renderSection('À régler', toFixDownloads)}
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
-            {waitingDownloads.length > 0 && renderSection('En attente de disponibilité', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
             {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} />}
-            {completedDownloads.length > 0 && renderSection('Terminés', completedDownloads, 'completed')}
+            <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
+            {listedCompleted.length > 0 && renderSection('Terminés', listedCompleted, 'completed')}
             {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'cancelled')}
 
-            {!downloads.length && (
+            {!downloads.length && !recentImports.items.length && (
               <div className="py-16 flex flex-col items-center text-center gap-3 text-zinc-500">
                 <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center">
                   <Download size={24} />
