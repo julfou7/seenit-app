@@ -82,6 +82,14 @@
           "contains": "SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sans fichier, triés par date"
         },
         {
+          "file": "tests/recentImports.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : imports réels des 7 derniers jours, groupés par série, doublons et grabs ignorés"
+        },
+        {
+          "file": "tests/recentImports.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : un terminé n’est couvert que par le même TMDB et le même épisode, jamais par le titre"
+        },
+        {
           "file": "tests/downloadSeasonGroups.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 #879 onglet Télécharger : une carte par saison, regroupée par identité exacte"
         },

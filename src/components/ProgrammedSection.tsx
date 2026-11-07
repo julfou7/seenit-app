@@ -74,7 +74,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick }: { refreshKey?
   const cancelButton = (item: ProgrammedItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => void cancel(item)} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel">Annuler</button>;
 
   return <section className="downloads-section" data-programmed>
-    <h2>Programmés · {items.length}</h2>
+    <h2>Programmés</h2>
     {failures.length > 0 && <p className="download-card__meta" role="status">{failures.join(' et ')} injoignable pour l’instant : la liste peut être incomplète.</p>}
     {[...series.values()].map(group => {
       const first = group[0];

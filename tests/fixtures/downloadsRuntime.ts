@@ -41,7 +41,19 @@ export const addEpisodeToSeason = async (target: { tmdbId: number; season: numbe
 // #879 — calendrier Sonarr/Radarr de la section « Programmés » (vide hors de la page dédiée).
 const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 export const cleanUrl = (url: string) => String(url || '').replace(/\/+$/, '');
+// Rangée « Téléchargés » : imports Sonarr/Radarr des 7 derniers jours (un grab et un doublon d'import en piège).
+const ago = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+const SONARR_IMPORTS = [
+  { eventType: 'downloadFolderImported', date: ago(0.1), seriesId: 7, episode: { seasonNumber: 2, episodeNumber: 10 }, series: { title: 'Severance', tmdbId: 95396 } },
+  { eventType: 'downloadFolderImported', date: ago(0.2), seriesId: 7, episode: { seasonNumber: 2, episodeNumber: 9 }, series: { title: 'Severance', tmdbId: 95396 } },
+  { eventType: 'downloadFolderImported', date: ago(0.3), seriesId: 7, episode: { seasonNumber: 2, episodeNumber: 10 }, series: { title: 'Severance', tmdbId: 95396 } },
+  { eventType: 'grabbed', date: ago(0.4), seriesId: 8, episode: { seasonNumber: 1, episodeNumber: 4 }, series: { title: 'A Knight of the Seven Kingdoms', tmdbId: 224372 } },
+  { eventType: 'downloadFolderImported', date: ago(1), seriesId: 8, episode: { seasonNumber: 1, episodeNumber: 3 }, series: { title: 'A Knight of the Seven Kingdoms', tmdbId: 224372 } }
+];
+// Dune (TMDB 4) est aussi un téléchargement terminé suivi : il n'est pas répété dans « Terminés ».
+const RADARR_IMPORTS = [{ eventType: 3, date: ago(3), movieId: 40, movie: { title: 'Dune', tmdbId: 4 } }];
 export const executeGet = async (url: string) => {
+  if (url.includes('/api/v3/history/since')) return telemetry.programmed ? [] : url.includes('includeMovie=true') ? RADARR_IMPORTS : SONARR_IMPORTS;
   if (!telemetry.programmed) return [];
   if (url.includes('/api/v3/calendar') && url.includes('includeSeries=true')) return [
     { id: 801, seriesId: 5, seasonNumber: 1, episodeNumber: 8, title: 'Épisode 8', airDateUtc: inDays(7), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },

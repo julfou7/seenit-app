@@ -16,12 +16,15 @@ Le téléchargement de saison est une icône de 44 px à droite du titre Saison 
 Il disparaît de la rangée Tout marquer vu / Bande-annonce. Les commandes épisode restent séparées.
 Vérifier les vrais composants carte, sélecteur et saison en 360/412 px, y compris titre long et Retour.
 
-Mes téléchargements et Recherche C411 restent distincts. Ordre : À traiter (erreurs et avertissements),
-En cours, En attente, Terminés, Annulés. Une entrée appartient à un seul groupe. Une erreur prime sur
+Mes téléchargements et Recherche C411 restent distincts. Ordre (refonte du 07/11/2026, maquette
+DlOngletSuivi) : À régler (erreurs, avertissements et releases pas encore trouvées), En cours,
+Programmés, Téléchargés (imports Sonarr/Radarr des 7 derniers jours), Terminés, Annulés. Une entrée
+appartient à un seul groupe. Une erreur prime sur
 100 % ; transfert terminé ne prouve ni import Arr ni présence Plex. Aucun faux succès déduit d'un libellé.
 
-Cartes #141417, titres blancs 800 sur deux lignes, sous-textes #8b8b94, progression or, erreurs avec
-liseré rouge discret et message actionnable. Les terminés sont condensés avec fiche, autre release et
+Cartes « billet » de l'accueil depuis le 07/11/2026 : affiche inclinée qui déborde, fond teinté par
+section, titres or 800 sur deux lignes, sous-textes #a1a1aa, progression or en bas du billet, à régler
+avec liseré rose et actions visibles. Les terminés sont condensés avec fiche, autre release et
 retrait. Cibles 44 px, safe areas, focus sûr des confirmations, reduced-motion. Aucun polling ajouté.
 L'attente automatique n'est annoncée qu'avec preuve de surveillance Arr/RSS.
 
