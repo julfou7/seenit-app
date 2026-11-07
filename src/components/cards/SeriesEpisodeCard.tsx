@@ -122,7 +122,7 @@ export function SeriesEpisodeCard({ show, today: day, episode, context, detail, 
   const subtitle = presentation
     ? presentation.subtitle
     : context.kind === 'watch' && context.upToDate
-      ? reversibleComplete ? seriesCompletionLabel(show) : 'À jour'
+      ? reversibleComplete ? seriesCompletionLabel(show, today) : 'À jour'
       : episode?.name || (episode ? `Épisode ${episode.episode_number}` : 'Reprise à actualiser');
   const backdropPath = presentation?.backdropPath === undefined ? show.backdropPath : presentation.backdropPath;
   const openLabel = presentation?.ariaLabel || `Ouvrir ${show.title}, ${code}${episode?.name ? `, ${episode.name}` : ''}`;

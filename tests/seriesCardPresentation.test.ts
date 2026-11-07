@@ -64,6 +64,12 @@ test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions',
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Ended' }), 'Série terminée');
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Canceled' }), 'Série annulée');
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series' }), 'Prochain épisode bientôt');
+  // Retour terrain 07/11 (MobLand) : date connue → délai relatif, jamais « bientôt ».
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-13' } }, '2026-11-07'), 'Prochain épisode dans 6 jours');
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-08' } }, '2026-11-07'), 'Prochain épisode demain');
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-20' } }, '2026-11-07'), 'Prochain épisode dans 13 jours · 20 nov.');
+  // Date passée ou absente : pas de délai inventé.
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-01' } }, '2026-11-07'), 'Prochain épisode bientôt');
   const episode = { season_number: 5, episode_number: 4, episode_count: 8, aired_episodes_in_season: 5 };
   const show = { seenEpisodes: ['5x1', '5x2', '5x3'], seasonsCache: [], nextEpisodeToWatch: episode, nextEpisodeToAir: null, seriesEnded: true, tmdbStatus: 'Ended' };
   const progress = buildSeriesSeasonProgress(show, episode, 'watch', '2026-10-21');

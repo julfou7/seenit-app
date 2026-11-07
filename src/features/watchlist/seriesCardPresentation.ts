@@ -1,5 +1,6 @@
 import type { Show } from '../../types';
 import { isCurrentSeasonProgress } from '../shows/seasonProgressEvidence.ts';
+import { upcomingEpisodeLabel } from '../shows/detailPlanning.ts';
 
 export interface SeriesCardEpisode {
   season_number: number;
@@ -107,9 +108,15 @@ export function seriesEpisodeCode(episode: SeriesCardEpisode): string {
   return `S${String(episode.season_number).padStart(2, '0')} | E${String(episode.episode_number).padStart(2, '0')}`;
 }
 
-export function seriesCompletionLabel(show: Pick<Show, 'seriesEnded' | 'tmdbStatus'>): string {
+export function seriesCompletionLabel(show: Pick<Show, 'seriesEnded' | 'tmdbStatus' | 'nextEpisodeToAir'>, today?: string): string {
   if (show.tmdbStatus === 'Canceled') return 'Série annulée';
   if (show.seriesEnded || show.tmdbStatus === 'Ended') return 'Série terminée';
+  // Retour terrain 07/11 : quand la date du prochain épisode est connue, « Prochain épisode dans 6 jours ».
+  const airDate: unknown = show.nextEpisodeToAir?.air_date;
+  if (today && typeof airDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(airDate) && airDate >= today) {
+    const label = upcomingEpisodeLabel(airDate, today);
+    return `Prochain épisode ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
+  }
   return 'Prochain épisode bientôt';
 }
 

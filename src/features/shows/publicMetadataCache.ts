@@ -9,7 +9,11 @@ export interface PublicMetadataPolicy {
 
 import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
 
-export const PUBLIC_METADATA_CACHE_SCHEMA_VERSION = 1;
+/**
+ * Version 2 (#407) : les détails de série persistés avant ce correctif portaient des dates décalées
+ * de +1 jour selon le réseau ; ils sont ignorés et relus une fois depuis TMDB.
+ */
+export const PUBLIC_METADATA_CACHE_SCHEMA_VERSION = 2;
 export const PUBLIC_METADATA_CACHE_DB_NAME = 'seenit-public-metadata-v1';
 export const PUBLIC_METADATA_CACHE_STORE_NAME = 'entries';
 export const PUBLIC_METADATA_CACHE_PERSISTENT_MAX_ENTRIES = 320;
