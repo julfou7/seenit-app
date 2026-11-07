@@ -166,3 +166,14 @@ test('SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre com
   assert.match(view, /const pickSegment = \(episode: number\) => \{ if \(selectableEpisodes\.includes\(episode\)\) togglePickedEpisode\(episode\); requestEpisodeScroll\(episode\); \};/);
   assert.match(rows, /data-episode-row=\{episode\.episode_number\}/);
 });
+
+test('SEENIT-DOWNLOAD-014 #879 les pastilles de saison montrent la part vue et un téléchargement actif', () => {
+  const pills = rows.slice(rows.indexOf('export function SeasonPills'), rows.indexOf('/**', rows.indexOf('export function SeasonPills')));
+  assert.match(pills, /downloading\?: \(season: number\) => boolean/);
+  assert.match(pills, /const seenPct = count > 0 \? Math\.min\(100, Math\.round\(\(seen \/ count\) \* 100\)\) : 0;/);
+  assert.match(pills, /data-season-bar/);
+  assert.match(pills, /\{active && <i aria-hidden="true" data-season-downloading/);
+  assert.match(pills, /aria-label=\{`Saison \$\{season\.season_number\}, \$\{state\}\$\{active \? ', téléchargement en cours' : ''\}`\}/);
+  // Le point n'apparaît que sous le gate téléchargement, avec la même garde que le mode.
+  assert.match(view, /downloading=\{canUseDownloadMode \? season => Boolean\(model\.hasActiveDownloadInScope\?\.\(\{ mediaType: 'tv', tmdbId: Number\(effectiveTmdbId\), seasonNumber: season \}\)\) : undefined\}/);
+});

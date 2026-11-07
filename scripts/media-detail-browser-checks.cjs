@@ -69,6 +69,7 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.body.innerText.includes("Moyenne par saison") && document.querySelectorAll("[role=group][aria-label=Saisons] button").length===5', 'courbe des saisons et pastilles');
     await click(client, byLabel('Saison 1, ✓ vue'));
     await check(client, '' + byLabel('Saison 1, ✓ vue') + '?.getAttribute("aria-pressed")==="true" && document.body.innerText.includes("Saison 1 · 13/13")', 'une pastille sélectionne sa saison');
+    await check(client, '(()=>{const pills=[...document.querySelectorAll("[aria-label^=\\"Saison \\"][aria-pressed]")];const full=' + byLabel('Saison 1, ✓ vue') + '?.querySelector("[data-season-bar] i");return pills.length>1&&pills.every(p=>p.querySelector("[data-season-bar]")&&p.getBoundingClientRect().height>=44)&&full?.style.width==="100%"})()', 'pastilles de saison avec mini-barre « vu » (#879)');
     await click(client, byText('button', 'Tout marquer non vu'));
     await check(client, 'document.body.innerText.includes("Saison 1 · 0/13") && ' + byText('button', 'Tout marquer vu'), 'tout marquer non vu puis vu depuis la carte saison');
     await click(client, byLabel('Marquer l’épisode 1 vu'));
