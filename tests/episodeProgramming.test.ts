@@ -98,6 +98,10 @@ test('SEENIT-DOWNLOAD-014 #879 programmation : portée relue avant l’ajout de 
   // Sélection mixte : la programmation est attendue avant le lot immédiat (pas d'ajout concurrent de la série).
   const launch = view.slice(view.indexOf('const launchPickedEpisodes'), view.indexOf('const programPickedEpisodes'));
   assert.ok(launch.indexOf('await programPickedEpisodes(') > 0 && launch.indexOf('await programPickedEpisodes(') < launch.indexOf('await launchArrEpisodeBatch('));
+  // Une programmation interrompue arrête toute la sélection ; la portée est relue avant chaque saison.
+  assert.match(launch, /for \(const \[season, episodes\] of toProgram\) \{ if \(!sameScope\(\) \|\| await programPickedEpisodes\(season, episodes, quality, nowCount\)\) return; \}/);
+  assert.match(launch, /for \(const \[season, episodes\] of toDownload\) \{\n\s+if \(!sameScope\(\)\) return;/);
+  assert.match(view, /if \(outcome\.interrupted\) return true;/);
 });
 
 test('SEENIT-DOWNLOAD-014 #879 un épisode à venir surveillé est « programmé », les autres restent programmables', () => {
@@ -119,7 +123,7 @@ test('SEENIT-DOWNLOAD-014 #879 en mode, les épisodes à venir se cochent en ble
   assert.match(view, /const selectableEpisodes = modeStates\.filter\(entry => isEpisodePickable\(entry\.state\)\)/);
   const launch = view.slice(view.indexOf('const launchPickedEpisodes'), view.indexOf('const programPickedEpisodes'));
   assert.match(launch, /const toDownload = bySeason\(pickedNow\);/, 'seuls les épisodes sortis sont téléchargés maintenant');
-  assert.match(launch, /for \(const \[season, episodes\] of toProgram\) await programPickedEpisodes\(/);
+  assert.match(launch, /for \(const \[season, episodes\] of toProgram\) \{ if \(!sameScope\(\) \|\| await programPickedEpisodes\(/);
   assert.match(view, /episodes, qualityPreference: quality, readConfig: \(\) => useDownloadConfigStore\.getState\(\)/);
   // « Version précise » ne concerne qu'un épisode sorti.
   assert.match(view, /onPrecise=\{pickedNow\.length === 1 && !pickedFuture\.length \? openPreciseVersion : undefined\}/);

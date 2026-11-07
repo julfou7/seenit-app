@@ -37,7 +37,9 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
   const tasks: Promise<void>[] = [];
   if (config.sonarrUrl && config.sonarrApiKey) {
     tasks.push(io.get(`${cleanUrl(config.sonarrUrl)}/api/v3/calendar?${range}&includeSeries=true`, headersFor(config.sonarrApiKey)).then(list => {
-      for (const entry of (Array.isArray(list) ? list : []) as CalendarEpisode[]) {
+      // Une page de connexion HTML ou toute réponse non tableau est une panne, pas un calendrier vide.
+      if (!Array.isArray(list)) { result.failures.push('Sonarr'); return; }
+      for (const entry of list as CalendarEpisode[]) {
         if (!entry.id || entry.monitored !== true || entry.hasFile === true || entry.series?.monitored === false) continue;
         result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date: entry.airDateUtc || entry.airDate, posterUrl: poster(entry.series?.images) });
       }
@@ -45,7 +47,8 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
   }
   if (config.radarrUrl && config.radarrApiKey) {
     tasks.push(io.get(`${cleanUrl(config.radarrUrl)}/api/v3/calendar?${range}`, headersFor(config.radarrApiKey)).then(list => {
-      for (const movie of (Array.isArray(list) ? list : []) as CalendarMovie[]) {
+      if (!Array.isArray(list)) { result.failures.push('Radarr'); return; }
+      for (const movie of list as CalendarMovie[]) {
         if (!movie.id || movie.monitored !== true || movie.hasFile === true) continue;
         const date = [movie.digitalRelease, movie.physicalRelease, movie.inCinemas].filter((value): value is string => Boolean(value) && Date.parse(value!) >= now).sort()[0];
         result.items.push({ kind: 'movie', id: movie.id, tmdbId: movie.tmdbId || undefined, title: movie.title || 'Film', date, posterUrl: poster(movie.images) });
@@ -56,6 +59,9 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
   result.items.sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity));
   return result;
 }
+
+/** Portée serveur d'une liste « Programmés » : les identifiants Sonarr/Radarr n'ont de sens que sur ce serveur. */
+export const programmedScope = (config: DownloadConfig) => [isDownloadFeatureEnabled(config), cleanUrl(config.sonarrUrl || ''), config.sonarrApiKey || '', cleanUrl(config.radarrUrl || ''), config.radarrApiKey || ''].join('\n');
 
 /** Déprogrammer : l'épisode (ou le film) n'est plus surveillé ; rien n'est supprimé. */
 export async function unprogramItem(config: DownloadConfig, item: ProgrammedItem, io: CalendarIo = defaultIo): Promise<void> {

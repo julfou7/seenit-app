@@ -49,7 +49,7 @@ test('SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la sélection tr
   assert.doesNotMatch(view, /\}, \[modeSeason\]\);/, 'plus aucun effacement au changement de saison');
   assert.match(view, /const key = episodePresenceKey\(season, episode\); if \(next\.has\(key\)\) next\.delete\(key\); else next\.set\(key, \{ season, episode, future \}\);/);
   // Lancement saison par saison, dans l'ordre, arrêté si un lot est interrompu.
-  assert.match(view, /for \(const \[season, episodes\] of toDownload\) \{\n\s+const \{ interrupted \} = await launchArrEpisodeBatch\(\{/);
+  assert.match(view, /for \(const \[season, episodes\] of toDownload\) \{\n\s+if \(!sameScope\(\)\) return;\n\s+const \{ interrupted \} = await launchArrEpisodeBatch\(\{/);
   assert.match(view, /if \(interrupted\) return;/);
   assert.match(view, /window\.addEventListener\('app-close-modals', close\);/);
   assert.match(view, /\{downloadMode && canUseDownloadMode && <DownloadModeBar /);

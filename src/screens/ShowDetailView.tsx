@@ -3,6 +3,7 @@ import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Heart, MoreVertical, Play, RefreshCw, RotateCcw, Ban, Trash2, Download, Share2 } from 'lucide-react';
 import { cn, getTodayStr, openExternalUrl } from '../lib/utils';
+import { auth } from '../lib/firebase';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonProfile as PersonDetailModal } from '../components/PersonProfile';
 import { TrailerModal } from '../components/TrailerModal';
@@ -201,11 +202,15 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
     const single = nowCount === 1 && !pickedFuture.length;
     // Programmation d'abord, attendue : la série n'est jamais ajoutée deux fois en parallèle par le lot immédiat.
-    for (const [season, episodes] of toProgram) await programPickedEpisodes(season, episodes, quality, nowCount);
+    // Portée commune aux deux phases : compte et serveur Sonarr du lancement, relus avant chaque saison.
+    const scope = `${auth.currentUser?.uid || ''}\n${config.sonarrUrl}\n${config.sonarrApiKey}`;
+    const sameScope = () => { const current = useDownloadConfigStore.getState(); return isDownloadFeatureEnabled(current) && `${auth.currentUser?.uid || ''}\n${current.sonarrUrl}\n${current.sonarrApiKey}` === scope; };
+    for (const [season, episodes] of toProgram) { if (!sameScope() || await programPickedEpisodes(season, episodes, quality, nowCount)) return; }
     if (!nowCount) return;
     if (!single) useToastStore.getState().showToast({ title, action: `${nowCount} épisode${nowCount > 1 ? 's' : ''} · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
     // Une saison après l'autre, dans l'ordre ; chaque lot relit compte, gate et serveur avant chaque épisode.
     for (const [season, episodes] of toDownload) {
+      if (!sameScope()) return;
       const { interrupted } = await launchArrEpisodeBatch({
       title, year, tmdbId: effectiveTmdbId,
       tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId,
@@ -220,21 +225,23 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     }
   };
   /** #879 — Les épisodes à venir cochés en bleu sont surveillés par Sonarr, qui les télécharge à leur sortie. */
-  const programPickedEpisodes = async (season: number, episodes: number[], quality: DownloadQualityChoice, launchedNow: number) => {
+  /** Renvoie vrai si la programmation a été interrompue (compte, gate ou serveur changé). */
+  const programPickedEpisodes = async (season: number, episodes: number[], quality: DownloadQualityChoice, launchedNow: number): Promise<boolean> => {
     const { programArrEpisodes, programmingSummary } = await import('../features/downloads/episodeProgramming');
     const outcome = await programArrEpisodes({
       title, tmdbId: effectiveTmdbId!, tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId,
       season, episodes, qualityPreference: quality, readConfig: () => useDownloadConfigStore.getState()
     });
-    if (outcome.interrupted) return;
+    if (outcome.interrupted) return true;
     const toast = useToastStore.getState().showToast;
-    if (outcome.failure && !outcome.programmed.length) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return; }
+    if (outcome.failure && !outcome.programmed.length) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return false; }
     const single = episodes.length === 1 && !launchedNow;
     if (outcome.programmed.length) toast({ title, subtitle: single ? `S${season} | E${episodes[0]}` : undefined, action: single ? `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` : programmingSummary(launchedNow, outcome.programmed.length, quality), posterPath: show?.posterPath }, 'success');
     if (outcome.failure && outcome.programmed.length) toast({ title, action: `${outcome.failed.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.failed.join(', ')} non programmé${outcome.failed.length > 1 ? 's' : ''} : ${outcome.failure}`, posterPath: show?.posterPath }, 'error');
     if (outcome.unannounced.length) toast({ title, action: `${outcome.unannounced.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.unannounced.join(', ')} pas encore annoncé${outcome.unannounced.length > 1 ? 's' : ''} dans Sonarr : réessaie plus tard.`, posterPath: show?.posterPath }, 'info');
     // Relit la présence : les épisodes programmés passent en « Programmé ».
     if (outcome.programmed.length) void refreshPlexAvailability();
+    return false;
   };
   const openPreciseVersion = () => {
     if (pickedNow.length !== 1 || !effectiveTmdbId) return;

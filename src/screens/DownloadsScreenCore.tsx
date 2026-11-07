@@ -360,7 +360,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const renderSection = (
     title: string,
     items: LiveDownloadItem[],
-    clearSection?: 'completed' | 'cancelled' | 'error'
+    clearSection?: 'completed' | 'cancelled' | 'error',
+    groupSeasons = false
   ) => (
     <section className={`downloads-section${title === 'À traiter' ? ' downloads-section--attention' : ''}`}>
       <div className="flex items-center justify-between px-0.5">
@@ -378,7 +379,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
           </button>
         )}
       </div>
-      {groupSeasonDownloads(items).map(entry => {
+      {(groupSeasons ? groupSeasonDownloads(items) : items.map(item => ({ kind: 'single' as const, item }))).map(entry => {
         // #879 — plusieurs épisodes d'une même saison : une seule carte, ✕ par épisode (pas de balayage global).
         if (entry.kind === 'season') return <SeasonDownloadCard key={entry.key} seasonNumber={entry.seasonNumber} items={entry.items} onShowClick={onShowClick} onRemove={handleRemove} />;
         const { item } = entry;
@@ -471,7 +472,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             )}
 
             {errorDownloads.length > 0 && renderSection('À traiter', errorDownloads, 'error')}
-            {activeDownloads.length > 0 && renderSection('En cours', activeDownloads)}
+            {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
             {waitingDownloads.length > 0 && renderSection('En attente de disponibilité', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
             {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} />}

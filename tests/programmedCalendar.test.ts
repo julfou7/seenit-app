@@ -15,6 +15,7 @@ const bundle = await build({ entryPoints: ['src/features/downloads/programmedCal
 type Item = { kind: string; id: number; seriesId?: number; date?: string; title?: string };
 const calendar = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`) as {
   fetchProgrammedCalendar: (config: Record<string, unknown>, options: Record<string, unknown>) => Promise<{ items: Item[]; failures: string[] }>;
+  programmedScope: (config: Record<string, unknown>) => string;
   unprogramItem: (config: Record<string, unknown>, item: Item, io: Record<string, unknown>) => Promise<void>;
   programmedDateLabel: (date: string | undefined, now: number) => string;
 };
@@ -50,6 +51,9 @@ test('SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sa
   // Panne d'une source : signalée, jamais confondue avec « rien de programmé ».
   const down = await calendar.fetchProgrammedCalendar(config, { now, io: { ...io, get: async (url: string) => { if (url.startsWith('http://sonarr')) throw new Error('503'); return io.get(url); } } });
   assert.deepEqual([down.failures, down.items.map(item => item.id)], [['Sonarr'], [9]]);
+  // Page de connexion HTML d'un proxy (HTTP 200) : panne, pas calendrier vide.
+  const html = await calendar.fetchProgrammedCalendar(config, { now, io: { ...io, get: async () => '<html>login</html>' } });
+  assert.deepEqual([...html.failures].sort(), ['Radarr', 'Sonarr']);
   // Téléchargements désactivés : aucun appel.
   urls.length = 0;
   assert.deepEqual((await calendar.fetchProgrammedCalendar({ ...config, downloadsEnabled: false }, { now, io })).items, []);
@@ -65,6 +69,12 @@ test('SEENIT-DOWNLOAD-013 #879 Annuler une programmation retire seulement la sur
   await assert.rejects(calendar.unprogramItem({ ...config, downloadsEnabled: false }, { kind: 'movie', id: 9 }, io));
   assert.equal(calendar.programmedDateLabel(undefined, now), 'Date à venir');
   assert.equal(calendar.programmedDateLabel('2026-11-08T12:00:00Z', now), 'Demain');
+  // La liste est liée au serveur qui l'a fournie : une autre URL ou clé change la portée.
+  assert.notEqual(calendar.programmedScope(config), calendar.programmedScope({ ...config, sonarrUrl: 'http://autre' }));
+  assert.equal(calendar.programmedScope(config), calendar.programmedScope({ ...config, sonarrUrl: 'http://sonarr' }));
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
+  assert.match(section, /if \(programmedScope\(config\) !== loadedScope\.current\) \{/, 'Annuler refuse une portée changée');
+  assert.match(section, /useEffect\(\(\) => \{ void load\(\); \}, \[load, refreshKey, scope\]\);/, 'rechargée quand la portée change');
+  assert.match(section, /if \(id !== request\.current \|\| programmedScope\(useDownloadConfigStore\.getState\(\)\) !== at\) return;/, 'réponse d’une ancienne portée ignorée');
   assert.match(section, /else series\.set\(item\.seriesId, /, 'groupé par identifiant Sonarr exact, jamais par titre');
 });

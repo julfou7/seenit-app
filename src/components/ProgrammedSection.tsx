@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Clock3, Film, Tv } from 'lucide-react';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
-import { fetchProgrammedCalendar, programmedDateLabel, unprogramItem, type ProgrammedItem } from '../features/downloads/programmedCalendar';
+import { fetchProgrammedCalendar, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem } from '../features/downloads/programmedCalendar';
 
 type EpisodeItem = Extract<ProgrammedItem, { kind: 'episode' }>;
 const movieRelease = (date?: string) => {
@@ -21,20 +21,40 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick }: { refreshKey?
   const [items, setItems] = useState<ProgrammedItem[]>([]);
   const [failures, setFailures] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  // Les identifiants viennent d'un serveur précis : la liste est liée à sa portée et rechargée quand elle change.
+  const scope = programmedScope(useDownloadConfigStore());
+  const loadedScope = useRef<string | null>(null);
+  const request = useRef(0);
   const load = useCallback(async () => {
-    const calendar = await fetchProgrammedCalendar(useDownloadConfigStore.getState());
+    const id = ++request.current;
+    const config = useDownloadConfigStore.getState();
+    const at = programmedScope(config);
+    loadedScope.current = null;
+    setItems([]);
+    setFailures([]);
+    const calendar = await fetchProgrammedCalendar(config);
+    // Une réponse d'une ancienne portée (ou d'un ancien chargement) est ignorée.
+    if (id !== request.current || programmedScope(useDownloadConfigStore.getState()) !== at) return;
+    loadedScope.current = at;
     setItems(calendar.items);
     setFailures(calendar.failures);
   }, []);
-  useEffect(() => { void load(); }, [load, refreshKey]);
+  useEffect(() => { void load(); }, [load, refreshKey, scope]);
 
   const cancel = async (item: ProgrammedItem) => {
     const key = `${item.kind}:${item.id}`;
     if (busy) return;
-    setBusy(key);
     const label = item.kind === 'episode' ? `${item.seriesTitle} · ${code(item)}` : item.title;
+    const config = useDownloadConfigStore.getState();
+    // Jamais un ancien identifiant envoyé à un autre serveur : la liste est rechargée à la place.
+    if (programmedScope(config) !== loadedScope.current) {
+      useToastStore.getState().showToast({ title: label, action: 'La configuration a changé : liste rechargée, rien n’a été modifié.' }, 'info');
+      void load();
+      return;
+    }
+    setBusy(key);
     try {
-      await unprogramItem(useDownloadConfigStore.getState(), item);
+      await unprogramItem(config, item);
       setItems(previous => previous.filter(entry => !(entry.kind === item.kind && entry.id === item.id)));
       useToastStore.getState().showToast({ title: item.kind === 'episode' ? item.seriesTitle : item.title, subtitle: item.kind === 'episode' ? `S${item.season} | E${item.episode}` : undefined, action: 'N’est plus programmé.' }, 'info');
     } catch (error: unknown) {
