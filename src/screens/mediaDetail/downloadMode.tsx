@@ -54,13 +54,15 @@ export function DownloadModeBanner({ season, states, progress, picked, allPicked
   return <section aria-label="Mode téléchargement" className="rounded-[18px] bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)] px-3.5 pt-3 pb-2 flex flex-col animate-in fade-in slide-in-from-top-1 duration-150 motion-reduce:animate-none">
     <strong className="text-[15px] font-extrabold text-[#F2C36B]">Mode téléchargement · saison {season}</strong>
     <span className="text-[12.5px] text-zinc-300">Touche une barre ou un épisode pour le cocher.</span>
-    {/* Segments de 44 px de haut : chaque épisode de la saison se touche directement. */}
-    <div className="flex gap-[3px] mt-1" role="group" aria-label={`Saison ${season} : ${legend.map(entry => entry.label).join(', ') || 'rien de téléchargé'}`}>
+    {/* Segments de 44 × 44 px au minimum : chaque épisode se touche directement ; une longue saison défile
+        horizontalement au lieu de réduire les cibles à quelques pixels. Le numéro situe l'épisode. */}
+    <div className="flex gap-[3px] mt-1 overflow-x-auto hide-scrollbar snap-x" role="group" aria-label={`Saison ${season} : ${legend.map(entry => entry.label).join(', ') || 'rien de téléchargé'}`}>
       {states.map(entry => {
         const selectable = isEpisodeSelectable(entry.state);
         const isPicked = picked.has(entry.episode);
         return <button key={entry.episode} type="button" data-mode-segment={entry.episode} onClick={() => onSegment(entry.episode)} aria-pressed={selectable ? isPicked : undefined}
-          aria-label={`Épisode ${entry.episode} : ${isPicked ? 'coché' : STATE_LABEL[entry.state]}`} className="flex-1 min-w-0 h-11 flex items-center active:scale-y-125 transition-transform">
+          aria-label={`Épisode ${entry.episode} : ${isPicked ? 'coché' : STATE_LABEL[entry.state]}`} className="flex-1 min-w-11 h-11 shrink-0 snap-start flex flex-col justify-center gap-1 active:scale-95 transition-transform">
+          <span aria-hidden="true" className={cn('text-[10.5px] font-extrabold leading-none text-center', isPicked ? 'text-[#F2C36B]' : 'text-zinc-500')}>{entry.episode}</span>
           <span className="block w-full h-[9px] rounded-[3px]" style={segmentStyle(entry.state, isPicked, progress(entry.episode))} />
         </button>;
       })}

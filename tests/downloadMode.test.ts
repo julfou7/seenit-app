@@ -140,6 +140,7 @@ const findNodes = (node: unknown, match: (node: Node) => boolean, out: Node[] = 
 
 test('SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre compacte se quitte et le mode amène l’épisode en cours', async () => {
   const { DownloadModeBanner, DownloadModeBar } = await loadMode();
+  const mode = readFileSync('src/screens/mediaDetail/downloadMode.tsx', 'utf8');
   const touched: number[] = [];
   const banner = DownloadModeBanner({ season: 1, states: [{ episode: 1, state: 'seen' }, { episode: 2, state: 'available' }, { episode: 3, state: 'present' }], progress: () => undefined,
     picked: new Set([2]), allPicked: true, canPick: true, onToggleAll: () => {}, onSegment: (episode: number) => touched.push(episode) });
@@ -148,7 +149,8 @@ test('SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre com
   segments.forEach(segment => (segment.props!.onClick as () => void)());
   assert.deepEqual(touched, [1, 2, 3], 'tout segment se touche (la fiche décide de cocher et fait défiler)');
   assert.deepEqual(segments.map(segment => segment.props!['aria-pressed']), [undefined, true, undefined], 'seul un épisode cochable expose son état coché');
-  assert.match(String(segments[0].props!.className), /h-11/, 'cible de 44 px');
+  assert.match(String(segments[0].props!.className), /min-w-11 h-11 shrink-0/, 'cible de 44 × 44 px, jamais écrasée');
+  assert.match(mode, /flex gap-\[3px\] mt-1 overflow-x-auto hide-scrollbar snap-x/, 'une longue saison défile au lieu de rétrécir les cibles');
   let exited = 0;
   const bar = DownloadModeBar({ title: '1 épisode', detail: '', enabled: true, onLaunch: () => {}, onPrecise: () => {}, onExit: () => { exited += 1; } }) as Node;
   (findNodes(bar, node => node.props?.['aria-label'] === 'Quitter le mode téléchargement')[0].props!.onClick as () => void)();

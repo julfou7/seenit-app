@@ -56,12 +56,15 @@ async function testDownloadsHarness(client, root) {
     await check(client, '(()=>{const b=document.querySelector(\'[aria-label="Télécharger l’épisode 1"]\').getBoundingClientRect();return b.width>=44&&b.height>=44})()', 'contrôle de 44 px');
     await check(client, 'document.documentElement.scrollWidth<=innerWidth&&!document.querySelector(\'[aria-label="Télécharger la saison 2"]\')', 'titres sans débordement, plus de bouton de saison');
     // Retour terrain du 07/11 : chaque segment du bandeau se touche (44 px) et la barre d'action tient sur une ligne.
-    await check(client, '[...document.querySelectorAll("[data-mode-segment]")].every(b=>b.getBoundingClientRect().height>=44)&&document.querySelector(\'[data-mode-segment="1"]\').getAttribute("aria-pressed")==="true"', 'segments touchables de 44 px, état coché exposé');
+    await check(client, '[...document.querySelectorAll("[data-mode-segment]")].every(b=>{const r=b.getBoundingClientRect();return r.height>=44&&r.width>=44})&&document.querySelector(\'[data-mode-segment="1"]\').getAttribute("aria-pressed")==="true"', 'segments touchables de 44 × 44 px, état coché exposé');
     await evaluate(client, 'document.querySelector(\'[data-mode-segment="4"]\').click()');
     await check(client, 'document.querySelector(\'[aria-label="Télécharger l’épisode 4"]\').getAttribute("aria-checked")==="false"&&document.querySelector(\'[data-mode-segment="4"]\').getAttribute("aria-pressed")==="false"', 'toucher un segment décoche son épisode, ligne et bandeau synchrones');
     await evaluate(client, 'document.querySelector(\'[data-mode-segment="3"]\').click()');
     await check(client, '!document.querySelector(\'[data-mode-segment="3"]\').hasAttribute("aria-pressed")&&document.querySelector(\'[aria-label="Épisode 3 téléchargé"]\')', 'un segment téléchargé ne se coche pas');
     await check(client, '(()=>{const bar=document.querySelector("[data-mode-bar]").getBoundingClientRect();return bar.height<=64&&bar.bottom<=innerHeight&&document.querySelector(\'[aria-label="Quitter le mode téléchargement"]\')&&[...document.querySelectorAll("[data-mode-bar] button")].filter(b=>/^(1080p|4K)$/.test(b.textContent.trim())).length===2})()', 'barre d’action compacte sur une ligne (≤ 64 px) avec ✕, 1080p et 4K');
+    // Une saison de 24 épisodes garde des cibles de 44 × 44 px : la rangée défile, la page ne déborde pas.
+    await evaluate(client, 'window.__downloads.mount("banner-long")');
+    await check(client, '(()=>{const segments=[...document.querySelectorAll("[data-mode-segment]")];const row=segments[0]?.parentElement;return segments.length===24&&segments.every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44})&&row.scrollWidth>row.clientWidth&&document.documentElement.scrollWidth<=innerWidth})()', 'saison longue : 24 segments de 44 × 44 px, défilement horizontal sans débordement');
     // Hors mode : aucune commande de téléchargement, seulement des pastilles passives.
     await evaluate(client, 'window.__downloads.mount("episodes-normal")');
     await check(client, '!document.querySelector("[role=checkbox]")&&!document.querySelector(\'[aria-label^="Télécharger l’épisode"]\')&&document.body.innerText.includes("✓ Prêt")&&document.body.innerText.includes("30 %")', 'fiche propre hors mode, pastilles passives');
