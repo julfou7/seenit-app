@@ -133,17 +133,21 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const selectableEpisodes = modeStates.filter(entry => isEpisodeSelectable(entry.state)).map(entry => entry.episode);
   const activeDownloads = modeStates.filter(entry => entry.state === 'active').length;
   // Retour terrain du 07/11 : entrer dans le mode amène l'épisode où on en est au centre de l'écran, et
-  // toucher un segment du bandeau amène sa ligne. Le défilement attend le rendu de la liste.
+  // toucher un segment du bandeau amène sa ligne. La demande reste en attente tant que la ligne n'est pas
+  // rendue (saison encore en chargement) et se rejoue à l'arrivée des épisodes ; quitter le mode l'annule.
   const [episodeScroll, setEpisodeScroll] = useState<{ episode: number; id: number } | null>(null);
   const requestEpisodeScroll = (episode: number) => setEpisodeScroll(previous => ({ episode, id: (previous?.id || 0) + 1 }));
   useEffect(() => {
     if (!episodeScroll) return;
     const frame = requestAnimationFrame(() => {
+      const row = mainScrollRef.current?.querySelector<HTMLElement>(`[data-episode-row="${episodeScroll.episode}"]`);
+      if (!row) return;
       const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      mainScrollRef.current?.querySelector<HTMLElement>(`[data-episode-row="${episodeScroll.episode}"]`)?.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+      row.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+      setEpisodeScroll(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [episodeScroll, mainScrollRef]);
+  }, [episodeScroll, mainScrollRef, selectedEpisodes]);
   const enterDownloadMode = () => {
     if (!canUseDownloadMode) return;
     const nextInSeason = nextEp && nextEp.season_number === modeSeason ? nextEp.episode_number : null;
@@ -153,7 +157,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     const target = nextInSeason ?? selectableEpisodes[0] ?? modeStates.find(entry => entry.state !== 'seen')?.episode;
     if (target !== undefined) requestEpisodeScroll(target);
   };
-  const exitDownloadMode = () => { setDownloadMode(false); setPickedEpisodes(new Set()); };
+  const exitDownloadMode = () => { setDownloadMode(false); setPickedEpisodes(new Set()); setEpisodeScroll(null); };
   const toggleDownloadMode = () => (downloadMode ? exitDownloadMode() : enterDownloadMode());
   const togglePickedEpisode = (episode: number) => setPickedEpisodes(previous => { const next = new Set(previous); if (next.has(episode)) next.delete(episode); else next.add(episode); return next; });
   const allPicked = selectableEpisodes.length > 0 && selectableEpisodes.every(episode => pickedEpisodes.has(episode));

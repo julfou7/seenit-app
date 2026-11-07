@@ -159,7 +159,10 @@ test('SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre com
   assert.equal(findNodes(bar, node => node.props?.['aria-label'] === 'Quitter le mode téléchargement').length, 1);
   // La fiche : entrer dans le mode défile jusqu'à l'épisode où on en est ; un segment défile jusqu'à sa ligne.
   assert.match(view, /const target = nextInSeason \?\? selectableEpisodes\[0\] \?\? modeStates\.find\(entry => entry\.state !== 'seen'\)\?\.episode;\n\s+if \(target !== undefined\) requestEpisodeScroll\(target\);/);
-  assert.match(view, /querySelector<HTMLElement>\(`\[data-episode-row="\$\{episodeScroll\.episode\}"\]`\)\?\.scrollIntoView\(\{ block: 'center'/);
+  assert.match(view, /const row = mainScrollRef\.current\?\.querySelector<HTMLElement>\(`\[data-episode-row="\$\{episodeScroll\.episode\}"\]`\);\n\s+if \(!row\) return;/, 'ligne absente (saison en chargement) : la demande reste en attente');
+  assert.match(view, /row\.scrollIntoView\(\{ block: 'center', behavior: reduce \? 'auto' : 'smooth' \}\);\n\s+setEpisodeScroll\(null\);/, 'consommée seulement une fois la ligne atteinte');
+  assert.match(view, /\}, \[episodeScroll, mainScrollRef, selectedEpisodes\]\);/, 'rejouée à l’arrivée des épisodes de la saison');
+  assert.match(view, /const exitDownloadMode = \(\) => \{ setDownloadMode\(false\); setPickedEpisodes\(new Set\(\)\); setEpisodeScroll\(null\); \};/, 'quitter le mode annule un défilement en attente');
   assert.match(view, /const pickSegment = \(episode: number\) => \{ if \(selectableEpisodes\.includes\(episode\)\) togglePickedEpisode\(episode\); requestEpisodeScroll\(episode\); \};/);
   assert.match(rows, /data-episode-row=\{episode\.episode_number\}/);
 });
