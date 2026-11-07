@@ -95,6 +95,7 @@ async function testMediaDetailHarness(client) {
     await check(client, byText('button', 'Better Call Saul') + ' && document.body.innerText.includes("Dans le même univers")', 'univers TVDB en lignes');
     await click(client, byLabel('Actions de la fiche'));
     await check(client, ['Partager la fiche', 'Synchroniser la série', 'Téléchargement', 'Abandonner la série', 'Supprimer la série'].map(label => byText('[role=dialog] button', label)).join(' && '), 'menu ⋮ : toutes les actions existantes');
+    await check(client, '(()=>{const menu=document.querySelector("[data-anchored-menu]"),button=' + byLabel('Actions de la fiche') + ';if(!menu||!button)return false;const m=menu.getBoundingClientRect(),b=button.getBoundingClientRect();return menu.getAttribute("role")==="menu"&&m.top>=b.bottom-1&&m.top<=b.bottom+24&&Math.abs(m.right-b.right)<=12&&m.bottom<innerHeight-40&&m.width<=300})()', 'menu ⋮ ancré sous son bouton, plus de feuille du bas (#879)');
     await evaluate(client, 'document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
     const seriesGeometry = await evaluate(client, geometry);
     if (seriesGeometry.overflow) throw new Error(`SEENIT-UX-019 série ${width}px déborde ${JSON.stringify(seriesGeometry)}`);

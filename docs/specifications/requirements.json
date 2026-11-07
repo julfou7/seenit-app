@@ -224,6 +224,10 @@
           "contains": "SEENIT-UX-019 #871 la saga v2 numérote l’ordre TMDB, situe le film affiché et pose le tampon VU"
         },
         {
+          "file": "tests/detailMenu.test.ts",
+          "contains": "SEENIT-UX-019 #879 le menu ⋮ des fiches est ancré sous son bouton, sans feuille du bas"
+        },
+        {
           "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 #857 un épisode à venir dit quand il sort, en relatif et daté au-delà d’une semaine"
         },

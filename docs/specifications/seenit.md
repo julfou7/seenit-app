@@ -687,6 +687,9 @@ n'est rouverte que par une nouvelle décision produit explicite.
     s'atténue pas pendant l'attente, et dessine l'anneau puis la coche par des calques animés en
     transform/opacity (compositeur), sans saccade quand la fiche se re-rend. L'Accueil garde son
     animation actuelle.
+  - le menu ⋮ d'une fiche est un menu ancré sous son bouton, aligné sur le bord de la fiche (#879) : plus de
+    feuille qui monte du bas ; toucher à côté le ferme. Téléchargement y indique le mode et les
+    téléchargements en cours, et les actions de cycle de vie sont séparées en bas ;
   - une fiche média garde la barre de navigation quel que soit son point d'entrée (#870). Le dock de
     recherche d'Explorer ne remplace la barre que tant qu'aucune fiche n'est ouverte par-dessus : une fiche
     ouverte depuis les résultats de recherche affiche la barre, qui disparaît de nouveau au retour à la
