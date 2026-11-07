@@ -222,7 +222,7 @@ test('la carte 8f reste partagée par les adapters de production et leurs action
   assert.match(card, /series-8f__unknown-tail/);
   assert.match(card, /Nombre d'épisodes encore inconnu/);
   const history = readFileSync(new URL('../src/components/HistoryFeed.tsx', import.meta.url), 'utf8');
-  assert.match(history, /label: 'Marquer non vu', onSelect: \(\) => setUnseenModalItem\(target\)/);
+  assert.match(history, /onUnseen: \(\) => onUnseen\(item\)/);
   assert.match(history, /onOpen=\{handleRowClick\}/);
   const expanded = readFileSync(new URL('../src/screens/watchListPresentation.tsx', import.meta.url), 'utf8');
   assert.match(expanded, /<ContinueWatchingCard show=\{show\} layout="list"/);

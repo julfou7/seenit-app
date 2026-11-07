@@ -43,3 +43,5 @@
 @media(prefers-reduced-motion:reduce) { .history-entry--today .seenit-check { animation:none; } }
 
 .history-entry__group.series-ribbon { top:auto; bottom:0; left:0; width:100%; height:17px; border-radius:0; font-size:9px; padding:2px 3px; transform:none; background:var(--badge-bg); }
+/* #9 Historique : la ligne qui porte le menu ancré reste visible, encadrée d'or. */
+.history-entry--menu { position:relative; z-index:121; box-shadow:inset 0 0 0 1.5px rgba(229,169,61,.6); }

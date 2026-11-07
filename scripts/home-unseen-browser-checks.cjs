@@ -16,10 +16,9 @@ async function testHomeUnseenHarness(root,client){
  await evaluate(client,'document.querySelector("#home-tab-history").click()');
  await wait(client,'Boolean([...document.querySelectorAll("[data-history-row]")].find(e=>e.textContent.includes("A Knight")))','épisode réel dans historique');
  await evaluate(client,'window.__historyUnseen.control.holdDetails=true;window.__historyUnseen.control.detailCalls=0;[...document.querySelectorAll("[data-history-row]")].find(e=>e.textContent.includes("A Knight")).querySelector(".history-entry__action-column button").click()');
- await wait(client,'Boolean([...document.querySelectorAll("[role=dialog] button")].find(e=>e.textContent==="Marquer non vu"))','menu historique');
- await evaluate(client,'[...document.querySelectorAll("[role=dialog] button")].find(e=>e.textContent==="Marquer non vu").click()');
- await wait(client,'Boolean(document.querySelector("[role=alertdialog]"))','confirmation non vu');
- await evaluate(client,'[...document.querySelectorAll("[role=alertdialog] button")].find(e=>e.textContent==="Oui, marquer non vu").click()');
+ await wait(client,'Boolean([...document.querySelectorAll("[data-history-menu] button")].find(e=>e.textContent.startsWith("Marquer non vu")))','menu historique ancré');
+ await evaluate(client,'[...document.querySelectorAll("[data-history-menu] button")].find(e=>e.textContent.startsWith("Marquer non vu")).click()');
+ assert.equal(await evaluate(client,'Boolean(document.querySelector("[role=alertdialog]"))'),false,'plus de confirmation rouge');
  await wait(client,'window.__homeAVoir.snapshot().find(s=>s.id==="series-0").seenEpisodes.length===0','non vu enregistré même si TMDB ne répond jamais');
  assert.equal(await evaluate(client,'window.__historyUnseen.control.detailCalls'),0,'La suppression ne demande pas TMDB');
  assert.deepEqual(await evaluate(client,'(()=>{const ep=window.__homeAVoir.snapshot().find(s=>s.id==="series-0").nextEpisodeToWatch;return[ep.episode_number,ep.episode_count]})()'),[1,6],'La reprise exacte conserve le total connu');
@@ -47,10 +46,8 @@ async function testHomeUnseenHarness(root,client){
  await evaluate(client,'window.__homeAVoir.clear();window.__historyUnseen.setup();document.querySelector("#home-tab-history").click()');
  await wait(client,'Boolean([...document.querySelectorAll("[data-history-row]")].find(e=>e.textContent.includes("A Knight")))','retour épisode pour échec écriture');
  await evaluate(client,'[...document.querySelectorAll("[data-history-row]")].find(e=>e.textContent.includes("A Knight")).querySelector(".history-entry__action-column button").click()');
- await wait(client,'Boolean([...document.querySelectorAll("[role=dialog] button")].find(e=>e.textContent==="Marquer non vu"))','menu après bascules');
- await evaluate(client,'[...document.querySelectorAll("[role=dialog] button")].find(e=>e.textContent==="Marquer non vu").click()');
- await wait(client,'Boolean(document.querySelector("[role=alertdialog]"))','confirmation erreur');
- await evaluate(client,'window.__homeAVoir.telemetry.failNext=true;[...document.querySelectorAll("[role=alertdialog] button")].find(e=>e.textContent==="Oui, marquer non vu").click()');
+ await wait(client,'Boolean([...document.querySelectorAll("[data-history-menu] button")].find(e=>e.textContent.startsWith("Marquer non vu")))','menu après bascules');
+ await evaluate(client,'window.__homeAVoir.telemetry.failNext=true;[...document.querySelectorAll("[data-history-menu] button")].find(e=>e.textContent.startsWith("Marquer non vu")).click()');
  await wait(client,'window.__homeAVoir.toasts().some(t=>t.type==="error")','échec explicite sans faux succès');
  assert.deepEqual(await evaluate(client,'window.__homeErrors'),[],'Aucune promesse de mutation non gérée');
  await client.send('Emulation.setTouchEmulationEnabled',{enabled:false});

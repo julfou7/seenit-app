@@ -1,17 +1,14 @@
 import { compareHistoryEntries, buildHistoryRows, historyGroupCode, indexHistoryPeriods, historyPeriodSummary, type TimelineRow } from '../features/history/historyTimeline';
 import { HomeLoadMore } from './cards/HomeLoadMore';
-import { DialogLayer } from './ui/DialogLayer';
 import { HISTORY_PAGE_SIZE } from '../features/watchlist/homePresentation';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import type { Show } from '../types';
-import { AlertCircle } from 'lucide-react';
 import { tmdb } from '../features/shows/tmdb';
 import { useToastStore } from '../store/toastStore';
 import { openExternalUrl, scrollAllCarouselsToStart } from '../lib/utils';
 import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
-import type { SeriesCardAction } from './cards/SeriesEpisodeCard';
-import { HistoryEntryRow } from './HistoryEntryRow';
+import { HistoryEntryRow, type HistoryRowMenu } from './HistoryEntryRow';
 import {
   createWatchProviderRequestLimiter,
   scheduleWatchProviderCardEnrichment,
@@ -24,9 +21,7 @@ import {
   buildHistoryAriaLabel,
   formatHistoryRowDate,
   formatHistoryClock,
-  historyDateInputValue,
   historyLocalDayKey,
-  historyTimeInputValue,
   parseHistoryLocalDateTime,
   resolveHistoryTimestamp,
 } from '../features/history/historyPresentation';
@@ -139,8 +134,8 @@ function HistoryRowItem({
   show,
   onShowClick,
   onEpisodeClick,
-  setUnseenModalItem,
-  onEdit,
+  onUnseen,
+  onSaveDate,
   onRewatch,
 }: {
   item: HistoryItem;
@@ -149,8 +144,8 @@ function HistoryRowItem({
   show: Show;
   onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void;
   onEpisodeClick?: (showId: string, season: number, episode: number) => void;
-  setUnseenModalItem: (item: HistoryItem) => void;
-  onEdit: (item: HistoryItem) => void;
+  onUnseen: (item: HistoryItem) => void | Promise<void>;
+  onSaveDate: (item: HistoryItem, date: string, time: string) => void | Promise<void>;
   onRewatch: (item: HistoryItem, show: Show, providerName?: string | null) => void | Promise<void>;
 }) {
   const forcePlex = item.plexImported;
@@ -185,14 +180,19 @@ function HistoryRowItem({
     watchedAt: item.watchedAt,
     timeKnown: item.watchedTimeKnown,
   });
-  const actionsFor = (target: HistoryItem): SeriesCardAction[] => [
-    { label: 'Marquer non vu', onSelect: () => setUnseenModalItem(target) },
-    { label: 'Changer la date/heure', onSelect: () => onEdit(target) },
-    { label: 'Revoir', onSelect: () => onRewatch(target, show, effectiveProviderName) },
-    ...(target.mediaType === 'tv' ? [{ label: 'Ouvrir la série', onSelect: () => onShowClick?.(target.showId, 'tv') }] : []),
-  ];
   const clock = formatHistoryClock(item.watchedAt, item.watchedTimeKnown);
   const dateLabel = formatHistoryRowDate(item.watchedAt);
+  // #9 Historique : menu ancré (maquette validée le 07/11) ; « Aujourd’hui à 07:41 » rappelle la date courante.
+  const dayGap = Math.round((Date.parse(`${localTodayKey()}T12:00:00`) - Date.parse(`${historyLocalDayKey(item.watchedAt)}T12:00:00`)) / 86_400_000);
+  const dayLabel = dayGap === 0 ? 'Aujourd’hui' : dayGap === 1 ? 'Hier' : dayGap === 2 ? 'Avant-hier' : dateLabel;
+  const menu: HistoryRowMenu = {
+    whenLabel: clock ? `${dayLabel} à ${clock}` : `${dayLabel} · heure inconnue`,
+    watchedAt: item.watchedAt, timeKnown: item.watchedTimeKnown,
+    onSaveDate: (date, time) => onSaveDate(item, date, time),
+    onRewatch: () => onRewatch(item, show, effectiveProviderName),
+    onOpenSeries: item.mediaType === 'tv' ? () => onShowClick?.(item.showId, 'tv') : undefined,
+    onUnseen: () => onUnseen(item),
+  };
 
 
   return <div ref={cardRef} className="history-entry-host">
@@ -200,7 +200,7 @@ function HistoryRowItem({
       code={historyGroupCode(row)}
       date={dateLabel} clock={clock || 'heure inconnue'} today={historyLocalDayKey(item.watchedAt) === localTodayKey()} timestamp={item.watchedAt}
       images={[show.posterPath, show.backdropPath]}
-      label={ariaLabel} onOpen={handleRowClick} actions={actionsFor(item)} />
+      label={ariaLabel} onOpen={handleRowClick} menu={menu} />
   </div>;
 }
 
@@ -223,10 +223,6 @@ export const HistoryFeed = memo(function HistoryFeed({
   const showsById = useMemo(() => new Map((active ? shows : []).map(show => [show.id, show])), [shows, active]);
   const showToast = useToastStore(state => state.showToast);
   const [metadataByKey, setMetadataByKey] = useState<Record<string, HistoryMetadata>>({});
-  const [unseenModalItem, setUnseenModalItem] = useState<HistoryItem | null>(null);
-  const [editingItem, setEditingItem] = useState<HistoryItem | null>(null);
-  const [editDate, setEditDate] = useState('');
-  const [editTime, setEditTime] = useState('');
 
   const historyItems = useMemo(() => {
     if (!active) return [];
@@ -356,12 +352,6 @@ export const HistoryFeed = memo(function HistoryFeed({
     return () => { mounted = false; cancel(); };
   }, [displayedItems, metadataByKey]);
 
-  const handleEdit = useCallback((item: HistoryItem) => {
-    setEditingItem(item);
-    setEditDate(historyDateInputValue(item.watchedAt));
-    setEditTime(historyTimeInputValue(item.watchedAt, item.watchedTimeKnown));
-  }, []);
-
   const handleRewatch = useCallback(async (item: HistoryItem, show: Show, providerName?: string | null) => {
     if (item.plexImported || providerName?.toLocaleLowerCase('fr-FR').includes('plex')) {
       await openPlexWatchUrl(show);
@@ -387,8 +377,7 @@ export const HistoryFeed = memo(function HistoryFeed({
     }
   }, [showToast]);
 
-  const handleSaveWatchDate = useCallback(async () => {
-    if (!editingItem) return;
+  const handleSaveWatchDate = useCallback(async (editingItem: HistoryItem, editDate: string, editTime: string) => {
     const parsed = parseHistoryLocalDateTime(editDate, editTime);
     if (!parsed) {
       showToast('Date ou heure invalide.', 'error');
@@ -410,7 +399,6 @@ export const HistoryFeed = memo(function HistoryFeed({
       },
     };
     const nextLastWatchedAt = historyLastWatchedAt(nextRecords, targetShow.seenEpisodes || [epKey]);
-    setEditingItem(null);
     await updateShow(targetShow.id, {
       episodeRecords: nextRecords,
       lastWatchedAt: nextLastWatchedAt,
@@ -432,10 +420,9 @@ export const HistoryFeed = memo(function HistoryFeed({
         scrollAllCarouselsToStart();
       }
     );
-  }, [editDate, editTime, editingItem, showToast, shows, updateShow]);
+  }, [showToast, shows, updateShow]);
 
   const handleConfirmUnseen = useCallback(async (item: HistoryItem) => {
-    setUnseenModalItem(null);
     const targetShow = shows.find(show => show.id === item.showId);
     if (!targetShow) return;
 
@@ -492,11 +479,9 @@ export const HistoryFeed = memo(function HistoryFeed({
     }
     scrollAllCarouselsToStart();
 
-    const epLabel = isMovie
-      ? `« ${item.showTitle} »`
-      : `« ${item.showTitle} » S${String(item.season).padStart(2, '0')} | E${String(item.episode).padStart(2, '0')}`;
+    // Toast d'épisode (104 px) : « Retiré de l’historique » et Annuler pendant 5 s, date exacte restaurée.
     showToast(
-      `${epLabel} retiré de l'historique`,
+      { title: item.showTitle, subtitle: isMovie ? undefined : `S${item.season} | E${item.episode}`, action: 'Retiré de l’historique', posterPath: targetShow.posterPath || undefined },
       'info',
       targetShow,
       async () => {
@@ -536,54 +521,14 @@ export const HistoryFeed = memo(function HistoryFeed({
           <div className="history-entry-list">{period.rows.map(row => {
             const item = row.item, show = showsById.get(item.showId);
             return show ? <HistoryRowItem key={row.key} item={item} row={row} metadata={metadataByKey[getMetadataKey(item)]} show={show}
-              onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} setUnseenModalItem={setUnseenModalItem}
-              onEdit={handleEdit} onRewatch={handleRewatch} /> : null;
+              onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} onUnseen={handleConfirmUnseen}
+              onSaveDate={handleSaveWatchDate} onRewatch={handleRewatch} /> : null;
           })}</div>
         </section>;
       })}
       {hasMore && <HomeLoadMore step={HISTORY_PAGE_SIZE} lastLabel="Afficher la dernière" remainingCount={rows.length - displayedRows.length} items={rows.slice(displayedRows.length, displayedRows.length + 3).flatMap(row => { const show = showsById.get(row.item.showId); return show ? [show] : []; })} onLoad={() => setPage(value => value + 1)} />}
 
 
-      {editingItem && (
-        <DialogLayer onDismiss={() => setEditingItem(null)} label="Changer la date et l’heure" historyMode="local" role="dialog" className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-white/10 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
-            <div>
-              <h3 className="text-base font-bold text-white">Changer la date/heure</h3>
-              <p className="text-xs text-zinc-400 mt-1">Laissez l’heure vide si elle n’est pas connue : SeenIt ne l’inventera pas.</p>
-            </div>
-            <label className="block text-xs font-bold text-zinc-300">
-              Date
-              <input type="date" value={editDate} onChange={event => setEditDate(event.target.value)} className="mt-1.5 w-full min-h-11 rounded-xl bg-zinc-950 border border-white/10 px-3 text-sm text-white" />
-            </label>
-            <label className="block text-xs font-bold text-zinc-300">
-              Heure (facultative)
-              <input type="time" value={editTime} onChange={event => setEditTime(event.target.value)} className="mt-1.5 w-full min-h-11 rounded-xl bg-zinc-950 border border-white/10 px-3 text-sm text-white" />
-            </label>
-            <div className="flex items-center justify-end gap-2.5 pt-1">
-              <button type="button" data-dialog-initial-focus onClick={() => setEditingItem(null)} className="min-h-11 px-4 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-bold">Annuler</button>
-              <button type="button" onClick={() => { void handleSaveWatchDate(); }} className="min-h-11 px-4 rounded-xl bg-[#E5A93D] text-zinc-950 text-xs font-extrabold">Enregistrer</button>
-            </div>
-          </div>
-        </DialogLayer>
-      )}
-
-      {unseenModalItem && (
-        <DialogLayer onDismiss={() => setUnseenModalItem(null)} label="Marquer comme non vu" historyMode="local" role="alertdialog" className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-zinc-900 border border-white/10 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3 text-amber-400">
-              <div className="w-10 h-10 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0"><AlertCircle size={20} /></div>
-              <h3 className="text-base font-bold text-white">Marquer comme non vu ?</h3>
-            </div>
-            <p className="text-zinc-300 text-xs sm:text-sm leading-relaxed">
-              Voulez-vous vraiment retirer <strong className="text-white">{unseenModalItem.showTitle}</strong> {unseenModalItem.mediaType === 'movie' ? 'de vos films vus' : `(S${String(unseenModalItem.season).padStart(2, '0')} | E${String(unseenModalItem.episode).padStart(2, '0')})`} de votre historique ?
-            </p>
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button type="button" onClick={() => setUnseenModalItem(null)} data-dialog-initial-focus className="min-h-11 px-4 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition-colors cursor-pointer">Annuler</button>
-              <button type="button" onClick={() => { void handleConfirmUnseen(unseenModalItem); }} className="min-h-11 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors shadow-lg shadow-red-600/30 cursor-pointer">Oui, marquer non vu</button>
-            </div>
-          </div>
-        </DialogLayer>
-      )}
     </div>
   );
 });
