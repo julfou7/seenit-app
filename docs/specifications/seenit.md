@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.260**
+Version applicative : **1.4.261**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -552,6 +552,12 @@ film. TMDB est l'autorité normale et suffisante de cette section.
 - Aucun catalogue SeenIt, groupe TVDB, Wikidata ou rapprochement par titre ne complète une collection
   TMDB absente ou incomplète.
 - Si TMDB ne fournit aucune collection exploitable, la section est masquée.
+- Affichage (saga v2, #871) : frise de repères numérotés 1…N (or plein si vu, contour gris sinon, rond creux
+  or avec halo pour le film affiché), repère, affiche et texte centrés sur le même axe, trait or seulement
+  entre deux films vus ; en-tête « X / N vus » et barre segmentée dont la case du film affiché est cerclée ;
+  la ligne du film affiché est encadrée d'or avec « TU ES ICI » et garde son statut vu. Un film vu porte le
+  tampon VU de l'accueil sur son affiche (annoncé « vu » aux lecteurs d'écran), un film non vu « À voir » ;
+  métadonnées « année · durée » quand TMDB fournit la durée. Rendu seul : ni source ni identité ne changent.
 
 #### Franchise / univers — TVDB comme source normale
 
@@ -1550,9 +1556,11 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   recherche est souligné plutôt que recoloré. Toute pagination progressive réutilise `HomeLoadMore`
   (pastille de liste ou tuile de fin de carrousel, trois prochaines vignettes, « Afficher N de plus » /
   « Afficher les N » / « Afficher la dernière » et « X en attente ») ; aucun bouton texte de pagination
-  séparé. **État : cible partiellement livrée.** À regarder, l'Historique et la page Notifications
-  respectent déjà ces deux règles ; leur généralisation reste suivie par #874 (titres) et #873
-  (Afficher plus). Une surface encore non conforme est un écart connu, jamais une règle alternative.
+  séparé. **État : livrée (#874, #873).** Le jeton `--seenit-media-title` (classe `seenit-media-title`)
+  porte l'or des titres sur toutes les surfaces média, et le composant `LoadMore`, dont `HomeLoadMore`
+  est la forme de l'accueil, est le seul contrôle de pagination, avec « Réduire » en action secondaire
+  quand une liste se replie. Une nouvelle surface reprend ce jeton et ce composant ; une surface non
+  conforme est un écart, jamais une règle alternative.
 
 ## 10. Performance et résilience
 

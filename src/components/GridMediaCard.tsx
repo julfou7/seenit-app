@@ -45,13 +45,15 @@ export const GridMediaCard = React.memo(function GridMediaCard({
   const openLabel = `Ouvrir la fiche ${isTv ? 'Série' : 'Film'} ${displayTitle}`;
 
   const rating = media.vote_average && media.vote_average > 0 ? media.vote_average.toFixed(1) : null;
-  const characterOrJob = (media as any).character || (media as any).job;
+  // Champs facultatifs des crédits TMDB (rôle, poste, nombre d'épisodes), typés au lieu de `any`.
+  const credit = media as TMDBMedia & { character?: string; job?: string; number_of_episodes?: number };
+  const characterOrJob = credit.character || credit.job;
 
   const isAtCinema = !isTv && (isMovieAtCinema(media) || isMovieAtCinema(show));
   const isUpcoming = !isTv && !isAtCinema && (isMovieUpcoming(media) || isMovieUpcoming(show));
 
   const seenCount = isTv ? (show?.seenEpisodes?.length || 0) : 0;
-  const totalEpisodes = show?.totalAiredEpisodes || show?.totalEpisodes || (media as any).number_of_episodes || 0;
+  const totalEpisodes = show?.totalAiredEpisodes || show?.totalEpisodes || credit.number_of_episodes || 0;
   const progressPercentage = isUpToDate
     ? 100
     : totalEpisodes > 0
@@ -278,7 +280,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
         aria-label={openLabel}
         className="min-h-11 flex flex-col justify-center px-0.5 min-w-0 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]/70"
       >
-        <h3 className="text-xs font-bold text-white truncate w-full" title={displayTitle}>
+        <h3 className="seenit-media-title text-xs font-bold truncate w-full" title={displayTitle}>
           {displayTitle}
         </h3>
 
@@ -501,7 +503,7 @@ export function PreviewModal({
                 onShowClick(media.id, isTv ? 'tv' : 'movie');
                 onClose();
               }}
-              className="text-[22px] font-extrabold text-white hover:text-[#E5A93D] tracking-tight leading-tight mb-2 cursor-pointer transition-colors"
+              className="seenit-media-title text-[22px] font-extrabold hover:text-[#E5A93D] tracking-tight leading-tight mb-2 cursor-pointer transition-colors"
             >
               {displayTitle}
             </h2>

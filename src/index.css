@@ -10,6 +10,11 @@ html, body {
 
 @import "tailwindcss";
 
+/* #874 — Le titre d'un film ou d'une série est en or SeenIt partout (hors titres d'épisode, personnes,
+   personnages, releases et notifications système). Un seul jeton, utilisé par toutes les surfaces média. */
+:root { --seenit-media-title: #F2C36B; }
+.seenit-media-title { color: var(--seenit-media-title); }
+
 /* Portails indépendants des stacking contexts des écrans, bornés au clavier visible. */
 .seenit-dialog-layer {
   top: var(--dialog-top, 0px) !important;

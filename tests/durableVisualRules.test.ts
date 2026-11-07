@@ -20,8 +20,10 @@ test('SEENIT-UX-020 le contrat canonique, la référence UX et le registre porte
   assert.match(rule, /USR-2026-11-06-003/);
   assert.match(rule, /`#F2C36B`/);
   assert.match(rule, /`HomeLoadMore`/);
-  // Statut honnête : la cible n'est pas entièrement livrée et ses issues restent ouvertes.
-  assert.match(rule, /cible partiellement livrée/);
+  // Statut honnête : livré par #874 et #873, avec le jeton et le composant uniques.
+  assert.match(rule, /État : livrée \(#874, #873\)/);
+  assert.match(rule, /`--seenit-media-title`/);
+  assert.match(rule, /`LoadMore`/);
   assert.match(rule, /#874/);
   assert.match(rule, /#873/);
   const reference = section(ux, '## 9. Règles visuelles durables', '\n## ');

@@ -207,7 +207,7 @@ export const HeroCard = React.memo(function HeroCard({
           )}
         </div>
 
-        <h2 className="text-[38px] font-extrabold text-white uppercase tracking-tight leading-[1.05] mb-1 line-clamp-2 drop-shadow-xl">
+        <h2 className="seenit-media-title text-[38px] font-extrabold uppercase tracking-tight leading-[1.05] mb-1 line-clamp-2 drop-shadow-xl">
           {title}
         </h2>
 

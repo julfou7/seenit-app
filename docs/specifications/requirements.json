@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.260",
+  "applicationVersion": "1.4.261",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -182,6 +182,22 @@
           "contains": "SEENIT-UX-020 HomeLoadMore reste le contrôle de pagination livré sur À regarder et l’Historique"
         },
         {
+          "file": "tests/mediaTitleToken.test.ts",
+          "contains": "SEENIT-UX-020 #874 un seul jeton « titre média » en or, utilisé par toutes les surfaces film et série"
+        },
+        {
+          "file": "tests/loadMore.test.ts",
+          "contains": "SEENIT-UX-020 #873 un seul « Afficher plus » : libellé du lot, des N restants ou du dernier, compteur et trois vignettes"
+        },
+        {
+          "file": "tests/loadMore.test.ts",
+          "contains": "SEENIT-UX-020 #873 toutes les paginations réutilisent le contrôle partagé, sans bouton texte « voir plus »"
+        },
+        {
+          "file": "tests/loadMore.test.ts",
+          "contains": "SEENIT-UX-020 #873 le focus clavier suit le dépliage et le repli sans se perdre"
+        },
+        {
           "file": "tests/durableVisualRules.test.ts",
           "contains": "SEENIT-UX-020 les titres média déjà livrés en or le restent, même lus"
         }
@@ -202,6 +218,10 @@
         {
           "file": "tests/explorerSearchVisibility.test.ts",
           "contains": "SEENIT-UX-019 #870 une fiche média ouverte depuis la recherche d’Explorer garde la barre de navigation"
+        },
+        {
+          "file": "tests/sagaTimeline.test.ts",
+          "contains": "SEENIT-UX-019 #871 la saga v2 numérote l’ordre TMDB, situe le film affiché et pose le tampon VU"
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",
