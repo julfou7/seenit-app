@@ -1,7 +1,15 @@
 import { create } from 'zustand';
 import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
 
-export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }> };
+export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], pushed: [] as string[] };
+// #879 — versions de la page « Version précise » (C411 simulé) : la conseillée n'est pas la première reçue.
+const day = 86_400_000;
+const FIXTURE_RELEASES = [
+  { id: 11, infoHash: 'a', name: 'L.Arene.S01E03.MULTi.2160p.NF.WEB-DL.DV.HDR.DDP5.1.H265.mkv', size: 7.4e9, seeders: 410, leechers: 3, createdAt: new Date(Date.now() - day).toISOString(), magnetUri: 'magnet:?xt=urn:btih:a' },
+  { id: 12, infoHash: 'b', name: 'L.Arene.S01E03.FRENCH.1080p.WEB.H264-NoTag.mkv', size: 2.1e9, seeders: 214, leechers: 3, createdAt: new Date(Date.now() - 2 * day).toISOString(), magnetUri: 'magnet:?xt=urn:btih:b' },
+  { id: 13, infoHash: 'c', name: 'The.Arena.S01E03.VOSTFR.1080p.NF.WEB-DL.DDP5.1.x264.mkv', size: 1.8e9, seeders: 156, leechers: 1, magnetUri: 'magnet:?xt=urn:btih:c' },
+  { id: 14, infoHash: 'd', name: 'L.Arene.S01E03.FRENCH.1080p.HDLight.x264.mkv', size: 1.1e9, seeders: 6, leechers: 0, magnetUri: 'magnet:?xt=urn:btih:d' }
+];
 const sample = (id: string, title: string, status: string, progress = 0): LiveDownloadItem => ({ id, title, movieTitle: title, mediaType: 'movie', tmdbId: Number(id), size: 1200000000, sizeleft: 600000000, status, progress, statusText: status === 'warning' ? 'Manual import required' : 'État confirmé par le client', quality: '1080p', downloadClient: 'Radarr', releaseTitle: `${title}.1080p`, posterPath: '/fixture.jpg', addedAt: Number(id) });
 export const fixtureItems = [sample('1', 'Blade Runner', 'warning', 100), sample('2', 'The Punisher : un très long titre de film à conserver entièrement', 'downloading', 63), { ...sample('3', 'The Boys', 'waiting'), availability: { reason: 'unconfirmed', automatic: false } }, sample('4', 'Dune', 'completed', 100)];
 export const useLiveDownloadStore = create(() => ({ downloads: fixtureItems, fetchDownloads: async () => {}, removeDownload: async (item: LiveDownloadItem) => { telemetry.removed.push(item.id); useLiveDownloadStore.setState(state => ({ downloads: state.downloads.filter(value => value.id !== item.id) })); return true; }, clearAllDownloads: async () => {} }));
@@ -11,8 +19,8 @@ export const useToastStore = Object.assign(() => () => {}, { getState: () => ({ 
 export const useShowsStore = <T,>(selector: (state: { shows: [] }) => T) => selector({ shows: [] });
 export const formatBytes = (size: number) => `${(size / 1000000000).toFixed(1)} Go`;
 export const formatCleanMediaInfo = (item: LiveDownloadItem) => ({ cleanTitle: item.title, subTitle: item.mediaType === 'tv' ? 'S02 | E05' : 'Film', isTv: item.mediaType === 'tv' });
-export const pushReleaseDirectly = async () => { throw new Error('mutation inattendue'); };
-export const searchC411Torrents = async () => { telemetry.searched++; throw new Error('C411 indisponible (503).'); };
+export const pushReleaseDirectly = async (payload: { torrent: { name: string } }) => { if (!telemetry.c411Results) throw new Error('mutation inattendue'); telemetry.pushed.push(payload.torrent.name); return { success: true, message: 'ok' }; };
+export const searchC411Torrents = async ({ query }: { query: string }) => { telemetry.searched++; telemetry.queries.push(query); if (!telemetry.c411Results) throw new Error('C411 indisponible (503).'); return FIXTURE_RELEASES; };
 export const formatTorrentSize = formatBytes;
 export const openC411Magnet = async () => false;
 export const DownloadConfigSection = () => null;

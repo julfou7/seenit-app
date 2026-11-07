@@ -33,6 +33,8 @@ interface ShowDetailViewProps {
 }
 
 const DownloadModal = lazy(() => import('../components/DownloadModal').then(module => ({ default: module.DownloadModal })));
+// #879 — Page « Version précise » chargée au premier usage (services C411/Sonarr hors du chunk de la fiche).
+const PreciseVersionPage = lazy(() => import('./mediaDetail/PreciseVersionPage'));
 
 const STATUS_LABELS: Record<string, string> = { Ended: 'Terminée', Canceled: 'Annulée', 'Returning Series': 'En cours', 'In Production': 'En production', 'Post Production': 'Post-production', Planned: 'Prévue', Pilot: 'Pilote', ended: 'Terminée', canceled: 'Annulée', returning: 'En cours' };
 
@@ -52,12 +54,6 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const libraryShows = useShowsStore(state => state.shows);
   const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
   const movieAvailable = !isSeries && Boolean(model.presence.radarrHasFile || model.presence.plexInfo?.available);
-  const openEpisodeDownload = (season: number, episode?: number) => {
-    if (!downloadsEnabled) return;
-    setDownloadTargetSeason(season);
-    setDownloadTargetEpisode(episode);
-    setIsDownloadModalOpen(true);
-  };
   const redditVisibleTitle = tmdbDetails?.name || tmdbDetails?.title || show?.title || '';
   const redditMovieOriginalTitle = tmdbDetails?.original_title || show?.originalTitle || null;
   const isAtCinema = !isSeries && (isMovieAtCinema(tmdbDetails) || isMovieAtCinema(show));
@@ -125,6 +121,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   // #879 — Mode téléchargement : la fiche reste propre, la sélection d'épisodes est une surcouche.
   const [downloadMode, setDownloadMode] = useState(false);
   const [pickedEpisodes, setPickedEpisodes] = useState<Set<number>>(() => new Set());
+  const [preciseTarget, setPreciseTarget] = useState<{ season: number; episode: number } | null>(null);
   const canUseDownloadMode = isSeries && downloadsEnabled && Boolean(effectiveTmdbId);
   const modeToday = getTodayStr();
   const modeSeason = selectedSeason?.season_number ?? null;
@@ -230,10 +227,10 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     if (outcome.programmed.length) void refreshPlexAvailability();
   };
   const openPreciseVersion = () => {
-    if (modeSeason === null || !pickedNow.length) return;
-    const first = pickedNow[0];
+    if (modeSeason === null || pickedNow.length !== 1 || !effectiveTmdbId) return;
+    const target = { season: modeSeason, episode: pickedNow[0] };
     exitDownloadMode();
-    openEpisodeDownload(modeSeason, first);
+    setPreciseTarget(target);
   };
   const seasonVideos = selectedSeason ? (seasonsCache[selectedSeason.season_number]?.videos?.results || []).filter((video: { site?: string }) => video.site === 'YouTube') : [];
   const castPayloadKnown = isSeries ? Boolean(tmdbDetails?.aggregate_credits || tmdbDetails?.credits) : Boolean(tmdbDetails?.credits);
@@ -321,8 +318,9 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       {selectedPersonId && <PersonDetailModal personId={selectedPersonId} hint={(() => { const member = cast.find((entry: { id: number }) => entry.id === selectedPersonId); return member ? { name: member.name, profile_path: member.profile_path, character: member.roles?.[0]?.character || member.character } : undefined; })()} origin={show || (effectiveTmdbId ? { id: '', userId: '', tmdbId: Number(effectiveTmdbId), title, mediaType: isSeries ? 'tv' : 'movie', posterPath: posterPath || null, backdropPath: backdropUrl || null, status: 'plan_to_watch', seenEpisodes: [], episodeRecords: {}, isArchived: false, createdAt: 0, updatedAt: 0 } as unknown as typeof show : null)}
         onClose={() => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); }}
         onShowClick={(tmdbId, type) => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) || (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) || (show?.id && String(show.id) === String(tmdbId)); if (!isSameShow && onShowClick) setTimeout(() => onShowClick(tmdbId, type || 'movie'), 50); }} />}
-      {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={pickedNow.length && !pickedFuture.length ? openPreciseVersion : undefined} onExit={exitDownloadMode} />}
+      {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={pickedNow.length === 1 && !pickedFuture.length ? openPreciseVersion : undefined} onExit={exitDownloadMode} />}
       {trailerModalVideos && <TrailerModal videos={trailerModalVideos} onClose={() => setTrailerModalVideos(null)} />}
+      {preciseTarget && downloadsEnabled && effectiveTmdbId && <Suspense fallback={<span role="status">Ouverture de la version précise…</span>}><PreciseVersionPage onClose={() => setPreciseTarget(null)} target={{ title, tmdbId: effectiveTmdbId, tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, year: (tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4), posterPath: show?.posterPath || undefined, ...preciseTarget }} /></Suspense>}
       {isDownloadModalOpen && <Suspense fallback={<span role="status">Ouverture du téléchargement…</span>}><DownloadModal isOpen={isDownloadModalOpen} onClose={() => { setIsDownloadModalOpen(false); setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); }} title={title} originalTitle={tmdbDetails?.original_title || tmdbDetails?.original_name || show?.originalTitle} year={(tmdbDetails?.release_date || tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4)} mediaType={isSeries ? 'tv' : 'movie'} tmdbId={effectiveTmdbId} tvdbId={tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId} imdbId={tmdbDetails?.external_ids?.imdb_id || show?.imdbId} posterPath={posterPath || tmdbDetails?.poster_path || show?.posterPath} initialSeason={downloadTargetSeason} initialEpisode={downloadTargetEpisode} totalSeasons={tmdbDetails?.number_of_seasons || seasons.length || 1} seasonsData={tmdbDetails?.seasons} onSuccessToast={(msg) => showToast(msg, 'success', show || undefined)} /></Suspense>}
     </div>
   );

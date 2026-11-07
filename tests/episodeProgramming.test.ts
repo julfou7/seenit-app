@@ -102,5 +102,5 @@ test('SEENIT-DOWNLOAD-014 #879 en mode, les épisodes à venir se cochent en ble
   assert.match(launch, /if \(toProgram\.length\) void programPickedEpisodes\(/);
   assert.match(view, /episodes, qualityPreference: quality, readConfig: \(\) => useDownloadConfigStore\.getState\(\)/);
   // « Version précise » ne concerne qu'un épisode sorti.
-  assert.match(view, /onPrecise=\{pickedNow\.length && !pickedFuture\.length \? openPreciseVersion : undefined\}/);
+  assert.match(view, /onPrecise=\{pickedNow\.length === 1 && !pickedFuture\.length \? openPreciseVersion : undefined\}/);
 });

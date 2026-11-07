@@ -11,18 +11,13 @@ import {
   Search,
   X
 } from 'lucide-react';
-import { type C411Torrent, formatTorrentSize, openC411Magnet, searchC411Torrents } from '../services/c411';
+import { type C411Torrent, formatTorrentSize, searchC411Torrents } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useToastStore } from '../store/toastStore';
 import './download-dialog.css';
-import { pushReleaseDirectly } from '../services/sonarrRadarr';
+import { sendReleaseToClient } from '../features/downloads/releaseSend';
 import { tmdb } from '../features/shows/tmdb';
-import {
-  acceptDownloadRequest,
-  beginDownloadRequest,
-  failDownloadRequest
-} from '../features/downloads/downloadLifecycle';
 import { launchArrDownload } from '../features/downloads/downloadLaunch';
 import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGuard';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
@@ -333,100 +328,21 @@ export function DownloadModal({
 
   const handleSendToClient = async (torrent: C411Torrent) => {
     if (sendingTorrentId) return;
-
-    let service: 'sonarr' | 'radarr' | 'qbittorrent' | null = null;
-    let url = '';
-    let apiKey = '';
-    let username = '';
-    let password = '';
-
-    if (mediaType === 'tv' && config.sonarrUrl && config.sonarrApiKey) {
-      service = 'sonarr';
-      url = config.sonarrUrl;
-      apiKey = config.sonarrApiKey;
-    } else if (mediaType === 'movie' && config.radarrUrl && config.radarrApiKey) {
-      service = 'radarr';
-      url = config.radarrUrl;
-      apiKey = config.radarrApiKey;
-    } else if (config.qbittorrentUrl) {
-      service = 'qbittorrent';
-      url = config.qbittorrentUrl;
-      username = config.qbittorrentUsername;
-      password = config.qbittorrentPassword;
-    }
-
-    if (!service) {
-      if (torrent.magnetUri) {
-        const opened = await openC411Magnet(torrent.magnetUri);
-        showToast(
-          opened ? 'Ouverture du client BitTorrent local…' : 'Aucun client BitTorrent ne peut ouvrir ce lien.',
-          opened ? 'info' : 'error'
-        );
-      } else {
-        showToast('Aucun client de téléchargement disponible.', 'error');
-      }
-      return;
-    }
-
     setSendingTorrentId(torrent.id);
-    const clientLabel = service === 'sonarr' ? 'Sonarr' : service === 'radarr' ? 'Radarr' : 'qBittorrent';
-    const requestId = beginDownloadRequest({
-      title,
-      seriesTitle: isTv ? title : undefined,
-      movieTitle: !isTv ? title : undefined,
-      mediaType,
-      tmdbId,
-      imdbId,
-      seasonNumber: mediaType === 'tv' && scopeMode !== 'all' ? selectedSeason : undefined,
-      episodeNumber: mediaType === 'tv' && scopeMode === 'episode' ? selectedEpisode : undefined,
-      posterPath,
-      downloadClient: clientLabel,
-      statusText: 'Demande prise en compte • préparation du téléchargement…',
-      releaseTitle: torrent.name
-    });
-
-    showMediaDownloadToast('Préparation du téléchargement…', 'download');
-
     try {
-      const result = await pushReleaseDirectly({
-        service,
-        url,
-        apiKey,
-        username,
-        password,
-        torrent,
-        mediaType,
-        mediaInfo: {
-          title,
-          tmdbId,
-          tvdbId,
-          imdbId,
-          year,
-          season: mediaType === 'tv' && scopeMode !== 'all' ? selectedSeason : undefined,
-          episode: mediaType === 'tv' && scopeMode === 'episode' ? selectedEpisode : undefined
-        }
+      // #879 — même envoi que la page « Version précise » (corps déplacé dans releaseSend).
+      const result = await sendReleaseToClient({
+        config, torrent, mediaType, title, tmdbId, tvdbId, imdbId, year, posterPath,
+        season: mediaType === 'tv' && scopeMode !== 'all' ? selectedSeason : undefined,
+        episode: mediaType === 'tv' && scopeMode === 'episode' ? selectedEpisode : undefined,
+        notify: showMediaDownloadToast
       });
-
+      if (result.magnetOnly) return;
+      setActionMessage({ text: result.message, type: result.success ? 'success' : 'error' });
       if (result.success) {
-        acceptDownloadRequest(
-          requestId,
-          `Téléchargement accepté • mise en file d'attente`,
-          'queued'
-        );
-        const successMessage = 'Téléchargement lancé.';
-        setActionMessage({ text: successMessage, type: 'success' });
-        if (onSuccessToast) onSuccessToast(successMessage);
-        else showMediaDownloadToast(successMessage, 'success');
-      } else {
-        failDownloadRequest(requestId, result.message);
-        setActionMessage({ text: result.message, type: 'error' });
-        showMediaDownloadToast(result.message, 'error');
+        if (onSuccessToast) onSuccessToast(result.message);
+        else showMediaDownloadToast(result.message, 'success');
       }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : "Erreur lors de l'envoi de la release.";
-      failDownloadRequest(requestId, message);
-      setActionMessage({ text: message, type: 'error' });
-      showMediaDownloadToast(message, 'error');
     } finally {
       setSendingTorrentId(null);
     }

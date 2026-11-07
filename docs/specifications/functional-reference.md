@@ -527,7 +527,10 @@ n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes 
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
 ligne à la place de la navigation). En mode, un épisode à venir se coche en bleu pour être **programmé** :
 Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sans recherche immédiate ; un
-épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Chaque pastille de saison montre sa part vue en mini-barre et, avec
+épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Avec un seul épisode sorti
+coché, « Version précise › » ouvre une page pleine hauteur : versions C411 filtrables (Toutes, 1080p, 4K, Français, VO),
+la conseillée en tête et dépliée (nom du fichier, sources, date, **Télécharger cette version**), et « Chercher sous un
+autre nom… ». Chaque pastille de saison montre sa part vue en mini-barre et, avec
 Téléchargements activé, un point bleu quand un téléchargement de cette saison est actif. Un épisode
 présent dans Sonarr est reconnu comme téléchargé dans la fiche et la popup. Dans la liste d'une saison, un épisode vu
 a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »

@@ -89,6 +89,27 @@ async function testDownloadsHarness(client, root) {
     await evaluate(client, 'document.querySelector(\'[aria-label="Télécharger en 1080p"]\').click()');
     await check(client, 'window.__downloads.telemetry.mutations.length===1 && window.__downloads.telemetry.mutations[0].quality==="1080p" && !document.querySelector(".download-dialog")', 'choix qualité unique puis fermeture');
     await evaluate(client, 'window.__downloads.telemetry.mutations.length=0');
+    // #879 : page « Version précise » — pleine page, filtres de 44 px, conseillée en tête et dépliée.
+    await evaluate(client, 'window.__downloads.mount("precise")');
+    await check(client, '(()=>{const page=document.querySelector("[data-precise-version]").getBoundingClientRect();const first=document.querySelector("[data-version-card]");return first&&first.dataset.versionCard==="12"&&first.querySelector("[aria-expanded=true]")&&first.innerText.includes("Conseillée")&&first.innerText.includes("L.Arene.S01E03.FRENCH.1080p")&&document.querySelectorAll("[data-version-card]").length===4&&page.top===0&&Math.round(page.height)===innerHeight&&window.__downloads.telemetry.queries.at(-1)==="L\u2019Arène S01E03".replace("\u2019","\x27")})()', 'version précise pleine page, conseillée (français 1080p) en tête et dépliée');
+    await check(client, '(()=>{const chips=[...document.querySelectorAll("[aria-label=\'Filtrer les versions\'] button")];return chips.length===5&&chips.every(b=>b.getBoundingClientRect().height>=44)&&chips[0].getAttribute("aria-pressed")==="true"&&document.documentElement.scrollWidth<=innerWidth&&[...document.querySelectorAll("[data-version-card] > button")].every(b=>b.getBoundingClientRect().height>=44)})()', 'filtres et cartes touchables (44 px), sans débordement');
+    await evaluate(client, '[...document.querySelectorAll("[aria-label=\'Filtrer les versions\'] button")].find(b=>b.textContent==="4K").click()');
+    await check(client, '[...document.querySelectorAll("[data-version-card]")].map(c=>c.dataset.versionCard).join()==="11"', 'filtre 4K');
+    await evaluate(client, '[...document.querySelectorAll("[aria-label=\'Filtrer les versions\'] button")].find(b=>b.textContent==="VO").click()');
+    await check(client, '[...document.querySelectorAll("[data-version-card]")].map(c=>c.dataset.versionCard).sort().join()==="11,13"', 'filtre VO : Multi et VO sous-titrée');
+    await evaluate(client, 'document.querySelector(\'[data-version-card="13"] > button\').click()');
+    await check(client, 'document.querySelector(\'[data-version-card="13"]\').innerText.includes("The.Arena.S01E03.VOSTFR")', 'déplier montre le nom du fichier');
+    await evaluate(client, '[...document.querySelectorAll(\'[data-version-card="13"] button\')].find(b=>b.textContent.includes("Télécharger cette version")).click()');
+    await check(client, 'window.__downloads.telemetry.pushed.at(-1)==="The.Arena.S01E03.VOSTFR.1080p.NF.WEB-DL.DDP5.1.x264.mkv"&&window.__downloads.telemetry.opened.includes("precise:close")', 'la version choisie part au client, puis la page se ferme');
+    await evaluate(client, 'window.__downloads.mount("precise")');
+    await check(client, 'document.querySelectorAll("[data-version-card]").length===4', 'versions rechargées');
+    await evaluate(client, '[...document.querySelectorAll("button")].find(b=>b.textContent==="Chercher sous un autre nom…").click()');
+    await check(client, 'document.activeElement===document.querySelector("input[aria-label=\'Nom à chercher\']")', 'chercher sous un autre nom donne le focus au champ');
+    await evaluate(client, `(()=>{const input=document.querySelector("input[aria-label='Nom à chercher']");Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'The Arena S01E03');input.dispatchEvent(new Event('input',{bubbles:true}));input.form.requestSubmit();})()`);
+    await check(client, 'window.__downloads.telemetry.queries.at(-1)==="The Arena S01E03"', 'nouvelle recherche sous le nom saisi');
+    await evaluate(client, 'window.__downloads.mount("precise-error")');
+    await check(client, 'document.querySelector("[data-precise-version] [role=alert]")?.textContent.includes("503")&&!document.body.innerText.includes("Aucune version trouvée")', 'version précise : panne distincte d’une absence de version');
+    await evaluate(client, 'window.__downloads.telemetry.mutations.length=0');
     reports.push({ width, cards: true, confirmation: true, error: true, episodeActions: true, realQualityDialog: true });
   }
   return reports;

@@ -12,6 +12,10 @@
       ],
       "tests": [
         {
+          "file": "tests/preciseVersion.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 version précise : une page, la même voie d’envoi que la popup"
+        },
+        {
           "file": "tests/episodeProgramming.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 programmer surveille seulement les épisodes à venir demandés, sans rien rechercher"
         },
