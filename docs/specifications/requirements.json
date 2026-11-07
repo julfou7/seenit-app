@@ -74,6 +74,10 @@
       ],
       "tests": [
         {
+          "file": "tests/downloadSeasonGroups.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 #879 onglet Télécharger : une carte par saison, regroupée par identité exacte"
+        },
+        {
           "file": "tests/downloadPrototype.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 le sélecteur reste utilisable après un terminé et bloque seulement le scope actif"
         },

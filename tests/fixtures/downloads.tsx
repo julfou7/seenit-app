@@ -5,14 +5,19 @@ import { SeasonPanel } from '../../src/screens/mediaDetail/seriesSections';
 import { DownloadModeBanner, DownloadModeBar } from '../../src/screens/mediaDetail/downloadMode';
 import { DownloadModal } from '../../src/components/DownloadModal';
 import PreciseVersionPage from '../../src/screens/mediaDetail/PreciseVersionPage';
-import { telemetry } from './downloadsRuntime';
+import { fixtureItems, telemetry, useLiveDownloadStore } from './downloadsRuntime';
+import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
+
+// #879 — deux épisodes de la même saison (TMDB 77) et un homonyme d'une autre série (TMDB 99).
+const episode = (id: string, tmdbId: number, episodeNumber: number, status: string, progress: number): LiveDownloadItem => ({ id, title: "L'Arène", seriesTitle: "L'Arène", mediaType: 'tv', tmdbId, seasonNumber: 1, episodeNumber, size: 2e9, sizeleft: 1e9, status, progress, timeleft: '12 min', statusText: 'En cours', quality: '1080p', downloadClient: 'Sonarr', posterPath: '/fixture.jpg', addedAt: Number(id) });
+const seasonItems = [episode('41', 77, 4, 'downloading', 64), episode('42', 77, 5, 'queued', 0), episode('43', 99, 4, 'downloading', 20)];
 
 const root = createRoot(document.getElementById('root')!);
 let mounts = 0;
-const mount = (page = 'downloads') => { telemetry.c411Results = page === 'precise'; mounts += 1; mountPage(page); };
+const mount = (page = 'downloads') => { telemetry.c411Results = page === 'precise'; mounts += 1; useLiveDownloadStore.setState({ downloads: page === 'season-group' ? seasonItems : fixtureItems }); mountPage(page); };
 const mountPage = (page: string) => root.render(page === 'modal' || page === 'movie-modal'
   ? <DownloadModal isOpen title="L'Arène et un titre de série particulièrement long" mediaType={page === 'modal' ? 'tv' : 'movie'} tmdbId={99} initialSeason={1} initialEpisode={1} seasonsData={[{ season_number: 1, episode_count: 10 }]} onClose={() => mount()} />
-  : page === 'downloads'
+  : page === 'downloads' || page === 'season-group'
   ? <div className="h-[100dvh] max-w-md mx-auto flex flex-col"><DownloadsScreen onShowClick={id => telemetry.opened.push(String(id))} /></div>
   : page === 'banner-long'
   ? <div className="max-w-md mx-auto p-4"><DownloadModeBanner season={1} states={Array.from({ length: 24 }, (_, index) => ({ episode: index + 1, state: index < 5 ? 'seen' as const : 'available' as const }))} progress={() => undefined} picked={new Set([6])} allPicked={false} canPick onToggleAll={() => {}} onSegment={episode => telemetry.requested.push(episode)} /></div>

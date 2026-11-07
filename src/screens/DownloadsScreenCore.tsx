@@ -1,5 +1,7 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
 import { DownloadItemCard } from '../components/DownloadItemCard';
+import { SeasonDownloadCard } from '../components/SeasonDownloadCard';
+import { groupSeasonDownloads } from '../features/downloads/downloadSeriesGroups';
 import { downloadGroup } from '../features/downloads/downloadGroups';
 import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
 import { ReleaseLightFilter } from '../components/ReleaseLightFilter';
@@ -374,7 +376,10 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
           </button>
         )}
       </div>
-      {items.map(item => {
+      {groupSeasonDownloads(items).map(entry => {
+        // #879 — plusieurs épisodes d'une même saison : une seule carte, ✕ par épisode (pas de balayage global).
+        if (entry.kind === 'season') return <SeasonDownloadCard key={entry.key} seasonNumber={entry.seasonNumber} items={entry.items} onShowClick={onShowClick} onRemove={handleRemove} />;
+        const { item } = entry;
         const isActive = downloadGroup(item) === 'active' || downloadGroup(item) === 'waiting';
 
         return (

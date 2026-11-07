@@ -865,6 +865,11 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
   priorité : elle n'affiche jamais « Téléchargement terminé » et ne relance pas la présence Plex pour
   un transfert dont l'import est encore explicitement en erreur.
 - Les actifs conservent l'ordre de lancement ; l'historique affiche les plus récents d'abord.
+- Plusieurs épisodes d'une même saison d'une même série (TMDB exact, sinon TVDB exact, jamais le titre)
+  forment une seule carte (#879, maquette DlOngletSuivi) : affiche, titre, « Saison N · K épisodes », une
+  barre (un segment par épisode suivi) avec sa légende, puis une ligne par épisode avec son état
+  (« 64 % · ≈ 12 min » et barre, « En attente », « Téléchargé · prêt à regarder ») et ✕ pour l'annuler
+  ou le retirer, avec la même confirmation ; la carte n'a pas de balayage qui annulerait toute la saison.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
 - « Vider » ne touche que la section d'historique visée, jamais un actif.
