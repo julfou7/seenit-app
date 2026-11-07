@@ -1,10 +1,18 @@
 /** Champs d'une notification reçue lus par la déduplication (sous-ensemble d'InboxNotification). */
 export interface ReceivedLike { data: Record<string, unknown>; receivedAt: number }
 
-/** Épisode visé par une notification reçue (`season`/`episode` du rappel natif), s'il est connu. */
+const episodePair = (seasonValue: unknown, episodeValue: unknown) => {
+  const season = Number(seasonValue), episode = Number(episodeValue);
+  return seasonValue !== undefined && episodeValue !== undefined && seasonValue !== null && episodeValue !== null && Number.isInteger(season) && Number.isInteger(episode) ? { season, episode } : undefined;
+};
+
+/**
+ * Épisode annoncé par une notification reçue. Un rappel de sortie porte la sortie dans
+ * `releasedSeason`/`releasedEpisode` ; `season`/`episode` y désignent l'épisode à reprendre (cible de
+ * « Vu »), différent en cas de retard. La sortie annoncée prime donc, `season`/`episode` en repli.
+ */
 export function receivedEpisode(item: ReceivedLike): { season: number; episode: number } | undefined {
-  const season = Number(item.data.season), episode = Number(item.data.episode);
-  return item.data.season !== undefined && item.data.episode !== undefined && Number.isInteger(season) && Number.isInteger(episode) ? { season, episode } : undefined;
+  return episodePair(item.data.releasedSeason, item.data.releasedEpisode) || episodePair(item.data.season, item.data.episode);
 }
 
 /**

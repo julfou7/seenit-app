@@ -17,6 +17,12 @@ test('Retour terrain 07/11 : un rappel de sortie déjà reçu n’apparaît pas 
   assert.equal(releaseReminderAlreadyReceived(e08, [{ data: {}, receivedAt: at('2026-11-05') }], '2026-11-07', dayOf), false);
   assert.equal(releaseReminderAlreadyReceived(e08, [], '2026-11-07', dayOf), false);
   assert.deepEqual(receivedEpisode({ data: { season: '2', episode: '8' }, receivedAt: 0 }), { season: 2, episode: 8 });
+  // Avec du retard : le rappel de S02E08 vise S02E07 à reprendre ; la sortie annoncée fait foi (constat Codex #892).
+  const late = { data: { season: 2, episode: 7, releasedSeason: 2, releasedEpisode: 8 }, receivedAt: at('2026-11-06') };
+  assert.deepEqual(receivedEpisode(late), { season: 2, episode: 8 });
+  assert.equal(releaseReminderAlreadyReceived(e08, [late], '2026-11-07', dayOf), true);
+  const inbox = readFileSync('src/features/notifications/notificationInbox.ts', 'utf8');
+  assert.match(inbox, /'releasedSeason','releasedEpisode'/, 'la boîte de réception conserve la sortie annoncée');
   assert.equal(receivedEpisode({ data: { season: 2 }, receivedAt: 0 }), undefined);
 });
 
