@@ -1003,7 +1003,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 <div className="absolute left-3.5 right-3.5 z-30 flex items-center justify-between pointer-events-auto" style={{ top: '14px' }}>
                   <button type="button" onClick={(e) => { e.stopPropagation(); const targetTmdbId = tmdbShowId || show?.tmdbId; if (onShowClick && targetTmdbId) onShowClick(targetTmdbId, show?.mediaType || 'tv'); else onClose(); }} aria-label="Retour à la série" className="h-11 max-w-[230px] pl-2.5 pr-3.5 rounded-[22px] bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_4px_14px_rgba(0,0,0,0.4)] flex items-center gap-2 text-white active:scale-95">
                     <ArrowLeft size={18} className="text-[#E5A93D] shrink-0" />
-                    <span className="min-w-0 flex flex-col text-left leading-[1.15]"><span className="text-[9px] font-extrabold tracking-[0.08em] text-zinc-400">SÉRIE</span><span className="text-[13px] font-bold truncate">{show?.title || tmdbShowTitle || 'Retour'}</span></span>
+                    <span className="min-w-0 flex flex-col text-left leading-[1.15]"><span className="text-[9px] font-extrabold tracking-[0.08em] text-zinc-400">SÉRIE</span><span className="seenit-media-title text-[13px] font-bold truncate">{show?.title || tmdbShowTitle || 'Retour'}</span></span>
                   </button>
                   <button type="button" onClick={onClose} aria-label="Fermer" className="w-11 h-11 rounded-full bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center justify-center text-white active:scale-95"><X size={18} /></button>
                 </div>
@@ -1031,7 +1031,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
             <div className="absolute left-3.5 right-3.5 z-30 flex items-center justify-between pointer-events-auto" style={{ top: '14px' }}>
               <button type="button" onClick={(e) => { e.stopPropagation(); const targetTmdbId = tmdbShowId || show?.tmdbId; if (onShowClick && targetTmdbId) onShowClick(targetTmdbId, show?.mediaType || 'tv'); else onClose(); }} aria-label="Retour à la série" className="h-11 max-w-[230px] pl-2.5 pr-3.5 rounded-[22px] bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_4px_14px_rgba(0,0,0,0.4)] flex items-center gap-2 text-white active:scale-95">
                 <ArrowLeft size={18} className="text-[#E5A93D] shrink-0" />
-                <span className="min-w-0 flex flex-col text-left leading-[1.15]"><span className="text-[9px] font-extrabold tracking-[0.08em] text-zinc-400">SÉRIE</span><span className="text-[13px] font-bold truncate">{show?.title || tmdbShowTitle || 'Retour'}</span></span>
+                <span className="min-w-0 flex flex-col text-left leading-[1.15]"><span className="text-[9px] font-extrabold tracking-[0.08em] text-zinc-400">SÉRIE</span><span className="seenit-media-title text-[13px] font-bold truncate">{show?.title || tmdbShowTitle || 'Retour'}</span></span>
               </button>
               <button type="button" onClick={onClose} aria-label="Fermer" className="w-11 h-11 rounded-full bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center justify-center text-white active:scale-95"><X size={18} /></button>
             </div>

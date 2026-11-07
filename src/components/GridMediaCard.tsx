@@ -278,7 +278,7 @@ export const GridMediaCard = React.memo(function GridMediaCard({
         aria-label={openLabel}
         className="min-h-11 flex flex-col justify-center px-0.5 min-w-0 text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#E5A93D]/70"
       >
-        <h3 className="text-xs font-bold text-white truncate w-full" title={displayTitle}>
+        <h3 className="seenit-media-title text-xs font-bold truncate w-full" title={displayTitle}>
           {displayTitle}
         </h3>
 
@@ -501,7 +501,7 @@ export function PreviewModal({
                 onShowClick(media.id, isTv ? 'tv' : 'movie');
                 onClose();
               }}
-              className="text-[22px] font-extrabold text-white hover:text-[#E5A93D] tracking-tight leading-tight mb-2 cursor-pointer transition-colors"
+              className="seenit-media-title text-[22px] font-extrabold hover:text-[#E5A93D] tracking-tight leading-tight mb-2 cursor-pointer transition-colors"
             >
               {displayTitle}
             </h2>

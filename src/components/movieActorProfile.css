@@ -36,12 +36,12 @@
 .actor-profile__seen-poster { width:104px; height:156px; border-radius:12px; background:#27272a; display:block; position:relative; overflow:hidden; }
 .actor-profile__seen-poster img { width:100%; height:100%; object-fit:cover; }
 .actor-profile__seen-poster svg,.actor-profile__grid svg { position:absolute; bottom:6px; right:6px; border:1px solid #f7c65e99; background:#09090bd1; color:#f7c65e; border-radius:50%; padding:3px; box-sizing:content-box; }
-.actor-profile__seen strong { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; height:32px; line-height:16px; font-size:12px; font-weight:700; margin-top:7px; }
+.actor-profile__seen strong { color:var(--seenit-media-title); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; height:32px; line-height:16px; font-size:12px; font-weight:700; margin-top:7px; }
 .actor-profile__seen small,.actor-profile__grid small { font-size:11px; color:#a1a1aa; display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:3px; }
 .actor-profile__tabs { display:flex; gap:8px; margin-bottom:12px; }.actor-profile__tabs button { min-height:44px; padding:0 16px; border-radius:20px; background:#18181b; font-size:13px; }.actor-profile__tabs button[aria-pressed=true] { color:#f7c65e; background:#f7c65e24; }
 .actor-profile__grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px 8px; }
 .actor-profile__grid button { min-width:0; text-align:left; }.actor-profile__grid button>span { display:block; position:relative; aspect-ratio:2/3; border-radius:12px; overflow:hidden; background:#27272a; }.actor-profile__grid img { width:100%; height:100%; object-fit:cover; }
-.actor-profile__grid strong { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:12px; font-weight:700; line-height:16px; margin-top:6px; }
+.actor-profile__grid strong { color:var(--seenit-media-title); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:12px; font-weight:700; line-height:16px; margin-top:6px; }
 .actor-profile__more { width:100%; min-height:44px; background:#18181b; color:#d4d4d8; border-radius:22px; margin-top:14px; font-weight:700; font-size:13px; }
 .actor-profile__bio p { font-size:13px; line-height:1.6; color:#a1a1aa; margin:0; }.actor-profile__bio .is-clamped { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }.actor-profile__bio button,.actor-profile__error button { color:#f7c65e; min-height:44px; font-size:13px; font-weight:700; }
 .actor-profile__error { color:#a1a1aa; font-size:13px; }

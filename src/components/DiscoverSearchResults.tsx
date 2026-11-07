@@ -40,7 +40,7 @@ export function DiscoverSearchResults({ model, characters = [], charactersLoadin
     {library.length > 0 && <section aria-label="Dans ta bibliothèque">
       <h2>Dans ta bibliothèque</h2>
       {library.map(show => <button key={show.id} type="button" className="explorer-result-row" onClick={() => onShowClick(show.tmdbId, show.mediaType)}>
-        <Thumbnail path={show.posterPath} /><span className="explorer-row-text"><strong><Highlight title={show.title} query={query} /></strong>
+        <Thumbnail path={show.posterPath} /><span className="explorer-row-text"><strong className="seenit-media-title"><Highlight title={show.title} query={query} /></strong>
           <small>{show.mediaType === 'movie' ? 'Film' : 'Série'}{show.firstAirDate ? ` · ${show.firstAirDate.slice(0, 4)}` : ''}
             {show.mediaType !== 'movie' && show.totalEpisodes ? ` · ${show.seenEpisodes.length}/${show.totalEpisodes}` : ''}</small></span>
         <span className="explorer-row-status">{librarySearchStatus(show)}</span>
@@ -57,7 +57,7 @@ export function DiscoverSearchResults({ model, characters = [], charactersLoadin
         const title = item.title || item.name || '';
         return <div key={searchMediaKey(item.id, item.media_type)} className="explorer-result-row">
           <button type="button" className="explorer-row-main" onClick={() => onShowClick(item.id, item.media_type === 'movie' ? 'movie' : 'tv')}>
-            <Thumbnail path={item.poster_path} /><span className="explorer-row-text"><strong><Highlight title={title} query={query} /></strong>
+            <Thumbnail path={item.poster_path} /><span className="explorer-row-text"><strong className="seenit-media-title"><Highlight title={title} query={query} /></strong>
               <small>{item.media_type === 'movie' ? 'Film' : 'Série'}{(item.release_date || item.first_air_date) ? ` · ${(item.release_date || item.first_air_date).slice(0, 4)}` : ''}{item.vote_average > 0 ? ` · ★ ${item.vote_average.toFixed(1)}` : ''}</small></span>
           </button><ResultAction item={item} model={model} />
         </div>;

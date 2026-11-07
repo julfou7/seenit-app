@@ -4,6 +4,7 @@ import { cn, getTodayStr } from '../../lib/utils';
 import { mediaKeyFrom } from '../../features/shows/mediaRelations';
 import { frenchCharacterName } from '../../features/shows/frenchLabels';
 import { DetailCard, DetailChip, DetailSectionTitle } from './detailUi';
+import { LoadMore } from '../../components/cards/HomeLoadMore';
 
 type CastMember = { id: number; name: string; gender?: number | null; profile_path?: string | null; character?: string; roles?: Array<{ character?: string; episode_count?: number }>; total_episode_count?: number; episode_count?: number };
 
@@ -34,7 +35,9 @@ export function CastRows({ cast, isSeries, totalEpisodes, loading, onOpenPerson 
         </span>
       </button>;
     })}
-    {cast.length > 6 && <button type="button" onClick={() => setShowAll(value => !value)} aria-expanded={showAll} className="min-h-11 rounded-[14px] bg-[rgba(24,24,27,0.7)] text-[13px] font-bold text-[#F2C36B] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">{showAll ? 'Réduire' : `Afficher tout le casting (${cast.length})`}</button>}
+    {/* #873 : le seul « Afficher plus » de l'app (portraits des suivants) ; « Réduire » reste une action secondaire. */}
+    {cast.length > 6 && !showAll && <LoadMore round previews={cast.slice(6, 9).map((actor, index) => ({ key: `cast-more-${actor.id}-${index}`, initial: initialsOf(actor.name || '?'), imagePath: actor.profile_path }))} remainingCount={cast.length - 6} step={cast.length} onLoad={() => setShowAll(true)} />}
+    {cast.length > 6 && showAll && <button type="button" onClick={() => setShowAll(false)} aria-expanded className="self-center min-h-11 px-4 text-[13px] font-bold text-zinc-400">Réduire</button>}
   </section>;
 }
 
@@ -87,7 +90,7 @@ export function RelationList({ title, subtitle, parts, currentKey, shows, timeli
         {timeline && <span className="w-5 shrink-0 flex flex-col items-center" aria-hidden="true"><span className="w-0.5 h-2.5" style={{ background: index === 0 ? 'transparent' : '#3f3f46' }} /><span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: state.seen ? '#E5A93D' : here ? '#09090b' : '#3f3f46', boxShadow: here ? 'inset 0 0 0 3px #E5A93D' : 'none' }} /><span className="w-0.5 flex-1" style={{ background: index === parts.length - 1 ? 'transparent' : '#3f3f46' }} /></span>}
         <span className={cn('flex-1 min-w-0 flex gap-3 items-center', timeline ? 'pt-1 pb-3' : 'py-1.5')}>
           <span className="w-11 h-[66px] rounded-lg overflow-hidden bg-zinc-800 shrink-0" style={{ boxShadow: here ? '0 0 0 2px #E5A93D' : 'none' }}>{part.poster_path && <img src={`https://image.tmdb.org/t/p/w154${part.poster_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" />}</span>
-          <span className="flex-1 min-w-0 flex flex-col gap-0.5"><span className="text-[15px] font-bold text-white line-clamp-2">{part.title || part.name}</span><span className="text-[12px] text-zinc-400">{[kind, year].filter(Boolean).join(' · ')}</span><span className={cn('text-[12px] font-bold', here ? 'text-white' : state.seen || state.inLibrary ? 'text-[#F2C36B]' : 'text-zinc-400')}>{state.label}</span></span>
+          <span className="flex-1 min-w-0 flex flex-col gap-0.5"><span className="seenit-media-title text-[15px] font-bold line-clamp-2">{part.title || part.name}</span><span className="text-[12px] text-zinc-400">{[kind, year].filter(Boolean).join(' · ')}</span><span className={cn('text-[12px] font-bold', here ? 'text-white' : state.seen || state.inLibrary ? 'text-[#F2C36B]' : 'text-zinc-400')}>{state.label}</span></span>
         </span>
       </button>;
     })}
