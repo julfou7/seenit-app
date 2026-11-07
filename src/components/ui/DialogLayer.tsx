@@ -131,12 +131,20 @@ export function DialogLayer({ onDismiss, label, historyMode = 'local', canDismis
     const frame = requestAnimationFrame(() => {
       if (activeSurface() === surface) focusInside(surface);
     });
+    // #872 : la zone visible ne suit le clavier que pendant une saisie. Sans champ actif (fiche ouverte
+    // depuis la recherche, clavier refermé), la couche prend toute la fenêtre, même si visualViewport garde
+    // la hauteur ou le décalage mesurés clavier ouvert : sinon le bas de la page sort de l'écran.
     const updateViewport = () => {
       const viewport = window.visualViewport;
-      surface.style.setProperty('--dialog-height', `${viewport?.height ?? window.innerHeight}px`);
-      surface.style.setProperty('--dialog-top', `${viewport?.offsetTop ?? 0}px`);
+      const active = document.activeElement;
+      const editing = active instanceof HTMLElement && (active.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName));
+      surface.style.setProperty('--dialog-height', `${editing && viewport ? viewport.height : window.innerHeight}px`);
+      surface.style.setProperty('--dialog-top', `${editing && viewport ? viewport.offsetTop : 0}px`);
     };
+    const updateAfterFocus = () => requestAnimationFrame(updateViewport);
     updateViewport();
+    document.addEventListener('focusin', updateAfterFocus);
+    document.addEventListener('focusout', updateAfterFocus);
     window.visualViewport?.addEventListener('resize', updateViewport);
     window.visualViewport?.addEventListener('scroll', updateViewport);
     window.addEventListener('resize', updateViewport);
@@ -149,6 +157,8 @@ export function DialogLayer({ onDismiss, label, historyMode = 'local', canDismis
       window.visualViewport?.removeEventListener('resize', updateViewport);
       window.visualViewport?.removeEventListener('scroll', updateViewport);
       window.removeEventListener('resize', updateViewport);
+      document.removeEventListener('focusin', updateAfterFocus);
+      document.removeEventListener('focusout', updateAfterFocus);
       if (!surfaces.size) {
         document.removeEventListener('keydown', handleKey, true);
         document.removeEventListener('focusin', handleFocus);

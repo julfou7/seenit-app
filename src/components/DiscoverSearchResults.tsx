@@ -48,7 +48,7 @@ export function DiscoverSearchResults({ model, characters = [], charactersLoadin
     </section>}
     {(characters.length > 0 || charactersLoading) && <section aria-label="Personnages"><h2>Personnages {charactersLoading ? <small>recherche…</small> : charactersPartial ? <small>liste incomplète, nouvel essai bientôt</small> : null}</h2>
       {characters.map(character => <button type="button" className="explorer-result-row" key={character.id} onClick={() => onCharacterClick?.(character)}>
-        <span className="explorer-row-photo explorer-character-avatar">{characterInitials(character.name)}</span><span className="explorer-row-text"><strong><Highlight title={character.name} query={query} /></strong><small>{character.universe}{character.actors[0] ? ' · ' + character.actors[0].name : ''}</small></span><ChevronRight size={18} className="text-zinc-500 shrink-0" />
+        <span className="explorer-row-photo explorer-character-avatar">{characterInitials(character.name)}</span><span className="explorer-row-text"><strong><Highlight title={character.name} query={query} /></strong><small>{[character.universe, character.actors[0]?.name].filter(Boolean).join(' · ')}</small></span><ChevronRight size={18} className="text-zinc-500 shrink-0" />
       </button>)}
     </section>}
     {(pending || media.length > 0) && <section aria-label="Films et séries TMDB">

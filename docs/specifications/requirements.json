@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.261",
+  "applicationVersion": "1.4.262",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -3426,6 +3426,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/characterSheetAnomalies.test.ts",
+          "contains": "SEENIT-DISCOVER-004 #872 l’univers d’un personnage vient d’une source exacte, sinon il est masqué"
+        },
         {
           "file": "tests/characters.test.ts",
           "contains": "SEENIT-DISCOVER-004"
