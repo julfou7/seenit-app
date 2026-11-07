@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Download } from 'lucide-react';
+import { Download, X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import type { EpisodeDownloadPresentation } from '../../features/downloads/episodeDownloadPresentation';
 
@@ -8,7 +8,8 @@ import type { EpisodeDownloadPresentation } from '../../features/downloads/episo
  * #879 — Mode téléchargement de la fiche série : une surcouche, jamais des boutons partout.
  * Hors mode, la fiche ne garde qu'un bouton ⬇ (avec le nombre de téléchargements actifs) et des
  * pastilles passives sur les vignettes. En mode, le contrôle de sélection remplace le Vu de chaque
- * épisode, le bandeau montre la saison et la barre d'action du bas demande la qualité (1080p ou 4K).
+ * épisode, le bandeau montre la saison (chaque segment se touche) et la barre d'action du bas, compacte,
+ * demande la qualité (1080p ou 4K) sans cacher la liste (retour terrain du 07/11).
  */
 export type EpisodeModeState = 'seen' | EpisodeDownloadPresentation['kind'];
 
@@ -33,6 +34,8 @@ const segmentStyle = (state: EpisodeModeState, picked: boolean, progress?: numbe
   return { background: '#3f3f46' };
 };
 
+const STATE_LABEL: Record<EpisodeModeState, string> = { seen: 'vu', present: 'téléchargé', active: 'en cours', attention: 'à régler', future: 'à venir', available: 'disponible' };
+
 const LEGEND: Array<{ state: EpisodeModeState; one: string; many: string; dot: React.CSSProperties }> = [
   { state: 'seen', one: 'vu', many: 'vus', dot: { background: '#E5A93D' } },
   { state: 'present', one: 'téléchargé', many: 'téléchargés', dot: { background: '#F4F4F5' } },
@@ -40,40 +43,48 @@ const LEGEND: Array<{ state: EpisodeModeState; one: string; many: string; dot: R
   { state: 'attention', one: 'à régler', many: 'à régler', dot: { background: 'rgba(251,113,133,0.6)' } }
 ];
 
-export function DownloadModeBanner({ season, states, progress, picked, allPicked, canPick, onToggleAll, onExit }: {
+export function DownloadModeBanner({ season, states, progress, picked, allPicked, canPick, onToggleAll, onSegment }: {
   season: number; states: readonly { episode: number; state: EpisodeModeState }[]; progress: (episode: number) => number | undefined;
-  picked: ReadonlySet<number>; allPicked: boolean; canPick: boolean; onToggleAll: () => void; onExit: () => void;
+  picked: ReadonlySet<number>; allPicked: boolean; canPick: boolean; onToggleAll: () => void;
+  /** Toucher un segment coche ou décoche son épisode (s'il se coche) et fait défiler jusqu'à sa ligne. */
+  onSegment: (episode: number) => void;
 }) {
   const counts = states.reduce<Record<string, number>>((acc, entry) => { acc[entry.state] = (acc[entry.state] || 0) + 1; return acc; }, {});
   const legend = LEGEND.filter(entry => counts[entry.state]).map(entry => ({ ...entry, label: `${counts[entry.state]} ${counts[entry.state] > 1 ? entry.many : entry.one}` }));
-  return <section aria-label="Mode téléchargement" className="rounded-[18px] bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)] px-3.5 py-3 flex flex-col gap-2.5 animate-in fade-in slide-in-from-top-1 duration-150 motion-reduce:animate-none">
-    <div className="flex items-center gap-2.5">
-      <span className="flex-1 min-w-0"><strong className="block text-[15px] font-extrabold text-[#F2C36B]">Mode téléchargement</strong><span className="text-[12.5px] text-zinc-300">Coche les épisodes de la saison {season} à récupérer.</span></span>
-      <button type="button" onClick={onExit} className="min-h-11 px-3.5 rounded-xl bg-white/10 text-[14px] font-extrabold text-zinc-100 active:scale-95">Terminé</button>
-    </div>
-    <div className="flex gap-[3px]" role="img" aria-label={`Saison ${season} : ${legend.map(entry => entry.label).join(', ') || 'rien de téléchargé'}`}>
-      {states.map(entry => <span key={entry.episode} className="flex-1 h-[7px] rounded-[3px]" style={segmentStyle(entry.state, picked.has(entry.episode), progress(entry.episode))} />)}
+  return <section aria-label="Mode téléchargement" className="rounded-[18px] bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)] px-3.5 pt-3 pb-2 flex flex-col animate-in fade-in slide-in-from-top-1 duration-150 motion-reduce:animate-none">
+    <strong className="text-[15px] font-extrabold text-[#F2C36B]">Mode téléchargement · saison {season}</strong>
+    <span className="text-[12.5px] text-zinc-300">Touche une barre ou un épisode pour le cocher.</span>
+    {/* Segments de 44 × 44 px au minimum : chaque épisode se touche directement ; une longue saison défile
+        horizontalement au lieu de réduire les cibles à quelques pixels. Le numéro situe l'épisode. */}
+    <div className="flex gap-[3px] mt-1 overflow-x-auto hide-scrollbar snap-x" role="group" aria-label={`Saison ${season} : ${legend.map(entry => entry.label).join(', ') || 'rien de téléchargé'}`}>
+      {states.map(entry => {
+        const selectable = isEpisodeSelectable(entry.state);
+        const isPicked = picked.has(entry.episode);
+        return <button key={entry.episode} type="button" data-mode-segment={entry.episode} onClick={() => onSegment(entry.episode)} aria-pressed={selectable ? isPicked : undefined}
+          aria-label={`Épisode ${entry.episode} : ${isPicked ? 'coché' : STATE_LABEL[entry.state]}`} className="flex-1 min-w-11 h-11 shrink-0 snap-start flex flex-col justify-center gap-1 active:scale-95 transition-transform">
+          <span aria-hidden="true" className={cn('text-[10.5px] font-extrabold leading-none text-center', isPicked ? 'text-[#F2C36B]' : 'text-zinc-500')}>{entry.episode}</span>
+          <span className="block w-full h-[9px] rounded-[3px]" style={segmentStyle(entry.state, isPicked, progress(entry.episode))} />
+        </button>;
+      })}
     </div>
     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
       {legend.map(entry => <span key={entry.state} className="inline-flex items-center gap-1.5 text-[12px] font-bold text-zinc-300"><i aria-hidden="true" className="w-[9px] h-[9px] rounded-[3px]" style={entry.dot} />{entry.label}</span>)}
-      {canPick && <button type="button" onClick={onToggleAll} className="ml-auto min-h-11 text-[14px] font-extrabold text-[#F2C36B]">{allPicked ? 'Tout décocher' : 'Tout cocher'}</button>}
+      {canPick && <button type="button" onClick={onToggleAll} className="ml-auto min-h-11 px-3 rounded-xl bg-[rgba(229,169,61,0.14)] text-[13.5px] font-extrabold text-[#F2C36B] active:scale-95">{allPicked ? 'Tout décocher' : 'Tout cocher'}</button>}
     </div>
   </section>;
 }
 
-export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise }: { title: string; detail: string; enabled: boolean; onLaunch: (quality: '1080p' | '4k') => void; onPrecise?: () => void }) {
+export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise, onExit }: { title: string; detail: string; enabled: boolean; onLaunch: (quality: '1080p' | '4k') => void; onPrecise?: () => void; onExit: () => void }) {
   // La fiche vit dans un contexte d'empilement (z-150) sous la navigation (z-160) : la barre passe par un
-  // portail sur document.body pour recouvrir réellement la navigation et recevoir les appuis.
-  const bar = <div role="region" aria-label="Lancer le téléchargement" className="fixed inset-x-2.5 bottom-[calc(10px+env(safe-area-inset-bottom,0px))] z-[170] max-w-md mx-auto rounded-3xl bg-[rgba(22,22,26,0.96)] backdrop-blur-xl p-3 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.13),0_14px_34px_rgba(0,0,0,0.6)] animate-in fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
-    <div className="flex items-baseline justify-between gap-3 px-1">
-      <strong className="min-w-0 truncate text-[15px] font-extrabold text-white">{title}</strong>
-      {onPrecise && <button type="button" onClick={onPrecise} disabled={!enabled} className="shrink-0 min-h-8 text-[13px] font-bold text-zinc-400 disabled:opacity-40">Version précise ›</button>}
-    </div>
-    <p className="px-1 text-[12.5px] text-zinc-400">{detail}</p>
-    <div className="flex gap-2 mt-2.5">
-      <button type="button" disabled={!enabled} onClick={() => onLaunch('1080p')} className="flex-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[16px] font-extrabold active:scale-[0.98] disabled:bg-zinc-800 disabled:text-zinc-500">1080p</button>
-      <button type="button" disabled={!enabled} onClick={() => onLaunch('4k')} className="flex-1 h-12 rounded-[14px] bg-zinc-800 text-zinc-100 text-[16px] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] active:scale-[0.98] disabled:text-zinc-500">4K</button>
-    </div>
+  // portail sur document.body pour recouvrir réellement la navigation et recevoir les appuis. Une seule
+  // ligne de 60 px (retour terrain du 07/11) : la liste n'est plus cachée par un grand panneau.
+  const bar = <div role="region" aria-label="Lancer le téléchargement" data-mode-bar className="fixed inset-x-2.5 bottom-[calc(10px+env(safe-area-inset-bottom,0px))] z-[170] max-w-md mx-auto rounded-[22px] bg-[rgba(22,22,26,0.96)] backdrop-blur-xl p-2 flex items-center gap-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.13),0_14px_34px_rgba(0,0,0,0.6)] animate-in fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
+    <button type="button" onClick={onExit} aria-label="Quitter le mode téléchargement" className="w-11 h-11 shrink-0 grid place-items-center rounded-full bg-white/10 text-zinc-100 active:scale-95"><X size={20} /></button>
+    {onPrecise && enabled
+      ? <button type="button" onClick={onPrecise} className="flex-1 min-w-0 min-h-11 flex flex-col justify-center text-left leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className="text-[12.5px] font-bold text-zinc-400">Version précise ›</span></button>
+      : <span className="flex-1 min-w-0 min-h-11 flex flex-col justify-center leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className="truncate text-[12.5px] text-zinc-400">{detail}</span></span>}
+    <button type="button" disabled={!enabled} onClick={() => onLaunch('1080p')} className="h-11 shrink-0 px-3.5 rounded-[13px] bg-[#E5A93D] text-black text-[15px] font-extrabold active:scale-[0.97] disabled:bg-zinc-800 disabled:text-zinc-500">1080p</button>
+    <button type="button" disabled={!enabled} onClick={() => onLaunch('4k')} className="h-11 shrink-0 px-3.5 rounded-[13px] bg-zinc-800 text-zinc-100 text-[15px] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] active:scale-[0.97] disabled:text-zinc-500">4K</button>
   </div>;
   return typeof document === 'undefined' ? bar : createPortal(bar, document.body);
 }

@@ -8,17 +8,19 @@ const toastSource = readFileSync(
 );
 
 test('SEENIT-UX-004 #878 tous les toasts ont la même taille et coupent le texte au lieu de grandir', () => {
-  // Une seule carte et deux tailles fixes : 76 px, ou 104 px pour un toast d'épisode (retour terrain du 07/11).
+  // Une seule carte et deux gabarits : 76 px, ou 104 px pour un toast d'épisode (retour terrain du 07/11).
+  // Hauteur minimale, jamais fixe (terrain 1.4.259) : une police agrandie fait grandir la carte, sans rogner.
   assert.match(toastSource, /const isEpisodeToast = Boolean\(episodeLabel\);/);
-  assert.match(toastSource, /data-toast-card data-toast-size=\{isEpisodeToast \? 'episode' : 'standard'\} className=\{cn\('seenit-toast w-full relative overflow-hidden min-h-\[64px\][^']*', isEpisodeToast \? 'h-\[104px\]' : 'h-\[76px\]'\)\}/);
+  assert.match(toastSource, /data-toast-card data-toast-size=\{isEpisodeToast \? 'episode' : 'standard'\} className=\{cn\('seenit-toast w-full relative overflow-hidden [^']*', isEpisodeToast \? 'min-h-\[104px\]' : 'min-h-\[76px\]'\)\}/);
+  assert.doesNotMatch(toastSource, /'h-\[(76|104)px\]'|leading-\[18px\]|leading-\[20px\]/, 'ni hauteur de carte ni hauteur de ligne en pixels fixes');
   assert.doesNotMatch(toastSource, /sm:w-auto/);
   assert.doesNotMatch(toastSource, /sm:rounded-full/);
-  // Titre sur deux lignes au plus en lignes de 18 px (2 × 18 + 18 + marges = 76 px : rien n'est rogné), détail sur une ligne.
-  assert.match(toastSource, /text-\[15px\] leading-\[18px\] font-extrabold line-clamp-2 break-words/);
-  assert.match(toastSource, /text-\[13\.5px\] leading-\[18px\] font-semibold text-zinc-200/);
+  // Titre sur deux lignes au plus, hauteurs de ligne relatives et blocs jamais écrasés ; détail sur une ligne.
+  assert.match(toastSource, /shrink-0 text-\[15px\] leading-\[1\.2\] font-extrabold line-clamp-2 break-words/);
+  assert.match(toastSource, /shrink-0 flex items-center gap-1\.5 min-w-0 text-\[13\.5px\] leading-\[1\.33\] font-semibold text-zinc-200/);
   assert.match(toastSource, /<span className="truncate">\{detail\}<\/span>/);
   // Épisode en pastille or « S01 | E03 », comme avant #878, plus de bandeau sur l'affiche.
-  assert.match(toastSource, /\{episodeLabel && \(\s*<span data-toast-episode className="self-start my-0\.5 rounded-md bg-amber-500\/15/);
+  assert.match(toastSource, /\{episodeLabel && \(\s*<span data-toast-episode className="shrink-0 self-start my-0\.5 rounded-md bg-amber-500\/15/);
   assert.doesNotMatch(toastSource, /episodeBand/);
   // Bande gauche : affiche du média (68 px pour un épisode), sinon bande teintée de l'action.
   assert.match(toastSource, /cn\('shrink-0 relative bg-zinc-800 self-stretch', isEpisodeToast \? 'w-\[68px\]' : 'w-14'\)/);

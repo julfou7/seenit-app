@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.259",
+  "applicationVersion": "1.4.260",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -34,6 +34,10 @@
         {
           "file": "tests/downloadMode.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 le lot propose ses épisodes suivants au pack et ne relance pas ceux qu’il a couverts"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre compacte se quitte et le mode amène l’épisode en cours"
         },
         {
           "file": "tests/downloadSearchRuntime.test.ts",

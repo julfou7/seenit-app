@@ -151,6 +151,12 @@ async function testNavbarHarness(client, root) {
     await delay(250);
     const capture=await client.send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true});
     fs.writeFileSync(path.join(root,'quality-reports',`navbar-13j-${width}.png`),Buffer.from(capture.data,'base64'));
+    // Terrain 1.4.259 : un toast d'épisode au titre sur deux lignes n'est jamais rogné, même si Android agrandit la police.
+    await evaluate(client,'window.__nav13j.clearToasts();window.__nav13j.episodeToast()');
+    const toastFits='(()=>{const card=document.querySelector("[data-toast-card][data-toast-size=episode]");if(!card)return false;const title=card.querySelector(".line-clamp-2"),chip=card.querySelector("[data-toast-episode]"),detail=chip.nextElementSibling,c=card.getBoundingClientRect(),t=title.getBoundingClientRect();return Math.abs(t.height-2*parseFloat(getComputedStyle(title).lineHeight))<=1&&t.bottom<=chip.getBoundingClientRect().top+0.5&&detail.getBoundingClientRect().bottom<=c.bottom})()';
+    await check(client,toastFits+' && document.querySelector("[data-toast-card]").getBoundingClientRect().height===104','toast d’épisode : titre entier sur deux lignes, 104 px à police normale');
+    await evaluate(client,'for(const el of document.querySelectorAll("[data-toast-card] span"))el.style.fontSize=(parseFloat(getComputedStyle(el).fontSize)*1.3)+"px"');
+    await check(client,toastFits+' && document.querySelector("[data-toast-card]").getBoundingClientRect().height>104','police agrandie (130 %) : la carte grandit, rien n’est rogné');
     await evaluate(client,'window.__nav13j.clearToasts();window.__nav13j.detail()');
     await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none" && document.querySelector("[data-dialog-layer]").getBoundingClientRect().height>=900','fiche plein écran avec la barre (SEENIT-UX-019)');
     await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});

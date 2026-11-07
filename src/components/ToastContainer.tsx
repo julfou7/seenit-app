@@ -345,8 +345,10 @@ export function ToastContainer() {
             navigationTarget ? "cursor-pointer" : "cursor-grab",
           )}
         >
-          {/* #878 : une seule forme et deux tailles fixes : 76 px, ou 104 px pour un épisode (titre entier, pastille, action). */}
-          <div data-toast-card data-toast-size={isEpisodeToast ? 'episode' : 'standard'} className={cn('seenit-toast w-full relative overflow-hidden min-h-[64px] bg-zinc-900/95 backdrop-blur-xl rounded-[18px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_16px_40px_rgba(0,0,0,0.8)] flex items-stretch', isEpisodeToast ? 'h-[104px]' : 'h-[76px]')}>
+          {/* #878 : une seule forme et deux gabarits : 76 px, ou 104 px pour un épisode (titre entier, pastille, action).
+              Hauteur minimale et non fixe (terrain 1.4.259) : si Android agrandit la police, la carte grandit au
+              lieu de rogner le titre ; à police normale, tous les toasts d'un même gabarit ont la même taille. */}
+          <div data-toast-card data-toast-size={isEpisodeToast ? 'episode' : 'standard'} className={cn('seenit-toast w-full relative overflow-hidden bg-zinc-900/95 backdrop-blur-xl rounded-[18px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_16px_40px_rgba(0,0,0,0.8)] flex items-stretch', isEpisodeToast ? 'min-h-[104px]' : 'min-h-[76px]')}>
 
             {/* Bande gauche : affiche du média (68 px pour un épisode, affiche entière), sinon couleur et icône de l'action. */}
             {hasPoster ? (
@@ -360,26 +362,27 @@ export function ToastContainer() {
               </div>
             )}
 
-            {/* Texte : titre sur deux lignes au plus (lignes de 18 px : deux lignes et le détail tiennent dans 76 px),
-                pastille d'épisode comme avant #878, détail sur une ligne. */}
+            {/* Texte : titre sur deux lignes au plus, pastille d'épisode comme avant #878, détail sur une ligne.
+                Hauteurs de ligne relatives à la police (une police agrandie garde ses lignes entières) et blocs
+                jamais écrasés (shrink-0) : 2 × 18 px + 18 px tiennent dans 76 px à police normale. */}
             <div className="flex-1 py-2.5 pl-3 pr-2.5 flex flex-col justify-center min-w-0 gap-0.5">
               {displayTitle ? (
                 <>
-                  <span className={cn('text-[15px] leading-[18px] font-extrabold line-clamp-2 break-words', isMediaTitle ? 'text-[#F2C36B]' : 'text-zinc-100')}>
+                  <span className={cn('shrink-0 text-[15px] leading-[1.2] font-extrabold line-clamp-2 break-words', isMediaTitle ? 'text-[#F2C36B]' : 'text-zinc-100')}>
                     {displayTitle}
                   </span>
                   {episodeLabel && (
-                    <span data-toast-episode className="self-start my-0.5 rounded-md bg-amber-500/15 px-1.5 text-[12.5px] leading-[20px] font-extrabold tracking-wide text-amber-300 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.3)]">{episodeLabel}</span>
+                    <span data-toast-episode className="shrink-0 self-start my-0.5 rounded-md bg-amber-500/15 px-1.5 text-[12.5px] leading-[1.6] font-extrabold tracking-wide text-amber-300 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.3)]">{episodeLabel}</span>
                   )}
                   {detail && (
-                    <span className="flex items-center gap-1.5 min-w-0 text-[13.5px] leading-[18px] font-semibold text-zinc-200">
+                    <span className="shrink-0 flex items-center gap-1.5 min-w-0 text-[13.5px] leading-[1.33] font-semibold text-zinc-200">
                       {hasPoster && renderIcon()}
                       <span className="truncate">{detail}</span>
                     </span>
                   )}
                 </>
               ) : (
-                <span className="text-[15px] leading-[18px] font-extrabold text-zinc-100 line-clamp-2 break-words">{[episodeLabel, detail].filter(Boolean).join(' · ')}</span>
+                <span className="shrink-0 text-[15px] leading-[1.2] font-extrabold text-zinc-100 line-clamp-2 break-words">{[episodeLabel, detail].filter(Boolean).join(' · ')}</span>
               )}
             </div>
 

@@ -250,7 +250,8 @@ basse. Si elle est ouverte depuis une fiche personne de l'onglet, Retour restaur
 et le focus du bouton utilisé ; un dialogue bloquant couvre la navigation et rend le fond inerte.
 
 Un toast fait 76 px de haut ; un toast d'épisode (épisode vu, Plex) fait 104 px pour afficher le titre
-entier, l'épisode en pastille or « S01 | E03 » et l'action (`SEENIT-UX-004`).
+entier, l'épisode en pastille or « S01 | E03 » et l'action (`SEENIT-UX-004`). Ce sont des hauteurs
+minimales : avec une police Android agrandie, la carte grandit au lieu de rogner le titre.
 
 Les toasts internes qui confirment l'ajout à **À voir** ou le passage à **Vu / Terminée** sont aussi des
 raccourcis de navigation : leur surface principale ouvre la fiche Film/Série uniquement avec l'identité
@@ -519,8 +520,9 @@ sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L
 trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
 et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮ ;
 hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Une série
-n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office,
-bandeau de saison, barre 1080p / 4K à la place de la navigation). Dans la liste d'une saison, un épisode vu
+n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
+et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
+ligne à la place de la navigation). Dans la liste d'une saison, un épisode vu
 a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »
 à droite, sans bouton Vu. Depuis les retours de la v1.4.247, le bouton
 or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, genres et thèmes sont sous le synopsis, tout est

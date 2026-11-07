@@ -132,16 +132,36 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const modeStates = modeSeason === null ? [] : seasonModeStates(selectedEpisodes, episode => Boolean(show?.seenEpisodes?.includes(`${modeSeason}x${episode}`)), episodePresentation, modeToday);
   const selectableEpisodes = modeStates.filter(entry => isEpisodeSelectable(entry.state)).map(entry => entry.episode);
   const activeDownloads = modeStates.filter(entry => entry.state === 'active').length;
+  // Retour terrain du 07/11 : entrer dans le mode amène l'épisode où on en est au centre de l'écran, et
+  // toucher un segment du bandeau amène sa ligne. La demande reste en attente tant que la ligne n'est pas
+  // rendue (saison encore en chargement) et se rejoue à l'arrivée des épisodes ; quitter le mode l'annule.
+  const [episodeScroll, setEpisodeScroll] = useState<{ episode: number; id: number } | null>(null);
+  const requestEpisodeScroll = (episode: number) => setEpisodeScroll(previous => ({ episode, id: (previous?.id || 0) + 1 }));
+  useEffect(() => {
+    if (!episodeScroll) return;
+    const frame = requestAnimationFrame(() => {
+      const row = mainScrollRef.current?.querySelector<HTMLElement>(`[data-episode-row="${episodeScroll.episode}"]`);
+      if (!row) return;
+      const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      row.scrollIntoView({ block: 'center', behavior: reduce ? 'auto' : 'smooth' });
+      setEpisodeScroll(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [episodeScroll, mainScrollRef, selectedEpisodes]);
   const enterDownloadMode = () => {
     if (!canUseDownloadMode) return;
-    const next = nextEp && nextEp.season_number === modeSeason && selectableEpisodes.includes(nextEp.episode_number) ? [nextEp.episode_number] : [];
+    const nextInSeason = nextEp && nextEp.season_number === modeSeason ? nextEp.episode_number : null;
+    const next = nextInSeason !== null && selectableEpisodes.includes(nextInSeason) ? [nextInSeason] : [];
     setPickedEpisodes(new Set(next));
     setDownloadMode(true);
+    const target = nextInSeason ?? selectableEpisodes[0] ?? modeStates.find(entry => entry.state !== 'seen')?.episode;
+    if (target !== undefined) requestEpisodeScroll(target);
   };
-  const exitDownloadMode = () => { setDownloadMode(false); setPickedEpisodes(new Set()); };
+  const exitDownloadMode = () => { setDownloadMode(false); setPickedEpisodes(new Set()); setEpisodeScroll(null); };
   const toggleDownloadMode = () => (downloadMode ? exitDownloadMode() : enterDownloadMode());
   const togglePickedEpisode = (episode: number) => setPickedEpisodes(previous => { const next = new Set(previous); if (next.has(episode)) next.delete(episode); else next.add(episode); return next; });
   const allPicked = selectableEpisodes.length > 0 && selectableEpisodes.every(episode => pickedEpisodes.has(episode));
+  const pickSegment = (episode: number) => { if (selectableEpisodes.includes(episode)) togglePickedEpisode(episode); requestEpisodeScroll(episode); };
   // Changer de saison vide la sélection (la barre d'action ne vise qu'une saison).
   useEffect(() => { setPickedEpisodes(new Set()); }, [modeSeason]);
   // Changer d'onglet ferme le mode comme toute superposition.
@@ -155,7 +175,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const pickedTitle = !pickedList.length ? 'Coche des épisodes' : pickedList.length === 1 && modeSeason !== null
     ? `${episodeCode(modeSeason, pickedList[0])} · ${selectedEpisodes?.find((entry: { episode_number: number; name?: string }) => entry.episode_number === pickedList[0])?.name || `Épisode ${pickedList[0]}`}`
     : `${pickedList.length} épisodes`;
-  const pickedDetail = !pickedList.length ? 'Touche un épisode pour le cocher.' : pickedList.length === 1 ? 'En quelle qualité ?' : `Saison ${modeSeason} · en quelle qualité ?`;
+  const pickedDetail = 'Touche une barre ou un épisode.';
   /** Lance les épisodes cochés avec les mêmes gardes que la popup : rien n'est remplacé ni relancé en double. */
   const launchPickedEpisodes = async (quality: DownloadQualityChoice) => {
     if (modeSeason === null || !pickedList.length || !effectiveTmdbId) return;
@@ -247,7 +267,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         {isSeries && <>
           <SeasonAverageChart averages={averages} />
           <SeasonPills seasons={seasons} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }} />
-          {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={() => setPickedEpisodes(allPicked ? new Set() : new Set(selectableEpisodes))} onExit={exitDownloadMode} />}
+          {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={() => setPickedEpisodes(allPicked ? new Set() : new Set(selectableEpisodes))} onSegment={pickSegment} />}
           {selectedSeason && <SeasonPanel season={selectedSeason} episodes={selectedEpisodes} show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
             downloadMode={canUseDownloadMode ? { active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode } : null}
             episodesHasFile={model.presence.episodesHasFile}
@@ -273,7 +293,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       {selectedPersonId && <PersonDetailModal personId={selectedPersonId} hint={(() => { const member = cast.find((entry: { id: number }) => entry.id === selectedPersonId); return member ? { name: member.name, profile_path: member.profile_path, character: member.roles?.[0]?.character || member.character } : undefined; })()} origin={show || (effectiveTmdbId ? { id: '', userId: '', tmdbId: Number(effectiveTmdbId), title, mediaType: isSeries ? 'tv' : 'movie', posterPath: posterPath || null, backdropPath: backdropUrl || null, status: 'plan_to_watch', seenEpisodes: [], episodeRecords: {}, isArchived: false, createdAt: 0, updatedAt: 0 } as unknown as typeof show : null)}
         onClose={() => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); }}
         onShowClick={(tmdbId, type) => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) || (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) || (show?.id && String(show.id) === String(tmdbId)); if (!isSameShow && onShowClick) setTimeout(() => onShowClick(tmdbId, type || 'movie'), 50); }} />}
-      {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={openPreciseVersion} />}
+      {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={openPreciseVersion} onExit={exitDownloadMode} />}
       {trailerModalVideos && <TrailerModal videos={trailerModalVideos} onClose={() => setTrailerModalVideos(null)} />}
       {isDownloadModalOpen && <Suspense fallback={<span role="status">Ouverture du téléchargement…</span>}><DownloadModal isOpen={isDownloadModalOpen} onClose={() => { setIsDownloadModalOpen(false); setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); }} title={title} originalTitle={tmdbDetails?.original_title || tmdbDetails?.original_name || show?.originalTitle} year={(tmdbDetails?.release_date || tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4)} mediaType={isSeries ? 'tv' : 'movie'} tmdbId={effectiveTmdbId} tvdbId={tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId} imdbId={tmdbDetails?.external_ids?.imdb_id || show?.imdbId} posterPath={posterPath || tmdbDetails?.poster_path || show?.posterPath} initialSeason={downloadTargetSeason} initialEpisode={downloadTargetEpisode} totalSeasons={tmdbDetails?.number_of_seasons || seasons.length || 1} seasonsData={tmdbDetails?.seasons} onSuccessToast={(msg) => showToast(msg, 'success', show || undefined)} /></Suspense>}
     </div>
