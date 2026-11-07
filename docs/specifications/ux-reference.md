@@ -308,7 +308,7 @@ Règles décidées par le propriétaire (`USR-2026-11-06-002`, `USR-2026-11-06-0
 - **Titres média en or.** Tout titre de film ou de série s'affiche en `#F2C36B`, quelle que soit la
   surface (cartes, grilles, listes, rails, fiches, recherche, téléchargements, notifications in-app).
   Les titres d'épisode, personnes, personnages, noms de releases et notifications système Android en
-  sont exclus. Dans une recherche, le titre reste en or et le terme cherché est souligné (#874). Un
+  sont exclus. Exception (07/11) : dans les résultats de recherche, titres en blanc et terme cherché en or. Un
   seul jeton : `--seenit-media-title` / classe `seenit-media-title`.
 - **Un seul « Afficher plus ».** Toute pagination progressive utilise le motif `HomeLoadMore` :
   pastille de 52 px en liste ou tuile en fin de carrousel, trois vignettes rondes des prochains

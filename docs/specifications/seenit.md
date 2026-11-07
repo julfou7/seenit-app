@@ -1553,10 +1553,11 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   d'identité média ni de position de la fiche n'est introduit.
 - **SEENIT-UX-020** — Règles visuelles durables du 06/11/2026 (`USR-2026-11-06-002`, `USR-2026-11-06-003`,
   détail dans `docs/specifications/ux-reference.md` §9). Tout titre de film ou de série s'affiche en or
-  `#F2C36B` sur toutes les surfaces PWA/APK (cartes, grilles, listes, rails, fiches, recherche,
-  téléchargements, notifications in-app), y compris une fois lu ; les titres d'épisode, personnes,
-  personnages, noms de releases et notifications système Android en sont exclus, et le terme d'une
-  recherche est souligné plutôt que recoloré. Toute pagination progressive réutilise `HomeLoadMore`
+  `#F2C36B` sur toutes les surfaces PWA/APK (cartes, grilles, listes, rails, fiches, téléchargements,
+  notifications in-app), y compris une fois lu ; les titres d'épisode, personnes, personnages, noms de
+  releases et notifications système Android en sont exclus. Exception voulue par le propriétaire le
+  07/11 (`USR-2026-11-07-001`) : dans les résultats de recherche, les titres restent clairs (blancs) et
+  seul le terme cherché est en or. Toute pagination progressive réutilise `HomeLoadMore`
   (pastille de liste ou tuile de fin de carrousel, trois prochaines vignettes, « Afficher N de plus » /
   « Afficher les N » / « Afficher la dernière » et « X en attente ») ; aucun bouton texte de pagination
   séparé. **État : livrée (#874, #873).** Le jeton `--seenit-media-title` (classe `seenit-media-title`)
