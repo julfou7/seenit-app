@@ -26,6 +26,7 @@ import { DownloadModeBanner, DownloadModeBar, DownloadModeToggle, isEpisodeSelec
 import { SeenItRing } from '../components/SeenItLogo';
 import { episodeDownloadPresentation } from '../features/downloads/episodeDownloadPresentation';
 import type { DownloadQualityChoice } from '../features/downloads/downloadLaunch';
+import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
 
 interface ShowDetailViewProps {
   model: ShowDetailViewModel;
@@ -127,7 +128,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const canUseDownloadMode = isSeries && downloadsEnabled && Boolean(effectiveTmdbId);
   const modeToday = getTodayStr();
   const modeSeason = selectedSeason?.season_number ?? null;
-  const episodePresentation = (episode: number, aired: boolean) => episodeDownloadPresentation(episode, aired, Boolean(modeSeason !== null && model.presence.episodesHasFile?.[`${modeSeason}x${episode}`]), modeSeason !== null ? model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, modeSeason, episode) : null);
+  const episodePresentation = (episode: number, aired: boolean) => episodeDownloadPresentation(episode, aired, Boolean(modeSeason !== null && model.presence.episodesHasFile?.[episodePresenceKey(modeSeason, episode)]), modeSeason !== null ? model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, modeSeason, episode) : null);
   // Pas de mémorisation : la file en direct (lue par une fonction stable du store) doit être relue à chaque rendu.
   const modeStates = modeSeason === null ? [] : seasonModeStates(selectedEpisodes, episode => Boolean(show?.seenEpisodes?.includes(`${modeSeason}x${episode}`)), episodePresentation, modeToday);
   const selectableEpisodes = modeStates.filter(entry => isEpisodeSelectable(entry.state)).map(entry => entry.episode);
@@ -198,7 +199,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       posterPath: show?.posterPath || undefined, season, episodes, qualityPreference: quality,
       readConfig: () => useDownloadConfigStore.getState(),
       // Mêmes gardes que la popup : un fichier présent n'est jamais remplacé, pas de double lancement.
-      skip: episode => Boolean(model.presence.episodesHasFile?.[`${season}x${episode}`]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
+      skip: episode => Boolean(model.presence.episodesHasFile?.[episodePresenceKey(season, episode)]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
       // Un épisode : tous les messages ; plusieurs : seulement les erreurs (le bilan reste dans Téléchargements).
       notify: (episode, action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: show?.posterPath }, toastType); }
     });

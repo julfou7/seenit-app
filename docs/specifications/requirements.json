@@ -44,6 +44,10 @@
           "contains": "SEENIT-DOWNLOAD-014 #879 les pastilles de saison montrent la part vue et un téléchargement actif"
         },
         {
+          "file": "tests/episodePresenceKey.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 un épisode téléchargé dans Sonarr est reconnu par la fiche, le mode et la popup"
+        },
+        {
           "file": "tests/downloadSearchRuntime.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 un pack de saison sert tout le lot : les épisodes demandés sont sélectionnés ensemble dans le transfert exact"
         },

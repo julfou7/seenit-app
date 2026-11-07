@@ -61,7 +61,7 @@ test('SEENIT-DOWNLOAD-014 #879 le lancement garde les gardes de la popup et une 
   assert.match(body, /if \(!isDownloadFeatureEnabled\(config\)\) return;/);
   assert.match(body, /if \(model\.presence\.loading\) \{/);
   assert.match(body, /if \(!\(config\.sonarrUrl && config\.sonarrApiKey\)\)/);
-  assert.match(body, /skip: episode => Boolean\(model\.presence\.episodesHasFile\?\.\[`\$\{season\}x\$\{episode\}`\]\)/, 'un fichier présent n’est jamais remplacé');
+  assert.match(body, /skip: episode => Boolean\(model\.presence\.episodesHasFile\?\.\[episodePresenceKey\(season, episode\)\]\)/, 'un fichier présent n’est jamais remplacé');
   assert.match(body, /\|\| Boolean\(model\.hasActiveDownloadInScope\?\.\(\{ mediaType: 'tv', tmdbId: Number\(effectiveTmdbId\), seasonNumber: season, episodeNumber: episode \}\)\)/, 'pas de double lancement');
   assert.match(body, /readConfig: \(\) => useDownloadConfigStore\.getState\(\),/, 'configuration relue avant chaque épisode');
   assert.match(readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8'), /hasActiveDownloadInScope: scope => hasActiveDownloadInScope\(useLiveDownloadStore\.getState\(\)\.downloads, scope\)/, 'même garde que la popup, fournie par le cœur');

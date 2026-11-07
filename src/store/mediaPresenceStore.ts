@@ -3,6 +3,10 @@ import { useDownloadConfigStore } from './downloadConfigStore';
 import { executeGet, cleanUrl } from '../services/sonarrRadarr';
 import { checkPlexAvailability, PlexMediaInfo } from '../features/plex/plexAvailability';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
+import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
+
+/** Champs d'un épisode Sonarr lus par la présence (#879, typés au lieu de `any`). */
+type SonarrEpisodeLike = { seasonNumber: number; episodeNumber: number; hasFile?: boolean };
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
@@ -191,15 +195,14 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
           });
 
           if (match && match.id) {
-            const episodes: any[] = await executeGet(`${sonarrBase}/api/v3/episode?seriesId=${match.id}`, headers).catch(() => []);
+            const episodes: SonarrEpisodeLike[] = await executeGet(`${sonarrBase}/api/v3/episode?seriesId=${match.id}`, headers).catch(() => []);
             if (Array.isArray(episodes) && episodes.length > 0) {
-              const episodesBySeason: Record<number, any[]> = {};
+              const episodesBySeason: Record<number, SonarrEpisodeLike[]> = {};
 
-              episodes.forEach((ep: any) => {
+              episodes.forEach((ep) => {
                 const sNum = ep.seasonNumber;
                 const eNum = ep.episodeNumber;
-                const key = `S${sNum}E${eNum}`;
-                episodesHasFile[key] = !!ep.hasFile;
+                episodesHasFile[episodePresenceKey(sNum, eNum)] = !!ep.hasFile;
 
                 if (sNum > 0) {
                   if (!episodesBySeason[sNum]) episodesBySeason[sNum] = [];
@@ -210,13 +213,13 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
               Object.entries(episodesBySeason).forEach(([sNumStr, epList]) => {
                 const sNum = Number(sNumStr);
                 if (epList.length > 0) {
-                  seasonsHasFile[sNum] = epList.every((ep: any) => ep.hasFile === true);
+                  seasonsHasFile[sNum] = epList.every((ep) => ep.hasFile === true);
                 }
               });
 
-              const allMainEps = episodes.filter((ep: any) => ep.seasonNumber > 0);
+              const allMainEps = episodes.filter((ep) => ep.seasonNumber > 0);
               if (allMainEps.length > 0) {
-                sonarrHasFile = allMainEps.every((ep: any) => ep.hasFile === true);
+                sonarrHasFile = allMainEps.every((ep) => ep.hasFile === true);
               }
             }
           }
