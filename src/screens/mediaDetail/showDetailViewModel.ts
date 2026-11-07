@@ -38,6 +38,8 @@ export interface ShowDetailViewModel {
   setDownloadTargetEpisode: (value: number | undefined) => void; setDownloadTargetSeason: (value: number | undefined) => void;
   presence: MediaPresenceData;
   getEpisodeDownload: (tmdbId?: number | string, tvdbId?: number | string, season?: number, episode?: number) => LiveDownloadItem | null;
+  /** #879 — Garde partagée avec la popup : une demande est-elle déjà active dans ce périmètre ? */
+  hasActiveDownloadInScope?: (scope: { mediaType: 'movie' | 'tv'; tmdbId: number; seasonNumber?: number; episodeNumber?: number }) => boolean;
   isDownloadModalOpen: boolean; setIsDownloadModalOpen: (open: boolean) => void;
   dropShow: () => unknown; followShow: () => unknown; resumeShow: () => unknown; rewatchShow: () => unknown;
   handleAnimatedBack: () => void; handleDeleteShow: () => unknown; handleShare: () => Promise<unknown> | unknown; handleSyncSingle: () => unknown; handleWatchNextEpisode: () => void;

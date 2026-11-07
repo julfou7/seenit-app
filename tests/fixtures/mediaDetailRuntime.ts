@@ -52,3 +52,6 @@ export const getDoc = async () => ({ exists: () => false, data: () => ({}) });
 export const setDoc = async () => {};
 export const onSnapshot = () => () => {};
 export const onAuthStateChanged = () => () => {};
+
+// #879 : le lancement Sonarr/Radarr reste hors du harnais de la fiche (aucun réseau).
+export const launchArrDownload = async () => {};

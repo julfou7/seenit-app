@@ -124,7 +124,8 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
     if (!uid || auth.currentUser?.uid !== uid) return;
     const next = [...new Set([...readUserScopedJson<string[]>(uid, 'home_dismissed_notifications', []), notice.id])].slice(-500);
     setDismissed(next); writeUserScopedJson(uid, 'home_dismissed_notifications', next);
-    useToastStore.getState().showToast('Notification retirée', 'info', undefined, () => {
+    // #878 : le toast porte le média retiré (affiche + titre) ; le type info reste non navigable.
+    useToastStore.getState().showToast('Notification retirée', 'info', notice.show, () => {
       if (auth.currentUser?.uid !== uid) return;
       const restored = readUserScopedJson<string[]>(uid, 'home_dismissed_notifications', []).filter(id => id !== notice.id);
       setDismissed(restored); writeUserScopedJson(uid, 'home_dismissed_notifications', restored);

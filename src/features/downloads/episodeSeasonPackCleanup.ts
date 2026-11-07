@@ -7,6 +7,8 @@ export interface TrackedSeasonPackFallback {
   seasonNumber: number;
   episodeNumber: number;
   episodeId?: number;
+  /** #879 — Autres épisodes du même lot sélectionnés dans ce pack : le nettoyage attend aussi leur import. */
+  extraEpisodes?: Array<{ episodeNumber: number; episodeId?: number }>;
   title?: string;
   createdAt: number;
   cleanedUp?: boolean;
@@ -172,7 +174,7 @@ export async function checkEpisodeImportedInSonarr(
     const episodes = await client.get(`${base}/api/v3/episode?seriesId=${target.seriesId}`, headers);
     if (Array.isArray(episodes)) {
       const match = episodes.find(
-        (ep: any) => Number(ep.seasonNumber) === Number(target.seasonNumber)
+        (ep: { seasonNumber?: unknown; episodeNumber?: unknown; hasFile?: unknown }) => Number(ep.seasonNumber) === Number(target.seasonNumber)
            && Number(ep.episodeNumber) === Number(target.episodeNumber)
       );
       return match ? match.hasFile === true : false;
@@ -209,7 +211,7 @@ export async function cleanupSeasonPackFromSonarrAndQbit(
 
     try {
       const res = await client.get(`${sonarrBase}/api/v3/queue?pageSize=100`, sonarrHeaders);
-      const queue: any[] = Array.isArray(res) ? res : (Array.isArray(res?.records) ? res.records : []);
+      const queue: Array<{ id?: unknown; downloadId?: unknown }> = Array.isArray(res) ? res : (Array.isArray(res?.records) ? res.records : []);
       const matching = queue.filter(
         rec => normalizeDownloadClientId(rec.downloadId) === normalizedTargetId
       );
@@ -298,12 +300,22 @@ export async function processTrackedSeasonPackFallbacks(
     pack.lastCheckedAt = now;
     updatedAny = true;
 
-    const isImported = await checkEpisodeImportedInSonarr(config.sonarrUrl, config.sonarrApiKey, {
-      seriesId: pack.seriesId,
-      seasonNumber: pack.seasonNumber,
-      episodeNumber: pack.episodeNumber,
-      episodeId: pack.episodeId
-    }, transport);
+    // Le pack n'est retiré qu'une fois tous ses épisodes sélectionnés importés : retirer le torrent
+    // après le premier couperait le téléchargement des autres épisodes du même lot.
+    const selectedEpisodes = [
+      { episodeNumber: pack.episodeNumber, episodeId: pack.episodeId },
+      ...(Array.isArray(pack.extraEpisodes) ? pack.extraEpisodes : [])
+    ];
+    let isImported = true;
+    for (const selected of selectedEpisodes) {
+      isImported = await checkEpisodeImportedInSonarr(config.sonarrUrl, config.sonarrApiKey, {
+        seriesId: pack.seriesId,
+        seasonNumber: pack.seasonNumber,
+        episodeNumber: selected.episodeNumber,
+        episodeId: selected.episodeId
+      }, transport);
+      if (!isImported) break;
+    }
 
     if (isImported) {
       const cleanupResult = await cleanupSeasonPackFromSonarrAndQbit(pack.downloadId, config, transport);

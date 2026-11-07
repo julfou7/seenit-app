@@ -46,13 +46,18 @@ async function testDownloadsHarness(client, root) {
     await evaluate(client, `(()=>{const input=document.querySelector('input[data-navigation-search]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Titre');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     await evaluate(client, 'document.querySelector("form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
     await check(client, 'document.body.innerText.includes("503") && !document.body.innerText.includes("Aucune release trouvée")', 'panne distincte d’un résultat vide');
+    // #879 : mode téléchargement — le contrôle remplace le Vu, le prochain épisode est déjà coché.
     await evaluate(client, 'window.__downloads.mount("episodes")');
-    await check(client, 'document.querySelector(\'[aria-label="Télécharger l’épisode 1"]\')', 'commande épisode réelle');
-    await evaluate(client, 'document.querySelector(\'[aria-label="Télécharger l’épisode 1"]\').click()');
-    await check(client, 'window.__downloads.telemetry.requested.includes(1)&&!window.__downloads.telemetry.opened.includes("episode:1")', 'télécharger ne déclenche pas l’ouverture');
-    await check(client, 'document.querySelector(\'[aria-label="Épisode 3 disponible"]\').disabled && document.querySelector(\'[aria-label^="Téléchargement de l’épisode 2"]\').disabled', 'présent et actif sans double envoi');
-    await check(client, 'document.documentElement.scrollWidth<=innerWidth', 'titres et actions épisode sans débordement');
-    await check(client, '(()=>{const b=document.querySelector(\'[aria-label="Télécharger la saison 2"]\');const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44&&b.parentElement.parentElement.textContent.includes("Saison 2")&&!b.textContent.trim()})()', 'saison disponible par icône dans son en-tête');
+    await check(client, 'document.querySelector(\'[role=checkbox][aria-label="Télécharger l’épisode 1"][aria-checked="true"]\')', 'prochain épisode coché en mode');
+    await check(client, '!document.querySelector(\'[aria-label^="Marquer l’épisode"]\')', 'en mode, le contrôle remplace le Vu');
+    await evaluate(client, 'document.querySelector(\'[role=checkbox][aria-label="Télécharger l’épisode 4"]\').click()');
+    await check(client, 'window.__downloads.telemetry.requested.includes(4)&&!window.__downloads.telemetry.opened.includes("episode:4")&&document.querySelector(\'[aria-label="Télécharger l’épisode 4"]\').getAttribute("aria-checked")==="true"', 'cocher ne déclenche pas l’ouverture');
+    await check(client, '!document.querySelector(\'[role=checkbox][aria-label$="épisode 3"]\')&&document.querySelector(\'[aria-label="Épisode 3 téléchargé"]\')&&!document.querySelector(\'[role=checkbox][aria-label$="épisode 2"]\')&&document.querySelector(\'[aria-label="Épisode 2 : 30 %"]\')', 'présent et actif sans double envoi');
+    await check(client, '(()=>{const b=document.querySelector(\'[aria-label="Télécharger l’épisode 1"]\').getBoundingClientRect();return b.width>=44&&b.height>=44})()', 'contrôle de 44 px');
+    await check(client, 'document.documentElement.scrollWidth<=innerWidth&&!document.querySelector(\'[aria-label="Télécharger la saison 2"]\')', 'titres sans débordement, plus de bouton de saison');
+    // Hors mode : aucune commande de téléchargement, seulement des pastilles passives.
+    await evaluate(client, 'window.__downloads.mount("episodes-normal")');
+    await check(client, '!document.querySelector("[role=checkbox]")&&!document.querySelector(\'[aria-label^="Télécharger l’épisode"]\')&&document.body.innerText.includes("✓ Prêt")&&document.body.innerText.includes("30 %")', 'fiche propre hors mode, pastilles passives');
     await evaluate(client, 'window.__downloads.mount("modal")');
     await check(client, 'document.querySelector(".download-dialog__choices") && document.querySelectorAll(".download-dialog__choices button").length===2', 'vrai sélecteur de qualité monté');
     await check(client, '(()=>{const d=document.querySelector(".download-dialog").getBoundingClientRect();return d.top>=16&&d.bottom<=innerHeight-16&&document.documentElement.scrollWidth<=innerWidth})()', 'popup et titre long contenus en 360/412');

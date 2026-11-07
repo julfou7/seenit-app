@@ -1,8 +1,50 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.257",
+  "applicationVersion": "1.4.258",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
+    {
+      "id": "SEENIT-DOWNLOAD-014",
+      "title": "Mode téléchargement de la fiche série, sans commandes permanentes",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 seul un épisode sorti, sans fichier ni téléchargement actif, se coche (un échec se relance)"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 hors mode la fiche reste propre ; en mode le contrôle remplace le Vu"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la saison change vide la sélection, l’onglet ferme le mode"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 le lancement garde les gardes de la popup et une seule voie Sonarr"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 un lot d’épisodes s’arrête dès que le compte, le gate ou le serveur Sonarr change"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 le lot propose ses épisodes suivants au pack et ne relance pas ceux qu’il a couverts"
+        },
+        {
+          "file": "tests/downloadSearchRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 un pack de saison sert tout le lot : les épisodes demandés sont sélectionnés ensemble dans le transfert exact"
+        },
+        {
+          "file": "tests/episodeSeasonPackCleanup.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 un pack partagé par un lot n’est retiré qu’après l’import de tous ses épisodes"
+        }
+      ]
+    },
     {
       "id": "SEENIT-DOWNLOAD-013",
       "title": "Téléchargements sobres, sélecteur de qualité, commandes épisode et lancements sans faux succès",
@@ -2277,7 +2319,7 @@
     },
     {
       "id": "SEENIT-UX-004",
-      "title": "Toasts mobiles longs lisibles et bilan Plex multi-lignes contrôlable",
+      "title": "Toasts à taille unique, bande média ou action, et bilan Plex contrôlable",
       "targets": [
         "pwa",
         "apk"
@@ -2285,7 +2327,7 @@
       "tests": [
         {
           "file": "tests/toastLayout.test.ts",
-          "contains": "SEENIT-UX-004 les toasts longs reviennent à la ligne sans troncature sur mobile"
+          "contains": "SEENIT-UX-004 #878 tous les toasts ont la même taille et coupent le texte au lieu de grandir"
         },
         {
           "file": "tests/toastLayout.test.ts",
@@ -2317,7 +2359,11 @@
         },
         {
           "file": "tests/plexToastSummary.test.ts",
-          "contains": "SEENIT-UX-004 le bilan final Plex utilise un bloc multi-lignes avec identité Plex"
+          "contains": "SEENIT-UX-004 le bilan final Plex utilise la bande Plex, un titre et une ligne de détail"
+        },
+        {
+          "file": "tests/plexToastSummary.test.ts",
+          "contains": "SEENIT-UX-004 #878 le sous-titre d’un toast n’est jamais perdu : code d’épisode sur l’affiche, contexte dans le détail"
         }
       ]
     },

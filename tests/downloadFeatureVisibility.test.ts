@@ -68,8 +68,10 @@ test('SEENIT-DOWNLOAD-VISIBILITY-001 verrouille toutes les mentions de télécha
   }
   assert.match(showWrapperSource, /button:has\(svg\.lucide-download\)/);
   assert.match(view, /const downloadsEnabled = useDownloadConfigStore\(isDownloadFeatureEnabled\)/);
-  assert.match(view, /onDownloadEpisode=\{downloadsEnabled \?/);
-  assert.match(view, /onDownloadSeason=\{downloadsEnabled \?/);
+  // #879 : le mode téléchargement remplace les commandes par ligne et de saison, sous le même gate.
+  assert.match(view, /const canUseDownloadMode = isSeries && downloadsEnabled && Boolean\(effectiveTmdbId\)/);
+  assert.match(view, /downloadMode=\{canUseDownloadMode \? \{ active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode \} : null\}/);
+  assert.doesNotMatch(view, /onDownloadEpisode=|onDownloadSeason=/);
   assert.match(liveStoreSource, /downloads:\s*\[\]/);
 
   // Détail épisode : plus de bouton Télécharger ni de bannière live ; le gate reste en place.

@@ -48,3 +48,13 @@ Le reçu de l'événement Download porte désormais le texte « Import Plex term
 dans le worker natif. Cette copie produit ne constitue pas une preuve d'indexation Plex : seul le
 contrôle exact existant autorise « Disponible dans Plex ». Identifiant, canal, cache d'images et
 isolation UID sont conservés ; le visuel de ce reçu doit encore être vérifié séparément sur One UI.
+
+## Refonte #879 — mode téléchargement (06/11)
+
+Maquettes : canvas Design, rangée « 8 · Téléchargements v2 ». Les commandes par épisode et l'icône de
+saison décrites plus haut sont remplacées par le **mode téléchargement** de `SEENIT-DOWNLOAD-014` : hors
+mode, un seul bouton ⬇ dans la carte de progression et des pastilles passives ; en mode, le contrôle
+remplace le Vu, le prochain épisode est coché, un bandeau montre la saison et une barre d'action demande
+1080p ou 4K. Le lancement est partagé avec la popup (`launchArrDownload`). Lots suivants (#879) : onglet
+Téléchargements au style À voir (séries groupées, barre de saison, ajout à la volée), page Version
+précise, menu ⋮ ancré, programmation Sonarr/Radarr des épisodes à venir, film.

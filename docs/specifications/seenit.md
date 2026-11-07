@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.257**
+Version applicative : **1.4.258**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -638,8 +638,13 @@ n'est rouverte que par une nouvelle décision produit explicite.
     toucher ; **Vu, puis Ex** ; réaction 👎 👍 ❤️ une fois vu (enregistrée dans l'épisode) ; Où regarder ;
     Reddit verrouillé avant visionnage ; Précédent / Suivant, swipe et flèches (`SEENIT-UX-008`).
   Les actions de cycle de vie (partager, synchroniser, abandonner/reprendre, retirer, supprimer) et
-  l'entrée existante **Téléchargement** restent dans le menu ⋮. Les fiches n'exposent plus de bouton
-  de téléchargement en ligne. Les cibles tactiles restent d'au moins 44 px.
+  l'entrée existante **Téléchargement** restent dans le menu ⋮. Hors du mode téléchargement
+  (`SEENIT-DOWNLOAD-014`, #879), une fiche n'expose aucune commande de téléchargement par ligne ou par
+  saison : seulement le bouton ⬇ de la carte de progression d'une série, sous le gate personnel. Dans la
+  liste d'une saison, toutes les lignes gardent la même taille et leur photo : un épisode vu a sa photo
+  grisée, le tampon VU de l'accueil, son titre barré et sa date de visionnage quand elle est connue ; un
+  épisode à venir a un fond hachuré, sa date de sortie sous le titre et le délai (« Dans 8 jours ») à
+  droite, sans bouton Vu. Les cibles tactiles restent d'au moins 44 px.
   Retours terrain v1.4.247 (03/11/2026) :
   - le bouton or de la série est **Voir SxxEyy** : il ouvre la fiche du prochain épisode à voir, sans
     le marquer ; on le marque depuis cette fiche ;
@@ -1080,7 +1085,10 @@ pour le cache des sagas et univers.
 - **SEENIT-DOWNLOAD-004** — Un timeout Android après un POST ne provoque jamais un rejeu
   automatique ambigu.
 - **SEENIT-DOWNLOAD-008** — Le fallback pack saison ne modifie que le torrent nouvellement créé
-  et prouvé par un identifiant exact ; un torrent préexistant est intouchable.
+  et prouvé par un identifiant exact ; un torrent préexistant est intouchable. Quand un lot du mode
+  téléchargement (`SEENIT-DOWNLOAD-014`) passe par un pack, les autres épisodes demandés de la saison
+  sont sélectionnés ensemble dans ce même transfert exact (un fichier unique et distinct par épisode,
+  jamais un épisode déjà présent), et le pack n'est retiré qu'après l'import de tous ces épisodes.
 - **SEENIT-DOWNLOAD-009** — Les marqueurs techniques `SxxEyy`, `Sxx` et `xYY` peuvent préciser
   le scope transitoire d'un transfert TV, sans identifier la série par son nom.
 
@@ -1337,18 +1345,25 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   affiché jusqu'à ce que la prochaine vue soit prête. Une fiche média n'empile pas plusieurs animations
   d'entrée : son conteneur porte l'unique transition, y compris lorsque le premier contenu affiché est
   un shell froid.
-- **SEENIT-UX-004** — Un toast mobile long utilise toute la largeur utile disponible, revient à la
-  ligne sans troncature et reste au-dessus de la navigation basse et de la safe area. La règle vaut
-  pour la PWA et l'APK, notamment pour la synchronisation Plex. Pendant une synchronisation longue,
-  le bandeau Plex indique la phase réellement connue et la durée écoulée, sans inventer de pourcentage.
-  Les toasts unitaires Plex d'un même lot peuvent être abandonnés via « Ignorer les suivants » : cette
-  action purge uniquement les notifications Plex encore en file et conserve le bilan final ainsi que
-  les notifications des autres fonctionnalités. Le bilan final Plex n'est jamais rendu comme une seule
-  phrase dense : il utilise un bloc Plex visuellement distinct, un titre « Synchronisation Plex terminée »
-  puis des lignes séparées pour les serveurs scannés et le couple `vus / non vus`, avec un pictogramme ou
-  logo Plex de taille suffisante pour identifier immédiatement la source. Dans tous les textes français
-  destinés à l'utilisateur, l'état inverse de « vu » est nommé **« non vu »** ; le terme « dé-vu » n'est
-  plus utilisé.
+- **SEENIT-UX-004** — Tous les toasts partagent une forme unique et une **taille fixe** (#878) : toute la
+  largeur utile moins 12 px de chaque côté, 76 px de haut, au-dessus de la navigation basse et de la
+  safe area, en PWA comme en APK. Le texte s'adapte à la boîte, jamais l'inverse : titre sur deux lignes
+  au plus, détail sur une ligne, un texte plus long est coupé par « … ». La bande gauche de 56 px montre
+  l'affiche du média quand l'action vise un film ou une série (code épisode en bandeau), sinon une bande
+  teintée portant l'icône de l'action (or pour Plex et les succès, rose pour une erreur, neutre pour une
+  information). Rien du message n'est perdu : le reste du sous-titre (« non vu sur Plex », compteurs d'un
+  bilan, type de média) rejoint la ligne de détail devant l'action, et le code épisode y passe en tête
+  quand il n'y a pas d'affiche. Le titre d'un média reste en or (`SEENIT-UX-020`) ; la couleur de l'action passe par
+  l'icône et la barre de temps, jamais par le titre. Un seul bouton de 104 px : « Annuler », sinon
+  « Ignorer les suivants » sur un toast Plex en file. Un retrait qui vise un média (notification retirée)
+  transmet ce média au toast pour que l'utilisateur voie ce qui a été retiré. Glisser vers le bas ferme
+  le toast. Pendant une synchronisation longue, le bandeau Plex indique la phase réellement connue et
+  la durée écoulée, sans inventer de pourcentage. Les toasts unitaires Plex d'un même lot peuvent être
+  abandonnés via « Ignorer les suivants » : cette action purge uniquement les notifications Plex encore
+  en file et conserve le bilan final ainsi que les notifications des autres fonctionnalités. Le bilan
+  final Plex utilise la bande Plex, le titre « Synchronisation terminée » et une ligne de détail qui
+  réunit les serveurs scannés et le couple `vus / non vus`. Dans tous les textes français destinés à
+  l'utilisateur, l'état inverse de « vu » est nommé **« non vu »** ; le terme « dé-vu » n'est plus utilisé.
 - **SEENIT-UX-005** — Sur un onglet déjà actif, un appui simple ferme exactement le niveau visible
   courant sans effacer l'état racine ; à la racine il remonte en haut doucement sans vider les filtres.
   Deux appuis sur ce même onglet en moins de 350 ms réinitialisent
@@ -2082,7 +2097,9 @@ Le vidage du cache local écoute aussi appStateChange via Capacitor App : il ne 
 Retour terrain226 du26/10 (#729) : coche entièrement masquée avant son tracé normalisé ; splash à cadence commune160ms par cran, maintien final réduit200ms (3500ms puis fondu500ms). Ticket horizontal avec découpes symétriques ; en rail, acteurs alignés par rangées communes aux titres, Vu36px dans cible44px à droite du talon, fin/heure à gauche et année sous le titre. La dernière notification retirée ferme sa feuille avec retour de focus et Annuler conservé. Voir docs/design/marque-2026-10-25.md.
 ### Téléchargements — évolution du 5 novembre 2026
 
-**SEENIT-DOWNLOAD-013** — Le [contrat du prototype](../design/downloads-2026-11-05.md) (#861) complète SEENIT-UX-019 et les invariants DOWNLOAD existants : groupes exclusifs avec erreurs prioritaires, cartes compactes, numéros sur vignettes, commandes épisode de la fiche série sous feature gate. Il remplace l'exclusion des commandes de téléchargement en ligne pour ces lignes seulement. Aucune présence Plex ni réussite d'import n'est déduite du seul pourcentage. Les appels C411 portent le Referer dès la première tentative ; une panne ou une réponse invalide ne devient jamais un résultat vide. Les lancements automatiques utilisent les releases interactives déjà vérifiées, sans seconde recherche. Une saison emploie un pack confirmé ou des épisodes mappés sans doublon ; aucun fichier existant n'est remplacé sans choix manuel explicite. Light est filtré sur sa mention réelle, pas déduit de la taille.
+**SEENIT-DOWNLOAD-013** — Le [contrat du prototype](../design/downloads-2026-11-05.md) (#861) complète SEENIT-UX-019 et les invariants DOWNLOAD existants : groupes exclusifs avec erreurs prioritaires, cartes compactes, numéros sur vignettes, commandes épisode de la fiche série sous feature gate ; depuis #879, ces commandes passent par le mode téléchargement de `SEENIT-DOWNLOAD-014` et plus aucune ligne n'en porte hors de ce mode. Aucune présence Plex ni réussite d'import n'est déduite du seul pourcentage. Les appels C411 portent le Referer dès la première tentative ; une panne ou une réponse invalide ne devient jamais un résultat vide. Les lancements automatiques utilisent les releases interactives déjà vérifiées, sans seconde recherche. Une saison emploie un pack confirmé ou des épisodes mappés sans doublon ; aucun fichier existant n'est remplacé sans choix manuel explicite. Light est filtré sur sa mention réelle, pas déduit de la taille.
+
+**SEENIT-DOWNLOAD-014** — Mode téléchargement de la fiche série (#879). Le propriétaire télécharge rarement : la fiche reste propre et le téléchargement est une surcouche. Hors mode, la fiche n'affiche qu'un bouton ⬇ dans la carte de progression, avec le nombre de téléchargements actifs de la saison, et des pastilles passives sur les vignettes (« 42 % », « ✓ Prêt », « ! ») seulement quand la file Sonarr ou un fichier le prouve. Le bouton ⬇ ou l'entrée **Téléchargement** du menu ⋮ ouvre le mode : le contrôle de téléchargement remplace le Vu de chaque épisode (jamais deux boutons sur une ligne) ; seul un épisode sorti, sans fichier ni téléchargement actif, se coche (un échec se relance) ; le prochain épisode à voir est coché d'office ; un bandeau montre la saison épisode par épisode (vu, téléchargé, en cours, à régler, à venir) avec Tout cocher et Terminé ; une barre d'action remplace la navigation et demande la qualité à chaque fois (1080p ou 4K), avec un accès à la version précise. Aucune feuille ne monte du bas. Le lancement réutilise la voie de la popup (`launchArrDownload` : demande durable, profil de qualité, repli sur le pack de saison) avec ses gardes : gate, vérification de présence terminée, Sonarr configuré, fichier présent jamais remplacé, demande déjà active jamais relancée. Un lot de plusieurs épisodes reste attaché au compte, au gate et au serveur Sonarr qui l'ont lancé : ils sont relus avant chaque épisode et le lot s'arrête net si l'un d'eux change (déconnexion, autre compte, téléchargements désactivés, autre serveur), sans jamais créer de demande au nom d'un autre compte. Les épisodes suivants du lot sont proposés au repli pack de saison : ceux qu'il couvre ne sont pas relancés (`SEENIT-DOWNLOAD-008`). Changer de saison vide la sélection, changer d'onglet ferme le mode. Aucun calcul « ce qui manque » ni présence Plex : le prochain épisode vient de la progression de visionnage.
 
 Correctif visuel terrain v254 : aucun nom technique de release dans la carte, même dépliée ; actions
 secondaires sous « … ». Le sélecteur commun expose des choix qualité homogènes, sans jargon
