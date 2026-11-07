@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
 
-export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], pushed: [] as string[], programmed: false, unmonitored: [] as string[] };
+export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], pushed: [] as string[], programmed: false, unmonitored: [] as string[], added: [] as string[] };
 // #879 — versions de la page « Version précise » (C411 simulé) : la conseillée n'est pas la première reçue.
 const day = 86_400_000;
 const FIXTURE_RELEASES = [
@@ -35,6 +35,9 @@ export const searchAndDownloadInRadarr = async () => ({ success: true, message: 
 export const searchAndDownloadInSonarr = searchAndDownloadInRadarr;
 export const downloadEpisodeWithSeasonPackFallback = async () => { throw new Error('Lancement épisode inattendu dans ce contrôle visuel'); };
 export const useTabShortcut = () => {};
+// #879 — « Ajouter E6 » : la série TMDB 77 a l'épisode 6 sorti, ni vu, ni présent.
+export const useNextEpisodeToAdd = (target: { tmdbId: number } | null) => target?.tmdbId === 77 ? { episode: 6, name: 'Sans filet' } : null;
+export const addEpisodeToSeason = async (target: { tmdbId: number; season: number }, episode: number, quality: string) => { telemetry.added.push(`${target.tmdbId}:S${target.season}E${episode}:${quality}`); };
 // #879 — calendrier Sonarr/Radarr de la section « Programmés » (vide hors de la page dédiée).
 const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
 export const cleanUrl = (url: string) => String(url || '').replace(/\/+$/, '');
