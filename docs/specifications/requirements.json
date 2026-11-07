@@ -196,6 +196,10 @@
           "contains": "SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée"
         },
         {
+          "file": "tests/explorerSearchVisibility.test.ts",
+          "contains": "SEENIT-UX-019 #870 une fiche média ouverte depuis la recherche d’Explorer garde la barre de navigation"
+        },
+        {
           "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 #857 un épisode à venir dit quand il sort, en relatif et daté au-delà d’une semaine"
         },
@@ -2363,7 +2367,7 @@
         },
         {
           "file": "tests/plexToastSummary.test.ts",
-          "contains": "SEENIT-UX-004 #878 le sous-titre d’un toast n’est jamais perdu : code d’épisode sur l’affiche, contexte dans le détail"
+          "contains": "SEENIT-UX-004 #878 le sous-titre d’un toast n’est jamais perdu : épisode en pastille, contexte dans le détail"
         }
       ]
     },

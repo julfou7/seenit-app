@@ -8,15 +8,20 @@ const toastSource = readFileSync(
 );
 
 test('SEENIT-UX-004 #878 tous les toasts ont la même taille et coupent le texte au lieu de grandir', () => {
-  // Une seule carte, hauteur fixe, quel que soit le message (plus de pilule ni de carte qui grandit).
-  assert.match(toastSource, /data-toast-card className="seenit-toast w-full relative overflow-hidden h-\[76px\]/);
+  // Une seule carte et deux tailles fixes : 76 px, ou 104 px pour un toast d'épisode (retour terrain du 07/11).
+  assert.match(toastSource, /const isEpisodeToast = Boolean\(episodeLabel\);/);
+  assert.match(toastSource, /data-toast-card data-toast-size=\{isEpisodeToast \? 'episode' : 'standard'\} className=\{cn\('seenit-toast w-full relative overflow-hidden min-h-\[64px\][^']*', isEpisodeToast \? 'h-\[104px\]' : 'h-\[76px\]'\)\}/);
   assert.doesNotMatch(toastSource, /sm:w-auto/);
   assert.doesNotMatch(toastSource, /sm:rounded-full/);
-  // Titre sur deux lignes au plus, détail sur une ligne.
-  assert.match(toastSource, /text-\[15px\] leading-tight font-extrabold line-clamp-2 break-words/);
+  // Titre sur deux lignes au plus en lignes de 18 px (2 × 18 + 18 + marges = 76 px : rien n'est rogné), détail sur une ligne.
+  assert.match(toastSource, /text-\[15px\] leading-\[18px\] font-extrabold line-clamp-2 break-words/);
+  assert.match(toastSource, /text-\[13\.5px\] leading-\[18px\] font-semibold text-zinc-200/);
   assert.match(toastSource, /<span className="truncate">\{detail\}<\/span>/);
-  // Bande gauche de 56 px : affiche du média, sinon bande teintée de l'action.
-  assert.match(toastSource, /w-14 shrink-0 relative bg-zinc-800 self-stretch/);
+  // Épisode en pastille or « S01 | E03 », comme avant #878, plus de bandeau sur l'affiche.
+  assert.match(toastSource, /\{episodeLabel && \(\s*<span data-toast-episode className="self-start my-0\.5 rounded-md bg-amber-500\/15/);
+  assert.doesNotMatch(toastSource, /episodeBand/);
+  // Bande gauche : affiche du média (68 px pour un épisode), sinon bande teintée de l'action.
+  assert.match(toastSource, /cn\('shrink-0 relative bg-zinc-800 self-stretch', isEpisodeToast \? 'w-\[68px\]' : 'w-14'\)/);
   assert.match(toastSource, /w-14 shrink-0 grid place-items-center self-stretch', getBandClass\(\)/);
   // Titre média en or, couleur d'action jamais sur le titre ; un seul bouton de 104 px.
   assert.match(toastSource, /isMediaTitle \? 'text-\[#F2C36B\]' : 'text-zinc-100'/);

@@ -215,7 +215,8 @@ La [barre 13j](../design/navbar-13j.md) est un îlot verre flottant centré, hau
 10 px plus safe area, avec fondu progressif inférieur de 92 px. Sans Télécharger, seul le dernier
 onglet et le séparateur disparaissent. Glyphes rendus26px, libellés10–11px et cibles minimales48 ×68px.
 Pas de repli au scroll. Le contenu réserve 84 px plus safe area ; les toasts restent au-dessus à
-80 px plus safe area, ou 24 px sur une fiche/dialogue sans barre. La fiche média occupe tout le viewport.
+80 px plus safe area, ou 24 px sur une fiche/dialogue sans barre. La fiche média occupe tout le viewport
+et garde la barre, y compris ouverte depuis la recherche d'Explorer (#870).
 
 L'onglet actif et ses glyphes utilisent l'or SeenIt et son bouton expose `aria-current="page"`. Un appui
 sur l'onglet actif ferme exactement le niveau courant, ou remonte en haut doucement à la racine sans
@@ -247,6 +248,9 @@ leur entrée existante. Les trois familles d'en-têtes restent distinctes : raci
 La fiche média participe à cette pile en tant que panneau non modal plein écran et masque la navigation
 basse. Si elle est ouverte depuis une fiche personne de l'onglet, Retour restaure cette personne
 et le focus du bouton utilisé ; un dialogue bloquant couvre la navigation et rend le fond inerte.
+
+Un toast fait 76 px de haut ; un toast d'épisode (épisode vu, Plex) fait 104 px pour afficher le titre
+entier, l'épisode en pastille or « S01 | E03 » et l'action (`SEENIT-UX-004`).
 
 Les toasts internes qui confirment l'ajout à **À voir** ou le passage à **Vu / Terminée** sont aussi des
 raccourcis de navigation : leur surface principale ouvre la fiche Film/Série uniquement avec l'identité
@@ -526,7 +530,8 @@ Depuis les retours de la v1.4.251 (#857) :
 - la note TMDB, l'âge et le bouton entier **Bande-annonce** sont en tête de fiche, au-dessus de
   **Marquer vu** (film) ou de la carte de progression (série) ;
 - un film se suit et se marque vu en un clic chacun : **Suivre le film** (puis « ✓ Suivi ») est aussi large
-  que **Marquer vu** ;
+  que **Marquer vu** ; un film vu affiche le logo Vu de SeenIt (anneau or et coche, « Vu »), qui annule le
+  Vu au toucher (07/11, plus de « ✓ Vu · annuler ») ;
 - « Fin à » n'affiche plus l'heure courante ni « Fini X min avant minuit », et la soirée de l'épisode non
   plus l'heure courante ;
 - le bouton **Vu** des épisodes, en liste comme dans la fiche épisode, est celui de l'Accueil (anneau SeenIt

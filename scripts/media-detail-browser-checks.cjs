@@ -107,7 +107,7 @@ async function testMediaDetailHarness(client) {
     await click(client, byText('button', 'Suivre le film'));
     await check(client, byText('button', 'Marquer vu') + '?.textContent.includes("Film suivi") && !' + byText('button', 'Suivre le film'), 'film suivi : le bouton devient Marquer vu (#859)');
     await click(client, byText('button', 'Marquer vu'));
-    await check(client, byText('button', '✓ Vu · annuler') + ' && !document.body.innerText.includes("Si tu lances maintenant")', 'film vu : bouton annulable, plus d’heure de fin');
+    await check(client, '(()=>{const cta=document.querySelector(\'button[aria-label="Vu, toucher pour annuler"]\');return cta&&cta.querySelector("[data-movie-seen] svg[data-brand-ring][data-active=true]")&&cta.textContent.trim()==="Vu"&&!document.body.innerText.includes("annuler")})() && !document.body.innerText.includes("Si tu lances maintenant")', 'film vu : logo Vu de SeenIt, plus de « Vu · annuler », plus d’heure de fin');
     const movieGeometry = await evaluate(client, geometry);
     if (movieGeometry.overflow) throw new Error(`SEENIT-UX-019 film ${width}px déborde ${JSON.stringify(movieGeometry)}`);
 

@@ -674,12 +674,17 @@ n'est rouverte que par une nouvelle décision produit explicite.
     « Fin à », courbe de saison, résumé, et les mêmes boutons flottants que la page.
   Retours terrain v1.4.252 (04/11/2026, #859) :
   - le film n'a plus qu'**un seul bouton**, suivi des tuiles du diffuseur et de Plex comme la série :
-    **Suivre le film**, puis **Marquer vu** (ou « Pas encore sorti ») une fois suivi, puis « ✓ Vu ·
-    annuler ». Ne plus suivre reste dans le menu ⋮ ;
+    **Suivre le film**, puis **Marquer vu** (ou « Pas encore sorti ») une fois suivi, puis le **logo Vu
+    de SeenIt** (anneau or et coche, suivi de « Vu » ; retour terrain du 07/11, plus de « ✓ Vu · annuler »).
+    Toucher ce bouton annule toujours le Vu. Ne plus suivre reste dans le menu ⋮ ;
   - dans les fiches, le bouton **Vu** anime dès le toucher (retiré si l'enregistrement échoue), ne
     s'atténue pas pendant l'attente, et dessine l'anneau puis la coche par des calques animés en
     transform/opacity (compositeur), sans saccade quand la fiche se re-rend. L'Accueil garde son
     animation actuelle.
+  - une fiche média garde la barre de navigation quel que soit son point d'entrée (#870). Le dock de
+    recherche d'Explorer ne remplace la barre que tant qu'aucune fiche n'est ouverte par-dessus : une fiche
+    ouverte depuis les résultats de recherche affiche la barre, qui disparaît de nouveau au retour à la
+    recherche.
 
 ### 5.7 Réouverture et cache chaud d'une fiche média
 
@@ -1345,15 +1350,18 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   affiché jusqu'à ce que la prochaine vue soit prête. Une fiche média n'empile pas plusieurs animations
   d'entrée : son conteneur porte l'unique transition, y compris lorsque le premier contenu affiché est
   un shell froid.
-- **SEENIT-UX-004** — Tous les toasts partagent une forme unique et une **taille fixe** (#878) : toute la
-  largeur utile moins 12 px de chaque côté, 76 px de haut, au-dessus de la navigation basse et de la
-  safe area, en PWA comme en APK. Le texte s'adapte à la boîte, jamais l'inverse : titre sur deux lignes
-  au plus, détail sur une ligne, un texte plus long est coupé par « … ». La bande gauche de 56 px montre
-  l'affiche du média quand l'action vise un film ou une série (code épisode en bandeau), sinon une bande
-  teintée portant l'icône de l'action (or pour Plex et les succès, rose pour une erreur, neutre pour une
-  information). Rien du message n'est perdu : le reste du sous-titre (« non vu sur Plex », compteurs d'un
-  bilan, type de média) rejoint la ligne de détail devant l'action, et le code épisode y passe en tête
-  quand il n'y a pas d'affiche. Le titre d'un média reste en or (`SEENIT-UX-020`) ; la couleur de l'action passe par
+- **SEENIT-UX-004** — Tous les toasts partagent une forme unique et **deux tailles fixes** (#878) : toute
+  la largeur utile moins 12 px de chaque côté, au-dessus de la navigation basse et de la safe area, en
+  PWA comme en APK ; 76 px de haut, ou 104 px pour un toast d'épisode, qui porte plus d'informations
+  (retour terrain du 07/11). Le texte s'adapte à la boîte, jamais l'inverse : titre sur deux lignes au
+  plus en lignes de 18 px (deux lignes et le détail tiennent sans être rognés), détail sur une ligne, un
+  texte plus long est coupé par « … ». Le toast d'épisode reprend la présentation d'avant #878 avec la
+  nouvelle police : titre entier, épisode dans une pastille or « S01 | E03 », puis l'action. La bande
+  gauche montre l'affiche du média quand l'action vise un film ou une série (56 px, 68 px pour un
+  épisode), sinon une bande teintée de 56 px portant l'icône de l'action (or pour Plex et les succès,
+  rose pour une erreur, neutre pour une information). Rien du message n'est perdu : le reste du
+  sous-titre (« non vu sur Plex », compteurs d'un bilan, type de média) rejoint la ligne de détail devant
+  l'action. Le titre d'un média reste en or (`SEENIT-UX-020`) ; la couleur de l'action passe par
   l'icône et la barre de temps, jamais par le titre. Un seul bouton de 104 px : « Annuler », sinon
   « Ignorer les suivants » sur un toast Plex en file. Un retrait qui vise un média (notification retirée)
   transmet ce média au toast pour que l'utilisateur voie ce qui a été retiré. Glisser vers le bas ferme
