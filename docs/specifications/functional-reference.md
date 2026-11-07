@@ -525,7 +525,8 @@ jamais de feuille du bas) ;
 hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Une série
 n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
-ligne à la place de la navigation). En mode, un épisode à venir se coche en bleu pour être **programmé** :
+ligne à la place de la navigation). La sélection est gardée quand on change de saison (« 5 épisodes · 2 saisons ») et
+les saisons partent dans l'ordre. En mode, un épisode à venir se coche en bleu pour être **programmé** :
 Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sans recherche immédiate ; un
 épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Avec un seul épisode sorti
 coché, « Version précise › » ouvre une page pleine hauteur : versions C411 filtrables (Toutes, 1080p, 4K, Français, VO),

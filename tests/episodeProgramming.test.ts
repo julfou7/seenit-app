@@ -118,8 +118,8 @@ test('SEENIT-DOWNLOAD-014 #879 en mode, les épisodes à venir se cochent en ble
   assert.match(rows, /episodesMonitored\?\.\[key\]/);
   assert.match(view, /const selectableEpisodes = modeStates\.filter\(entry => isEpisodePickable\(entry\.state\)\)/);
   const launch = view.slice(view.indexOf('const launchPickedEpisodes'), view.indexOf('const programPickedEpisodes'));
-  assert.match(launch, /const episodes = pickedNow;/, 'seuls les épisodes sortis sont téléchargés maintenant');
-  assert.match(launch, /if \(toProgram\.length\) await programPickedEpisodes\(/);
+  assert.match(launch, /const toDownload = bySeason\(pickedNow\);/, 'seuls les épisodes sortis sont téléchargés maintenant');
+  assert.match(launch, /for \(const \[season, episodes\] of toProgram\) await programPickedEpisodes\(/);
   assert.match(view, /episodes, qualityPreference: quality, readConfig: \(\) => useDownloadConfigStore\.getState\(\)/);
   // « Version précise » ne concerne qu'un épisode sorti.
   assert.match(view, /onPrecise=\{pickedNow\.length === 1 && !pickedFuture\.length \? openPreciseVersion : undefined\}/);

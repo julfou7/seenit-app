@@ -29,7 +29,7 @@
         },
         {
           "file": "tests/downloadMode.test.ts",
-          "contains": "SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la saison change vide la sélection, l’onglet ferme le mode"
+          "contains": "SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la sélection traverse les saisons, l’onglet ferme le mode"
         },
         {
           "file": "tests/downloadMode.test.ts",
