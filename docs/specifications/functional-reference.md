@@ -680,6 +680,10 @@ La cible produit des fiches est volontairement simple :
 - **Série** : uniquement **Dans la même franchise** ou **Dans le même univers** via TVDB ;
 - les sections **Films similaires** et **Séries similaires** sont supprimées des fiches. Les recommandations contextuelles restent dans Explorer.
 
+La saga s'affiche en frise numérotée (#871) : « X / N vus » et barre segmentée, repères 1…N alignés sur
+les affiches, film affiché encadré d'or avec « TU ES ICI », tampon VU sur l'affiche des films vus et
+« À voir » sinon.
+
 Pour un film, « Ordre de visionnage » provient exclusivement de sa collection TMDB explicite. Aucune
 série, liste TVDB, entrée SeenIt ou source secondaire ne complète cette section lorsqu'une collection
 TMDB est absente.

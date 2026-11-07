@@ -552,6 +552,12 @@ film. TMDB est l'autorité normale et suffisante de cette section.
 - Aucun catalogue SeenIt, groupe TVDB, Wikidata ou rapprochement par titre ne complète une collection
   TMDB absente ou incomplète.
 - Si TMDB ne fournit aucune collection exploitable, la section est masquée.
+- Affichage (saga v2, #871) : frise de repères numérotés 1…N (or plein si vu, contour gris sinon, rond creux
+  or avec halo pour le film affiché), repère, affiche et texte centrés sur le même axe, trait or seulement
+  entre deux films vus ; en-tête « X / N vus » et barre segmentée dont la case du film affiché est cerclée ;
+  la ligne du film affiché est encadrée d'or avec « TU ES ICI » et garde son statut vu. Un film vu porte le
+  tampon VU de l'accueil sur son affiche (annoncé « vu » aux lecteurs d'écran), un film non vu « À voir » ;
+  métadonnées « année · durée » quand TMDB fournit la durée. Rendu seul : ni source ni identité ne changent.
 
 #### Franchise / univers — TVDB comme source normale
 

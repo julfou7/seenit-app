@@ -216,6 +216,10 @@
           "contains": "SEENIT-UX-019 #870 une fiche média ouverte depuis la recherche d’Explorer garde la barre de navigation"
         },
         {
+          "file": "tests/sagaTimeline.test.ts",
+          "contains": "SEENIT-UX-019 #871 la saga v2 numérote l’ordre TMDB, situe le film affiché et pose le tampon VU"
+        },
+        {
           "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 #857 un épisode à venir dit quand il sort, en relatif et daté au-delà d’une semaine"
         },
