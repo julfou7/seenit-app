@@ -305,8 +305,10 @@ export function ToastContainer() {
   // Le titre d'un média reste en or (SEENIT-UX-020) ; un titre système reste blanc.
   const isMediaTitle = Boolean(hasPoster || show || navigationTarget);
   const displayTitle = parsed.title && isPlexToast ? parsed.title.replace(/^PLEX\s*•\s*/i, '') : parsed.title;
-  // Code d'épisode sur l'affiche, contexte du sous-titre et action réunis sur la ligne de détail.
-  const { episodeBand, detail } = toastDetailLine({ subtitle: parsed.subtitle, action: parsed.action || (typeof message === 'string' ? message : ''), hasPoster });
+  // Épisode en pastille (comme avant #878), contexte du sous-titre et action réunis sur la ligne de détail.
+  const { episodeLabel, detail } = toastDetailLine({ subtitle: parsed.subtitle, action: parsed.action || (typeof message === 'string' ? message : '') });
+  // Retour terrain du 07/11 : un toast d'épisode porte plus d'informations, il a sa propre taille fixe, plus haute.
+  const isEpisodeToast = Boolean(episodeLabel);
 
   return (
     <AnimatePresence>
@@ -343,17 +345,14 @@ export function ToastContainer() {
             navigationTarget ? "cursor-pointer" : "cursor-grab",
           )}
         >
-          {/* #878 : une seule forme, taille fixe (76 px), quel que soit le message. */}
-          <div data-toast-card className="seenit-toast w-full relative overflow-hidden h-[76px] min-h-[64px] bg-zinc-900/95 backdrop-blur-xl rounded-[18px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_16px_40px_rgba(0,0,0,0.8)] flex items-stretch">
+          {/* #878 : une seule forme et deux tailles fixes : 76 px, ou 104 px pour un épisode (titre entier, pastille, action). */}
+          <div data-toast-card data-toast-size={isEpisodeToast ? 'episode' : 'standard'} className={cn('seenit-toast w-full relative overflow-hidden min-h-[64px] bg-zinc-900/95 backdrop-blur-xl rounded-[18px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14),0_16px_40px_rgba(0,0,0,0.8)] flex items-stretch', isEpisodeToast ? 'h-[104px]' : 'h-[76px]')}>
 
-            {/* Bande gauche de 56 px : affiche du média, sinon couleur et icône de l'action. */}
+            {/* Bande gauche : affiche du média (68 px pour un épisode, affiche entière), sinon couleur et icône de l'action. */}
             {hasPoster ? (
-              <div className="w-14 shrink-0 relative bg-zinc-800 self-stretch">
+              <div className={cn('shrink-0 relative bg-zinc-800 self-stretch', isEpisodeToast ? 'w-[68px]' : 'w-14')}>
                 <img src={posterUrl!} alt="" className="w-full h-full object-cover object-center" />
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent from-40% to-zinc-900" />
-                {episodeBand && (
-                  <span className="absolute inset-x-0 bottom-0 h-[18px] grid place-items-center bg-black/80 text-[10px] font-extrabold tracking-wide text-amber-300">{episodeBand}</span>
-                )}
               </div>
             ) : (
               <div className={cn('w-14 shrink-0 grid place-items-center self-stretch', getBandClass())} aria-hidden="true">
@@ -361,22 +360,26 @@ export function ToastContainer() {
               </div>
             )}
 
-            {/* Texte : titre sur deux lignes au plus, détail sur une ligne. */}
+            {/* Texte : titre sur deux lignes au plus (lignes de 18 px : deux lignes et le détail tiennent dans 76 px),
+                pastille d'épisode comme avant #878, détail sur une ligne. */}
             <div className="flex-1 py-2.5 pl-3 pr-2.5 flex flex-col justify-center min-w-0 gap-0.5">
               {displayTitle ? (
                 <>
-                  <span className={cn('text-[15px] leading-tight font-extrabold line-clamp-2 break-words', isMediaTitle ? 'text-[#F2C36B]' : 'text-zinc-100')}>
+                  <span className={cn('text-[15px] leading-[18px] font-extrabold line-clamp-2 break-words', isMediaTitle ? 'text-[#F2C36B]' : 'text-zinc-100')}>
                     {displayTitle}
                   </span>
+                  {episodeLabel && (
+                    <span data-toast-episode className="self-start my-0.5 rounded-md bg-amber-500/15 px-1.5 text-[12.5px] leading-[20px] font-extrabold tracking-wide text-amber-300 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.3)]">{episodeLabel}</span>
+                  )}
                   {detail && (
-                    <span className="flex items-center gap-1.5 min-w-0 text-[13.5px] font-semibold text-zinc-200">
+                    <span className="flex items-center gap-1.5 min-w-0 text-[13.5px] leading-[18px] font-semibold text-zinc-200">
                       {hasPoster && renderIcon()}
                       <span className="truncate">{detail}</span>
                     </span>
                   )}
                 </>
               ) : (
-                <span className="text-[15px] leading-tight font-extrabold text-zinc-100 line-clamp-2 break-words">{detail}</span>
+                <span className="text-[15px] leading-[18px] font-extrabold text-zinc-100 line-clamp-2 break-words">{[episodeLabel, detail].filter(Boolean).join(' · ')}</span>
               )}
             </div>
 

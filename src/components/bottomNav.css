@@ -20,5 +20,6 @@
 @keyframes nvRing{0%{transform:scale(1);opacity:1}75%,100%{transform:scale(2.2);opacity:0}}
 /* La fiche média et les Réglages gardent la barre ; les dialogues plein écran la masquent (SEENIT-UX-019). */
 body:has([data-dialog-layer]:not([data-settings-layer]):not([data-media-layer])) .bottom-nav-shell{display:none}
-body:has([data-app-tab=discover]:not([aria-hidden=true]) [data-discover-search-mode=true]) .bottom-nav-shell{display:none}
+/* Le dock de recherche d'Explorer remplace la barre, sauf sous une fiche média ouverte depuis la recherche (#870). */
+body:has([data-app-tab=discover]:not([aria-hidden=true]) [data-discover-search-mode=true]):not(:has([data-media-layer])) .bottom-nav-shell{display:none}
 @media(prefers-reduced-motion:reduce){.navigation-tab,.navigation-download-dot,.navigation-download-dot::after{animation:none!important;transition:none!important}}

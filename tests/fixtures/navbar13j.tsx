@@ -13,7 +13,7 @@ import { NAVIGATION_TABS, type RootNavigationTab } from '../../src/features/navi
 import { useToastStore } from '../../src/store/toastStore';
 import { api, telemetry } from './navbar13jRuntime';
 Object.defineProperty(navigator, 'vibrate', { value: (ms: number) => { telemetry.vibrations.push(ms); return true; } });
-function Screen({ tab, active, shortcut }: { tab: RootNavigationTab; active: boolean; shortcut?: number }) {
+function Screen({ tab, active, shortcut, searchMode = false }: { tab: RootNavigationTab; active: boolean; shortcut?: number; searchMode?: boolean }) {
   const [view, setView] = useState('secondary');
   const [query, setQuery] = useState('conservée');
   const ref = useRef<HTMLDivElement>(null);
@@ -24,8 +24,9 @@ function Screen({ tab, active, shortcut }: { tab: RootNavigationTab; active: boo
     return () => { window.removeEventListener(tab+'-reset-all', reset); window.removeEventListener(tab+'-back-one-level', back); };
   }, [tab, view]);
   useTabShortcut(shortcut, () => { telemetry.shortcuts.push(tab); setView(tab === 'downloads' ? 'search' : 'root'); const frame=requestAnimationFrame(() => ref.current?.querySelector<HTMLInputElement>('input')?.focus({preventScroll:true})); return () => cancelAnimationFrame(frame); });
-  return <div data-app-tab={tab} style={{display:active?'flex':'none',height:'100dvh',flexDirection:'column'}}>
-    <div className="overflow-y-auto pb-nav" ref={ref} style={{height:'100%',overflow:'auto',background:'linear-gradient(130deg,#161d38,#0c0c10 70%)'}}>
+  // Comme App : l'onglet inactif est aria-hidden, l'onglet Explorer porte le mode recherche.
+  return <div data-app-tab={tab} aria-hidden={!active} style={{display:active?'flex':'none',height:'100dvh',flexDirection:'column'}}>
+    <div className="overflow-y-auto pb-nav" ref={ref} data-discover-search-mode={tab==='discover'?searchMode:undefined} style={{height:'100%',overflow:'auto',background:'linear-gradient(130deg,#161d38,#0c0c10 70%)'}}>
       <h1 style={{padding:24,fontSize:26,fontWeight:800}}>{NAVIGATION_TABS.find(item=>item.id===tab)?.label}</h1>
       <button id={tab+'-reset'} onClick={() => resetCurrentNavigationTab(tab)} style={{minHeight:44,padding:12}}>Réinitialiser la vue</button>
       <button id={tab+'-detail'} onClick={() => window.dispatchEvent(new Event('nav-detail'))} style={{minHeight:44,padding:12}}>Ouvrir une fiche</button>
@@ -43,12 +44,13 @@ function Harness() {
   const sequence = useRef(0);
   const [quick, setQuick] = useState(false);
   const [detail, setDetail] = useState(false);
+  const [searchMode, setSearchMode] = useState(false);
   useEffect(()=>{ const open=()=>setDetail(true);window.addEventListener('nav-detail',open);return()=>window.removeEventListener('nav-detail',open);},[]);
   const request = (target: RootNavigationTab) => setShortcut({ tab: target, id: ++sequence.current });
   const long = (target:RootNavigationTab) => activateNavigationShortcut(tab, target, { changeTab: setTab, request, quickAccount: () => { telemetry.shortcuts.push('profile');setQuick(true); } });
-  Object.assign(window,{__nav13j:{...api,clearToasts:()=>useToastStore.getState().clearQueue(),toast:()=>useToastStore.getState().showToast('Une confirmation lisible au-dessus de la barre.','info'),detail:()=>setDetail(true),tab:()=>tab}});
+  Object.assign(window,{__nav13j:{...api,clearToasts:()=>useToastStore.getState().clearQueue(),toast:()=>useToastStore.getState().showToast('Une confirmation lisible au-dessus de la barre.','info'),detail:()=>setDetail(true),searchMode:(value:boolean)=>setSearchMode(value),tab:()=>tab}});
   return <div>
-    {NAVIGATION_TABS.map(item=><Screen key={item.id} tab={item.id} active={tab===item.id} shortcut={tab===item.id&&shortcut?.tab===item.id?shortcut.id:undefined}/>)}
+    {NAVIGATION_TABS.map(item=><Screen key={item.id} tab={item.id} active={tab===item.id} searchMode={searchMode} shortcut={tab===item.id&&shortcut?.tab===item.id?shortcut.id:undefined}/>)}
     <BottomNav currentTab={tab} onTabChange={setTab} onActiveTabClick={()=>activateCurrentNavigationTab(rootTab)} onActiveTabDoubleClick={()=>resetCurrentNavigationTab(rootTab)} onLongPress={long}/>
     {quick&&<QuickAccountSheet onClose={()=>setQuick(false)}/>}
     {detail&&<DialogLayer label="Fiche média" blocking={false} historyMode="external" data-media-layer="" onDismiss={()=>setDetail(false)} className="fixed inset-0 bg-zinc-950"><h2>Fiche média</h2><button type="button" style={{minHeight:44,padding:16}} onClick={()=>setDetail(false)}>Retour à la liste</button></DialogLayer>}

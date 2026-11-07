@@ -23,6 +23,7 @@ import { SeasonAverageChart, SeasonPanel, SeasonPills, SeriesProgressCard, seaso
 import { MovieEndCard, VerifiedSimilarRail } from './mediaDetail/movieSections';
 import type { ShowDetailViewModel } from './mediaDetail/showDetailViewModel';
 import { DownloadModeBanner, DownloadModeBar, DownloadModeToggle, isEpisodeSelectable, seasonModeStates } from './mediaDetail/downloadMode';
+import { SeenItRing } from '../components/SeenItLogo';
 import { episodeDownloadPresentation } from '../features/downloads/episodeDownloadPresentation';
 import type { DownloadQualityChoice } from '../features/downloads/downloadLaunch';
 
@@ -108,10 +109,11 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   })();
 
   // #859 : un seul bouton à états pour le film, avec les tuiles diffuseur et Plex comme la série. Suivre,
-  // puis Marquer vu (ou « Pas encore sorti »), puis « ✓ Vu · annuler ». Ne plus suivre reste dans le menu ⋮.
+  // puis Marquer vu (ou « Pas encore sorti »), puis le logo Vu de SeenIt (anneau or + coche, retour terrain
+  // du 07/11 : plus de « ✓ Vu · annuler »). Toucher annule toujours le Vu. Ne plus suivre reste dans le menu ⋮.
   const movieFollowed = !isSeries && Boolean(show) && show?.status !== 'dropped';
   const movieCta = (() => {
-    if (hasSeenMedia) return <GoldCta tone="done" label="✓ Vu · annuler" ariaLabel="Vu, toucher pour annuler" onClick={toggleMovieSeen} />;
+    if (hasSeenMedia) return <GoldCta tone="done" label={<span data-movie-seen className="inline-flex items-center gap-2"><SeenItRing size={30} />Vu</span>} ariaLabel="Vu, toucher pour annuler" onClick={toggleMovieSeen} />;
     if (!movieFollowed) return <GoldCta label="Suivre le film" onClick={togglePlanToWatchMovie} />;
     if (isUnreleased) return <GoldCta tone="neutral" label="Pas encore sorti" sub="Film suivi" onClick={() => showToast('Ce film n’est pas encore sorti.', 'info')} />;
     return <GoldCta label="Marquer vu" sub="Film suivi" onClick={toggleMovieSeen} />;

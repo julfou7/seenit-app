@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.258",
+  "applicationVersion": "1.4.259",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -194,6 +194,10 @@
         {
           "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée"
+        },
+        {
+          "file": "tests/explorerSearchVisibility.test.ts",
+          "contains": "SEENIT-UX-019 #870 une fiche média ouverte depuis la recherche d’Explorer garde la barre de navigation"
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",
@@ -2363,7 +2367,7 @@
         },
         {
           "file": "tests/plexToastSummary.test.ts",
-          "contains": "SEENIT-UX-004 #878 le sous-titre d’un toast n’est jamais perdu : code d’épisode sur l’affiche, contexte dans le détail"
+          "contains": "SEENIT-UX-004 #878 le sous-titre d’un toast n’est jamais perdu : épisode en pastille, contexte dans le détail"
         }
       ]
     },

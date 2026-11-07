@@ -155,6 +155,16 @@ async function testNavbarHarness(client, root) {
     await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none" && document.querySelector("[data-dialog-layer]").getBoundingClientRect().height>=900','fiche plein écran avec la barre (SEENIT-UX-019)');
     await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});
     await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none"','barre toujours là au retour');
+    // #870 : une fiche ouverte depuis la recherche d'Explorer garde la barre ; le dock de recherche la remplace seulement sans fiche.
+    await tap(client,selector('discover'));
+    await evaluate(client,'window.__nav13j.searchMode(true)');
+    await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display==="none"','recherche Explorer : le dock remplace la barre');
+    await evaluate(client,'window.__nav13j.detail()');
+    await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none"','#870 fiche ouverte depuis la recherche avec la barre');
+    await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});
+    await check(client,'!document.querySelector("[data-media-layer]") && getComputedStyle(document.querySelector(".bottom-nav-shell")).display==="none"','retour à la recherche : dock sans barre');
+    await evaluate(client,'window.__nav13j.searchMode(false)');
+    await check(client,'getComputedStyle(document.querySelector(".bottom-nav-shell")).display!=="none"','sortie de recherche : barre revenue');
     await client.send('Emulation.setEmulatedMedia',{features:[{name:'prefers-reduced-motion',value:'reduce'}]});
     await evaluate(client,'window.__nav13j.downloads([{id:"active",status:"downloading"}]);document.documentElement.style.fontSize="32px"');
     await check(client,'getComputedStyle(document.querySelector(".navigation-download-dot")).animationName==="none" && document.documentElement.scrollWidth<=document.documentElement.clientWidth','reduced-motion et texte agrandi');
