@@ -12,6 +12,7 @@ import type { LiveDownloadItem } from '../services/sonarrRadarr';
 import { getUpcomingEpisodeInfo } from './cards/UpcomingShowCard';
 import { canOfferPlexWatchedAction } from '../features/watchlist/homePresentation';
 import { getTodayStr } from '../lib/utils';
+import { receivedEpisode, releaseReminderAlreadyReceived } from '../features/notifications/notificationDedup';
 import { useToastStore } from '../store/toastStore';
 import type { Notice } from './HomeNotificationsPage';
 
@@ -89,12 +90,16 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
   const today = getTodayStr(new Date(clock));
   const userShows = shows.filter(show => show.userId === uid);
   const notices: Notice[] = [];
+  // Notifications réellement reçues, rattachées à leur série par identifiant (jamais par titre).
+  const receivedFor = (show: Show) => received.filter(item => String(show.id) === String(item.data.showId) || Number(show.tmdbId) === Number(item.data.tmdbId) && show.mediaType === (item.data.mediaType || 'tv'));
   for (const show of userShows) {
     if (show.isArchived || show.status === 'dropped') continue;
     const available = plex[getPlexMediaKey(show.tmdbId, show.mediaType, uid)];
     if (canOfferPlexWatchedAction(show.mediaType, available?.available === true, show.seenEpisodes.includes('movie'))) notices.push({ id: `plex:${show.id}:movie`, title: show.title, detail: 'Disponible sur Plex', show });
     const upcoming = getUpcomingEpisodeInfo(show);
-    if (upcoming && show.notificationsEnabled && upcoming.air_date === today) notices.push({ id: `reminder:${show.id}:${today}`, title: show.title, detail: 'Rappel de sortie · aujourd’hui', show });
+    // Le rappel calculé n'est qu'un repli : la notification déjà reçue pour cette sortie suffit (jamais deux cartes).
+    const alreadyReceived = upcoming && releaseReminderAlreadyReceived(upcoming, receivedFor(show), today, time => getTodayStr(new Date(time)));
+    if (upcoming && show.notificationsEnabled && upcoming.air_date === today && !alreadyReceived) notices.push({ id: `reminder:${show.id}:${today}`, title: show.title, detail: 'Rappel de sortie · aujourd’hui', show, episode: show.mediaType === 'tv' ? { season: upcoming.season_number, episode: upcoming.episode_number } : undefined });
     if (show.mediaType === 'movie' && upcoming && show.firstAirDate && show.firstAirDate >= today) notices.push({ id: `date:${show.id}:${show.firstAirDate}`, title: show.title, detail: `Sortie confirmée · ${new Date(`${show.firstAirDate}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`, show });
   }
   for (const download of downloads) {
@@ -108,7 +113,7 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
   }
   for (const item of received) {
     const show = userShows.find(show => String(show.id) === String(item.data.showId) || Number(show.tmdbId) === Number(item.data.tmdbId) && show.mediaType === (item.data.mediaType || 'tv'));
-    if (show) notices.push({ id: `received:${item.id}`, title: show.title, detail: formatNotificationEpisodeCodes(item.body), show });
+    if (show) notices.push({ id: `received:${item.id}`, title: show.title, detail: formatNotificationEpisodeCodes(item.body), show, episode: show.mediaType === 'tv' ? receivedEpisode(item) : undefined });
   }
   if (hasUpdate && release) notices.unshift({ id: `update:${release.version}`, title: `SeenIt ${release.version}`, detail: 'Une mise à jour est disponible', update: true });
   const isRead = (notice: Notice) => read.includes(notice.id) || Boolean(notice.newsId && readNews.includes(notice.newsId));

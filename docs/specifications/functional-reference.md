@@ -91,6 +91,8 @@ Hiérarchie des sources :
 1. **Firestore `default` sous le Firebase UID** est autoritatif pour les données durables du compte.
 2. **TMDB** fournit l'identité canonique, les fiches, saisons, épisodes, personnes, dates,
    disponibilités éditoriales et l'**Ordre de visionnage des films** via ses collections explicites.
+   Une date TMDB `YYYY-MM-DD` est une date calendaire conservée telle quelle : aucun décalage (« +1 jour »)
+   n'est déduit du réseau de diffusion (#407, MobLand sur Paramount+).
 3. **TVDB** fournit la relation **franchise / univers** des fiches Film et Série, uniquement après
    résolution par identifiant externe exact depuis TMDB et selon `SEENIT-RELATION-001`.
 4. **Plex** fournit seulement des preuves de watchlist, visionnage/non-vu et disponibilité, jamais
@@ -957,6 +959,12 @@ sortie cinéma le jour J et sortie DVD/VOD le jour J lorsqu'une date française 
 L'horaire de référence est 09:00 locale. Pour les films, la sortie cinéma utilise `release_dates` FR type
 3 puis 2 ; la sortie vidéo/VOD/physique utilise la première date FR type 4 ou 5. Sans preuve française
 explicite, aucun rappel film n'est programmé et aucune estimation J+120 n'est utilisée.
+
+Dans la page Notifications, le « Rappel de sortie · aujourd'hui » calculé n'apparaît pas si la
+notification de cet épisode a déjà été reçue (ou, sans numéro d'épisode, une notification de la série
+le même jour) : une sortie ne donne jamais deux cartes. Une notification d'épisode montre l'image de cet
+épisode (TMDB), le visuel de la série restant le repli. Une carte « à jour » dont le prochain épisode
+est daté affiche « Prochain épisode dans 6 jours » (ou « demain », « aujourd'hui ») au lieu de « bientôt ».
 
 - L'intention est partagée via Firestore ; chaque installation autorisée possède son propre token.
 - Un téléphone et une PWA du même compte peuvent recevoir l'événement sans partager un token unique.
