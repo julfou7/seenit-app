@@ -1550,9 +1550,11 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   recherche est souligné plutôt que recoloré. Toute pagination progressive réutilise `HomeLoadMore`
   (pastille de liste ou tuile de fin de carrousel, trois prochaines vignettes, « Afficher N de plus » /
   « Afficher les N » / « Afficher la dernière » et « X en attente ») ; aucun bouton texte de pagination
-  séparé. **État : cible partiellement livrée.** À regarder, l'Historique et la page Notifications
-  respectent déjà ces deux règles ; leur généralisation reste suivie par #874 (titres) et #873
-  (Afficher plus). Une surface encore non conforme est un écart connu, jamais une règle alternative.
+  séparé. **État : livrée (#874, #873).** Le jeton `--seenit-media-title` (classe `seenit-media-title`)
+  porte l'or des titres sur toutes les surfaces média, et le composant `LoadMore`, dont `HomeLoadMore`
+  est la forme de l'accueil, est le seul contrôle de pagination, avec « Réduire » en action secondaire
+  quand une liste se replie. Une nouvelle surface reprend ce jeton et ce composant ; une surface non
+  conforme est un écart, jamais une règle alternative.
 
 ## 10. Performance et résilience
 

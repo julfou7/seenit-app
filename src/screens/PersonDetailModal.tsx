@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, X, Heart, Check, Clock, Film, Images, Loader
 import { cn, checkIsUpToDate } from '../lib/utils';
 import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { GridMediaCard, QuickPreviewModal } from '../components/GridMediaCard';
+import { LoadMore } from '../components/cards/HomeLoadMore';
 import { useShows } from '../hooks/useShows';
 import { removeTrackedMedia } from '../features/shows/removeTrackedMedia';
 import { useToastStore } from '../store/toastStore';
@@ -986,18 +987,10 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
                   );
                 })}
               </div>
-              {remainingCreditCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setVisibleCreditWindow({
-                    key: creditListKey,
-                    limit: visibleCreditLimit + PERSON_FILMOGRAPHY_PAGE_SIZE
-                  })}
-                  className="mt-5 min-h-11 w-full rounded-xl border border-white/10 bg-zinc-900/80 px-4 py-2 text-xs font-bold text-[#E5A93D] transition-colors hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E5A93D]"
-                >
-                  Afficher {Math.min(PERSON_FILMOGRAPHY_PAGE_SIZE, remainingCreditCount)} de plus
-                </button>
-              )}
+              {/* #873 : le seul « Afficher plus » de l'app, avec les affiches des prochains titres. */}
+              <LoadMore previews={filteredCredits.slice(visibleCredits.length, visibleCredits.length + 3).map(credit => ({ key: `credit-more-${credit.media_type || 'media'}-${credit.id}`, initial: (credit.title || credit.name || '?').charAt(0), imagePath: credit.poster_path }))}
+                remainingCount={remainingCreditCount} step={PERSON_FILMOGRAPHY_PAGE_SIZE}
+                onLoad={() => setVisibleCreditWindow({ key: creditListKey, limit: visibleCreditLimit + PERSON_FILMOGRAPHY_PAGE_SIZE })} />
             </>
           ) : (
             <div className="py-12 text-center text-zinc-500 text-xs flex flex-col items-center gap-2">

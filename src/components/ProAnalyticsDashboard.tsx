@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ChevronDown, Loader2 } from 'lucide-react';
 import { useProAnalytics, type PersonStat } from '../hooks/useProAnalytics';
 import { type Show } from '../types';
+import { LoadMore } from './cards/HomeLoadMore';
 import {
   PROFILE_MONTH_LABELS,
   PROFILE_WEEKDAY_LABELS,
@@ -48,10 +49,13 @@ function PeopleList({ title, people, onPersonClick }: {
           </span>
         </button>
       ))}
-      {people.length > PEOPLE_PREVIEW && (
-        <button type="button" className="moi-link" aria-expanded={expanded} onClick={() => setExpanded(value => !value)}>
-          {expanded ? 'Réduire' : `Voir les ${people.length}`}
-        </button>
+      {/* #873 : le seul « Afficher plus » de l'app ; « Réduire » reste une action secondaire. */}
+      {people.length > PEOPLE_PREVIEW && !expanded && (
+        <LoadMore round previews={people.slice(PEOPLE_PREVIEW, PEOPLE_PREVIEW + 3).map(person => ({ key: `person-more-${person.id}`, initial: person.name.charAt(0), imagePath: person.profile_path }))}
+          remainingCount={people.length - PEOPLE_PREVIEW} step={people.length} lastLabel="Afficher la dernière" onLoad={() => setExpanded(true)} />
+      )}
+      {people.length > PEOPLE_PREVIEW && expanded && (
+        <button type="button" className="moi-link" aria-expanded onClick={() => setExpanded(false)}>Réduire</button>
       )}
     </div>
   );
