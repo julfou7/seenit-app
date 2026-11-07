@@ -30,10 +30,10 @@ test('SEENIT-DOWNLOAD-013 #879 onglet Télécharger : une carte par saison, regr
 test('SEENIT-DOWNLOAD-013 #879 la carte de saison annule épisode par épisode, avec confirmation', () => {
   const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
   const card = readFileSync('src/components/SeasonDownloadCard.tsx', 'utf8');
-  // Seule « En cours » est groupée : À traiter, l'attente et l'historique gardent « Autre version » et « Changer la qualité ».
+  // Seule « En cours » est groupée : À régler (échec + attente), Terminés et Annulés gardent leurs cartes complètes.
   assert.match(screen, /\(groupSeasons \? groupSeasonDownloads\(items\) : items\.map\(item => \(\{ kind: 'single' as const, item \}\)\)\)\.map\(entry => \{/);
   assert.match(screen, /renderSection\('En cours', activeDownloads, undefined, true\)/);
-  assert.equal((screen.match(/renderSection\('[^']+', \w+(?:, '\w+')?\)/g) || []).length, 4, 'les quatre autres sections restent en cartes complètes');
+  assert.equal((screen.match(/renderSection\('[^']+', \w+(?:, '\w+')?\)/g) || []).length, 3, 'les trois autres sections restent en cartes complètes');
   assert.match(screen, /<SeasonDownloadCard key=\{entry\.key\} seasonNumber=\{entry\.seasonNumber\} items=\{entry\.items\} onShowClick=\{onShowClick\} onRemove=\{handleRemove\} \/>/, 'même confirmation que les cartes');
   assert.doesNotMatch(card, /SwipeableCard|onSwipe/, 'aucun geste qui annulerait toute la saison');
   assert.match(card, /aria-label=\{kind === 'done' \|\| kind === 'attention' \? `Retirer \$\{code\} de la liste` : `Annuler le téléchargement de \$\{code\}`\}/);

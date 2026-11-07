@@ -43,6 +43,16 @@ test('le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessa
   assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/notification', 'POST'), true);
   assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/notification/42', 'PUT'), true);
   assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/notification/test', 'POST'), false);
+  // Programmés, Téléchargés et lectures par identifiant : GET seul, chemin exact.
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/calendar?start=a&end=b&unmonitored=false', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/history/since?date=x&eventType=3&includeMovie=true', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/series/12', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/episode/801', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/movie/9', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/movie/9', 'DELETE'), false);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/series/12', 'DELETE'), false);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/history/failed/3', 'POST'), false);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/calendar/ics', 'GET'), false);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/info?filter=all', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/files?hash=abc', 'GET'), true);
   assert.equal(isAllowedServiceProxyPath('https://qbit.example/api/v2/torrents/filePrio', 'POST'), true);

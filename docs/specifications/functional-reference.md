@@ -859,8 +859,12 @@ Quand la fonctionnalité est désactivée :
 - Plex et les téléchargements de mise à jour SeenIt restent hors de ce gate.
 
 Quand elle est activée, l'onglet Télécharger possède deux modes : **Mes téléchargements** et
-**Recherche C411**. L'icône Réglages de son en-tête ouvre la configuration C411/Sonarr/Radarr/qBittorrent
-et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
+**Recherche C411**. Son en-tête (maquette DlOngletSuivi) porte deux boutons ronds de 44 px :
+**Recherche avancée** (bascule vers la recherche C411, « Mes téléchargements » pour revenir) et
+**Réglages**, qui ouvre la configuration C411/Sonarr/Radarr/qBittorrent et webhooks, qui ne doit pas
+être dupliquée dans les réglages généraux. Sous le titre, « N en cours · M à régler » (« Rien en cours »
+sinon). Il n'y a plus de bouton Actualiser : la liste se met à jour seule, et Programmés/Téléchargés
+se rechargent quand un téléchargement change d'état ou que l'app revient au premier plan.
 
 ### 10.1 Mes téléchargements
 
@@ -868,8 +872,13 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
 - Pendant le handoff vers le transfert physique, un qBittorrent encore sans identité média n'est pas
   affiché en parallèle d'une intention SeenIt active techniquement compatible. Seule sa représentation
   brute est masquée : aucune identité ne lui est attribuée sans preuve exacte.
-- Affiche séparément actifs, attentes de disponibilité, erreurs, annulés et terminés. Une erreur explicite d'import reste dans
-  « En erreur » même si qBittorrent a physiquement atteint 100 %. La fiche Film/Série réutilise la même
+- Cartes « billet » comme l'accueil (refonte du 07/11/2026) : affiche inclinée qui déborde en haut à
+  gauche, fond teinté par section (rose À régler, ambre En cours, bleu Programmés), titre or.
+- Sections dans l'ordre : **À régler** (erreurs puis releases pas encore trouvées, avec « Choisir une
+  version » et « Retirer » visibles sans passer par « … »), **En cours** (film : « Film · 1080p », barre
+  or, « 63 % » et « ≈ 25 min » en bas du billet), **Programmés**, **Téléchargés · 7 derniers jours**,
+  puis Terminés et Annulés. Une erreur explicite d'import reste dans
+  « À régler » même si qBittorrent a physiquement atteint 100 %. La fiche Film/Série réutilise la même
   priorité : elle n'affiche jamais « Téléchargement terminé » et ne relance pas la présence Plex pour
   un transfert dont l'import est encore explicitement en erreur.
 - Les actifs conservent l'ordre de lancement ; l'historique affiche les plus récents d'abord.
@@ -881,6 +890,12 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
   « Ajouter E6 » propose le premier épisode sorti de la saison, ni vu, ni présent, ni déjà dans la carte :
   « Ajouter E6 en quelle qualité ? » 1080p (« · comme les autres » si c'est la qualité de la carte), 4K,
   Plus tard ou Autres… (Version précise). L'ajout suit la voie et les gardes du mode téléchargement.
+- Rangée **Téléchargés · 7 derniers jours** : imports réels de Sonarr/Radarr (historique
+  `downloadFolderImported`, y compris ce qu'ils ont récupéré seuls à la sortie ; jamais un grab). Affiches
+  de 104 px qui défilent, coche « prêt », pastille « 2 ép. » quand une série a plusieurs épisodes,
+  titre or et « 2 épisodes · S02E09–E10 », « S01E03 · hier » ou « Film · lun. ». Toucher une affiche ouvre
+  sa fiche. Un terminé déjà dans la rangée (TMDB et épisode exacts) n'est pas répété dans « Terminés » ;
+  une source injoignable est signalée.
 - Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
   (120 jours) — épisodes et films surveillés, sans fichier, dont la série est surveillée — regroupés par
   série (identifiant Sonarr exact), avec « Programmé · ven. 14 nov. » en bleu et « Annuler » (44 px),
@@ -1238,4 +1253,4 @@ Correctif terrain v254 : carte sans nom technique ni boutons secondaires permane
 et fermeture sans commande. Le téléchargement de saison est une icône dans l'en-tête Saison N,
 plus dans la rangée Tout marquer vu / Bande-annonce. Vrais composants vérifiés en 360/412 px.
 
-Les cartes compactes suivent Moi/Réglages : À traiter, En cours, En attente, Terminés puis Annulés. Les erreurs explicites restent prioritaires. Dans la fiche série, le numéro occupe la vignette ; téléchargement et Vu sont des commandes séparées, disponibles selon feature gate et présence réelle. Le bouton ouvre le choix de qualité existant avant toute mutation. Voir le [contrat détaillé](../design/downloads-2026-11-05.md).
+Les cartes « billet » suivent l'accueil : À régler, En cours, Programmés, Téléchargés (7 derniers jours), Terminés puis Annulés. Les erreurs explicites restent prioritaires. Dans la fiche série, le numéro occupe la vignette ; téléchargement et Vu sont des commandes séparées, disponibles selon feature gate et présence réelle. Le bouton ouvre le choix de qualité existant avant toute mutation. Voir le [contrat détaillé](../design/downloads-2026-11-05.md).
