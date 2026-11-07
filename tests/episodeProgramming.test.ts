@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import { episodeDownloadPresentation } from '../src/features/downloads/episodeDownloadPresentation.ts';
+import { isAllowedServiceProxyPath } from '../src/features/downloads/downloadBackendSecurity.ts';
 
 // Vrai module de programmation : seuls les transports Sonarr, Firebase et le gate sont remplacés.
 const bundle = await build({ entryPoints: ['src/features/downloads/episodeProgramming.ts'], bundle: true, platform: 'node', format: 'esm', write: false,
@@ -58,6 +59,8 @@ test('SEENIT-DOWNLOAD-014 #879 programmer surveille seulement les épisodes à v
   // La qualité choisie s'applique à la série ; seul l'épisode 5 change (6 déjà surveillé, 7 présent, 9 non demandé).
   assert.deepEqual(puts.map(call => call.url), ['http://sonarr/api/v3/series', 'http://sonarr/api/v3/episode/51']);
   assert.equal(puts[0].body?.qualityProfileId, 9);
+  // En PWA, ces appels passent par le proxy serveur : chacun doit y être accepté (SEENIT-SECURITY-001).
+  assert.ok(sonarr.calls.every(call => isAllowedServiceProxyPath(call.url, call.method)), sonarr.calls.map(call => `${call.method} ${call.url}`).join(' '));
   assert.equal(puts[1].body?.monitored, true);
   assert.ok(sonarr.calls.every(call => !/command|release/.test(call.url)), 'aucune recherche ni téléchargement immédiat');
 });

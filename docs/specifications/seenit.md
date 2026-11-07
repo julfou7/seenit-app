@@ -1064,7 +1064,12 @@ pour le cache des sagas et univers.
   hydratation du compte et après sauvegarde/rotation des réglages ; une indisponibilité temporaire du
   client ne rend pas la sauvegarde de configuration invalide.
 - **SEENIT-SECURITY-001** — Le proxy backend n'autorise qu'une liste minimale de chemins et de
-  méthodes nécessaires. La cible réseau est validée contre SSRF et DNS rebinding.
+  méthodes nécessaires. La cible réseau est validée contre SSRF et DNS rebinding. Toute requête
+  *Arr que l'application construit doit figurer dans cette liste, sinon la PWA échoue là où l'APK
+  (requête directe) fonctionne : les lectures du calendrier (Programmés), de l'historique depuis une
+  date (Téléchargés) et d'une ressource par identifiant numérique (`series`, `episode`, `movie`) en
+  font partie, toujours en GET seul. Les tests passent les URL réellement émises par ces modules
+  au prédicat du proxy.
 - Le SID qBittorrent est indexé par UID, URL et utilisateur, puis invalidé uniquement sur une
   erreur d'authentification reconnue.
 

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import { isAllowedServiceProxyPath } from '../src/features/downloads/downloadBackendSecurity.ts';
 
 // Vrai module de la rangée « Téléchargés » : seuls le transport et le gate sont remplacés.
 const bundle = await build({ entryPoints: ['src/features/downloads/recentImports.ts'], bundle: true, platform: 'node', format: 'esm', write: false,
@@ -47,6 +48,8 @@ test('SEENIT-DOWNLOAD-013 Téléchargés : imports réels des 7 derniers jours, 
   const since = encodeURIComponent(new Date(now - 7 * 86_400_000).toISOString());
   assert.ok(urls.includes(`http://sonarr/api/v3/history/since?date=${since}&eventType=3&includeSeries=true&includeEpisode=true`));
   assert.ok(urls.includes(`http://radarr/api/v3/history/since?date=${since}&eventType=3&includeMovie=true`));
+  // En PWA, ces lectures passent par le proxy serveur : il doit les accepter (sinon « injoignable » à tort).
+  assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), urls.join(' '));
 });
 
 test('SEENIT-DOWNLOAD-013 Téléchargés : une source injoignable est dite, jamais lue comme « rien de téléchargé »', async () => {

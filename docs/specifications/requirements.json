@@ -1449,6 +1449,14 @@
         {
           "file": "tests/downloadBackendSecurity.test.ts",
           "contains": "le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessaires"
+        },
+        {
+          "file": "tests/episodeProgramming.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 programmer surveille seulement les épisodes à venir demandés, sans rien rechercher"
+        },
+        {
+          "file": "tests/recentImports.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : imports réels des 7 derniers jours, groupés par série, doublons et grabs ignorés"
         }
       ]
     },
