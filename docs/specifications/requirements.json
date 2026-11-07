@@ -12,8 +12,12 @@
       ],
       "tests": [
         {
+          "file": "tests/episodeProgramming.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 programmer surveille seulement les épisodes à venir demandés, sans rien rechercher"
+        },
+        {
           "file": "tests/downloadMode.test.ts",
-          "contains": "SEENIT-DOWNLOAD-014 #879 seul un épisode sorti, sans fichier ni téléchargement actif, se coche (un échec se relance)"
+          "contains": "SEENIT-DOWNLOAD-014 #879 un épisode sorti se télécharge seulement sans fichier ni téléchargement actif (un échec se relance)"
         },
         {
           "file": "tests/downloadMode.test.ts",

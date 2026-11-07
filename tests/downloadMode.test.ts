@@ -20,7 +20,7 @@ async function loadMode() {
   return module.exports as { isEpisodeSelectable: (state: string) => boolean; seasonModeStates: (...args: unknown[]) => { episode: number; state: string }[]; DownloadModeBanner: (props: Record<string, unknown>) => unknown; DownloadModeBar: (props: Record<string, unknown>) => unknown };
 }
 
-test('SEENIT-DOWNLOAD-014 #879 seul un épisode sorti, sans fichier ni téléchargement actif, se coche (un échec se relance)', async () => {
+test('SEENIT-DOWNLOAD-014 #879 un épisode sorti se télécharge seulement sans fichier ni téléchargement actif (un échec se relance)', async () => {
   const { isEpisodeSelectable, seasonModeStates } = await loadMode();
   assert.deepEqual(['available', 'attention', 'present', 'active', 'future', 'seen'].map(isEpisodeSelectable), [true, true, false, false, false, false]);
   const states = seasonModeStates(

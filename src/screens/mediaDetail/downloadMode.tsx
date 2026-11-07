@@ -15,6 +15,11 @@ export type EpisodeModeState = 'seen' | EpisodeDownloadPresentation['kind'];
 
 /** Un épisode peut être coché s'il est sorti, sans fichier ni téléchargement actif (un échec se relance). */
 export const isEpisodeSelectable = (state: EpisodeModeState) => state === 'available' || state === 'attention';
+/** #879 — Un épisode à venir, pas encore surveillé dans Sonarr, peut être programmé (coché en bleu). */
+export const isEpisodeProgrammable = (state: EpisodeModeState) => state === 'future';
+export const isEpisodePickable = (state: EpisodeModeState) => isEpisodeSelectable(state) || isEpisodeProgrammable(state);
+const SKY = '#7DD3FC';
+const HATCH = 'repeating-linear-gradient(135deg,#2a2a2f 0 2px,#141417 2px 4px)';
 
 export function DownloadModeToggle({ active, badge, onToggle }: { active: boolean; badge: number; onToggle: () => void }) {
   return <button type="button" onClick={onToggle} aria-pressed={active} aria-label={active ? 'Quitter le mode téléchargement' : `Mode téléchargement${badge ? `, ${badge} en cours` : ''}`}
@@ -25,22 +30,25 @@ export function DownloadModeToggle({ active, badge, onToggle }: { active: boolea
 }
 
 const segmentStyle = (state: EpisodeModeState, picked: boolean, progress?: number): React.CSSProperties => {
+  if (picked && state === 'future') return { background: HATCH, boxShadow: `inset 0 0 0 1.5px ${SKY}` };
   if (picked) return { background: '#27272a', boxShadow: 'inset 0 0 0 1.5px #E5A93D' };
+  if (state === 'programmed') return { background: HATCH, boxShadow: `inset 0 0 0 1.5px ${SKY}` };
   if (state === 'seen') return { background: '#E5A93D' };
   if (state === 'present') return { background: '#F4F4F5' };
   if (state === 'active') { const pct = Math.max(0, Math.min(100, Number(progress) || 0)); return { background: `linear-gradient(90deg,#F4F4F5 ${pct}%,#3f3f46 ${pct}%)` }; }
   if (state === 'attention') return { background: 'rgba(251,113,133,0.6)' };
-  if (state === 'future') return { background: 'repeating-linear-gradient(135deg,#2a2a2f 0 2px,#141417 2px 4px)' };
+  if (state === 'future') return { background: HATCH };
   return { background: '#3f3f46' };
 };
 
-const STATE_LABEL: Record<EpisodeModeState, string> = { seen: 'vu', present: 'téléchargé', active: 'en cours', attention: 'à régler', future: 'à venir', available: 'disponible' };
+const STATE_LABEL: Record<EpisodeModeState, string> = { seen: 'vu', present: 'téléchargé', active: 'en cours', attention: 'à régler', future: 'à venir, programmable', available: 'disponible', programmed: 'programmé' };
 
 const LEGEND: Array<{ state: EpisodeModeState; one: string; many: string; dot: React.CSSProperties }> = [
   { state: 'seen', one: 'vu', many: 'vus', dot: { background: '#E5A93D' } },
   { state: 'present', one: 'téléchargé', many: 'téléchargés', dot: { background: '#F4F4F5' } },
   { state: 'active', one: 'en cours', many: 'en cours', dot: { background: 'linear-gradient(90deg,#F4F4F5 50%,#3f3f46 50%)' } },
-  { state: 'attention', one: 'à régler', many: 'à régler', dot: { background: 'rgba(251,113,133,0.6)' } }
+  { state: 'attention', one: 'à régler', many: 'à régler', dot: { background: 'rgba(251,113,133,0.6)' } },
+  { state: 'programmed', one: 'programmé', many: 'programmés', dot: { background: '#141417', boxShadow: `inset 0 0 0 1.5px ${SKY}` } }
 ];
 
 export function DownloadModeBanner({ season, states, progress, picked, allPicked, canPick, onToggleAll, onSegment }: {
@@ -53,12 +61,12 @@ export function DownloadModeBanner({ season, states, progress, picked, allPicked
   const legend = LEGEND.filter(entry => counts[entry.state]).map(entry => ({ ...entry, label: `${counts[entry.state]} ${counts[entry.state] > 1 ? entry.many : entry.one}` }));
   return <section aria-label="Mode téléchargement" className="rounded-[18px] bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)] px-3.5 pt-3 pb-2 flex flex-col animate-in fade-in slide-in-from-top-1 duration-150 motion-reduce:animate-none">
     <strong className="text-[15px] font-extrabold text-[#F2C36B]">Mode téléchargement · saison {season}</strong>
-    <span className="text-[12.5px] text-zinc-300">Touche une barre ou un épisode pour le cocher.</span>
+    <span className="text-[12.5px] text-zinc-300">{states.some(entry => entry.state === 'future' || entry.state === 'programmed') ? 'Coche les épisodes. En bleu : programmés pour leur sortie.' : 'Touche une barre ou un épisode pour le cocher.'}</span>
     {/* Segments de 44 × 44 px au minimum : chaque épisode se touche directement ; une longue saison défile
         horizontalement au lieu de réduire les cibles à quelques pixels. Le numéro situe l'épisode. */}
     <div className="flex gap-[3px] mt-1 overflow-x-auto hide-scrollbar snap-x" role="group" aria-label={`Saison ${season} : ${legend.map(entry => entry.label).join(', ') || 'rien de téléchargé'}`}>
       {states.map(entry => {
-        const selectable = isEpisodeSelectable(entry.state);
+        const selectable = isEpisodePickable(entry.state);
         const isPicked = picked.has(entry.episode);
         return <button key={entry.episode} type="button" data-mode-segment={entry.episode} onClick={() => onSegment(entry.episode)} aria-pressed={selectable ? isPicked : undefined}
           aria-label={`Épisode ${entry.episode} : ${isPicked ? 'coché' : STATE_LABEL[entry.state]}`} className="flex-1 min-w-11 h-11 shrink-0 snap-start flex flex-col justify-center gap-1 active:scale-95 transition-transform">
@@ -110,11 +118,25 @@ export function EpisodeModeControl({ episode, state, picked, progress, onToggle 
   return <span aria-hidden="true" className="w-11 h-11 shrink-0" />;
 }
 
+/** #879 — Contrôle d'un épisode à venir en mode : case bleue « Programmer », ou état programmé. */
+export function EpisodeProgramControl({ episode, state, picked, onToggle }: { episode: number; state: EpisodeModeState; picked: boolean; onToggle: () => void }) {
+  if (state === 'programmed') return <span role="img" aria-label={`Épisode ${episode} programmé dans Sonarr`} className="w-11 h-11 shrink-0 grid place-items-center">
+    <svg viewBox="0 0 100 100" width="34" height="34" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" stroke={SKY} strokeWidth="8" /><path d="M50 30v22l14 9" fill="none" stroke={SKY} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+  </span>;
+  if (!isEpisodeProgrammable(state)) return null;
+  return <button type="button" role="checkbox" aria-checked={picked} aria-label={`Programmer l’épisode ${episode}`} onClick={event => { event.stopPropagation(); onToggle(); }} className="w-11 h-11 shrink-0 grid place-items-center">
+    <svg viewBox="0 0 100 100" width="34" height="34" aria-hidden="true">
+      {picked ? <circle cx="50" cy="50" r="42" fill={SKY} /> : <circle cx="50" cy="50" r="38" fill="none" stroke={SKY} strokeWidth="8" strokeDasharray="10 7" />}
+      <path d="M50 30v22l14 9" fill="none" stroke={picked ? '#0B0B0D' : SKY} strokeWidth={picked ? 10 : 8} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  </button>;
+}
+
 /** Pastille passive sur la vignette, hors mode : seulement quand il se passe quelque chose. */
 export function EpisodePassiveChip({ state, progress }: { state: EpisodeModeState; progress?: number }) {
-  const label = state === 'active' ? `${Math.max(0, Math.min(99, Math.round(Number(progress) || 0)))} %` : state === 'present' ? '✓ Prêt' : state === 'attention' ? '!' : null;
+  const label = state === 'active' ? `${Math.max(0, Math.min(99, Math.round(Number(progress) || 0)))} %` : state === 'present' ? '✓ Prêt' : state === 'attention' ? '!' : state === 'programmed' ? 'Programmé' : null;
   if (!label) return null;
-  return <span aria-hidden="true" className={cn('absolute right-1 bottom-1 rounded-md px-1.5 text-[10.5px] font-extrabold leading-[1.45]', state === 'attention' ? 'bg-rose-400 text-rose-950' : 'bg-black/85 text-zinc-100')}>{label}</span>;
+  return <span aria-hidden="true" className={cn('absolute right-1 bottom-1 rounded-md px-1.5 text-[10.5px] font-extrabold leading-[1.45]', state === 'attention' ? 'bg-rose-400 text-rose-950' : state === 'programmed' ? 'bg-black/85 text-sky-300' : 'bg-black/85 text-zinc-100')}>{label}</span>;
 }
 
 /** État de chaque épisode d'une saison pour le bandeau du mode (même calcul que les lignes). */

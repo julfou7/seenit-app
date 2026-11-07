@@ -525,7 +525,9 @@ jamais de feuille du bas) ;
 hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Une série
 n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
-ligne à la place de la navigation). Chaque pastille de saison montre sa part vue en mini-barre et, avec
+ligne à la place de la navigation). En mode, un épisode à venir se coche en bleu pour être **programmé** :
+Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sans recherche immédiate ; un
+épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Chaque pastille de saison montre sa part vue en mini-barre et, avec
 Téléchargements activé, un point bleu quand un téléchargement de cette saison est actif. Un épisode
 présent dans Sonarr est reconnu comme téléchargé dans la fiche et la popup. Dans la liste d'une saison, un épisode vu
 a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »

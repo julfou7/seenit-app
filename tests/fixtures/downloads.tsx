@@ -13,7 +13,21 @@ const mount = (page = 'downloads') => root.render(page === 'modal' || page === '
   ? <div className="h-[100dvh] max-w-md mx-auto flex flex-col"><DownloadsScreen onShowClick={id => telemetry.opened.push(String(id))} /></div>
   : page === 'banner-long'
   ? <div className="max-w-md mx-auto p-4"><DownloadModeBanner season={1} states={Array.from({ length: 24 }, (_, index) => ({ episode: index + 1, state: index < 5 ? 'seen' as const : 'available' as const }))} progress={() => undefined} picked={new Set([6])} allPicked={false} canPick onToggleAll={() => {}} onSegment={episode => telemetry.requested.push(episode)} /></div>
+  : page === 'program' || page === 'program-normal'
+  ? <ProgramFixture mode={page === 'program'} />
   : <EpisodesFixture mode={page === 'episodes'} />);
+
+// #879 : épisodes à venir — 5 programmable (coché en bleu), 6 déjà surveillé par Sonarr (« Programmé »).
+function ProgramFixture({ mode }: { mode: boolean }) {
+  const [picked, setPicked] = React.useState(() => new Set<number>());
+  const toggle = (episode: number) => { telemetry.requested.push(episode); setPicked(previous => { const next = new Set(previous); if (next.has(episode)) next.delete(episode); else next.add(episode); return next; }); };
+  const states = [{ episode: 4, state: 'available' as const }, { episode: 5, state: 'future' as const }, { episode: 6, state: 'programmed' as const }];
+  return <div className="max-w-md mx-auto p-4 flex flex-col gap-3">
+    {mode && <DownloadModeBanner season={2} states={states} progress={() => undefined} picked={picked} allPicked={false} canPick onToggleAll={() => {}} onSegment={episode => { if (episode !== 6) toggle(episode); }} />}
+    <SeasonPanel season={{ season_number: 2, episode_count: 3 }} episodes={[4, 5, 6].map(episode_number => ({ episode_number, name: `Épisode ${episode_number}`, air_date: episode_number === 4 ? '2020-01-01' : '2099-01-0' + episode_number, still_path: '/fixture.jpg', runtime: 52 }))} show={null} nextKey="2x4" runtimeFallback={52} onToggleSeason={() => {}} onToggleEpisode={() => {}} onOpenEpisode={episode => telemetry.opened.push(`episode:${episode.episode_number}`)}
+    downloadMode={{ active: mode, picked, onToggle: toggle }} episodesMonitored={{ '2x6': true }} getEpisodeDownload={() => null} />
+  </div>;
+}
 
 // #879 : la saison en mode téléchargement (sélection) ou en mode normal (pastilles passives seulement).
 function EpisodesFixture({ mode }: { mode: boolean }) {

@@ -65,6 +65,14 @@ async function testDownloadsHarness(client, root) {
     // Une saison de 24 épisodes garde des cibles de 44 × 44 px : la rangée défile, la page ne déborde pas.
     await evaluate(client, 'window.__downloads.mount("banner-long")');
     await check(client, '(()=>{const segments=[...document.querySelectorAll("[data-mode-segment]")];const row=segments[0]?.parentElement;return segments.length===24&&segments.every(b=>{const r=b.getBoundingClientRect();return r.width>=44&&r.height>=44})&&row.scrollWidth>row.clientWidth&&document.documentElement.scrollWidth<=innerWidth})()', 'saison longue : 24 segments de 44 × 44 px, défilement horizontal sans débordement');
+    // #879 : un épisode à venir se coche en bleu pour être programmé ; un épisode déjà surveillé est « Programmé ».
+    await evaluate(client, 'window.__downloads.mount("program")');
+    await check(client, '(()=>{const box=document.querySelector(\'[role=checkbox][aria-label="Programmer l’épisode 5"]\');const r=box?.getBoundingClientRect();return box&&box.getAttribute("aria-checked")==="false"&&r.width>=44&&r.height>=44&&!document.querySelector(\'[role=checkbox][aria-label$="épisode 6"]\')&&document.querySelector(\'[aria-label="Épisode 6 programmé dans Sonarr"]\')&&!document.querySelector(\'[aria-label^="Marquer l’épisode"]\')})()', 'épisode à venir programmable en 44 px, épisode surveillé affiché programmé');
+    await check(client, 'document.body.innerText.includes("En bleu : programmés pour leur sortie.")&&!document.querySelector(\'[data-mode-segment="6"]\').hasAttribute("aria-pressed")&&document.querySelector(\'[data-mode-segment="5"]\').getAttribute("aria-pressed")==="false"', 'bandeau : à venir cochable, programmé non cochable');
+    await evaluate(client, 'document.querySelector(\'[role=checkbox][aria-label="Programmer l’épisode 5"]\').click()');
+    await check(client, '(()=>{const row=document.querySelector(\'[data-episode-row="5"]\');return document.querySelector(\'[aria-label="Programmer l’épisode 5"]\').getAttribute("aria-checked")==="true"&&getComputedStyle(row).boxShadow.includes("125, 211, 252")&&!window.__downloads.telemetry.opened.includes("episode:5")&&document.documentElement.scrollWidth<=innerWidth})()', 'cocher en bleu sans ouvrir l’épisode, ligne bordée de bleu');
+    await evaluate(client, 'window.__downloads.mount("program-normal")');
+    await check(client, '!document.querySelector("[role=checkbox]")&&document.body.innerText.includes("Programmé")', 'hors mode, pastille « Programmé » passive');
     // Hors mode : aucune commande de téléchargement, seulement des pastilles passives.
     await evaluate(client, 'window.__downloads.mount("episodes-normal")');
     await check(client, '!document.querySelector("[role=checkbox]")&&!document.querySelector(\'[aria-label^="Télécharger l’épisode"]\')&&document.body.innerText.includes("✓ Prêt")&&document.body.innerText.includes("30 %")', 'fiche propre hors mode, pastilles passives');
