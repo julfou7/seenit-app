@@ -870,6 +870,11 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
   barre (un segment par épisode suivi) avec sa légende, puis une ligne par épisode avec son état
   (« 64 % · ≈ 12 min » et barre, « En attente », « Téléchargé · prêt à regarder ») et ✕ pour l'annuler
   ou le retirer, avec la même confirmation ; la carte n'a pas de balayage qui annulerait toute la saison.
+- Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
+  (120 jours) — épisodes et films surveillés, sans fichier, dont la série est surveillée — regroupés par
+  série (identifiant Sonarr exact), avec « Programmé · ven. 14 nov. » en bleu et « Annuler » (44 px),
+  qui retire la surveillance sans rien supprimer. Une source injoignable est signalée, jamais confondue
+  avec une liste vide.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
 - « Vider » ne touche que la section d'historique visée, jamais un actif.

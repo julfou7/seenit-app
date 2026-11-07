@@ -1,6 +1,7 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
 import { DownloadItemCard } from '../components/DownloadItemCard';
 import { SeasonDownloadCard } from '../components/SeasonDownloadCard';
+import { ProgrammedSection } from '../components/ProgrammedSection';
 import { groupSeasonDownloads } from '../features/downloads/downloadSeriesGroups';
 import { downloadGroup } from '../features/downloads/downloadGroups';
 import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
@@ -70,6 +71,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const sendInFlightRef = useRef(false);
 
   const [viewMode, setViewMode] = useState<ViewMode>('downloads');
+  const [programmedRefresh, setProgrammedRefresh] = useState(0);
   useTabShortcut(navigationShortcut, () => {
     setViewMode('search');
     const frame = requestAnimationFrame(() => screenRootRef.current?.querySelector<HTMLInputElement>('[data-navigation-search]')?.focus({ preventScroll: true }));
@@ -410,7 +412,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
           <div className="flex shrink-0 items-center gap-1.5">
             <button
               type="button"
-              onClick={() => void fetchDownloads()}
+              onClick={() => { void fetchDownloads(); setProgrammedRefresh(key => key + 1); }}
               className="w-11 h-11 rounded-xl bg-zinc-900 border border-white/10 text-zinc-400 hover:text-white flex items-center justify-center"
               title="Actualiser"
               aria-label="Actualiser les téléchargements"
@@ -471,6 +473,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {errorDownloads.length > 0 && renderSection('À traiter', errorDownloads, 'error')}
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads)}
             {waitingDownloads.length > 0 && renderSection('En attente de disponibilité', waitingDownloads)}
+            {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
+            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} />}
             {completedDownloads.length > 0 && renderSection('Terminés', completedDownloads, 'completed')}
             {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'cancelled')}
 

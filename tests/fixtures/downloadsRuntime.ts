@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
 
-export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], pushed: [] as string[] };
+export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], pushed: [] as string[], programmed: false, unmonitored: [] as string[] };
 // #879 — versions de la page « Version précise » (C411 simulé) : la conseillée n'est pas la première reçue.
 const day = 86_400_000;
 const FIXTURE_RELEASES = [
@@ -35,3 +35,20 @@ export const searchAndDownloadInRadarr = async () => ({ success: true, message: 
 export const searchAndDownloadInSonarr = searchAndDownloadInRadarr;
 export const downloadEpisodeWithSeasonPackFallback = async () => { throw new Error('Lancement épisode inattendu dans ce contrôle visuel'); };
 export const useTabShortcut = () => {};
+// #879 — calendrier Sonarr/Radarr de la section « Programmés » (vide hors de la page dédiée).
+const inDays = (days: number) => new Date(Date.now() + days * 86_400_000).toISOString();
+export const cleanUrl = (url: string) => String(url || '').replace(/\/+$/, '');
+export const executeGet = async (url: string) => {
+  if (!telemetry.programmed) return [];
+  if (url.includes('/api/v3/calendar') && url.includes('includeSeries=true')) return [
+    { id: 801, seriesId: 5, seasonNumber: 1, episodeNumber: 8, title: 'Épisode 8', airDateUtc: inDays(7), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
+    { id: 802, seriesId: 5, seasonNumber: 1, episodeNumber: 9, title: 'Épisode 9', airDateUtc: inDays(14), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
+    // Non surveillé, présent ou série désactivée : jamais « programmé ».
+    { id: 803, seriesId: 5, seasonNumber: 1, episodeNumber: 10, title: 'Épisode 10', airDateUtc: inDays(21), monitored: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
+    { id: 804, seriesId: 6, seasonNumber: 2, episodeNumber: 1, title: 'Pilote', airDateUtc: inDays(3), monitored: true, hasFile: false, series: { title: 'Série en pause', tmdbId: 78, monitored: false } }
+  ];
+  if (url.includes('/api/v3/calendar')) return [{ id: 901, title: 'Avatar : De feu et de cendres', tmdbId: 83533, monitored: true, hasFile: false, digitalRelease: inDays(40) }];
+  if (/\/api\/v3\/(?:episode|movie)\/\d+$/.test(url)) return { id: Number(url.split('/').pop()), monitored: true };
+  return [];
+};
+export const executePut = async (url: string, body: { monitored?: boolean }) => { if (body.monitored === false) telemetry.unmonitored.push(url); return body; };

@@ -74,6 +74,10 @@
       ],
       "tests": [
         {
+          "file": "tests/programmedCalendar.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sans fichier, triés par date"
+        },
+        {
           "file": "tests/downloadSeasonGroups.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 #879 onglet Télécharger : une carte par saison, regroupée par identité exacte"
         },

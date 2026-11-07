@@ -47,3 +47,7 @@
 .download-season__progress i { display:block; height:100%; background:#f4f4f5; transition:width 180ms ease; }
 .download-season__remove { flex:none; width:44px; height:44px; display:grid; place-items:center; border-radius:50%; color:#a1a1aa; }
 @media(prefers-reduced-motion:reduce) { .download-season__progress i { transition:none; } }
+/* #879 — section « Programmés » : état bleu, bouton Annuler de 44 px. */
+.programmed__state { display:flex; align-items:center; gap:5px; color:#7dd3fc; }
+.programmed__cancel { flex:none; min-height:44px; min-width:44px; padding:0 10px; border-radius:12px; color:#d4d4d8; font-size:13.5px; font-weight:700; }
+.programmed__cancel:disabled { opacity:.5; }
