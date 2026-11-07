@@ -519,8 +519,9 @@ sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L
 trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
 et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮ ;
 hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Une série
-n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office,
-bandeau de saison, barre 1080p / 4K à la place de la navigation). Dans la liste d'une saison, un épisode vu
+n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
+et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
+ligne à la place de la navigation). Dans la liste d'une saison, un épisode vu
 a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »
 à droite, sans bouton Vu. Depuis les retours de la v1.4.247, le bouton
 or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, genres et thèmes sont sous le synopsis, tout est

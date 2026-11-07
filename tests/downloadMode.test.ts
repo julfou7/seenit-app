@@ -13,11 +13,11 @@ async function loadMode() {
   const bundle = await build({ entryPoints: ['src/screens/mediaDetail/downloadMode.tsx'], bundle: true, write: false, platform: 'node', format: 'cjs',
     plugins: [{ name: 'mode-ports', setup(builder) {
       builder.onResolve({ filter: /^(?:react(?:\/jsx-runtime)?|react-dom|lucide-react)$|\/lib\/utils$/ }, args => ({ path: args.path, namespace: 'ports' }));
-      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="f";export const Download=()=>null;export const cn=(...a)=>a.filter(Boolean).join(" ");export const createPortal=(n)=>n;export default {};' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="f";export const Download=()=>null;export const X=()=>null;export const cn=(...a)=>a.filter(Boolean).join(" ");export const createPortal=(n)=>n;export default {};' }));
     } }] });
   const module = { exports: {} as Record<string, unknown> };
   vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module, exports: module.exports }));
-  return module.exports as { isEpisodeSelectable: (state: string) => boolean; seasonModeStates: (...args: unknown[]) => { episode: number; state: string }[] };
+  return module.exports as { isEpisodeSelectable: (state: string) => boolean; seasonModeStates: (...args: unknown[]) => { episode: number; state: string }[]; DownloadModeBanner: (props: Record<string, unknown>) => unknown; DownloadModeBar: (props: Record<string, unknown>) => unknown };
 }
 
 test('SEENIT-DOWNLOAD-014 #879 seul un épisode sorti, sans fichier ni téléchargement actif, se coche (un échec se relance)', async () => {
@@ -44,7 +44,7 @@ test('SEENIT-DOWNLOAD-014 #879 hors mode la fiche reste propre ; en mode le cont
 });
 
 test('SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la saison change vide la sélection, l’onglet ferme le mode', () => {
-  assert.match(view, /nextEp && nextEp\.season_number === modeSeason && selectableEpisodes\.includes\(nextEp\.episode_number\) \? \[nextEp\.episode_number\] : \[\]/);
+  assert.match(view, /const nextInSeason = nextEp && nextEp\.season_number === modeSeason \? nextEp\.episode_number : null;\n\s+const next = nextInSeason !== null && selectableEpisodes\.includes\(nextInSeason\) \? \[nextInSeason\] : \[\];/);
   assert.match(view, /useEffect\(\(\) => \{ setPickedEpisodes\(new Set\(\)\); \}, \[modeSeason\]\);/);
   assert.match(view, /window\.addEventListener\('app-close-modals', close\);/);
   assert.match(view, /\{downloadMode && canUseDownloadMode && <DownloadModeBar /);
@@ -126,4 +126,38 @@ test('SEENIT-DOWNLOAD-014 #879 le lot propose ses épisodes suivants au pack et 
   assert.deepEqual({ ...result }, { launched: 2, interrupted: false });
   assert.deepEqual(calls, [{ episode: 1, packEpisodes: [2, 3, 6] }, { episode: 6, packEpisodes: [] }], 'un épisode gardé n’est jamais proposé au pack, un épisode couvert n’est pas relancé');
   assert.match(launch, /packEpisodes,\n\s+qualityProfileId: effectiveProfileId,/, 'la voie partagée transmet le lot au repli');
+});
+
+type Node = { type?: unknown; props?: Record<string, unknown> & { children?: unknown } };
+const findNodes = (node: unknown, match: (node: Node) => boolean, out: Node[] = []): Node[] => {
+  if (Array.isArray(node)) { node.forEach(child => findNodes(child, match, out)); return out; }
+  if (!node || typeof node !== 'object') return out;
+  const element = node as Node;
+  if (element.props && match(element)) out.push(element);
+  findNodes(element.props?.children, match, out);
+  return out;
+};
+
+test('SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre compacte se quitte et le mode amène l’épisode en cours', async () => {
+  const { DownloadModeBanner, DownloadModeBar } = await loadMode();
+  const touched: number[] = [];
+  const banner = DownloadModeBanner({ season: 1, states: [{ episode: 1, state: 'seen' }, { episode: 2, state: 'available' }, { episode: 3, state: 'present' }], progress: () => undefined,
+    picked: new Set([2]), allPicked: true, canPick: true, onToggleAll: () => {}, onSegment: (episode: number) => touched.push(episode) });
+  const segments = findNodes(banner, node => node.props?.['data-mode-segment'] !== undefined);
+  assert.equal(segments.length, 3, 'un bouton par épisode de la saison');
+  segments.forEach(segment => (segment.props!.onClick as () => void)());
+  assert.deepEqual(touched, [1, 2, 3], 'tout segment se touche (la fiche décide de cocher et fait défiler)');
+  assert.deepEqual(segments.map(segment => segment.props!['aria-pressed']), [undefined, true, undefined], 'seul un épisode cochable expose son état coché');
+  assert.match(String(segments[0].props!.className), /h-11/, 'cible de 44 px');
+  let exited = 0;
+  const bar = DownloadModeBar({ title: '1 épisode', detail: '', enabled: true, onLaunch: () => {}, onPrecise: () => {}, onExit: () => { exited += 1; } }) as Node;
+  (findNodes(bar, node => node.props?.['aria-label'] === 'Quitter le mode téléchargement')[0].props!.onClick as () => void)();
+  assert.equal(exited, 1);
+  assert.match(String(bar.props!.className), /rounded-\[22px\][^"]*p-2 flex items-center gap-2/, 'une seule ligne compacte');
+  assert.equal(findNodes(bar, node => node.props?.['aria-label'] === 'Quitter le mode téléchargement').length, 1);
+  // La fiche : entrer dans le mode défile jusqu'à l'épisode où on en est ; un segment défile jusqu'à sa ligne.
+  assert.match(view, /const target = nextInSeason \?\? selectableEpisodes\[0\] \?\? modeStates\.find\(entry => entry\.state !== 'seen'\)\?\.episode;\n\s+if \(target !== undefined\) requestEpisodeScroll\(target\);/);
+  assert.match(view, /querySelector<HTMLElement>\(`\[data-episode-row="\$\{episodeScroll\.episode\}"\]`\)\?\.scrollIntoView\(\{ block: 'center'/);
+  assert.match(view, /const pickSegment = \(episode: number\) => \{ if \(selectableEpisodes\.includes\(episode\)\) togglePickedEpisode\(episode\); requestEpisodeScroll\(episode\); \};/);
+  assert.match(rows, /data-episode-row=\{episode\.episode_number\}/);
 });

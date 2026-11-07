@@ -36,6 +36,10 @@
           "contains": "SEENIT-DOWNLOAD-014 #879 le lot propose ses épisodes suivants au pack et ne relance pas ceux qu’il a couverts"
         },
         {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre compacte se quitte et le mode amène l’épisode en cours"
+        },
+        {
           "file": "tests/downloadSearchRuntime.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 un pack de saison sert tout le lot : les épisodes demandés sont sélectionnés ensemble dans le transfert exact"
         },
