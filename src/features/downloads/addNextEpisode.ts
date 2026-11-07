@@ -15,29 +15,31 @@ export interface SeasonTarget { tmdbId: number; tvdbId?: number; season: number;
 
 /** #879 — Prochain épisode à ajouter à une carte de saison (TMDB, progression et présence Sonarr exacte). */
 export function useNextEpisodeToAdd(target: SeasonTarget | null): { episode: number; name?: string } | null {
-  const [next, setNext] = useState<{ episode: number; name?: string } | null>(null);
+  const [episodes, setEpisodes] = useState<Array<{ episode_number: number; air_date?: string | null; name?: string }> | null>(null);
   const shows = useShowsStore(state => state.shows);
-  const key = target ? `${target.tmdbId}:${target.season}:${target.tracked.join(',')}` : '';
+  // Abonné à l'entrée de présence : la proposition attend une présence résolue et se recalcule à chaque mise à jour.
+  const presence = useMediaPresenceStore(state => target ? state.getPresence(target.tmdbId, 'tv') : undefined);
+  const key = target ? `${target.tmdbId}:${target.season}` : '';
   useEffect(() => {
-    if (!target || !isDownloadFeatureEnabled(useDownloadConfigStore.getState())) { setNext(null); return; }
+    setEpisodes(null);
+    if (!target || !isDownloadFeatureEnabled(useDownloadConfigStore.getState())) return;
     let cancelled = false;
-    void Promise.all([
-      tmdb.getSeasonDetails(target.tmdbId, target.season),
-      useMediaPresenceStore.getState().checkPresence({ tmdbId: target.tmdbId, tvdbId: target.tvdbId, title: target.title, mediaType: 'tv' })
-    ]).then(([season, presence]) => {
-      if (cancelled || !season.ok) return;
-      const show = shows.find(entry => Number(entry.tmdbId) === target.tmdbId);
-      const seen = new Set(show?.seenEpisodes || []);
-      setNext(nextEpisodeToAdd(season.value?.episodes || [], {
-        today: getTodayStr(),
-        seen: episode => seen.has(`${target.season}x${episode}`),
-        hasFile: episode => Boolean(presence.episodesHasFile?.[episodePresenceKey(target.season, episode)]),
-        tracked: new Set(target.tracked)
-      }));
-    }).catch(() => { if (!cancelled) setNext(null); });
+    void useMediaPresenceStore.getState().checkPresence({ tmdbId: target.tmdbId, tvdbId: target.tvdbId, title: target.title, mediaType: 'tv' }).catch(() => undefined);
+    void tmdb.getSeasonDetails(target.tmdbId, target.season)
+      .then(season => { if (!cancelled && season.ok) setEpisodes(season.value?.episodes || []); })
+      .catch(() => undefined);
     return () => { cancelled = true; };
-  }, [key, shows]);
-  return next;
+  }, [key]);
+  if (!target || !episodes || !presence || presence.loading) return null;
+  // Progression de la série elle-même : un film peut porter le même identifiant numérique TMDB.
+  const show = shows.find(entry => entry.mediaType === 'tv' && Number(entry.tmdbId) === target.tmdbId);
+  const seen = new Set(show?.seenEpisodes || []);
+  return nextEpisodeToAdd(episodes, {
+    today: getTodayStr(),
+    seen: episode => seen.has(`${target.season}x${episode}`),
+    hasFile: episode => Boolean(presence.episodesHasFile?.[episodePresenceKey(target.season, episode)]),
+    tracked: new Set(target.tracked)
+  });
 }
 
 /** Ajoute un épisode avec les gardes du mode : fichier présent ou demande active jamais relancés. */

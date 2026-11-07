@@ -52,5 +52,10 @@ test('SEENIT-DOWNLOAD-013 #879 « Ajouter E6 » : premier épisode sorti, ni vu,
   assert.match(add, /await launchArrEpisodeBatch\(\{/);
   assert.match(add, /hasActiveDownloadInScope\(useLiveDownloadStore\.getState\(\)\.downloads,/);
   assert.match(card, /const target = Number\(first\.tmdbId\) > 0 \?/, 'TMDB exact requis');
+  // Présence résolue requise, recalculée à chaque mise à jour (deux cartes d'une même série, cache froid).
+  assert.match(add, /const presence = useMediaPresenceStore\(state => target \? state\.getPresence\(target\.tmdbId, 'tv'\) : undefined\);/);
+  assert.match(add, /if \(!target \|\| !episodes \|\| !presence \|\| presence\.loading\) return null;/);
+  // Progression lue sur la série : un film peut porter le même identifiant numérique TMDB.
+  assert.match(add, /shows\.find\(entry => entry\.mediaType === 'tv' && Number\(entry\.tmdbId\) === target\.tmdbId\)/);
   assert.match(card, /<button type="button" onClick=\{\(\) => setPicking\(false\)\}>Plus tard<\/button>/);
 });
