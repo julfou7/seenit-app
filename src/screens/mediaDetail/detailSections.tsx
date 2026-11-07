@@ -99,9 +99,9 @@ export function SagaTimeline({ title, parts, currentKey, shows, onOpen }: { titl
   const seenCount = rows.filter(row => row.seen).length;
   return <DetailCard className="p-4 pb-2 flex flex-col" data-saga-timeline>
     <h3 className="m-0 text-[20px] font-extrabold tracking-[-0.02em] text-white">{title}</h3>
-    <div className="mt-1 flex items-baseline justify-between gap-3"><span className="text-[13.5px] text-zinc-400">Ordre de visionnage</span><span className="text-[13.5px] font-bold text-zinc-300"><strong className="font-extrabold text-[#F2C36B]">{seenCount}</strong> / {rows.length} vus</span></div>
+    <div className="mt-1 flex items-baseline justify-between gap-3"><span className="text-[13.5px] text-zinc-400">Ordre de visionnage</span><span className="text-[13.5px] font-bold text-zinc-300"><strong className="font-extrabold text-white">{seenCount}</strong> / {rows.length} vus</span></div>
     <div role="img" aria-label={`${seenCount} film${seenCount > 1 ? 's' : ''} vu${seenCount > 1 ? 's' : ''} sur ${rows.length}`} className="mt-2.5 mb-1.5 flex gap-[3px]">
-      {rows.map((row, index) => <span key={`saga-seg-${row.part.id}-${index}`} data-saga-segment className="h-[5px] flex-1 rounded-[3px]" style={row.here ? { boxShadow: 'inset 0 0 0 1.5px #fff', background: row.seen ? '#E5A93D' : 'transparent' } : { background: row.seen ? '#E5A93D' : '#3F3F46' }} />)}
+      {rows.map((row, index) => <span key={`saga-seg-${row.part.id}-${index}`} data-saga-segment className="h-[5px] flex-1 rounded-[3px]" style={{ background: row.here ? '#E5A93D' : row.seen ? '#A1A1AA' : '#3F3F46' }} />)}
     </div>
     <ol className="m-0 list-none p-0">
       {rows.map((row, index) => {
@@ -113,16 +113,17 @@ export function SagaTimeline({ title, parts, currentKey, shows, onOpen }: { titl
         return <li key={`saga-${part.media_type || 'media'}-${part.id}-${index}`} className="relative">
           <button type="button" onClick={() => { if (!here) onOpen(part); }} aria-current={here ? 'page' : undefined} data-saga-row={index + 1}
             className={cn('relative my-0.5 flex w-full min-h-[104px] items-center gap-3 rounded-2xl py-2.5 pr-2.5 pl-1.5 text-left', here && 'bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.8)]')}>
-            {index > 0 && <span aria-hidden="true" className="absolute top-[-2px] w-0.5 -ml-px" style={{ left: SAGA_AXIS, height: 'calc(50% + 2px)', background: previousSeen && seen ? '#E5A93D' : '#3F3F46' }} />}
-            {index < rows.length - 1 && <span aria-hidden="true" className="absolute top-1/2 bottom-[-2px] w-0.5 -ml-px" style={{ left: SAGA_AXIS, background: seen && nextSeen ? '#E5A93D' : '#3F3F46' }} />}
-            <span aria-hidden="true" data-saga-marker className={cn('relative z-[1] grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-extrabold tabular-nums', here ? 'bg-[#141417] text-[#F2C36B] shadow-[inset_0_0_0_3px_#E5A93D,0_0_0_4px_rgba(229,169,61,0.2)]' : seen ? 'bg-[#E5A93D] text-[#1A1206]' : 'bg-[#141417] text-zinc-400 shadow-[inset_0_0_0_2px_#52525B]')}>{index + 1}</span>
+            {index > 0 && <span aria-hidden="true" className="absolute top-[-2px] w-0.5 -ml-px" style={{ left: SAGA_AXIS, height: 'calc(50% + 2px)', background: previousSeen && seen ? '#71717A' : '#3F3F46' }} />}
+            {index < rows.length - 1 && <span aria-hidden="true" className="absolute top-1/2 bottom-[-2px] w-0.5 -ml-px" style={{ left: SAGA_AXIS, background: seen && nextSeen ? '#71717A' : '#3F3F46' }} />}
+            <span aria-hidden="true" data-saga-marker className={cn('relative z-[1] grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-extrabold tabular-nums', here ? 'bg-[#E5A93D] text-[#1A1206] shadow-[0_0_0_4px_rgba(229,169,61,0.2)]' : seen ? 'bg-zinc-700 text-zinc-100' : 'bg-[#141417] text-zinc-400 shadow-[inset_0_0_0_2px_#52525B]')}>{index + 1}</span>
             <span data-saga-poster className="relative h-[84px] w-14 shrink-0 overflow-hidden rounded-[10px] bg-zinc-800 shadow-[0_6px_16px_rgba(0,0,0,0.5)]">
               {part.poster_path && <img src={`https://image.tmdb.org/t/p/w154${part.poster_path}`} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
               {seen && <><span aria-hidden="true" className="absolute inset-0 bg-[rgba(9,9,11,0.35)]" /><SeenItWatchedStamp className="seenit-watched-stamp--mini" /></>}
             </span>
             <span className="min-w-0 flex-1">
               {here && <span className="mb-1 inline-flex h-5 items-center rounded-md bg-[#E5A93D] px-[7px] text-[10.5px] font-extrabold tracking-[0.04em] text-[#1A1206]">TU ES ICI</span>}
-              <strong className="seenit-media-title block text-[15px] font-extrabold leading-[1.28]">{part.title || part.name}</strong>
+              {/* Saga v3 (07/11, « beaucoup de jaune ») : l'or ne sert qu'au film affiché ; le tampon VU reste sur l'affiche. */}
+              <strong className={cn('block text-[15px] font-extrabold leading-[1.28]', here ? 'seenit-media-title' : seen ? 'text-zinc-400' : 'text-zinc-100')}>{part.title || part.name}</strong>
               <small className="mt-1 flex items-center gap-1.5 text-[12.5px] text-zinc-400">{meta}{seen ? <span className="sr-only">, vu</span> : <>{meta && ' · '}<span className="font-extrabold text-zinc-300">À voir</span></>}</small>
             </span>
           </button>

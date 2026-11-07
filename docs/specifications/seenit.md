@@ -552,9 +552,11 @@ film. TMDB est l'autorité normale et suffisante de cette section.
 - Aucun catalogue SeenIt, groupe TVDB, Wikidata ou rapprochement par titre ne complète une collection
   TMDB absente ou incomplète.
 - Si TMDB ne fournit aucune collection exploitable, la section est masquée.
-- Affichage (saga v2, #871) : frise de repères numérotés 1…N (or plein si vu, contour gris sinon, rond creux
-  or avec halo pour le film affiché), repère, affiche et texte centrés sur le même axe, trait or seulement
-  entre deux films vus ; en-tête « X / N vus » et barre segmentée dont la case du film affiché est cerclée ;
+- Affichage (saga v3, #871 puis #885) : frise de repères numérotés 1…N (gris plein si vu, contour gris sinon,
+  or plein avec halo pour le film affiché), repère, affiche et texte centrés sur le même axe, trait gris clair
+  entre deux films vus ; en-tête « X / N vus » (compteur blanc) et barre segmentée (vus en gris clair, film
+  affiché en or). L'or est réservé au film affiché : son titre est en or, les autres titres sont clairs (gris
+  si vus) ;
   la ligne du film affiché est encadrée d'or avec « TU ES ICI » et garde son statut vu. Un film vu porte le
   tampon VU de l'accueil sur son affiche (annoncé « vu » aux lecteurs d'écran), un film non vu « À voir » ;
   métadonnées « année · durée » quand TMDB fournit la durée. Rendu seul : ni source ni identité ne changent.
@@ -1562,7 +1564,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   notifications in-app), y compris une fois lu ; les titres d'épisode, personnes, personnages, noms de
   releases et notifications système Android en sont exclus. Exception voulue par le propriétaire le
   07/11 (`USR-2026-11-07-001`) : dans les résultats de recherche, les titres restent clairs (blancs) et
-  seul le terme cherché est en or. Toute pagination progressive réutilise `HomeLoadMore`
+  seul le terme cherché est en or ; de même, dans la frise de saga (`USR-2026-11-07-002`), seul le film
+  affiché a son titre en or. Toute pagination progressive réutilise `HomeLoadMore`
   (pastille de liste ou tuile de fin de carrousel, trois prochaines vignettes, « Afficher N de plus » /
   « Afficher les N » / « Afficher la dernière » et « X en attente ») ; aucun bouton texte de pagination
   séparé. **État : livrée (#874, #873).** Le jeton `--seenit-media-title` (classe `seenit-media-title`)
