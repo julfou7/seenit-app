@@ -33,7 +33,7 @@
         },
         {
           "file": "tests/movieProgramming.test.ts",
-          "contains": "DlFilm télécharger un film sorti passe par la voie de la popup (profil Radarr configuré)"
+          "contains": "DlFilm télécharger un film sorti passe par la voie de la popup (profil Radarr configuré, présence revérifiée)"
         },
         {
           "file": "tests/preciseVersion.test.ts",

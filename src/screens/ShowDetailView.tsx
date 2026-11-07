@@ -192,6 +192,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     window.addEventListener('app-close-modals', close);
     return () => window.removeEventListener('app-close-modals', close);
   }, []);
+  // Présence confirmée (Plex ou Radarr) pendant que la barre est ouverte : le mode se ferme, rien ne part.
+  useEffect(() => { if (movieAvailable) setFilmMode(false); }, [movieAvailable]);
   const pressFilmButton = () => {
     if (filmState === 'idle' || filmState === 'mode') { setFilmMode(!filmMode); return; }
     filmTrackRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
@@ -200,6 +202,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     setFilmMode(false);
     if (!effectiveTmdbId) return;
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
+    // Comme la popup (alreadyAvailable) : un film déjà présent, même seulement dans Plex, n'est jamais relancé.
+    if (movieAvailable) { useToastStore.getState().showToast({ title, action: 'Déjà disponible : rien n’a été lancé.', posterPath: show?.posterPath }, 'info'); return; }
     if (model.hasActiveDownloadInScope?.({ mediaType: 'movie', tmdbId: Number(effectiveTmdbId) })) { useToastStore.getState().showToast({ title, action: 'Déjà en cours de téléchargement.', posterPath: show?.posterPath }, 'info'); return; }
     if (!filmUpcoming) {
       // Même voie que la popup (launchArrDownload) : profil Radarr configuré pour la qualité choisie,
@@ -400,7 +404,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         onClose={() => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); }}
         onShowClick={(tmdbId, type) => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) || (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) || (show?.id && String(show.id) === String(tmdbId)); if (!isSameShow && onShowClick) setTimeout(() => onShowClick(tmdbId, type || 'movie'), 50); }} />}
       {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={pickedNow.length === 1 && !pickedFuture.length ? openPreciseVersion : undefined} onExit={exitDownloadMode} />}
-      {filmMode && canUseFilmMode && <DownloadModeBar tone={filmUpcoming ? 'sky' : 'gold'} title={filmUpcoming ? 'Programmer' : title} detail={filmUpcoming ? 'Dès sa sortie' : 'En quelle qualité ?'} enabled onLaunch={quality => { void launchFilm(quality); }} onPrecise={filmUpcoming ? undefined : () => { setFilmMode(false); setFilmPrecise(true); }} onExit={() => setFilmMode(false)} />}
+      {filmMode && canUseFilmMode && !movieAvailable && <DownloadModeBar tone={filmUpcoming ? 'sky' : 'gold'} title={filmUpcoming ? 'Programmer' : title} detail={filmUpcoming ? 'Dès sa sortie' : 'En quelle qualité ?'} enabled onLaunch={quality => { void launchFilm(quality); }} onPrecise={filmUpcoming ? undefined : () => { setFilmMode(false); setFilmPrecise(true); }} onExit={() => setFilmMode(false)} />}
       {filmPrecise && canUseFilmMode && <Suspense fallback={<span role="status">Ouverture de la version précise…</span>}><PreciseVersionPage onClose={() => setFilmPrecise(false)} target={{ title, tmdbId: effectiveTmdbId!, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, year: releaseYear || undefined, posterPath: show?.posterPath || undefined }} /></Suspense>}
       {trailerModalVideos && <TrailerModal videos={trailerModalVideos} onClose={() => setTrailerModalVideos(null)} />}
       {preciseTarget && downloadsEnabled && effectiveTmdbId && <Suspense fallback={<span role="status">Ouverture de la version précise…</span>}><PreciseVersionPage onClose={() => setPreciseTarget(null)} target={{ title, tmdbId: effectiveTmdbId, tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, year: (tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4), posterPath: show?.posterPath || undefined, ...preciseTarget }} /></Suspense>}

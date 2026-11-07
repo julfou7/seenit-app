@@ -97,11 +97,16 @@ test('DlFilm annuler une programmation : déconnexion, gate coupé ou autre serv
   }
 });
 
-test('DlFilm télécharger un film sorti passe par la voie de la popup (profil Radarr configuré)', async () => {
+test('DlFilm télécharger un film sorti passe par la voie de la popup (profil Radarr configuré, présence revérifiée)', async () => {
   const { readFileSync } = await import('node:fs');
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.match(view, /await launchArrDownload\(\{ config, mediaType: 'movie',/);
   assert.doesNotMatch(view, /launchMovieDownload/);
+  // Présence confirmée pendant que la barre est ouverte (Plex sans Radarr) : barre fermée, aucun lancement.
+  const launchFilm = view.slice(view.indexOf('const launchFilm = async'), view.indexOf('const cancelFilm = async'));
+  assert.ok(launchFilm.indexOf('if (movieAvailable)') > 0 && launchFilm.indexOf('if (movieAvailable)') < launchFilm.indexOf('launchArrDownload') && launchFilm.indexOf('if (movieAvailable)') < launchFilm.indexOf('programArrMovie'), 'la présence est revérifiée avant tout lancement ou programmation');
+  assert.match(view, /useEffect\(\(\) => \{ if \(movieAvailable\) setFilmMode\(false\); \}, \[movieAvailable\]\);/);
+  assert.match(view, /\{filmMode && canUseFilmMode && !movieAvailable && <DownloadModeBar/);
   const launch = readFileSync('src/features/downloads/downloadLaunch.ts', 'utf8');
   assert.match(launch, /qualityPreference === '4k' \? config\.radarr4kProfileId : config\.radarr1080pProfileId/);
 });
