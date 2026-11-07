@@ -12,6 +12,8 @@ test('SEENIT-UX-019 #879 le menu ⋮ des fiches est ancré sous son bouton, sans
   // Toutes les actions existantes restent, annoncées comme éléments de menu ; Téléchargement indique le mode et l'activité.
   assert.equal((menu.match(/role="menuitem"/g) || []).length, 8);
   for (const label of ['Partager la fiche', 'Synchroniser', 'Téléchargement', 'Abandonner la série', 'Supprimer la série']) assert.ok(menu.includes(label), label);
-  assert.match(menu, /menuSub\(`Mode téléchargement\$\{activeDownloads \? ` · \$\{activeDownloads\} en cours` : ''\}`\)/);
+  assert.match(menu, /menuSub\(canUseFilmMode \? 'Mode téléchargement du film' : `Mode téléchargement\$\{activeDownloads \? ` · \$\{activeDownloads\} en cours` : ''\}`\)/);
+  // Maquette DlFilm : sur un film, l'entrée du menu ouvre le mode téléchargement du film.
+  assert.match(menu, /if \(canUseFilmMode\) \{ setFilmMode\(true\); return; \}/);
   assert.match(menu, /<span aria-hidden="true" className="mx-3\.5 my-1 h-px bg-white\/\[0\.07\]" \/>/, 'actions de cycle de vie séparées');
 });

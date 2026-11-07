@@ -28,6 +28,9 @@ import { SeenItRing } from '../components/SeenItLogo';
 import { episodeDownloadPresentation } from '../features/downloads/episodeDownloadPresentation';
 import type { DownloadQualityChoice } from '../features/downloads/downloadLaunch';
 import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
+import { MovieDownloadButton, MovieDownloadTrack, type FilmDownloadState } from './mediaDetail/movieDownloadMode';
+import { downloadGroup } from '../features/downloads/downloadGroups';
+import { availabilityHint } from '../features/downloads/downloadAvailability';
 
 interface ShowDetailViewProps {
   model: ShowDetailViewModel;
@@ -174,6 +177,70 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     window.addEventListener('app-close-modals', close);
     return () => window.removeEventListener('app-close-modals', close);
   }, []);
+  // Maquette DlFilm — mode téléchargement du film : un bouton ⬇ à côté du bouton principal, la barre
+  // compacte des séries (1080p / 4K, Version précise) et le suivi du film dans la fiche avec « Annuler ».
+  // Un film à venir se programme (bleu) : Radarr le récupère dès sa sortie, sans recherche immédiate.
+  const canUseFilmMode = !isSeries && downloadsEnabled && Boolean(effectiveTmdbId);
+  const [filmMode, setFilmMode] = useState(false);
+  const filmUpcoming = !isSeries && (isUnreleased || isUpcomingMovie);
+  const filmItem = model.movieDownload && Number(model.movieDownload.tmdbId) === Number(effectiveTmdbId) ? model.movieDownload : null;
+  const filmGroup = filmItem ? downloadGroup(filmItem) : null;
+  const filmState: FilmDownloadState = filmMode ? 'mode' : filmGroup === 'active' ? 'active' : filmGroup === 'waiting' ? 'waiting' : !movieAvailable && model.presence.radarrMonitored && filmUpcoming ? 'programmed' : 'idle';
+  const filmTrackRef = React.useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const close = () => setFilmMode(false);
+    window.addEventListener('app-close-modals', close);
+    return () => window.removeEventListener('app-close-modals', close);
+  }, []);
+  // Présence confirmée (Plex ou Radarr) pendant que la barre est ouverte : le mode se ferme, rien ne part.
+  useEffect(() => { if (movieAvailable) setFilmMode(false); }, [movieAvailable]);
+  const pressFilmButton = () => {
+    if (filmState === 'idle' || filmState === 'mode') { setFilmMode(!filmMode); return; }
+    filmTrackRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  };
+  const launchFilm = async (quality: DownloadQualityChoice) => {
+    setFilmMode(false);
+    if (!effectiveTmdbId) return;
+    const qualityLabel = quality === '4k' ? '4K' : '1080p';
+    // Comme la popup (alreadyAvailable) : un film déjà présent, même seulement dans Plex, n'est jamais relancé.
+    if (movieAvailable) { useToastStore.getState().showToast({ title, action: 'Déjà disponible : rien n’a été lancé.', posterPath: show?.posterPath }, 'info'); return; }
+    if (model.hasActiveDownloadInScope?.({ mediaType: 'movie', tmdbId: Number(effectiveTmdbId) })) { useToastStore.getState().showToast({ title, action: 'Déjà en cours de téléchargement.', posterPath: show?.posterPath }, 'info'); return; }
+    if (!filmUpcoming) {
+      // Même voie que la popup (launchArrDownload) : profil Radarr configuré pour la qualité choisie,
+      // demande durable et échecs explicites ; présence vérifiée d'abord, un fichier n'est jamais remplacé.
+      const config = useDownloadConfigStore.getState();
+      const posterPath = show?.posterPath || tmdbDetails?.poster_path || undefined;
+      const notify = (action: string, kind: 'download' | 'success' | 'error' | 'info' = 'download') => useToastStore.getState().showToast({ title, action, posterPath }, kind);
+      if (!isDownloadFeatureEnabled(config) || !config.radarrUrl || !config.radarrApiKey) { notify('Configure Radarr dans les réglages des téléchargements.', 'error'); return; }
+      if (model.presence.loading) { notify('Vérification de la disponibilité en cours, réessaie dans un instant.', 'info'); return; }
+      const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
+      await launchArrDownload({ config, mediaType: 'movie', title, year: releaseYear || undefined, tmdbId: effectiveTmdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, posterPath, qualityPreference: quality, notify });
+      return;
+    }
+    const { programArrMovie } = await import('../features/downloads/movieProgramming');
+    const outcome = await programArrMovie({ title, tmdbId: effectiveTmdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, year: releaseYear ? Number(releaseYear) : undefined, qualityPreference: quality, readConfig: () => useDownloadConfigStore.getState() });
+    if (outcome.interrupted) return;
+    const toast = useToastStore.getState().showToast;
+    if (outcome.failure) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return; }
+    toast({ title, action: outcome.present ? 'Déjà présent dans Radarr.' : `Programmé pour sa sortie · ${qualityLabel}`, posterPath: show?.posterPath }, outcome.present ? 'info' : 'success');
+    void refreshPlexAvailability();
+  };
+  const cancelFilm = async () => {
+    const toast = useToastStore.getState().showToast;
+    if (filmState === 'programmed' && effectiveTmdbId) {
+      const { unprogramArrMovie } = await import('../features/downloads/movieProgramming');
+      const outcome = await unprogramArrMovie({ tmdbId: effectiveTmdbId, readConfig: () => useDownloadConfigStore.getState() });
+      if (outcome.interrupted) return;
+      toast({ title, action: outcome.done ? 'N’est plus programmé.' : outcome.failure || 'Annulation non confirmée.', posterPath: show?.posterPath }, outcome.done ? 'info' : 'error');
+      if (outcome.done) void refreshPlexAvailability();
+      return;
+    }
+    if (!filmItem) return;
+    const removed = Boolean(await model.removeMovieDownload?.(filmItem));
+    toast({ title, action: removed ? (filmState === 'waiting' ? 'Attente annulée.' : 'Téléchargement annulé.') : 'Annulation non confirmée.', posterPath: show?.posterPath }, removed ? 'info' : 'error');
+  };
+  const [filmPrecise, setFilmPrecise] = useState(false);
+
   const episodeCode = (season: number, episode: number) => `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
   const pickedList = [...picked.values()].sort((a, b) => a.season - b.season || a.episode - b.episode);
   const pickedSeasons = new Set(pickedList.map(entry => entry.season)).size;
@@ -274,7 +341,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           {effectiveTmdbId && <button type="button" role="menuitem" onClick={() => { setShowMenu(false); void handleShare(); }} className={cn(menuItem, 'text-zinc-100')}><Share2 size={19} className="shrink-0 text-zinc-400" />Partager la fiche</button>}
           {show && <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleSyncSingle(); }} disabled={isSyncingSingle} className={cn(menuItem, 'text-zinc-100 disabled:opacity-50')}><RefreshCw size={19} className={cn('shrink-0 text-zinc-400', isSyncingSingle && 'animate-spin')} /><span className="min-w-0">Synchroniser {isSeries ? 'la série' : 'le film'}{menuSub(isSeries ? 'Épisodes et dates' : 'Dates et disponibilités')}</span></button>}
           {/* Accès existant aux téléchargements, inchangé (SEENIT-DOWNLOAD-VISIBILITY-001) */}
-          {(!movieAvailable && (isSeries || !model.presence.loading)) ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); if (canUseDownloadMode) { enterDownloadMode(); return; } setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={20} className="shrink-0 text-[#E5A93D]" /><span className="min-w-0">Téléchargement{canUseDownloadMode && menuSub(`Mode téléchargement${activeDownloads ? ` · ${activeDownloads} en cours` : ''}`)}</span></button> : <button type="button" role="menuitem" disabled={model.presence.loading} onClick={() => { setShowMenu(false); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={20} className="shrink-0 text-[#E5A93D]" />{model.presence.loading ? 'Vérification de la disponibilité…' : 'Disponible · autre version'}</button>}
+          {(!movieAvailable && (isSeries || !model.presence.loading)) ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); if (canUseDownloadMode) { enterDownloadMode(); return; } if (canUseFilmMode) { setFilmMode(true); return; } setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={20} className="shrink-0 text-[#E5A93D]" /><span className="min-w-0">Téléchargement{(canUseDownloadMode || canUseFilmMode) && menuSub(canUseFilmMode ? 'Mode téléchargement du film' : `Mode téléchargement${activeDownloads ? ` · ${activeDownloads} en cours` : ''}`)}</span></button> : <button type="button" role="menuitem" disabled={model.presence.loading} onClick={() => { setShowMenu(false); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={20} className="shrink-0 text-[#E5A93D]" />{model.presence.loading ? 'Vérification de la disponibilité…' : 'Disponible · autre version'}</button>}
           {show && <>
             <span aria-hidden="true" className="mx-3.5 my-1 h-px bg-white/[0.07]" />
             {show.isArchived ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? rewatchShow() : toggleMovieSeen(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Revoir la série' : 'Revoir le film'}</button>
@@ -299,8 +366,9 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           </>}
         </div>
         {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}{canUseDownloadMode && show && <DownloadModeToggle active={downloadMode} badge={activeDownloads} onToggle={toggleDownloadMode} />}</SeriesProgressCard>
-          : <div className="flex gap-2">{movieCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}</div>}
+          : <div className="flex gap-2">{movieCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}{canUseFilmMode && !movieAvailable && <MovieDownloadButton state={filmState} progress={Number(filmItem?.progress) || 0} upcoming={filmUpcoming} onPress={pressFilmButton} />}</div>}
         {!isSeries && !hasSeenMedia && !isUnreleased && !isAtCinema && <MovieEndCard runtime={tmdbDetails?.runtime} />}
+        {canUseFilmMode && (filmState === 'active' || filmState === 'waiting' || filmState === 'programmed') && <div ref={filmTrackRef}><MovieDownloadTrack state={filmState} quality={filmItem?.quality} progress={Number(filmItem?.progress) || 0} timeleft={filmItem?.timeleft} waitingHint={filmItem ? availabilityHint(filmItem.availability) : undefined} onCancel={cancelFilm} /></div>}
 
         {tmdbDetails ? <DetailSynopsis text={tmdbDetails.overview || 'Aucun synopsis disponible.'} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} /> : <div className="space-y-2 animate-pulse" aria-hidden="true"><div className="h-3.5 w-full rounded bg-zinc-800/80" /><div className="h-3.5 w-4/5 rounded bg-zinc-800/80" /></div>}
         <ThemesCard genres={genres} keywords={keywords} expanded={areThemesExpanded} onToggle={() => setAreThemesExpanded((expanded: boolean) => !expanded)} loading={!tmdbDetails} />
@@ -325,7 +393,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         {!isSeries && <VerifiedSimilarRail movie={tmdbDetails} excludedIds={collectionIds} onOpen={movieId => onShowClick && onShowClick(movieId, 'movie')} />}
         {!isSeries && <CastRows cast={cast} isSeries={false} totalEpisodes={0} loading={!tmdbDetails || !castPayloadKnown} onOpenPerson={openPersonModal} />}
         <RedditSection query={isSeries ? `${redditVisibleTitle} series discussion` : redditMovieQuery} resolveQuery={isSeries ? undefined : resolveRedditMovieQuery} isLocked={false} title="Discussions Reddit" description="Retrouvez les avis, théories et spoilers de la communauté." />
-        {downloadMode && <div aria-hidden="true" className="h-24" />}
+        {(downloadMode || filmMode) && <div aria-hidden="true" className="h-24" />}
       </div>
 
       {selectedEpisode && <EpisodeDetailModal show={show} season={selectedEpisode.season} episode={selectedEpisode.episode} tmdbShowTitle={tmdbDetails?.name || tmdbDetails?.title} tmdbShowId={effectiveTmdbId}
@@ -336,6 +404,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         onClose={() => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); }}
         onShowClick={(tmdbId, type) => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) || (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) || (show?.id && String(show.id) === String(tmdbId)); if (!isSameShow && onShowClick) setTimeout(() => onShowClick(tmdbId, type || 'movie'), 50); }} />}
       {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={pickedNow.length === 1 && !pickedFuture.length ? openPreciseVersion : undefined} onExit={exitDownloadMode} />}
+      {filmMode && canUseFilmMode && !movieAvailable && <DownloadModeBar tone={filmUpcoming ? 'sky' : 'gold'} title={filmUpcoming ? 'Programmer' : title} detail={filmUpcoming ? 'Dès sa sortie' : 'En quelle qualité ?'} enabled onLaunch={quality => { void launchFilm(quality); }} onPrecise={filmUpcoming ? undefined : () => { setFilmMode(false); setFilmPrecise(true); }} onExit={() => setFilmMode(false)} />}
+      {filmPrecise && canUseFilmMode && <Suspense fallback={<span role="status">Ouverture de la version précise…</span>}><PreciseVersionPage onClose={() => setFilmPrecise(false)} target={{ title, tmdbId: effectiveTmdbId!, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, year: releaseYear || undefined, posterPath: show?.posterPath || undefined }} /></Suspense>}
       {trailerModalVideos && <TrailerModal videos={trailerModalVideos} onClose={() => setTrailerModalVideos(null)} />}
       {preciseTarget && downloadsEnabled && effectiveTmdbId && <Suspense fallback={<span role="status">Ouverture de la version précise…</span>}><PreciseVersionPage onClose={() => setPreciseTarget(null)} target={{ title, tmdbId: effectiveTmdbId, tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, year: (tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4), posterPath: show?.posterPath || undefined, ...preciseTarget }} /></Suspense>}
       {isDownloadModalOpen && <Suspense fallback={<span role="status">Ouverture du téléchargement…</span>}><DownloadModal isOpen={isDownloadModalOpen} onClose={() => { setIsDownloadModalOpen(false); setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); }} title={title} originalTitle={tmdbDetails?.original_title || tmdbDetails?.original_name || show?.originalTitle} year={(tmdbDetails?.release_date || tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4)} mediaType={isSeries ? 'tv' : 'movie'} tmdbId={effectiveTmdbId} tvdbId={tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId} imdbId={tmdbDetails?.external_ids?.imdb_id || show?.imdbId} posterPath={posterPath || tmdbDetails?.poster_path || show?.posterPath} initialSeason={downloadTargetSeason} initialEpisode={downloadTargetEpisode} totalSeasons={tmdbDetails?.number_of_seasons || seasons.length || 1} seasonsData={tmdbDetails?.seasons} onSuccessToast={(msg) => showToast(msg, 'success', show || undefined)} /></Suspense>}

@@ -1,16 +1,40 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.270",
+  "applicationVersion": "1.4.271",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
       "id": "SEENIT-DOWNLOAD-014",
-      "title": "Mode téléchargement de la fiche série, sans commandes permanentes",
+      "title": "Mode téléchargement de la fiche série et du film, sans commandes permanentes",
       "targets": [
         "pwa",
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/movieProgramming.test.ts",
+          "contains": "DlFilm programmer un film à venir : surveillé dans la qualité choisie, sans aucune recherche"
+        },
+        {
+          "file": "tests/movieProgramming.test.ts",
+          "contains": "DlFilm programmer : un changement de compte ou de serveur arrête tout sans écrire"
+        },
+        {
+          "file": "tests/movieProgramming.test.ts",
+          "contains": "DlFilm annuler une programmation : le film exact n’est plus surveillé, rien n’est supprimé"
+        },
+        {
+          "file": "tests/movieProgramming.test.ts",
+          "contains": "DlFilm annuler une programmation : déconnexion, gate coupé ou autre serveur pendant la lecture, aucune écriture"
+        },
+        {
+          "file": "tests/downloadSearchRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 un ajout Radarr ou Sonarr relit la portée juste avant le POST et n’écrit rien si elle a changé"
+        },
+        {
+          "file": "tests/movieProgramming.test.ts",
+          "contains": "DlFilm télécharger un film sorti passe par la voie de la popup (profil Radarr configuré, présence revérifiée)"
+        },
         {
           "file": "tests/preciseVersion.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 version précise : une page, la même voie d’envoi que la popup"

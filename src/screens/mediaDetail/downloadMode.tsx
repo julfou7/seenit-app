@@ -82,7 +82,7 @@ export function DownloadModeBanner({ season, states, progress, picked, allPicked
   </section>;
 }
 
-export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise, onExit }: { title: string; detail: string; enabled: boolean; onLaunch: (quality: '1080p' | '4k') => void; onPrecise?: () => void; onExit: () => void }) {
+export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise, onExit, tone = 'gold' }: { title: string; detail: string; enabled: boolean; onLaunch: (quality: '1080p' | '4k') => void; onPrecise?: () => void; onExit: () => void; tone?: 'gold' | 'sky' }) {
   // La fiche vit dans un contexte d'empilement (z-150) sous la navigation (z-160) : la barre passe par un
   // portail sur document.body pour recouvrir réellement la navigation et recevoir les appuis. Une seule
   // ligne de 60 px (retour terrain du 07/11) : la liste n'est plus cachée par un grand panneau.
@@ -90,8 +90,9 @@ export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise, o
     <button type="button" onClick={onExit} aria-label="Quitter le mode téléchargement" className="w-11 h-11 shrink-0 grid place-items-center rounded-full bg-white/10 text-zinc-100 active:scale-95"><X size={20} /></button>
     {onPrecise && enabled
       ? <button type="button" onClick={onPrecise} className="flex-1 min-w-0 min-h-11 flex flex-col justify-center text-left leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className="text-[12.5px] font-bold text-zinc-400">Version précise ›</span></button>
-      : <span className="flex-1 min-w-0 min-h-11 flex flex-col justify-center leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className="truncate text-[12.5px] text-zinc-400">{detail}</span></span>}
-    <button type="button" disabled={!enabled} onClick={() => onLaunch('1080p')} className="h-11 shrink-0 px-3.5 rounded-[13px] bg-[#E5A93D] text-black text-[15px] font-extrabold active:scale-[0.97] disabled:bg-zinc-800 disabled:text-zinc-500">1080p</button>
+      : <span className="flex-1 min-w-0 min-h-11 flex flex-col justify-center leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className={cn('truncate text-[12.5px]', tone === 'sky' ? 'font-bold text-[#7DD3FC]' : 'text-zinc-400')}>{detail}</span></span>}
+    {/* Bleu : le film à venir est programmé pour sa sortie (maquette DlFilm). */}
+    <button type="button" disabled={!enabled} onClick={() => onLaunch('1080p')} className={cn('h-11 shrink-0 px-3.5 rounded-[13px] text-black text-[15px] font-extrabold active:scale-[0.97] disabled:bg-zinc-800 disabled:text-zinc-500', tone === 'sky' ? 'bg-[#7DD3FC]' : 'bg-[#E5A93D]')}>1080p</button>
     <button type="button" disabled={!enabled} onClick={() => onLaunch('4k')} className="h-11 shrink-0 px-3.5 rounded-[13px] bg-zinc-800 text-zinc-100 text-[15px] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] active:scale-[0.97] disabled:text-zinc-500">4K</button>
   </div>;
   return typeof document === 'undefined' ? bar : createPortal(bar, document.body);

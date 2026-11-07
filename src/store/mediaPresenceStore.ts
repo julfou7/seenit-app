@@ -7,7 +7,7 @@ import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
 
 /** Champs d'un épisode Sonarr lus par la présence (#879, typés au lieu de `any`). */
 type SonarrEpisodeLike = { seasonNumber: number; episodeNumber: number; hasFile?: boolean; monitored?: boolean };
-type RadarrMovieLike = { tmdbId?: number | string; imdbId?: string; hasFile?: boolean };
+type RadarrMovieLike = { tmdbId?: number | string; imdbId?: string; hasFile?: boolean; monitored?: boolean };
 type SonarrSeriesLike = { id?: number; tvdbId?: number | string; tmdbId?: number | string; imdbId?: string; monitored?: boolean };
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -21,6 +21,8 @@ export interface MediaPresenceData {
   episodesHasFile: Record<string, boolean>;
   /** #879 — épisodes surveillés dans Sonarr (programmés), même clé « saison x épisode ». */
   episodesMonitored?: Record<string, boolean>;
+  /** Maquette DlFilm — film surveillé par Radarr sans fichier : programmé pour sa sortie. */
+  radarrMonitored?: boolean;
   plexInfo?: PlexMediaInfo;
   lastChecked: number;
 }
@@ -136,6 +138,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
     }).catch(() => ({ available: false, lastChecked: now } as PlexMediaInfo));
 
     let radarrHasFile = false;
+    let radarrMonitored = false;
     let sonarrHasFile = false;
     const seasonsHasFile: Record<number, boolean> = {};
     const episodesHasFile: Record<string, boolean> = {};
@@ -167,10 +170,11 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
 
           if (match) {
             radarrHasFile = !!match.hasFile;
+            radarrMonitored = match.monitored === true && !match.hasFile;
           }
         }
-      } catch (err) {
-        console.warn('[MediaPresence] Erreur vérification Radarr:', err);
+      } catch {
+        // Présence Radarr inconnue : le média reste « non présent », sans bruit dans la console.
       }
     }
 
@@ -231,8 +235,8 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
             }
           }
         }
-      } catch (err) {
-        console.warn('[MediaPresence] Erreur vérification Sonarr:', err);
+      } catch {
+        // Présence Sonarr inconnue : le média reste « non présent », sans bruit dans la console.
       }
     }
 
@@ -246,6 +250,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       seasonsHasFile: downloadsEnabled ? seasonsHasFile : {},
       episodesHasFile: downloadsEnabled ? episodesHasFile : {},
       episodesMonitored: downloadsEnabled ? episodesMonitored : {},
+      radarrMonitored: downloadsEnabled ? radarrMonitored : false,
       plexInfo,
       lastChecked: now
     };
