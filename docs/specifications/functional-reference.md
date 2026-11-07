@@ -537,7 +537,13 @@ Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sa
 épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Avec un seul épisode sorti
 coché, « Version précise › » ouvre une page pleine hauteur : versions C411 filtrables (Toutes, 1080p, 4K, Français, VO),
 la conseillée en tête et dépliée (nom du fichier, sources, date, **Télécharger cette version**), et « Chercher sous un
-autre nom… ». Chaque pastille de saison montre sa part vue en mini-barre et, avec
+autre nom… ». **Fiche film** (maquette DlFilm, 07/11/2026) : sous le gate et tant que le film n'est pas présent,
+un bouton ⬇ de 56 px suit le bouton principal ; il ouvre la même barre (✕, titre et « Version précise › »,
+1080p, 4K). Un film sorti part dans Radarr ; un film à venir se programme en bleu (« Programmer · Dès sa
+sortie » : Radarr le surveille sans recherche immédiate). Le bouton montre ensuite un anneau « 42 % » ou une
+horloge bleue, et la fiche affiche le suivi (téléchargement, « Pas encore trouvé » ou « Programmé pour sa
+sortie ») avec **Annuler** (confirmé sur place pour un téléchargement ; déprogrammer ne supprime rien).
+Chaque pastille de saison montre sa part vue en mini-barre et, avec
 Téléchargements activé, un point bleu quand un téléchargement de cette saison est actif. Un épisode
 présent dans Sonarr est reconnu comme téléchargé dans la fiche et la popup. Dans la liste d'une saison, un épisode vu
 a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »

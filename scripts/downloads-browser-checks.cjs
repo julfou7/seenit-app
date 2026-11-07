@@ -145,6 +145,26 @@ async function testDownloadsHarness(client, root) {
     await evaluate(client, 'window.__downloads.mount("precise-error")');
     await check(client, 'document.querySelector("[data-precise-version] [role=alert]")?.textContent.includes("503")&&!document.body.innerText.includes("Aucune version trouvée")', 'version précise : panne distincte d’une absence de version');
     await evaluate(client, 'window.__downloads.telemetry.mutations.length=0');
+    // Maquette DlFilm : bouton ⬇ de 56 px, barre 1080p/4K (bleue pour un film à venir), suivi avec Annuler confirmé.
+    await evaluate(client, 'window.__downloads.mount("film")');
+    await check(client, '(()=>{const b=document.querySelector("[data-film-download]");const r=b.getBoundingClientRect();return b.dataset.filmDownload==="idle"&&b.getAttribute("aria-label")==="Télécharger le film"&&r.width>=56&&r.height>=56})()', 'film : bouton ⬇ de 56 px à côté du bouton principal');
+    await evaluate(client, 'document.querySelector("[data-film-download]").click()');
+    await check(client, '(()=>{const bar=document.querySelector("[data-mode-bar]");return bar&&document.querySelector("[data-film-download]").getAttribute("aria-pressed")==="true"&&bar.innerText.includes("Version précise")&&bar.getBoundingClientRect().height<=64&&document.documentElement.scrollWidth<=innerWidth})()', 'film : mode ouvert, barre compacte avec Version précise');
+    await evaluate(client, '[...document.querySelectorAll("[data-mode-bar] button")].find(b=>b.textContent==="4K").click()');
+    await check(client, 'window.__downloads.telemetry.added.at(-1)==="film:lance:4k"&&!document.querySelector("[data-mode-bar]")', 'film : 4K lance puis referme le mode');
+    await evaluate(client, 'window.__downloads.mount("film-upcoming")');
+    await evaluate(client, 'document.querySelector("[data-film-download]").click()');
+    await check(client, '(()=>{const bar=document.querySelector("[data-mode-bar]");const go=[...bar.querySelectorAll("button")].find(b=>b.textContent==="1080p");return getComputedStyle(go).backgroundColor==="rgb(125, 211, 252)"&&bar.innerText.includes("Programmer\\nDès sa sortie")&&[...bar.querySelectorAll("strong,span")].every(e=>e.scrollWidth<=e.clientWidth+1)&&!bar.innerText.includes("Version précise")})()', 'film à venir : barre bleue « Programmer · Dès sa sortie », libellés entiers');
+    await evaluate(client, '[...document.querySelectorAll("[data-mode-bar] button")].find(b=>b.textContent==="1080p").click()');
+    await check(client, 'window.__downloads.telemetry.added.at(-1)==="film:programme:1080p"', 'film à venir : programmé en 1080p');
+    await evaluate(client, 'window.__downloads.mount("film-states")');
+    await check(client, '(()=>{const a=document.querySelector(\'[data-film-download="active"]\');const p=document.querySelector(\'[data-film-download="programmed"]\');return a.innerText.trim()==="42 %"&&a.getAttribute("aria-label")==="Téléchargement en cours, 42 %"&&p.getAttribute("aria-label")==="Programmé pour sa sortie"&&document.querySelector(\'[data-film-track="active"]\').innerText.includes("42 % · ≈ 12 min")&&document.querySelector(\'[data-film-track="programmed"]\').innerText.includes("Radarr le récupère dès sa sortie")})()', 'film : états en cours (42 %) et programmé');
+    await evaluate(client, '[...document.querySelectorAll(\'[data-film-track="active"] button\')].find(b=>b.textContent.includes("Annuler")).click()');
+    await check(client, 'document.querySelector(\'[data-film-track="active"]\').innerText.includes("Annuler le téléchargement ?")&&!window.__downloads.telemetry.removed.includes("film")', 'film : annuler un téléchargement demande confirmation');
+    await evaluate(client, '[...document.querySelectorAll(\'[data-film-track="active"] button\')].find(b=>b.textContent.includes("Annuler")).click()');
+    await check(client, 'window.__downloads.telemetry.removed.includes("film")', 'film : annulation confirmée');
+    await evaluate(client, '[...document.querySelectorAll(\'[data-film-track="programmed"] button\')].find(b=>b.textContent.includes("Annuler")).click()');
+    await check(client, 'window.__downloads.telemetry.unmonitored.includes("film")', 'film : déprogrammer sans confirmation (rien n’est supprimé)');
     reports.push({ width, cards: true, confirmation: true, error: true, episodeActions: true, realQualityDialog: true });
   }
   return reports;

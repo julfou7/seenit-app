@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { DownloadsScreen } from '../../src/screens/DownloadsScreenCore';
 import { SeasonPanel } from '../../src/screens/mediaDetail/seriesSections';
 import { DownloadModeBanner, DownloadModeBar } from '../../src/screens/mediaDetail/downloadMode';
+import { MovieDownloadButton, MovieDownloadTrack } from '../../src/screens/mediaDetail/movieDownloadMode';
 import { DownloadModal } from '../../src/components/DownloadModal';
 import PreciseVersionPage from '../../src/screens/mediaDetail/PreciseVersionPage';
 import { fixtureItems, telemetry, useLiveDownloadStore } from './downloadsRuntime';
@@ -23,6 +24,10 @@ const mountPage = (page: string) => root.render(page === 'modal' || page === 'mo
   ? <div className="max-w-md mx-auto p-4"><DownloadModeBanner season={1} states={Array.from({ length: 24 }, (_, index) => ({ episode: index + 1, state: index < 5 ? 'seen' as const : 'available' as const }))} progress={() => undefined} picked={new Set([6])} allPicked={false} canPick onToggleAll={() => {}} onSegment={episode => telemetry.requested.push(episode)} /></div>
   : page === 'precise' || page === 'precise-error'
   ? <PreciseVersionPage key={`${page}-${mounts}`} target={{ title: "L'Arène", tmdbId: 99, season: 1, episode: 3 }} onClose={() => telemetry.opened.push('precise:close')} />
+  : page === 'film' || page === 'film-upcoming'
+  ? <FilmFixture key={`${page}-${mounts}`} upcoming={page === 'film-upcoming'} />
+  : page === 'film-states'
+  ? <FilmStatesFixture key={`${page}-${mounts}`} />
   : page === 'program' || page === 'program-normal'
   ? <ProgramFixture mode={page === 'program'} />
   : <EpisodesFixture mode={page === 'episodes'} />);
@@ -51,6 +56,22 @@ function EpisodesFixture({ mode }: { mode: boolean }) {
     downloadMode={{ active: mode, picked, onToggle: toggle }}
     episodesHasFile={{ '2x3': true }} getEpisodeDownload={episode => episode === 2 ? { id: 'active', mediaType: 'tv', title: 'Série', status: 'downloading', statusText: 'En cours', progress: 30, size: 0, sizeleft: 0 } : null} />
     {mode && <DownloadModeBar title={`${picked.size} épisodes`} detail="Touche une barre ou un épisode." enabled={picked.size > 0} onLaunch={() => {}} onPrecise={() => {}} onExit={() => telemetry.opened.push('exit')} />}
+  </div>;
+}
+// Maquette DlFilm : même composition que la fiche film — bouton ⬇ à côté du bouton principal, barre du mode.
+function FilmFixture({ upcoming }: { upcoming: boolean }) {
+  const [mode, setMode] = React.useState(false);
+  return <div className="max-w-md mx-auto p-4 flex flex-col gap-3">
+    <div className="flex gap-2"><button type="button" className="flex-1 h-14 rounded-[18px] bg-[#E5A93D] text-black font-extrabold">Marquer vu</button><MovieDownloadButton state={mode ? 'mode' : 'idle'} progress={0} upcoming={upcoming} onPress={() => setMode(!mode)} /></div>
+    {mode && <DownloadModeBar tone={upcoming ? 'sky' : 'gold'} title={upcoming ? 'Programmer' : 'S.O.S. Fantômes : L’Héritage'} detail={upcoming ? 'Dès sa sortie' : 'En quelle qualité ?'} enabled
+      onLaunch={quality => { telemetry.added.push(`film:${upcoming ? 'programme' : 'lance'}:${quality}`); setMode(false); }} onPrecise={upcoming ? undefined : () => telemetry.opened.push('film:precise')} onExit={() => setMode(false)} />}
+  </div>;
+}
+function FilmStatesFixture() {
+  return <div className="max-w-md mx-auto p-4 flex flex-col gap-3">
+    <div className="flex gap-2"><MovieDownloadButton state="active" progress={42} upcoming={false} onPress={() => telemetry.opened.push('film:track')} /><MovieDownloadButton state="programmed" progress={0} upcoming onPress={() => telemetry.opened.push('film:track')} /></div>
+    <MovieDownloadTrack state="active" quality="1080p" progress={42} timeleft="12 min" onCancel={async () => { telemetry.removed.push('film'); }} />
+    <MovieDownloadTrack state="programmed" progress={0} onCancel={async () => { telemetry.unmonitored.push('film'); }} />
   </div>;
 }
 Object.assign(window, { __downloads: { mount, telemetry } });

@@ -198,8 +198,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     }
   };
 
-  const handle1ClickDownloadMovie = async (e: React.MouseEvent) => {
-    e.stopPropagation();
+  /** Maquette DlFilm : la barre du mode téléchargement du film lance en 1080p ou en 4K. */
+  const launchMovieDownload = async (qualityPreference: '1080p' | '4k' = '1080p') => {
     const config = useDownloadConfigStore.getState();
     if (!config.radarrUrl || !config.radarrApiKey) {
       showToast("Configurez Radarr dans les paramètres pour le téléchargement 1-clic", "error");
@@ -217,10 +217,10 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       backdropPath: backdropForDownload, downloadClient: 'Radarr', statusText: 'Préparation du téléchargement…'
     });
     try {
-      const res = await searchAndDownloadInRadarr({ url: config.radarrUrl, apiKey: config.radarrApiKey, title: movieTitle, tmdbId: effectiveTmdbId, year: movieYear, imdbId, qualityPreference: '1080p' });
+      const res = await searchAndDownloadInRadarr({ url: config.radarrUrl, apiKey: config.radarrApiKey, title: movieTitle, tmdbId: effectiveTmdbId, year: movieYear, imdbId, qualityPreference });
       if (res.success) {
         acceptDownloadRequest(requestId, res.message);
-        showToast(`Téléchargement de « ${movieTitle} » lancé dans Radarr !`, 'success');
+        showToast(`Téléchargement ${qualityPreference === '4k' ? '4K' : '1080p'} de « ${movieTitle} » lancé dans Radarr !`, 'success');
         useLiveDownloadStore.getState().startPolling(1000);
         useLiveDownloadStore.getState().fetchDownloads();
       } else {
@@ -235,6 +235,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       setIs1ClickDownloading(prev => ({ ...prev, movie: false }));
     }
   };
+  const handle1ClickDownloadMovie = (e: React.MouseEvent) => { e.stopPropagation(); void launchMovieDownload('1080p'); };
 
   const handleSyncSingle = async () => {
     if (!show?.id) {
@@ -688,7 +689,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       if (res.ok) { seasonData = res.value; setSeasonsCache(prev => ({ ...prev, [seasonNumber]: seasonData })); }
     }
     let epKeys: string[] = seasonData?.episodes
-      ? seasonData.episodes.filter((ep: any) => !ep.air_date || new Date(ep.air_date).getTime() <= Date.now()).map((ep: any) => `${seasonNumber}x${ep.episode_number}`)
+      ? seasonData.episodes.filter((ep: { air_date?: string | null }) => !ep.air_date || new Date(ep.air_date).getTime() <= Date.now()).map((ep: { episode_number: number }) => `${seasonNumber}x${ep.episode_number}`)
       : Array.from({ length: expectedEpCount }, (_, index) => `${seasonNumber}x${index + 1}`);
     const existingSeen = new Set(prevSeenEpisodes);
     const existingRecords = { ...prevEpisodeRecords };
@@ -958,9 +959,9 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const episodeRunTime = tmdbDetails?.episode_run_time?.[0] || 45;
   const remainingEpisodes = Math.max(0, totalEpisodes - seenCount);
   const remainingTimeMinutes = remainingEpisodes * episodeRunTime;
-  const ytVideos = tmdbDetails?.videos?.results?.filter((v: any) => v.site === 'YouTube') || [];
+  const ytVideos = tmdbDetails?.videos?.results?.filter((v: { site?: string }) => v.site === 'YouTube') || [];
   const hasTrailer = ytVideos.length > 0;
-  const firstSubscribedProvider = sortedProviders.find((p: any) => userPlatforms.includes(p.provider_id));
+  const firstSubscribedProvider = sortedProviders.find((p: { provider_id: number }) => userPlatforms.includes(p.provider_id));
   const watchLink = providers?.link;
   const mainProvider = firstSubscribedProvider || sortedProviders[0];
   const isMainProviderSubscribed = mainProvider ? (mainProvider.isPlex || userPlatforms.includes(mainProvider.provider_id)) : false;
@@ -986,5 +987,5 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const ratingInfo = getRatingInfo();
   const mediaTarget = tmdbDetails || show || (effectiveTmdbId ? { id: effectiveTmdbId } : null);
 
-  return <ShowDetailView model={{ hasActiveDownloadInScope: scope => hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, scope), nextEp, handleShare, activeTab, areThemesExpanded, backdropUrl, collectionData, collectionLoading, downloadTargetEpisode, downloadTargetSeason, dragX, dropShow, effectiveTmdbId, epStatus, expandedSeason, followShow, formatRemainingTime, formatRuntime, getEpisodeDownload, presence, handle1ClickDownloadEpisode, handle1ClickDownloadMovie, handle1ClickDownloadSeason, handleAnimatedBack, handleDeleteShow, handleSyncSingle, handleTabChange, handleTouchEnd, handleTouchMove, handleTouchStart, handleWatchNextEpisode, hasActiveDownload, hasCancelledDownload, hasCompletedDownload, hasDownloadError, hasSeenMedia, hasTrailer, initialEpisode, initialSeason, is1ClickDownloading, isDownloadModalOpen, isDownloadMode, isDragging, isExiting, isRefreshingPlex, isSeries, isSyncingSingle, isSynopsisExpanded, isUnreleased, keywords, loadSeason, logoPath, mainScrollRef, onShowClick, openEpisodeModal, openPersonModal, plexMediaInfo, posterError, posterPath, progressPercentage, providers, ratingInfo, refreshPlexAvailability, releaseYear, remainingTimeMinutes, requestedMediaKey, resumeShow, rewatchShow, seasonObserverRef, seasonsCache, seenCount, selectedEpisode, selectedPersonId, setAreThemesExpanded, setDownloadTargetEpisode, setDownloadTargetSeason, setIsDownloadModalOpen, setIsDownloadMode, setIsSynopsisExpanded, setLogoError, setPosterError, setSeasonsCache, setSelectedEpisode, setSelectedPersonId, setShowAllCast, setShowMenu, setTrailerModalVideos, show, showDownloadSummary, showMenu, showToast, sortedProviders, tabsRef, title, tmdbDetails, toggleEpisodeSeen, toggleFavorite, toggleMovieSeen, togglePlanToWatchMovie, toggleSeasonSeen, totalEpisodes, trailerModalVideos, universeData, userPlatforms, visibleSeasons, ytVideos }} />;
+  return <ShowDetailView model={{ launchMovieDownload, removeMovieDownload: item => useLiveDownloadStore.getState().removeDownload(item), movieDownload: isSeries ? null : mediaDownloads[0] || null, hasActiveDownloadInScope: scope => hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, scope), nextEp, handleShare, activeTab, areThemesExpanded, backdropUrl, collectionData, collectionLoading, downloadTargetEpisode, downloadTargetSeason, dragX, dropShow, effectiveTmdbId, epStatus, expandedSeason, followShow, formatRemainingTime, formatRuntime, getEpisodeDownload, presence, handle1ClickDownloadEpisode, handle1ClickDownloadMovie, handle1ClickDownloadSeason, handleAnimatedBack, handleDeleteShow, handleSyncSingle, handleTabChange, handleTouchEnd, handleTouchMove, handleTouchStart, handleWatchNextEpisode, hasActiveDownload, hasCancelledDownload, hasCompletedDownload, hasDownloadError, hasSeenMedia, hasTrailer, initialEpisode, initialSeason, is1ClickDownloading, isDownloadModalOpen, isDownloadMode, isDragging, isExiting, isRefreshingPlex, isSeries, isSyncingSingle, isSynopsisExpanded, isUnreleased, keywords, loadSeason, logoPath, mainScrollRef, onShowClick, openEpisodeModal, openPersonModal, plexMediaInfo, posterError, posterPath, progressPercentage, providers, ratingInfo, refreshPlexAvailability, releaseYear, remainingTimeMinutes, requestedMediaKey, resumeShow, rewatchShow, seasonObserverRef, seasonsCache, seenCount, selectedEpisode, selectedPersonId, setAreThemesExpanded, setDownloadTargetEpisode, setDownloadTargetSeason, setIsDownloadModalOpen, setIsDownloadMode, setIsSynopsisExpanded, setLogoError, setPosterError, setSeasonsCache, setSelectedEpisode, setSelectedPersonId, setShowAllCast, setShowMenu, setTrailerModalVideos, show, showDownloadSummary, showMenu, showToast, sortedProviders, tabsRef, title, tmdbDetails, toggleEpisodeSeen, toggleFavorite, toggleMovieSeen, togglePlanToWatchMovie, toggleSeasonSeen, totalEpisodes, trailerModalVideos, universeData, userPlatforms, visibleSeasons, ytVideos }} />;
 }

@@ -16,8 +16,9 @@ export interface PreciseVersionTarget {
   imdbId?: string;
   year?: number | string;
   posterPath?: string;
-  season: number;
-  episode: number;
+  /** Sans saison ni épisode, la page cherche le film (maquette DlFilm : « Version précise › »). */
+  season?: number;
+  episode?: number;
   qualityPreference?: '1080p' | '4k';
 }
 
@@ -31,7 +32,9 @@ const code = (season: number, episode: number) => `S${String(season).padStart(2,
  */
 export default function PreciseVersionPage({ target, onClose }: { target: PreciseVersionTarget; onClose: () => void }) {
   const { title, season, episode, qualityPreference = '1080p' } = target;
-  const initialQuery = `${title.trim()} ${code(season, episode)}`;
+  const isMovie = season === undefined || episode === undefined;
+  const scopeLabel = isMovie ? `Film${target.year ? ` · ${target.year}` : ''}` : code(season, episode);
+  const initialQuery = isMovie ? [title.trim(), target.year].filter(Boolean).join(' ') : `${title.trim()} ${code(season, episode)}`;
   const [query, setQuery] = useState(initialQuery);
   const [draft, setDraft] = useState(initialQuery);
   const [editing, setEditing] = useState(false);
@@ -47,12 +50,12 @@ export default function PreciseVersionPage({ target, onClose }: { target: Precis
     let cancelled = false;
     setState('loading');
     setOpen(null);
-    searchC411Torrents({ query, mediaType: 'tv' })
+    searchC411Torrents({ query, mediaType: isMovie ? 'movie' : 'tv' })
       .then(found => { if (cancelled) return; setResults(found); setState('ready'); })
       // Une panne reste une panne : elle n'est jamais présentée comme une absence de version.
       .catch((reason: unknown) => { if (cancelled) return; setResults([]); setError(reason instanceof Error ? reason.message : 'La recherche est momentanément indisponible.'); setState('error'); });
     return () => { cancelled = true; };
-  }, [query]);
+  }, [query, isMovie]);
 
   useEffect(() => { if (editing) searchRef.current?.focus(); }, [editing]);
 
@@ -62,7 +65,7 @@ export default function PreciseVersionPage({ target, onClose }: { target: Precis
   useEffect(() => { if (state === 'ready') setOpen(versions[0]?.release.id ?? null); }, [state, versions]);
 
   const notify = (action: string, toastType: 'download' | 'success' | 'error' | 'info' = 'download') =>
-    useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: target.posterPath }, toastType);
+    useToastStore.getState().showToast({ title, subtitle: isMovie ? undefined : `S${season} | E${episode}`, action, posterPath: target.posterPath }, toastType);
 
   const send = async (torrent: C411Torrent) => {
     if (sending !== null) return;
@@ -70,7 +73,7 @@ export default function PreciseVersionPage({ target, onClose }: { target: Precis
     if (!isDownloadFeatureEnabled(config)) return;
     setSending(torrent.id);
     try {
-      const result = await sendReleaseToClient({ config, torrent, mediaType: 'tv', title, tmdbId: target.tmdbId, tvdbId: target.tvdbId, imdbId: target.imdbId, year: target.year, posterPath: target.posterPath, season, episode, notify });
+      const result = await sendReleaseToClient({ config, torrent, mediaType: isMovie ? 'movie' : 'tv', title, tmdbId: target.tmdbId, tvdbId: target.tvdbId, imdbId: target.imdbId, year: target.year, posterPath: target.posterPath, season, episode, notify });
       if (result.success && !result.magnetOnly) { notify(result.message, 'success'); onClose(); }
     } finally {
       setSending(null);
@@ -89,7 +92,7 @@ export default function PreciseVersionPage({ target, onClose }: { target: Precis
       <button type="button" onClick={onClose} aria-label="Retour" className="w-11 h-11 grid place-items-center rounded-full text-zinc-100 active:bg-white/10"><ChevronLeft size={26} /></button>
       <div className="min-w-0 leading-tight">
         <h2 className="text-[19px] font-extrabold">Version précise</h2>
-        <p className="truncate text-[13px] text-zinc-400"><span className="seenit-media-title font-bold">{title}</span> · {code(season, episode)}</p>
+        <p className="truncate text-[13px] text-zinc-400"><span className="seenit-media-title font-bold">{title}</span> · {scopeLabel}</p>
       </div>
     </header>
 

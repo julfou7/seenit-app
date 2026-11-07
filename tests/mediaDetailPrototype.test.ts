@@ -151,7 +151,8 @@ test('SEENIT-UX-019 #858 le bouton Vu attend la vraie mutation avant d’annonce
 
 test('SEENIT-UX-019 #859 film à bouton unique et anneau Vu sur le compositeur', () => {
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
-  assert.match(view, /<div className="flex gap-2">\{movieCta\}\{mainProvider && providerTile\(mainProvider\)\}\{plexProvider && providerTile\(plexProvider\)\}<\/div>/);
+  // Maquette DlFilm : le bouton ⬇ du film suit le bouton unique et les tuiles, sous le gate et film absent.
+  assert.match(view, /<div className="flex gap-2">\{movieCta\}\{mainProvider && providerTile\(mainProvider\)\}\{plexProvider && providerTile\(plexProvider\)\}\{canUseFilmMode && !movieAvailable && <MovieDownloadButton /);
   assert.match(view, /if \(!movieFollowed\) return <GoldCta label="Suivre le film"/);
   // Retour terrain du 07/11 : un film vu affiche le logo Vu officiel (anneau or + coche), jamais « Vu · annuler ».
   assert.match(view, /if \(hasSeenMedia\) return <GoldCta tone="done" label=\{<span data-movie-seen className="inline-flex items-center gap-2"><SeenItRing size=\{30\} \/>Vu<\/span>\} ariaLabel="Vu, toucher pour annuler" onClick=\{toggleMovieSeen\} \/>;/);

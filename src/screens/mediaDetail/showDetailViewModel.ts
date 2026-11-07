@@ -40,6 +40,12 @@ export interface ShowDetailViewModel {
   getEpisodeDownload: (tmdbId?: number | string, tvdbId?: number | string, season?: number, episode?: number) => LiveDownloadItem | null;
   /** #879 — Garde partagée avec la popup : une demande est-elle déjà active dans ce périmètre ? */
   hasActiveDownloadInScope?: (scope: { mediaType: 'movie' | 'tv'; tmdbId: number; seasonNumber?: number; episodeNumber?: number }) => boolean;
+  /** Maquette DlFilm — lance le film exact dans Radarr dans la qualité choisie. */
+  launchMovieDownload?: (quality: '1080p' | '4k') => Promise<void>;
+  /** Maquette DlFilm — téléchargement suivi du film (TMDB exact), s'il existe. */
+  movieDownload?: LiveDownloadItem | null;
+  /** Maquette DlFilm — annule ce téléchargement (même retrait que l'onglet Télécharger). */
+  removeMovieDownload?: (item: LiveDownloadItem) => Promise<boolean>;
   isDownloadModalOpen: boolean; setIsDownloadModalOpen: (open: boolean) => void;
   dropShow: () => unknown; followShow: () => unknown; resumeShow: () => unknown; rewatchShow: () => unknown;
   handleAnimatedBack: () => void; handleDeleteShow: () => unknown; handleShare: () => Promise<unknown> | unknown; handleSyncSingle: () => unknown; handleWatchNextEpisode: () => void;
