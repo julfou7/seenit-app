@@ -92,7 +92,8 @@ Hiérarchie des sources :
 2. **TMDB** fournit l'identité canonique, les fiches, saisons, épisodes, personnes, dates,
    disponibilités éditoriales et l'**Ordre de visionnage des films** via ses collections explicites.
    Une date TMDB `YYYY-MM-DD` est une date calendaire conservée telle quelle : aucun décalage (« +1 jour »)
-   n'est déduit du réseau de diffusion (#407, MobLand sur Paramount+).
+   n'est déduit du réseau de diffusion (#407, MobLand sur Paramount+). Une série enregistrée avec l'ancien
+   décalage est resynchronisée une fois (`SEENIT-DATA-007`), même si son prochain épisode paraît futur.
 3. **TVDB** fournit la relation **franchise / univers** des fiches Film et Série, uniquement après
    résolution par identifiant externe exact depuis TMDB et selon `SEENIT-RELATION-001`.
 4. **Plex** fournit seulement des preuves de watchlist, visionnage/non-vu et disponibilité, jamais
@@ -696,9 +697,10 @@ La cible produit des fiches est volontairement simple :
 - **Série** : uniquement **Dans la même franchise** ou **Dans le même univers** via TVDB ;
 - les sections **Films similaires** et **Séries similaires** sont supprimées des fiches. Les recommandations contextuelles restent dans Explorer.
 
-La saga s'affiche en frise numérotée (#871) : « X / N vus » et barre segmentée, repères 1…N alignés sur
-les affiches, film affiché encadré d'or avec « TU ES ICI », tampon VU sur l'affiche des films vus et
-« À voir » sinon.
+La saga s'affiche en frise numérotée (#871, v3 #885) : « X / N vus » et barre segmentée, repères 1…N alignés
+sur les affiches, film affiché encadré d'or avec « TU ES ICI », tampon VU sur l'affiche des films vus et
+« À voir » sinon. L'or est réservé au film affiché (repère, segment, titre) ; les autres titres sont clairs,
+gris s'ils sont vus, et les repères et traits des films vus sont neutres.
 
 Pour un film, « Ordre de visionnage » provient exclusivement de sa collection TMDB explicite. Aucune
 série, liste TVDB, entrée SeenIt ou source secondaire ne complète cette section lorsqu'une collection

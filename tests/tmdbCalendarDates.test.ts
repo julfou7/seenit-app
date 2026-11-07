@@ -50,3 +50,18 @@ test('#407 les détails déjà mis en cache avec J+1 sont relus depuis TMDB', ()
   const cache = readFileSync('src/features/shows/publicMetadataCache.ts', 'utf8');
   assert.match(cache, /result\.schemaVersion === PUBLIC_METADATA_CACHE_SCHEMA_VERSION \? result : null/, 'une entrée v1 est ignorée');
 });
+
+test('#407 une série copiée avec l’ancien J+1 est resynchronisée une fois, même si son épisode paraît futur', async () => {
+  const { CALENDAR_DATES_REVISION, needsCalendarDatesRefresh } = await import('../src/features/shows/calendarDatesRevision.ts');
+  assert.equal(CALENDAR_DATES_REVISION, 2);
+  // Terrain 07/11 : MobLand garde nextEpisodeToAir = 14/11 (décalé) au lieu du 13/11 → « dans 7 jours ».
+  assert.equal(needsCalendarDatesRefresh({}), true);
+  assert.equal(needsCalendarDatesRefresh({ calendarDatesRevision: 1 }), true);
+  assert.equal(needsCalendarDatesRefresh({ calendarDatesRevision: 2 }), false);
+  const worker = readFileSync('src/hooks/useDetailsSyncWorker.ts', 'utf8');
+  const filter = worker.slice(worker.indexOf('const tvShowsToSync = shows.filter'), worker.indexOf('if (tvShowsToSync.length === 0)'));
+  // Avant la règle « prochain épisode futur → pas d'appel » : sinon la fausse date future bloquerait la correction.
+  assert.ok(filter.indexOf('if (needsCalendarDatesRefresh(s)) return true;') > 0 && filter.indexOf('if (needsCalendarDatesRefresh(s)) return true;') < filter.indexOf('hasFutureReleaseOnly'));
+  // Chaque écriture de synchronisation marque la révision, y compris le chemin « rien n'a changé ».
+  assert.equal((worker.match(/calendarDatesRevision: CALENDAR_DATES_REVISION/g) || []).length, 3);
+});
