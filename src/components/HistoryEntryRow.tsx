@@ -3,9 +3,10 @@ import { SeenItCheckButton } from './SeenItCheckButton';
 import { Capacitor } from '@capacitor/core';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../features/watchlist/posterHue';
 import { seriesCardPosterCrossOrigin } from '../features/watchlist/seriesCardPresentation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ChevronLeft, Minus, Plus } from 'lucide-react';
 import { historyDateInputValue, historyLocalDayKey, historyTimeInputValue } from '../features/history/historyPresentation';
+import { localDayKey, placeAnchoredMenu, shiftTime } from '../features/history/historyMenuPlacement';
 import { DialogLayer } from './ui/DialogLayer';
 import { imageUrl } from '../features/watchlist/seriesCardPresentation';
 import './historyEntryRow.css';
@@ -22,13 +23,6 @@ export interface HistoryRowMenu {
   onUnseen: () => void | Promise<void>;
 }
 
-const DAY_MS = 86_400_000;
-const shiftTime = (time: string, minutes: number) => {
-  const [hours, mins] = (time || '20:00').split(':').map(Number);
-  const total = (((hours * 60 + mins + minutes) % 1440) + 1440) % 1440;
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-};
-
 export function HistoryEntryRow({ title, episodeTitle, code, date, clock, today, timestamp, images, label, onOpen, menu: actions }: {
   title: string; episodeTitle?: string; code?: string; date: string; clock: string; today: boolean;
   timestamp: number; images: Array<string | null | undefined>; label: string;
@@ -36,7 +30,8 @@ export function HistoryEntryRow({ title, episodeTitle, code, date, clock, today,
 }) {
   const [menu, setMenu] = useState(false);
   const [view, setView] = useState<'actions' | 'date'>('actions');
-  const [anchor, setAnchor] = useState<{ top?: number; bottom?: number }>({});
+  const [anchor, setAnchor] = useState<{ top: number; maxHeight: number } | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [draftDate, setDraftDate] = useState('');
   const [draftTime, setDraftTime] = useState('');
   const [pending, setPending] = useState(false);
@@ -54,16 +49,20 @@ export function HistoryEntryRow({ title, episodeTitle, code, date, clock, today,
   const cancel = () => { if (timer.current) clearTimeout(timer.current); timer.current = null; origin.current = null; };
   useEffect(() => cancel, []);
   // Menu ancré sous la ligne (au-dessus si la place manque) : la ligne reste visible, encadrée d'or.
-  const openMenu = () => {
+  const openMenu = () => { setAnchor(null); setView('actions'); setMenu(true); };
+  // Mesuré une fois affiché (DialogLayer monte son contenu après coup) puis borné à l'écran visible ;
+  // re-mesuré quand on passe des actions à l'éditeur de date, de hauteur différente.
+  const place = useCallback((node: HTMLDivElement) => {
     const rect = rowRef.current?.getBoundingClientRect();
-    const roomBelow = rect ? window.innerHeight - rect.bottom : Infinity;
-    setAnchor(!rect ? { top: 80 } : roomBelow >= 340 ? { top: rect.bottom + 8 } : { bottom: window.innerHeight - rect.top + 8 });
-    setView('actions'); setMenu(true);
-  };
+    setAnchor(placeAnchoredMenu(rect ? { top: rect.top, bottom: rect.bottom } : { top: 72, bottom: 72 }, node.scrollHeight, window.innerHeight));
+  }, []);
+  // Référence stable : appelée une fois au montage du menu, pas à chaque rendu.
+  const attachMenu = useCallback((node: HTMLDivElement | null) => { menuRef.current = node; if (node) place(node); }, [place]);
+  useLayoutEffect(() => { if (menu && menuRef.current) place(menuRef.current); }, [view]);
   const run = async (action: () => void | Promise<void>) => { if (pending) return; setPending(true); try { setMenu(false); await action(); } finally { setPending(false); } };
   const openDate = () => { setDraftDate(historyDateInputValue(actions.watchedAt)); setDraftTime(historyTimeInputValue(actions.watchedAt, actions.timeKnown)); setView('date'); };
   const todayKey = historyLocalDayKey(Date.now());
-  const days = [0, 1, 2].map(offset => ({ offset, key: historyLocalDayKey(Date.now() - offset * DAY_MS), label: ['Aujourd’hui', 'Hier', 'Avant-hier'][offset] }));
+  const days = [0, 1, 2].map(offset => ({ offset, key: localDayKey(offset), label: ['Aujourd’hui', 'Hier', 'Avant-hier'][offset] }));
   const otherDay = Boolean(draftDate) && !days.some(day => day.key === draftDate);
   const item = 'w-full min-h-[52px] px-3.5 py-2 flex flex-col justify-center text-left rounded-xl active:bg-white/5 disabled:opacity-50';
   return <>
@@ -87,7 +86,7 @@ export function HistoryEntryRow({ title, episodeTitle, code, date, clock, today,
       <div className="history-entry__action-column"><SeenItCheckButton isWatched title={`Vu ${date} à ${clock} · actions de ${title}`} onClick={openMenu} /><time dateTime={new Date(timestamp).toISOString()}>{clock}</time></div>
     </article>
     {menu && <DialogLayer label={`Actions de ${title}`} onDismiss={() => setMenu(false)} className="fixed inset-0 z-[120]" onMouseDown={event => { if (event.target === event.currentTarget) setMenu(false); }}>
-      <div role="menu" aria-label={`Actions de ${title}`} data-history-menu style={{ ...anchor, right: 'max(12px, calc((100vw - 28rem) / 2 + 12px))' }}
+      <div role="menu" aria-label={`Actions de ${title}`} ref={attachMenu} data-history-menu style={{ top: anchor?.top ?? 0, maxHeight: anchor?.maxHeight, opacity: anchor ? 1 : 0, overflowY: 'auto', right: 'max(12px, calc((100vw - 28rem) / 2 + 12px))' }}
         className="absolute w-[min(320px,calc(100vw-24px))] rounded-[20px] bg-[#18181C] p-1.5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12),0_18px_40px_rgba(0,0,0,0.6)] animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none">
         {view === 'actions' ? <>
           <button type="button" role="menuitem" data-dialog-initial-focus disabled={pending} className={item} onClick={openDate}><strong className="text-[15px] font-bold text-zinc-100">Changer la date ou l’heure</strong><small className="text-[12.5px] text-zinc-400">{actions.whenLabel}</small></button>
