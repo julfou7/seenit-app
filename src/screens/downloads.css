@@ -106,3 +106,22 @@
 .downloads-recent__done { position:absolute; right:6px; bottom:6px; width:32px; height:32px; border-radius:16px; background:#0b0b0dcc; display:grid; place-items:center; color:#f4f4f5; }
 .downloads-recent__rail strong { display:block; margin-top:7px; font-size:13.5px; line-height:1.25; font-weight:800; color:var(--seenit-media-title,#f2c36b); overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 .downloads-recent__rail button > span:last-child { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; font-size:12px; line-height:1.3; color:#a1a1aa; overflow:hidden; overflow-wrap:anywhere; }
+/* Recherche avancée (refonte du 07/11) : en-tête retour + titre, un champ, filtres de « Version précise ». */
+.downloads-header--search { display:flex; align-items:center; gap:4px; padding-left:6px; }
+.downloads-header--search h1 { font-size:22px; }
+.downloads-header--search .downloads-subtitle { margin-top:0; font-size:13px; }
+.downloads-header__back { flex:none; width:44px; height:44px; display:grid; place-items:center; border-radius:50%; color:#f4f4f5; }
+.downloads-search { display:flex; flex-direction:column; gap:12px; }
+.downloads-search__form { display:flex; gap:8px; }
+.downloads-search__field { position:relative; flex:1; min-width:0; display:flex; align-items:center; height:48px; border-radius:14px; background:#1f1f23; color:#a1a1aa; }
+.downloads-search__field:focus-within { box-shadow:inset 0 0 0 1.5px #e5a93d; }
+.downloads-search__field > svg { flex:none; margin:0 8px 0 12px; }
+.downloads-search__field input { flex:1; min-width:0; height:100%; background:transparent; color:#fff; font-size:15px; outline:none; }
+.downloads-search__field input::placeholder { color:#71717a; }
+.downloads-search__field button { flex:none; width:44px; height:44px; display:grid; place-items:center; color:#a1a1aa; }
+.downloads-search__go { flex:none; width:48px; height:48px; display:grid; place-items:center; border-radius:14px; background:#e5a93d; color:#0b0b0d; }
+.downloads-search__go:disabled { background:#27272a; color:#71717a; }
+.downloads-search__note { display:flex; align-items:center; gap:8px; padding:20px 2px; font-size:14px; color:#a1a1aa; }
+.downloads-search__hint { padding:28px 8px; text-align:center; font-size:14px; line-height:1.5; color:#a1a1aa; }
+.downloads-search__error { border-radius:16px; background:#f43f5e1a; padding:14px 16px; color:#fecdd3; font-size:14px; }
+.downloads-search__error button { margin-top:10px; min-height:44px; padding:0 16px; border-radius:12px; box-shadow:inset 0 0 0 1px #ffffff26; color:#f4f4f5; font-weight:700; }

@@ -1081,8 +1081,9 @@ pour le cache des sagas et univers.
   Depuis l'APK il est remis au résolveur d'applications Android ; depuis la PWA il est remis au
   navigateur. Une absence de client produit une erreur lisible.
 - Une recherche ou un test C411 possède un timeout et distingue « aucun résultat » d'une panne.
-- **SEENIT-C411-003** — Dans la recherche manuelle globale, Film/Série reste un filtre facultatif.
-  Le type d'une release provient uniquement de sa sous-catégorie C411 explicite (`6` Film, `7` Série),
+- **SEENIT-C411-003** — La recherche manuelle globale (« Recherche avancée ») n'impose aucun type :
+  depuis la refonte du 07/11/2026, elle n'a plus de filtre Film/Série, seulement les filtres de version
+  (Toutes, 1080p, 4K, Français, VO), la conseillée en tête et dépliée. Le type d'une release provient uniquement de sa sous-catégorie C411 explicite (`6` Film, `7` Série),
   jamais de son nom. Avec qBittorrent configuré et un type prouvé, SeenIt lui transmet une seule fois
   le Magnet BTIH exact **sans catégorie qBittorrent gérée par Sonarr/Radarr** : ce flux global reste
   explicitement manuel et ne peut pas être repris comme un import *Arr automatique sans identité canonique.

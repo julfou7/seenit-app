@@ -860,7 +860,7 @@ Quand la fonctionnalité est désactivée :
 
 Quand elle est activée, l'onglet Télécharger possède deux modes : **Mes téléchargements** et
 **Recherche C411**. Son en-tête (maquette DlOngletSuivi) porte deux boutons ronds de 44 px :
-**Recherche avancée** (bascule vers la recherche C411, « Mes téléchargements » pour revenir) et
+**Recherche avancée** (ouvre la recherche C411, dont la flèche ‹ ramène au suivi) et
 **Réglages**, qui ouvre la configuration C411/Sonarr/Radarr/qBittorrent et webhooks, qui ne doit pas
 être dupliquée dans les réglages généraux. Sous le titre, « N en cours · M à régler » (« Rien en cours »
 sinon). Il n'y a plus de bouton Actualiser : la liste se met à jour seule, et Programmés/Téléchargés
@@ -936,9 +936,12 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   Une version actuelle reconnue par hash reste non sélectionnable ; une demande active du même scope
   bloque un nouvel envoi. C411 depuis une fiche Film ajoute si nécessaire le film exact sans recherche
   automatique concurrente, vérifie le parseur Radarr et n'envoie que la release choisie.
-- C411 recherche avec filtres Tous/Film/Série, qualité Toutes/4K/1080p/720p et tri seeders/taille/date.
-- Film/Série est un filtre facultatif : le mode Tous reste utilisable jusqu'au téléchargement. Chaque
-  résultat indique le type lorsque C411 fournit la sous-catégorie exacte (`6` Film ou `7` Série).
+- **Recherche avancée** (refonte du 07/11/2026, même langage que « Version précise ») : en-tête ‹ +
+  « Recherche avancée », un champ (« Titre, ou titre S02E05 ») avec un bouton loupe de 48 px, puis les
+  filtres de version Toutes, 1080p, 4K, Français, VO. Les résultats sont des cartes de version (qualité,
+  langue, Light, taille, vitesse), la conseillée en tête et dépliée ; déplier montre le nom du fichier,
+  le type (Film/Série quand C411 fournit la sous-catégorie exacte `6` ou `7`), les sources, l'âge,
+  « Télécharger » et « Magnet » (copie). Plus de filtre Film/Série, de qualité 720p, de liste Light ni de tri.
 - Depuis cette recherche globale sans fiche associée, un type et une identité ne sont jamais déduits du
   nom de release. Si qBittorrent est configuré et que C411 fournit le type exact, le Magnet BTIH validé
   lui est transmis directement **sans catégorie qBittorrent gérée par Sonarr/Radarr** ; ce téléchargement

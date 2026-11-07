@@ -52,7 +52,17 @@ async function testDownloadsHarness(client, root) {
     await evaluate(client, 'document.querySelector(\'[aria-label="Recherche avancée"]\').click()');
     await evaluate(client, `(()=>{const input=document.querySelector('input[data-navigation-search]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Titre');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     await evaluate(client, 'document.querySelector("form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))');
-    await check(client, 'document.body.innerText.includes("503") && !document.body.innerText.includes("Aucune release trouvée")', 'panne distincte d’un résultat vide');
+    await check(client, 'document.body.innerText.includes("503") && !document.body.innerText.includes("Aucune version trouvée")', 'panne distincte d’un résultat vide');
+    // Refonte du 07/11 : en-tête retour + titre, un champ, une rangée de filtres, la conseillée dépliée en tête.
+    await check(client, '(()=>{const back=document.querySelector(\'[aria-label="Retour aux téléchargements"]\').getBoundingClientRect();return document.querySelector(".downloads-header--search h1").textContent==="Recherche avancée"&&back.width>=44&&!document.body.innerText.includes("TRI")&&!document.querySelector("select")&&document.querySelectorAll("form").length===1})()', 'recherche avancée : en-tête simple, sans tri ni liste Light');
+    await evaluate(client, `(()=>{window.__downloads.telemetry.c411Results=true;document.querySelector("form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));})()`);
+    await check(client, '(()=>{const cards=[...document.querySelectorAll("[data-version-card]")];const chips=[...document.querySelectorAll("[aria-label=\'Filtrer les versions\'] button")];return cards.length===4&&cards[0].dataset.versionCard==="12"&&cards[0].querySelector("[aria-expanded=true]")&&cards[0].innerText.includes("Conseillée")&&cards[0].innerText.includes("sans import automatique")&&[...cards[0].querySelectorAll("button")].some(b=>b.textContent.includes("Magnet")&&b.getBoundingClientRect().height>=44)&&chips.length===5&&chips.every(b=>b.getBoundingClientRect().height>=44)&&document.documentElement.scrollWidth<=innerWidth})()', 'résultats en cartes de version, conseillée dépliée, filtres de 44 px');
+    await evaluate(client, '[...document.querySelectorAll("[aria-label=\'Filtrer les versions\'] button")].find(b=>b.textContent==="4K").click()');
+    await check(client, '[...document.querySelectorAll("[data-version-card]")].map(c=>c.dataset.versionCard).join()==="11"', 'filtre 4K de la recherche avancée');
+    const searchCapture = await client.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    fs.writeFileSync(path.join(root, 'quality-reports', `downloads-search-${width}.png`), Buffer.from(searchCapture.data, 'base64'));
+    await evaluate(client, 'window.__downloads.telemetry.c411Results=false;document.querySelector(\'[aria-label="Retour aux téléchargements"]\').click()');
+    await check(client, 'document.querySelector(".downloads-subtitle")?.textContent==="1 en cours · 2 à régler"', 'retour de la recherche vers le suivi');
     // #879 : mode téléchargement — le contrôle remplace le Vu, le prochain épisode est déjà coché.
     await evaluate(client, 'window.__downloads.mount("episodes")');
     await check(client, 'document.querySelector(\'[role=checkbox][aria-label="Télécharger l’épisode 1"][aria-checked="true"]\')', 'prochain épisode coché en mode');

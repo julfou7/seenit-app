@@ -85,8 +85,8 @@ test('SEENIT-UX-005 Télécharger efface sa recherche sans appel métier', () =>
   const resetEnd = downloadsCoreSource.indexOf("window.addEventListener('downloads-back-one-level'", resetStart);
   const resetBlock = downloadsCoreSource.slice(resetStart, resetEnd);
   assert.match(resetBlock, /setSearchQuery\(''\)/);
-  assert.match(resetBlock, /setSelectedMediaType\('all'\)/);
-  assert.match(resetBlock, /setSelectedQuality\('all'\)/);
+  assert.match(resetBlock, /setVersionFilter\('Toutes'\)/);
+  assert.match(resetBlock, /setOpenVersion\(null\)/);
   assert.match(resetBlock, /setShowConfiguration\(false\)/);
   assert.match(resetBlock, /setViewMode\('downloads'\)/);
   assert.match(resetBlock, /Télécharger réinitialisé/);

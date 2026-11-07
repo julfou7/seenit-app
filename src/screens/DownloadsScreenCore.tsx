@@ -6,24 +6,21 @@ import { RecentImportsRail, useRecentImports } from '../components/RecentImports
 import { coveredByRecentImport } from '../features/downloads/recentImports';
 import { groupSeasonDownloads } from '../features/downloads/downloadSeriesGroups';
 import { downloadGroup } from '../features/downloads/downloadGroups';
-import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
-import { ReleaseLightFilter } from '../components/ReleaseLightFilter';
+import { describeReleases, matchesVersionFilter, releaseAgeLabel, type VersionFilter } from '../features/downloads/releaseVersions';
+import { ReleaseVersionCard, VersionFilterChips } from '../components/ReleaseVersionCard';
 import './downloads.css';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowLeft,
+  ChevronLeft,
   Check,
   Copy,
   Download,
-  Film,
-  HardDrive,
-  Clock3,
   Loader2,
   Search,
   Settings,
   Trash2,
-  Tv,
   X
 } from 'lucide-react';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
@@ -32,15 +29,11 @@ import {
   type LiveDownloadItem,
   pushReleaseDirectly
 } from '../services/sonarrRadarr';
-import { type C411Torrent, formatTorrentSize, openC411Magnet, searchC411Torrents } from '../services/c411';
+import { type C411Torrent, openC411Magnet, searchC411Torrents } from '../services/c411';
 import { useToastStore } from '../store/toastStore';
 import { DownloadConfigSection } from '../components/DownloadConfigSection';
 import { SwipeableCard } from '../components/cards/SwipeableCard';
-import {
-  getC411ManualMediaTypeLabel,
-  planC411ManualDownload,
-  resolveC411ManualMediaType
-} from '../features/downloads/c411ManualRouting';
+import { planC411ManualDownload, resolveC411ManualMediaType } from '../features/downloads/c411ManualRouting';
 import {
   acceptDownloadRequest,
   beginDownloadRequest,
@@ -56,7 +49,6 @@ interface Props {
 }
 
 type ViewMode = 'downloads' | 'search';
-type SearchMediaType = 'all' | 'movie' | 'tv';
 
 export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const {
@@ -78,14 +70,18 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     return () => cancelAnimationFrame(frame);
   });
   const [showConfiguration, setShowConfiguration] = useState(false);
+  const openSearch = () => {
+    setViewMode('search');
+    requestAnimationFrame(() => screenRootRef.current?.querySelector<HTMLInputElement>('[data-navigation-search]')?.focus({ preventScroll: true }));
+  };
   const [clearingSection, setClearingSection] = useState<'completed' | 'cancelled' | 'error' | null>(null);
   const [pendingCancellation, setPendingCancellation] = useState<LiveDownloadItem | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMediaType, setSelectedMediaType] = useState<SearchMediaType>('all');
-  const [selectedQuality, setSelectedQuality] = useState<'all' | '2160p' | '1080p' | '720p'>('all');
-  const [lightFilter, setLightFilter] = useState<LightFilter>('all');
-  const [sortBy, setSortBy] = useState<'seeders' | 'size' | 'date'>('seeders');
+  // Recherche avancée (refonte du 07/11, même langage que « Version précise ») : un champ, une rangée de
+  // filtres, la conseillée en tête et dépliée ; plus de type, de qualité, de Light ni de tri séparés.
+  const [versionFilter, setVersionFilter] = useState<VersionFilter>('Toutes');
+  const [openVersion, setOpenVersion] = useState<number | null>(null);
   const [torrents, setTorrents] = useState<C411Torrent[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
@@ -117,10 +113,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
       setClearingSection(null);
       setPendingCancellation(null);
       setSearchQuery('');
-      setSelectedMediaType('all');
-      setSelectedQuality('all');
-      setLightFilter('all');
-      setSortBy('seeders');
+      setVersionFilter('Toutes');
+      setOpenVersion(null);
       setTorrents([]);
       setIsSearching(false);
       setHasSearched(false);
@@ -197,12 +191,11 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     setIsSearching(true);
     setSearchError(null);
     try {
-      const results = await searchC411Torrents({
-        query,
-        mediaType: selectedMediaType === 'all' ? undefined : selectedMediaType
-      });
+      const results = await searchC411Torrents({ query });
       if (searchRequestRef.current !== requestId) return;
       setTorrents(results);
+      setVersionFilter('Toutes');
+      setOpenVersion(describeReleases(results)[0]?.release.id ?? null);
       setHasSearched(true);
     } catch (error: unknown) {
       if (searchRequestRef.current !== requestId) return;
@@ -214,28 +207,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     }
   };
 
-  const filteredTorrents = useMemo(() => {
-    let list = torrents.filter(torrent => matchesLightFilter(`${torrent.name} ${torrent.quality || ''}`, lightFilter));
-
-    if (selectedQuality !== 'all') {
-      list = list.filter(torrent => {
-        const haystack = `${torrent.quality || ''} ${torrent.name}`.toLowerCase();
-        if (selectedQuality === '2160p') return /2160|4k|uhd/.test(haystack);
-        if (selectedQuality === '1080p') return /1080p|1080i/.test(haystack);
-        return /720p/.test(haystack);
-      });
-    }
-
-    list.sort((a, b) => {
-      if (sortBy === 'size') return (b.size || 0) - (a.size || 0);
-      if (sortBy === 'date') {
-        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      }
-      return (b.seeders || 0) - (a.seeders || 0);
-    });
-
-    return list;
-  }, [torrents, selectedQuality, lightFilter, sortBy]);
+  const versions = useMemo(() => describeReleases(torrents), [torrents]);
+  const visibleVersions = versions.filter(entry => matchesVersionFilter(entry, versionFilter));
 
   const performRemove = async (item: LiveDownloadItem) => {
     const status = String(item.status || '').toLowerCase();
@@ -428,33 +401,24 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
 
   return (
     <div ref={screenRootRef} className="downloads-page flex-1 min-h-0 flex flex-col text-white overflow-hidden">
-      <header className="downloads-header">
-        <div className="downloads-header__row">
-          <h1>Téléchargements</h1>
-          <div className="downloads-header__actions">
-            <button
-              type="button"
-              onClick={() => setViewMode(viewMode === 'search' ? 'downloads' : 'search')}
-              aria-pressed={viewMode === 'search'}
-              title="Recherche avancée"
-              aria-label="Recherche avancée"
-            >
-              <Search size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowConfiguration(true)}
-              title="Réglages"
-              aria-label="Ouvrir les réglages de téléchargement"
-            >
-              <Settings size={18} />
-            </button>
+      {viewMode === 'search'
+        ? <header className="downloads-header downloads-header--search">
+          <button type="button" onClick={() => setViewMode('downloads')} aria-label="Retour aux téléchargements" className="downloads-header__back"><ChevronLeft size={26} /></button>
+          <div className="min-w-0">
+            <h1>Recherche avancée</h1>
+            <p className="downloads-subtitle">Toutes les versions trouvées sur C411</p>
           </div>
-        </div>
-        {viewMode === 'downloads'
-          ? <p className="downloads-subtitle">{subtitle}</p>
-          : <button type="button" className="downloads-back" onClick={() => setViewMode('downloads')}><ArrowLeft size={16} aria-hidden="true" />Mes téléchargements</button>}
-      </header>
+        </header>
+        : <header className="downloads-header">
+          <div className="downloads-header__row">
+            <h1>Téléchargements</h1>
+            <div className="downloads-header__actions">
+              <button type="button" onClick={openSearch} title="Recherche avancée" aria-label="Recherche avancée"><Search size={18} /></button>
+              <button type="button" onClick={() => setShowConfiguration(true)} title="Réglages" aria-label="Ouvrir les réglages de téléchargement"><Settings size={18} /></button>
+            </div>
+          </div>
+          <p className="downloads-subtitle">{subtitle}</p>
+        </header>}
 
       <div className="downloads-content flex-1 overflow-y-auto px-4 py-3.5">
         {viewMode === 'downloads' ? (
@@ -494,174 +458,72 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             )}
           </div>
         ) : (
-          <div className="space-y-3.5">
+          <div className="downloads-search">
             <form
+              role="search"
               onSubmit={event => {
                 event.preventDefault();
                 void performSearch();
               }}
-              className="flex gap-2"
+              className="downloads-search__form"
             >
-              <div className="relative flex-1">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <span className="downloads-search__field">
+                <Search size={18} aria-hidden="true" />
                 <input
                   value={searchQuery}
                   onChange={event => setSearchQuery(event.target.value)}
-                  placeholder="Film, série, S02E05…"
+                  placeholder="Titre, ou titre S02E05"
                   data-navigation-search
+                  enterKeyHint="search"
                   aria-label="Rechercher une release C411"
-                  className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700 text-xs text-white outline-none focus:border-[#E5A93D]"
                 />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 w-11 h-11 text-zinc-500 flex items-center justify-center"
-                    aria-label="Effacer la recherche"
-                  >
-                    <X size={14} />
-                  </button>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={isSearching || !searchQuery.trim()}
-                className="px-3.5 py-2.5 rounded-xl bg-[#E5A93D] text-black text-xs font-black disabled:opacity-50"
-              >
-                {isSearching ? <Loader2 size={15} className="animate-spin" /> : 'Chercher'}
+                {searchQuery && <button type="button" onClick={() => setSearchQuery('')} aria-label="Effacer la recherche"><X size={16} /></button>}
+              </span>
+              <button type="submit" disabled={isSearching || !searchQuery.trim()} aria-label="Chercher" className="downloads-search__go">
+                {isSearching ? <Loader2 size={20} className="animate-spin" /> : <Search size={20} />}
               </button>
             </form>
 
-            <p className="text-[10px] leading-relaxed text-zinc-500">
-              Recherche globale : téléchargement manuel qBittorrent, sans import automatique Radarr/Sonarr/Plex.
-              Pour l’import automatique, lance la release depuis la fiche SeenIt du média.
-            </p>
-
-            <div className="flex items-center gap-1 overflow-x-auto pb-1">
-              {([
-                { id: 'all' as const, label: 'Tous' },
-                { id: 'movie' as const, label: 'Films' },
-                { id: 'tv' as const, label: 'Séries' }
-              ]).map(option => (
-                <button
-                  key={option.id}
-                  type="button"
-                  onClick={() => setSelectedMediaType(option.id)}
-                  className={`min-h-11 px-3 rounded-lg text-xs font-bold border shrink-0 ${
-                    selectedMediaType === option.id
-                      ? 'bg-zinc-700 text-white border-zinc-600'
-                      : 'bg-zinc-900 text-zinc-400 border-zinc-800'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-
-              <span className="w-px h-5 bg-zinc-800 mx-1 shrink-0" />
-
-              {(['all', '2160p', '1080p', '720p'] as const).map(quality => (
-                <button
-                  key={quality}
-                  type="button"
-                  onClick={() => setSelectedQuality(quality)}
-                  className={`min-h-11 px-3 rounded-lg text-xs font-bold border shrink-0 ${
-                    selectedQuality === quality
-                      ? 'bg-blue-600 text-white border-blue-500'
-                      : 'bg-zinc-900 text-zinc-400 border-zinc-800'
-                  }`}
-                >
-                  {quality === 'all' ? 'Toutes qualités' : quality === '2160p' ? '4K' : quality}
-                </button>
-              ))}
-            </div>
-
-            <ReleaseLightFilter value={lightFilter} onChange={setLightFilter} />
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs uppercase font-black text-zinc-500">Tri</span>
-              {(['seeders', 'size', 'date'] as const).map(sort => (
-                <button
-                  key={sort}
-                  type="button"
-                  onClick={() => setSortBy(sort)}
-                  className={`min-h-11 px-3 rounded-lg text-xs font-bold border ${
-                    sortBy === sort
-                      ? 'bg-zinc-700 text-white border-zinc-600'
-                      : 'bg-zinc-900 text-zinc-500 border-zinc-800'
-                  }`}
-                >
-                  {sort === 'seeders' ? 'Seeders' : sort === 'size' ? 'Taille' : 'Date'}
-                </button>
-              ))}
-            </div>
+            {versions.length > 0 && !isSearching && <VersionFilterChips value={versionFilter} onChange={label => { setVersionFilter(label); setOpenVersion(null); }} />}
 
             {isSearching ? (
-              <div className="py-16 flex flex-col items-center gap-2 text-zinc-400">
-                <Loader2 size={28} className="animate-spin text-[#E5A93D]" />
-                <span className="text-xs font-bold">Recherche C411…</span>
-              </div>
-            ) : filteredTorrents.length > 0 ? (
-              <div className="space-y-2.5">
-                {filteredTorrents.map(torrent => {
-                  const c411MediaType = resolveC411ManualMediaType(torrent);
-                  const mediaTypeLabel = getC411ManualMediaTypeLabel(c411MediaType);
+              <p role="status" className="downloads-search__note"><Loader2 size={18} className="animate-spin text-[#E5A93D]" />Recherche des versions…</p>
+            ) : searchError ? (
+              <div role="alert" className="downloads-search__error"><p>{searchError}</p><button type="button" onClick={() => void performSearch()}>Réessayer</button></div>
+            ) : visibleVersions.length > 0 ? (
+              <div className="flex flex-col gap-2.5">
+                {visibleVersions.map(entry => {
+                  const torrent = entry.release;
+                  const isOpen = openVersion === torrent.id;
                   const manualRoute = planC411ManualDownload(torrent, {
                     qbittorrentConfigured: Boolean(config.qbittorrentUrl),
                     sonarrConfigured: Boolean(config.sonarrUrl && config.sonarrApiKey),
                     radarrConfigured: Boolean(config.radarrUrl && config.radarrApiKey)
                   });
-                  const actionLabel = manualRoute.kind === 'qbittorrent'
-                    ? 'Télécharger'
-                    : manualRoute.kind === 'magnet'
-                      ? 'Ouvrir Magnet'
-                      : 'Indisponible';
-
+                  const actionLabel = manualRoute.kind === 'qbittorrent' ? 'Télécharger' : manualRoute.kind === 'magnet' ? 'Ouvrir Magnet' : 'Indisponible';
+                  const kind = resolveC411ManualMediaType(torrent);
                   return (
-                    <div key={torrent.id} className="rounded-2xl bg-zinc-900/85 border border-white/10 p-3.5 space-y-2.5">
-                      <h3 className="text-xs font-bold text-white break-words leading-snug">{torrent.name}</h3>
-                      <div className="flex flex-wrap items-center gap-2 text-[10px] text-zinc-400">
-                        {mediaTypeLabel && (
-                          <span className="inline-flex items-center gap-1 font-bold text-[#E5A93D]">
-                            {c411MediaType === 'tv' ? <Tv size={11} /> : <Film size={11} />}
-                            {mediaTypeLabel}
-                          </span>
-                        )}
-                        {torrent.quality && <span className="font-bold text-blue-300">{torrent.quality}</span>}
-                        {torrent.language && <span>{torrent.language}</span>}
-                        <span>{formatTorrentSize(torrent.size)}</span>
-                        <span className="text-emerald-400 font-bold">↑ {torrent.seeders || 0}</span>
-                        <span>↓ {torrent.leechers || 0}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          disabled={sendingTorrentId !== null}
-                          onClick={() => void handleSendTorrent(torrent)}
-                          className="flex-1 min-h-11 rounded-xl bg-[#E5A93D] hover:bg-[#f0b84c] text-black text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
-                        >
-                          {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                          {actionLabel}
+                    <ReleaseVersionCard key={torrent.id} entry={entry} open={isOpen} onToggle={() => setOpenVersion(isOpen ? null : torrent.id)}
+                      details={[kind === 'movie' ? 'Film' : kind === 'tv' ? 'Série' : '', `${torrent.seeders || 0} source${(torrent.seeders || 0) > 1 ? 's' : ''}`, releaseAgeLabel(entry.ageDays)].filter(Boolean).join(' · ')}>
+                      <div className="flex gap-2 mt-1">
+                        <button type="button" disabled={sendingTorrentId !== null || manualRoute.kind === 'blocked'} onClick={() => void handleSendTorrent(torrent)}
+                          className="flex-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-60">
+                          {sendingTorrentId === torrent.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}{actionLabel}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => void copyMagnet(torrent)}
-                          className="min-h-11 px-3 rounded-xl bg-zinc-800 text-zinc-300 text-xs font-bold flex items-center gap-1.5"
-                        >
-                          {copiedHash === torrent.infoHash ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                          Magnet
+                        <button type="button" onClick={() => void copyMagnet(torrent)} aria-label="Copier le lien Magnet"
+                          className="h-12 shrink-0 px-4 rounded-[14px] text-[14.5px] font-bold text-zinc-200 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center gap-1.5">
+                          {copiedHash === torrent.infoHash ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}Magnet
                         </button>
                       </div>
-                    </div>
+                      <span className="text-[12px] leading-snug text-zinc-500">Envoi direct à qBittorrent, sans import automatique Radarr/Sonarr/Plex : pour cela, télécharge depuis la fiche du film ou de la série.</span>
+                    </ReleaseVersionCard>
                   );
                 })}
               </div>
-            ) : searchError ? (
-              <div role="alert" className="py-10 space-y-3 text-center text-sm text-zinc-300"><p>{searchError}</p><button type="button" onClick={() => void performSearch()} className="min-h-11 px-4 rounded-xl border border-white/15">Réessayer</button></div>
             ) : hasSearched ? (
-              <div className="py-14 text-center text-xs text-zinc-500">Aucune release trouvée.</div>
+              <p className="downloads-search__note">{versions.length ? 'Aucune version pour ce filtre.' : 'Aucune version trouvée sous ce nom.'}</p>
             ) : (
-              <div className="py-14 text-center text-[11px] text-zinc-500 max-w-[300px] mx-auto">
-                La recherche manuelle est séparée du suivi : taper ici ne masque plus tes téléchargements en cours.
-              </div>
+              <p className="downloads-search__hint">Cherche un film ou une série, avec l’épisode si besoin (« The Bear S03E02 ») : toutes les versions s’affichent ici, la conseillée en tête.</p>
             )}
           </div>
         )}
