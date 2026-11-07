@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.265",
+  "applicationVersion": "1.4.266",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -73,6 +73,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/downloadSeasonGroups.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 #879 « Ajouter E6 » : premier épisode sorti, ni vu, ni présent, ni déjà suivi"
+        },
         {
           "file": "tests/programmedCalendar.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sans fichier, triés par date"

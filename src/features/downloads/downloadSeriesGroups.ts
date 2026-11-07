@@ -45,3 +45,13 @@ export function groupSeasonDownloads(items: readonly LiveDownloadItem[]): Downlo
   }
   return entries;
 }
+
+/**
+ * #879 — « Ajouter E6 » (maquette DlOngletSuivi) : premier épisode de la saison déjà sorti, ni vu, ni
+ * présent, ni déjà suivi dans la carte. Rien n'est proposé s'il n'y en a pas.
+ */
+export function nextEpisodeToAdd(episodes: readonly { episode_number: number; air_date?: string | null; name?: string }[], { today, seen, hasFile, tracked }: { today: string; seen: (episode: number) => boolean; hasFile: (episode: number) => boolean; tracked: ReadonlySet<number> }): { episode: number; name?: string } | null {
+  const next = [...episodes].sort((a, b) => a.episode_number - b.episode_number)
+    .find(entry => Boolean(entry.air_date) && entry.air_date! <= today && !seen(entry.episode_number) && !hasFile(entry.episode_number) && !tracked.has(entry.episode_number));
+  return next ? { episode: next.episode_number, name: next.name } : null;
+}

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { lazy, Suspense, useRef, useState } from 'react';
 import { Tv, X } from 'lucide-react';
 import { useShowsStore } from '../store/showsStore';
 import { formatCleanMediaInfo, type LiveDownloadItem } from '../services/sonarrRadarr';
@@ -6,6 +6,9 @@ import { findMatchingShowForDownload } from '../features/downloads/downloadIdent
 import { preferSeenItImagePath, selectStableDownloadPosterPath } from '../features/downloads/downloadPosterStability';
 import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
 import { downloadGroup } from '../features/downloads/downloadGroups';
+import { addEpisodeToSeason, useNextEpisodeToAdd } from '../features/downloads/addNextEpisode';
+import { useToastStore } from '../store/toastStore';
+const PreciseVersionPage = lazy(() => import('../screens/mediaDetail/PreciseVersionPage'));
 
 type RowKind = 'done' | 'active' | 'queued' | 'waiting' | 'attention';
 const rowKind = (item: LiveDownloadItem): RowKind => {
@@ -60,6 +63,18 @@ export function SeasonDownloadCard({ seasonNumber, items, onShowClick, onRemove 
   const counts = rows.reduce<Partial<Record<RowKind, number>>>((acc, row) => ({ ...acc, [row.kind]: (acc[row.kind] || 0) + 1 }), {});
   const legend = LEGEND.filter(entry => counts[entry.kind]).map(entry => `${counts[entry.kind]} ${counts[entry.kind]! > 1 ? entry.many : entry.one}`);
   const open = () => id && onShowClick?.(id, 'tv');
+  // « Ajouter E6 » : le prochain épisode sorti, ni vu, ni présent, ni déjà dans la carte (TMDB exact requis).
+  const target = Number(first.tmdbId) > 0 ? { tmdbId: Number(first.tmdbId), tvdbId: Number(first.tvdbId) || undefined, season: seasonNumber, title, posterPath: poster.current, tracked: items.map(item => Number(item.episodeNumber)) } : null;
+  const next = useNextEpisodeToAdd(target);
+  const [picking, setPicking] = useState(false);
+  const [precise, setPrecise] = useState<number | null>(null);
+  const sameQuality = qualities.length === 1 && /2160|4k/i.test(String(qualities[0])) ? '4k' : qualities.length === 1 && /1080/.test(String(qualities[0])) ? '1080p' : null;
+  const add = (quality: '1080p' | '4k') => {
+    if (!target || !next) return;
+    setPicking(false);
+    const episode = next.episode;
+    void addEpisodeToSeason(target, episode, quality, (action, kind = 'download') => useToastStore.getState().showToast({ title, subtitle: `S${seasonNumber} | E${episode}`, action, posterPath: poster.current }, kind));
+  };
 
   return <article className="download-card download-season" data-download-season={`${id || first.tvdbId}:${seasonNumber}`}>
     <div className="download-card__head">
@@ -90,5 +105,16 @@ export function SeasonDownloadCard({ seasonNumber, items, onShowClick, onRemove 
         </li>;
       })}
     </ul>
+    {next && !picking && <button type="button" className="download-season__add" onClick={() => setPicking(true)}>Ajouter E{next.episode}</button>}
+    {next && picking && <div className="download-season__pick" role="group" aria-label={`Ajouter E${next.episode} en quelle qualité ?`}>
+      <p>Ajouter E{next.episode} en quelle qualité ?</p>
+      <div>
+        <button type="button" className="is-gold" onClick={() => add('1080p')}>1080p{sameQuality === '1080p' && <span> · comme les autres</span>}</button>
+        <button type="button" onClick={() => add('4k')}>4K{sameQuality === '4k' && <span> · comme les autres</span>}</button>
+        <button type="button" onClick={() => setPicking(false)}>Plus tard</button>
+        <button type="button" onClick={() => { setPicking(false); setPrecise(next.episode); }}>Autres…</button>
+      </div>
+    </div>}
+    {precise !== null && target && <Suspense fallback={<span role="status">Ouverture de la version précise…</span>}><PreciseVersionPage target={{ title, tmdbId: target.tmdbId, tvdbId: target.tvdbId, posterPath: poster.current, season: seasonNumber, episode: precise }} onClose={() => setPrecise(null)} /></Suspense>}
   </article>;
 }
