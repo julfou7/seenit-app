@@ -525,7 +525,12 @@ jamais de feuille du bas) ;
 hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Une série
 n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
-ligne à la place de la navigation). Chaque pastille de saison montre sa part vue en mini-barre et, avec
+ligne à la place de la navigation). En mode, un épisode à venir se coche en bleu pour être **programmé** :
+Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sans recherche immédiate ; un
+épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Avec un seul épisode sorti
+coché, « Version précise › » ouvre une page pleine hauteur : versions C411 filtrables (Toutes, 1080p, 4K, Français, VO),
+la conseillée en tête et dépliée (nom du fichier, sources, date, **Télécharger cette version**), et « Chercher sous un
+autre nom… ». Chaque pastille de saison montre sa part vue en mini-barre et, avec
 Téléchargements activé, un point bleu quand un téléchargement de cette saison est actif. Un épisode
 présent dans Sonarr est reconnu comme téléchargé dans la fiche et la popup. Dans la liste d'une saison, un épisode vu
 a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »
@@ -860,6 +865,11 @@ et webhooks, qui ne doit pas être dupliquée dans les réglages généraux.
   priorité : elle n'affiche jamais « Téléchargement terminé » et ne relance pas la présence Plex pour
   un transfert dont l'import est encore explicitement en erreur.
 - Les actifs conservent l'ordre de lancement ; l'historique affiche les plus récents d'abord.
+- Plusieurs épisodes d'une même saison d'une même série (TMDB exact, sinon TVDB exact, jamais le titre)
+  forment une seule carte (#879, maquette DlOngletSuivi) : affiche, titre, « Saison N · K épisodes », une
+  barre (un segment par épisode suivi) avec sa légende, puis une ligne par épisode avec son état
+  (« 64 % · ≈ 12 min » et barre, « En attente », « Téléchargé · prêt à regarder ») et ✕ pour l'annuler
+  ou le retirer, avec la même confirmation ; la carte n'a pas de balayage qui annulerait toute la saison.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
 - « Vider » ne touche que la section d'historique visée, jamais un actif.

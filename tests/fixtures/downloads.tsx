@@ -4,16 +4,40 @@ import { DownloadsScreen } from '../../src/screens/DownloadsScreenCore';
 import { SeasonPanel } from '../../src/screens/mediaDetail/seriesSections';
 import { DownloadModeBanner, DownloadModeBar } from '../../src/screens/mediaDetail/downloadMode';
 import { DownloadModal } from '../../src/components/DownloadModal';
-import { telemetry } from './downloadsRuntime';
+import PreciseVersionPage from '../../src/screens/mediaDetail/PreciseVersionPage';
+import { fixtureItems, telemetry, useLiveDownloadStore } from './downloadsRuntime';
+import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
+
+// #879 — deux épisodes de la même saison (TMDB 77) et un homonyme d'une autre série (TMDB 99).
+const episode = (id: string, tmdbId: number, episodeNumber: number, status: string, progress: number): LiveDownloadItem => ({ id, title: "L'Arène", seriesTitle: "L'Arène", mediaType: 'tv', tmdbId, seasonNumber: 1, episodeNumber, size: 2e9, sizeleft: 1e9, status, progress, timeleft: '12 min', statusText: 'En cours', quality: '1080p', downloadClient: 'Sonarr', posterPath: '/fixture.jpg', addedAt: Number(id) });
+const seasonItems = [episode('41', 77, 4, 'downloading', 64), episode('42', 77, 5, 'queued', 0), episode('43', 99, 4, 'downloading', 20)];
 
 const root = createRoot(document.getElementById('root')!);
-const mount = (page = 'downloads') => root.render(page === 'modal' || page === 'movie-modal'
+let mounts = 0;
+const mount = (page = 'downloads') => { telemetry.c411Results = page === 'precise'; mounts += 1; useLiveDownloadStore.setState({ downloads: page === 'season-group' ? seasonItems : fixtureItems }); mountPage(page); };
+const mountPage = (page: string) => root.render(page === 'modal' || page === 'movie-modal'
   ? <DownloadModal isOpen title="L'Arène et un titre de série particulièrement long" mediaType={page === 'modal' ? 'tv' : 'movie'} tmdbId={99} initialSeason={1} initialEpisode={1} seasonsData={[{ season_number: 1, episode_count: 10 }]} onClose={() => mount()} />
-  : page === 'downloads'
+  : page === 'downloads' || page === 'season-group'
   ? <div className="h-[100dvh] max-w-md mx-auto flex flex-col"><DownloadsScreen onShowClick={id => telemetry.opened.push(String(id))} /></div>
   : page === 'banner-long'
   ? <div className="max-w-md mx-auto p-4"><DownloadModeBanner season={1} states={Array.from({ length: 24 }, (_, index) => ({ episode: index + 1, state: index < 5 ? 'seen' as const : 'available' as const }))} progress={() => undefined} picked={new Set([6])} allPicked={false} canPick onToggleAll={() => {}} onSegment={episode => telemetry.requested.push(episode)} /></div>
+  : page === 'precise' || page === 'precise-error'
+  ? <PreciseVersionPage key={`${page}-${mounts}`} target={{ title: "L'Arène", tmdbId: 99, season: 1, episode: 3 }} onClose={() => telemetry.opened.push('precise:close')} />
+  : page === 'program' || page === 'program-normal'
+  ? <ProgramFixture mode={page === 'program'} />
   : <EpisodesFixture mode={page === 'episodes'} />);
+
+// #879 : épisodes à venir — 5 programmable (coché en bleu), 6 déjà surveillé par Sonarr (« Programmé »).
+function ProgramFixture({ mode }: { mode: boolean }) {
+  const [picked, setPicked] = React.useState(() => new Set<number>());
+  const toggle = (episode: number) => { telemetry.requested.push(episode); setPicked(previous => { const next = new Set(previous); if (next.has(episode)) next.delete(episode); else next.add(episode); return next; }); };
+  const states = [{ episode: 4, state: 'available' as const }, { episode: 5, state: 'future' as const }, { episode: 6, state: 'programmed' as const }];
+  return <div className="max-w-md mx-auto p-4 flex flex-col gap-3">
+    {mode && <DownloadModeBanner season={2} states={states} progress={() => undefined} picked={picked} allPicked={false} canPick onToggleAll={() => {}} onSegment={episode => { if (episode !== 6) toggle(episode); }} />}
+    <SeasonPanel season={{ season_number: 2, episode_count: 3 }} episodes={[4, 5, 6].map(episode_number => ({ episode_number, name: `Épisode ${episode_number}`, air_date: episode_number === 4 ? '2020-01-01' : '2099-01-0' + episode_number, still_path: '/fixture.jpg', runtime: 52 }))} show={null} nextKey="2x4" runtimeFallback={52} onToggleSeason={() => {}} onToggleEpisode={() => {}} onOpenEpisode={episode => telemetry.opened.push(`episode:${episode.episode_number}`)}
+    downloadMode={{ active: mode, picked, onToggle: toggle }} episodesMonitored={{ '2x6': true }} getEpisodeDownload={() => null} />
+  </div>;
+}
 
 // #879 : la saison en mode téléchargement (sélection) ou en mode normal (pastilles passives seulement).
 function EpisodesFixture({ mode }: { mode: boolean }) {

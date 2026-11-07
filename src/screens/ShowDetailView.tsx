@@ -22,7 +22,7 @@ import { CastRows, RelationList, RelationsLoading, ThemesCard } from './mediaDet
 import { SeasonAverageChart, SeasonPanel, SeasonPills, SeriesProgressCard, seasonsOf } from './mediaDetail/seriesSections';
 import { MovieEndCard, VerifiedSimilarRail } from './mediaDetail/movieSections';
 import type { ShowDetailViewModel } from './mediaDetail/showDetailViewModel';
-import { DownloadModeBanner, DownloadModeBar, DownloadModeToggle, isEpisodeSelectable, seasonModeStates } from './mediaDetail/downloadMode';
+import { DownloadModeBanner, DownloadModeBar, DownloadModeToggle, isEpisodePickable, isEpisodeProgrammable, seasonModeStates } from './mediaDetail/downloadMode';
 import { SeenItRing } from '../components/SeenItLogo';
 import { episodeDownloadPresentation } from '../features/downloads/episodeDownloadPresentation';
 import type { DownloadQualityChoice } from '../features/downloads/downloadLaunch';
@@ -33,6 +33,8 @@ interface ShowDetailViewProps {
 }
 
 const DownloadModal = lazy(() => import('../components/DownloadModal').then(module => ({ default: module.DownloadModal })));
+// #879 — Page « Version précise » chargée au premier usage (services C411/Sonarr hors du chunk de la fiche).
+const PreciseVersionPage = lazy(() => import('./mediaDetail/PreciseVersionPage'));
 
 const STATUS_LABELS: Record<string, string> = { Ended: 'Terminée', Canceled: 'Annulée', 'Returning Series': 'En cours', 'In Production': 'En production', 'Post Production': 'Post-production', Planned: 'Prévue', Pilot: 'Pilote', ended: 'Terminée', canceled: 'Annulée', returning: 'En cours' };
 
@@ -52,12 +54,6 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const libraryShows = useShowsStore(state => state.shows);
   const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
   const movieAvailable = !isSeries && Boolean(model.presence.radarrHasFile || model.presence.plexInfo?.available);
-  const openEpisodeDownload = (season: number, episode?: number) => {
-    if (!downloadsEnabled) return;
-    setDownloadTargetSeason(season);
-    setDownloadTargetEpisode(episode);
-    setIsDownloadModalOpen(true);
-  };
   const redditVisibleTitle = tmdbDetails?.name || tmdbDetails?.title || show?.title || '';
   const redditMovieOriginalTitle = tmdbDetails?.original_title || show?.originalTitle || null;
   const isAtCinema = !isSeries && (isMovieAtCinema(tmdbDetails) || isMovieAtCinema(show));
@@ -125,13 +121,16 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   // #879 — Mode téléchargement : la fiche reste propre, la sélection d'épisodes est une surcouche.
   const [downloadMode, setDownloadMode] = useState(false);
   const [pickedEpisodes, setPickedEpisodes] = useState<Set<number>>(() => new Set());
+  const [preciseTarget, setPreciseTarget] = useState<{ season: number; episode: number } | null>(null);
   const canUseDownloadMode = isSeries && downloadsEnabled && Boolean(effectiveTmdbId);
   const modeToday = getTodayStr();
   const modeSeason = selectedSeason?.season_number ?? null;
-  const episodePresentation = (episode: number, aired: boolean) => episodeDownloadPresentation(episode, aired, Boolean(modeSeason !== null && model.presence.episodesHasFile?.[episodePresenceKey(modeSeason, episode)]), modeSeason !== null ? model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, modeSeason, episode) : null);
+  const episodePresentation = (episode: number, aired: boolean) => episodeDownloadPresentation(episode, aired, Boolean(modeSeason !== null && model.presence.episodesHasFile?.[episodePresenceKey(modeSeason, episode)]), modeSeason !== null ? model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, modeSeason, episode) : null, Boolean(modeSeason !== null && model.presence.episodesMonitored?.[episodePresenceKey(modeSeason, episode)]));
   // Pas de mémorisation : la file en direct (lue par une fonction stable du store) doit être relue à chaque rendu.
   const modeStates = modeSeason === null ? [] : seasonModeStates(selectedEpisodes, episode => Boolean(show?.seenEpisodes?.includes(`${modeSeason}x${episode}`)), episodePresentation, modeToday);
-  const selectableEpisodes = modeStates.filter(entry => isEpisodeSelectable(entry.state)).map(entry => entry.episode);
+  // Sorti sans fichier : à télécharger maintenant ; à venir non surveillé : à programmer pour sa sortie (bleu).
+  const selectableEpisodes = modeStates.filter(entry => isEpisodePickable(entry.state)).map(entry => entry.episode);
+  const futureEpisodes = new Set(modeStates.filter(entry => isEpisodeProgrammable(entry.state)).map(entry => entry.episode));
   const activeDownloads = modeStates.filter(entry => entry.state === 'active').length;
   // Retour terrain du 07/11 : entrer dans le mode amène l'épisode où on en est au centre de l'écran, et
   // toucher un segment du bandeau amène sa ligne. La demande reste en attente tant que la ligne n'est pas
@@ -176,7 +175,11 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const pickedTitle = !pickedList.length ? 'Coche des épisodes' : pickedList.length === 1 && modeSeason !== null
     ? `${episodeCode(modeSeason, pickedList[0])} · ${selectedEpisodes?.find((entry: { episode_number: number; name?: string }) => entry.episode_number === pickedList[0])?.name || `Épisode ${pickedList[0]}`}`
     : `${pickedList.length} épisodes`;
-  const pickedDetail = 'Touche une barre ou un épisode.';
+  const pickedNow = pickedList.filter(episode => !futureEpisodes.has(episode));
+  const pickedFuture = pickedList.filter(episode => futureEpisodes.has(episode));
+  // Maquette : « 2 maintenant · 1 programmé pour sa sortie · en quelle qualité ? ».
+  const pickedDetail = !pickedList.length ? 'Touche une barre ou un épisode.'
+    : `${[pickedNow.length ? `${pickedNow.length} maintenant` : '', pickedFuture.length ? `${pickedFuture.length} programmé${pickedFuture.length > 1 ? 's' : ''} pour sa sortie` : ''].filter(Boolean).join(' · ')} · en quelle qualité ?`;
   /** Lance les épisodes cochés avec les mêmes gardes que la popup : rien n'est remplacé ni relancé en double. */
   const launchPickedEpisodes = async (quality: DownloadQualityChoice) => {
     if (modeSeason === null || !pickedList.length || !effectiveTmdbId) return;
@@ -186,12 +189,16 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     const { launchArrEpisodeBatch } = await import('../features/downloads/downloadLaunch');
     if (model.presence.loading) { showToast('Vérification de la disponibilité en cours.', 'info'); return; }
     if (!(config.sonarrUrl && config.sonarrApiKey)) { useToastStore.getState().showToast({ title, action: 'Sonarr n’est pas configuré pour ce média.', posterPath: show?.posterPath }, 'error'); return; }
-    const episodes = pickedList;
+    const episodes = pickedNow;
+    const toProgram = pickedFuture;
     const season = modeSeason;
     exitDownloadMode();
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
-    const single = episodes.length === 1;
-    if (!single) useToastStore.getState().showToast({ title, action: `${episodes.length} épisodes · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
+    const single = episodes.length === 1 && !toProgram.length;
+    // Programmation d'abord, attendue : la série n'est jamais ajoutée deux fois en parallèle par le lot immédiat.
+    if (toProgram.length) await programPickedEpisodes(season, toProgram, quality, episodes.length);
+    if (!episodes.length) return;
+    if (!single) useToastStore.getState().showToast({ title, action: `${episodes.length} épisode${episodes.length > 1 ? 's' : ''} · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
     // Le lot relit compte, gate et serveur Sonarr avant chaque épisode et s'arrête si l'un d'eux change.
     await launchArrEpisodeBatch({
       title, year, tmdbId: effectiveTmdbId,
@@ -204,11 +211,28 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       notify: (episode, action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: show?.posterPath }, toastType); }
     });
   };
+  /** #879 — Les épisodes à venir cochés en bleu sont surveillés par Sonarr, qui les télécharge à leur sortie. */
+  const programPickedEpisodes = async (season: number, episodes: number[], quality: DownloadQualityChoice, launchedNow: number) => {
+    const { programArrEpisodes, programmingSummary } = await import('../features/downloads/episodeProgramming');
+    const outcome = await programArrEpisodes({
+      title, tmdbId: effectiveTmdbId!, tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId,
+      season, episodes, qualityPreference: quality, readConfig: () => useDownloadConfigStore.getState()
+    });
+    if (outcome.interrupted) return;
+    const toast = useToastStore.getState().showToast;
+    if (outcome.failure && !outcome.programmed.length) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return; }
+    const single = episodes.length === 1 && !launchedNow;
+    if (outcome.programmed.length) toast({ title, subtitle: single ? `S${season} | E${episodes[0]}` : undefined, action: single ? `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` : programmingSummary(launchedNow, outcome.programmed.length, quality), posterPath: show?.posterPath }, 'success');
+    if (outcome.failure && outcome.programmed.length) toast({ title, action: `${outcome.failed.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.failed.join(', ')} non programmé${outcome.failed.length > 1 ? 's' : ''} : ${outcome.failure}`, posterPath: show?.posterPath }, 'error');
+    if (outcome.unannounced.length) toast({ title, action: `${outcome.unannounced.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.unannounced.join(', ')} pas encore annoncé${outcome.unannounced.length > 1 ? 's' : ''} dans Sonarr : réessaie plus tard.`, posterPath: show?.posterPath }, 'info');
+    // Relit la présence : les épisodes programmés passent en « Programmé ».
+    if (outcome.programmed.length) void refreshPlexAvailability();
+  };
   const openPreciseVersion = () => {
-    if (modeSeason === null || !pickedList.length) return;
-    const first = pickedList[0];
+    if (modeSeason === null || pickedNow.length !== 1 || !effectiveTmdbId) return;
+    const target = { season: modeSeason, episode: pickedNow[0] };
     exitDownloadMode();
-    openEpisodeDownload(modeSeason, first);
+    setPreciseTarget(target);
   };
   const seasonVideos = selectedSeason ? (seasonsCache[selectedSeason.season_number]?.videos?.results || []).filter((video: { site?: string }) => video.site === 'YouTube') : [];
   const castPayloadKnown = isSeries ? Boolean(tmdbDetails?.aggregate_credits || tmdbDetails?.credits) : Boolean(tmdbDetails?.credits);
@@ -273,7 +297,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={() => setPickedEpisodes(allPicked ? new Set() : new Set(selectableEpisodes))} onSegment={pickSegment} />}
           {selectedSeason && <SeasonPanel season={selectedSeason} episodes={selectedEpisodes} show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
             downloadMode={canUseDownloadMode ? { active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode } : null}
-            episodesHasFile={model.presence.episodesHasFile}
+            episodesHasFile={model.presence.episodesHasFile} episodesMonitored={model.presence.episodesMonitored}
             getEpisodeDownload={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)} />}
         </>}
 
@@ -296,8 +320,9 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       {selectedPersonId && <PersonDetailModal personId={selectedPersonId} hint={(() => { const member = cast.find((entry: { id: number }) => entry.id === selectedPersonId); return member ? { name: member.name, profile_path: member.profile_path, character: member.roles?.[0]?.character || member.character } : undefined; })()} origin={show || (effectiveTmdbId ? { id: '', userId: '', tmdbId: Number(effectiveTmdbId), title, mediaType: isSeries ? 'tv' : 'movie', posterPath: posterPath || null, backdropPath: backdropUrl || null, status: 'plan_to_watch', seenEpisodes: [], episodeRecords: {}, isArchived: false, createdAt: 0, updatedAt: 0 } as unknown as typeof show : null)}
         onClose={() => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); }}
         onShowClick={(tmdbId, type) => { setSelectedPersonId(null); if (window.history.state?.isPersonDetailModal || window.history.state?.isModal) window.history.back(); const isSameShow = (effectiveTmdbId && Number(effectiveTmdbId) === Number(tmdbId)) || (show?.tmdbId && Number(show.tmdbId) === Number(tmdbId)) || (show?.id && String(show.id) === String(tmdbId)); if (!isSameShow && onShowClick) setTimeout(() => onShowClick(tmdbId, type || 'movie'), 50); }} />}
-      {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={openPreciseVersion} onExit={exitDownloadMode} />}
+      {downloadMode && canUseDownloadMode && <DownloadModeBar title={pickedTitle} detail={pickedDetail} enabled={pickedList.length > 0} onLaunch={quality => { void launchPickedEpisodes(quality); }} onPrecise={pickedNow.length === 1 && !pickedFuture.length ? openPreciseVersion : undefined} onExit={exitDownloadMode} />}
       {trailerModalVideos && <TrailerModal videos={trailerModalVideos} onClose={() => setTrailerModalVideos(null)} />}
+      {preciseTarget && downloadsEnabled && effectiveTmdbId && <Suspense fallback={<span role="status">Ouverture de la version précise…</span>}><PreciseVersionPage onClose={() => setPreciseTarget(null)} target={{ title, tmdbId: effectiveTmdbId, tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, year: (tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4), posterPath: show?.posterPath || undefined, ...preciseTarget }} /></Suspense>}
       {isDownloadModalOpen && <Suspense fallback={<span role="status">Ouverture du téléchargement…</span>}><DownloadModal isOpen={isDownloadModalOpen} onClose={() => { setIsDownloadModalOpen(false); setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); }} title={title} originalTitle={tmdbDetails?.original_title || tmdbDetails?.original_name || show?.originalTitle} year={(tmdbDetails?.release_date || tmdbDetails?.first_air_date || show?.firstAirDate)?.slice(0, 4)} mediaType={isSeries ? 'tv' : 'movie'} tmdbId={effectiveTmdbId} tvdbId={tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId} imdbId={tmdbDetails?.external_ids?.imdb_id || show?.imdbId} posterPath={posterPath || tmdbDetails?.poster_path || show?.posterPath} initialSeason={downloadTargetSeason} initialEpisode={downloadTargetEpisode} totalSeasons={tmdbDetails?.number_of_seasons || seasons.length || 1} seasonsData={tmdbDetails?.seasons} onSuccessToast={(msg) => showToast(msg, 'success', show || undefined)} /></Suspense>}
     </div>
   );

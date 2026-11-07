@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.263",
+  "applicationVersion": "1.4.264",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -12,8 +12,16 @@
       ],
       "tests": [
         {
+          "file": "tests/preciseVersion.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 version précise : une page, la même voie d’envoi que la popup"
+        },
+        {
+          "file": "tests/episodeProgramming.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 programmer surveille seulement les épisodes à venir demandés, sans rien rechercher"
+        },
+        {
           "file": "tests/downloadMode.test.ts",
-          "contains": "SEENIT-DOWNLOAD-014 #879 seul un épisode sorti, sans fichier ni téléchargement actif, se coche (un échec se relance)"
+          "contains": "SEENIT-DOWNLOAD-014 #879 un épisode sorti se télécharge seulement sans fichier ni téléchargement actif (un échec se relance)"
         },
         {
           "file": "tests/downloadMode.test.ts",
@@ -65,6 +73,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/downloadSeasonGroups.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 #879 onglet Télécharger : une carte par saison, regroupée par identité exacte"
+        },
         {
           "file": "tests/downloadPrototype.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 le sélecteur reste utilisable après un terminé et bloque seulement le scope actif"

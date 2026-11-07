@@ -7,6 +7,8 @@ export const telemetry: { opens: string[]; trailers: number; downloads: number; 
 export const useShowsStore = create<{ shows: Show[] }>(() => ({ shows: [] }));
 export const openPlexWatchUrl = async () => { telemetry.opens.push('plex'); };
 export const DownloadModal = () => { telemetry.downloads++; return createElement('div', { 'data-fixture-download': 'true' }, 'Téléchargement'); };
+// #879 — page « Version précise » chargée paresseusement par la fiche (export par défaut).
+export default function PreciseVersionPage() { return createElement('div', { 'data-fixture-precise': 'true' }, 'Version précise'); }
 export const PersonDetailModal = () => createElement('div', { 'data-fixture-person': 'true' }, 'Fiche personne');
 export const PersonProfile = PersonDetailModal;
 export const EpisodeDetailModal = () => createElement('div', { 'data-fixture-episode': 'true' }, 'Fiche épisode');

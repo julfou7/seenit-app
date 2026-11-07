@@ -6,7 +6,9 @@ import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureV
 import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
 
 /** Champs d'un épisode Sonarr lus par la présence (#879, typés au lieu de `any`). */
-type SonarrEpisodeLike = { seasonNumber: number; episodeNumber: number; hasFile?: boolean };
+type SonarrEpisodeLike = { seasonNumber: number; episodeNumber: number; hasFile?: boolean; monitored?: boolean };
+type RadarrMovieLike = { tmdbId?: number | string; imdbId?: string; hasFile?: boolean };
+type SonarrSeriesLike = { id?: number; tvdbId?: number | string; tmdbId?: number | string; imdbId?: string; monitored?: boolean };
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
@@ -17,14 +19,16 @@ export interface MediaPresenceData {
   sonarrHasFile?: boolean;
   seasonsHasFile: Record<number, boolean>;
   episodesHasFile: Record<string, boolean>;
+  /** #879 — épisodes surveillés dans Sonarr (programmés), même clé « saison x épisode ». */
+  episodesMonitored?: Record<string, boolean>;
   plexInfo?: PlexMediaInfo;
   lastChecked: number;
 }
 
 interface MediaPresenceStore {
   presenceCache: Record<string, MediaPresenceData>;
-  radarrMoviesCache: { data: any[]; timestamp: number; scopeKey: string } | null;
-  sonarrSeriesCache: { data: any[]; timestamp: number; scopeKey: string } | null;
+  radarrMoviesCache: { data: RadarrMovieLike[]; timestamp: number; scopeKey: string } | null;
+  sonarrSeriesCache: { data: SonarrSeriesLike[]; timestamp: number; scopeKey: string } | null;
 
   getPresence: (tmdbId?: number | string, mediaType?: 'movie' | 'tv', title?: string) => MediaPresenceData | undefined;
 
@@ -135,6 +139,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
     let sonarrHasFile = false;
     const seasonsHasFile: Record<number, boolean> = {};
     const episodesHasFile: Record<string, boolean> = {};
+    const episodesMonitored: Record<string, boolean> = {};
 
     if (downloadsEnabled && mediaType === 'movie' && config.radarrUrl && config.radarrApiKey) {
       try {
@@ -154,7 +159,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
         }
 
         if (Array.isArray(moviesList)) {
-          const match = moviesList.find((m: any) => {
+          const match = moviesList.find((m: RadarrMovieLike) => {
             if (tmdbId && m.tmdbId && Number(m.tmdbId) === Number(tmdbId)) return true;
             if (imdbId && m.imdbId && String(m.imdbId).toLowerCase() === String(imdbId).toLowerCase()) return true;
             return false;
@@ -187,7 +192,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
         }
 
         if (Array.isArray(seriesList)) {
-          const match = seriesList.find((s: any) => {
+          const match = seriesList.find((s: SonarrSeriesLike) => {
             if (tvdbId && s.tvdbId && Number(s.tvdbId) === Number(tvdbId)) return true;
             if (tmdbId && s.tmdbId && Number(s.tmdbId) === Number(tmdbId)) return true;
             if (imdbId && s.imdbId && String(s.imdbId).toLowerCase() === String(imdbId).toLowerCase()) return true;
@@ -203,6 +208,8 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
                 const sNum = ep.seasonNumber;
                 const eNum = ep.episodeNumber;
                 episodesHasFile[episodePresenceKey(sNum, eNum)] = !!ep.hasFile;
+                // Programmé seulement si Sonarr récupérera vraiment l'épisode : série ET épisode surveillés.
+                episodesMonitored[episodePresenceKey(sNum, eNum)] = ep.monitored === true && match.monitored !== false;
 
                 if (sNum > 0) {
                   if (!episodesBySeason[sNum]) episodesBySeason[sNum] = [];
@@ -238,6 +245,7 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       sonarrHasFile: downloadsEnabled ? sonarrHasFile : false,
       seasonsHasFile: downloadsEnabled ? seasonsHasFile : {},
       episodesHasFile: downloadsEnabled ? episodesHasFile : {},
+      episodesMonitored: downloadsEnabled ? episodesMonitored : {},
       plexInfo,
       lastChecked: now
     };
