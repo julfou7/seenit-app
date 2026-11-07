@@ -9,8 +9,8 @@ const read = (path: string) => readFileSync(path, 'utf8');
 async function loadControl() {
   const bundle = await build({ entryPoints: ['src/components/cards/HomeLoadMore.tsx'], bundle: true, write: false, platform: 'node', format: 'cjs',
     plugins: [{ name: 'load-more-ports', setup(builder) {
-      builder.onResolve({ filter: /^react\/jsx-runtime$|seriesCardPresentation$|\.css$/ }, args => ({ path: args.path, namespace: 'ports' }));
-      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="f";export const imageUrl=(path,size)=>"https://image.tmdb.org/t/p/"+size+path;' }));
+      builder.onResolve({ filter: /^react(?:\/jsx-runtime)?$|seriesCardPresentation$|\.css$/ }, args => ({ path: args.path, namespace: 'ports' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="f";export const imageUrl=(path,size)=>"https://image.tmdb.org/t/p/"+size+path;export const useEffect=()=>{};export const useRef=()=>({current:null});export const useState=(value)=>[value,()=>{}];' }));
     } }] });
   const module = { exports: {} as Record<string, unknown> };
   vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module, exports: module.exports }));
@@ -53,4 +53,16 @@ test('SEENIT-UX-020 #873 toutes les paginations réutilisent le contrôle partag
   assert.match(read('src/components/cards/HomeLoadMore.tsx'), /import '\.\/loadMore\.css';/);
   assert.match(read('src/components/cards/loadMore.css'), /\.home-load-more \{ height:52px; min-height:52px;/);
   assert.doesNotMatch(read('src/screens/watchListHome.css'), /\.home-load-more \{/, 'une seule source de styles');
+});
+
+test('SEENIT-UX-020 #873 le focus clavier suit le dépliage et le repli sans se perdre', () => {
+  const control = read('src/components/cards/HomeLoadMore.tsx');
+  assert.match(control, /export function useRevealFocus<T extends HTMLElement>\(itemSelector: string\)/);
+  assert.match(control, /next\?\.focus\(\{ preventScroll: true \}\);/);
+  assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /onLoad=\{\(\) => \{ setShowAll\(true\); reveal\.focusItem\(6\); \}\}/);
+  assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /onClick=\{\(\) => \{ setShowAll\(false\); reveal\.focusLoadMore\(\); \}\}/);
+  assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /reveal\.focusItem\(PEOPLE_PREVIEW\)/);
+  assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /setExpanded\(false\); reveal\.focusLoadMore\(\);/);
+  assert.match(read('src/components/MovieActorProfile.tsx'), /filmographyReveal\.focusItem\(limit\); setLimit/);
+  assert.match(read('src/screens/PersonDetailModal.tsx'), /creditsReveal\.focusItem\(visibleCredits\.length\);/);
 });

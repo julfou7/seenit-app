@@ -87,6 +87,11 @@ async function testMediaDetailHarness(client) {
     await check(client, '(()=>{const b=' + byLabel('Marquer l’épisode 5 non vu') + ';return b&&b.getAttribute("aria-pressed")==="true"&&!b.dataset.celebrate&&!b.querySelector(".seenit-check__sweep")})()', 'anneau Vu final net après l’animation (#859)');
     await check(client, byText('a,button,div', 'Inclus dans ton abonnement') + ' && ' + byLabel('Actualiser Plex') + ' && ' + byText('button', 'Sur Julien-NAS'), 'Où regarder en lignes avec Plex et actualisation');
     await check(client, 'document.querySelectorAll(\'[aria-labelledby=detail-cast-title] > button[aria-label^="Ouvrir la fiche"]\').length===6 && (()=>{const more=document.querySelector("[aria-labelledby=detail-cast-title] [data-load-more]");return more&&more.textContent.includes("Afficher le dernier")&&more.textContent.includes("1 en attente")&&more.getBoundingClientRect().height>=44})()', 'Personnages : six lignes puis le seul « Afficher plus » (#873)');
+    // #873 : le focus clavier suit le dépliage (premier personnage révélé) puis le repli (« Afficher plus »).
+    await click(client, 'document.querySelector("[aria-labelledby=detail-cast-title] [data-load-more]")');
+    await check(client, '(()=>{const rows=document.querySelectorAll("[aria-labelledby=detail-cast-title] [data-cast-row]");return rows.length===7&&document.activeElement===rows[6]})()', 'Afficher plus : le focus passe au premier personnage révélé (#873)');
+    await click(client, '[...document.querySelectorAll("[aria-labelledby=detail-cast-title] button")].find(b=>b.textContent.trim()==="Réduire")');
+    await check(client, 'document.activeElement===document.querySelector("[aria-labelledby=detail-cast-title] [data-load-more]")', 'Réduire : le focus revient sur « Afficher plus » (#873)');
     await check(client, byText('button', 'Better Call Saul') + ' && document.body.innerText.includes("Dans le même univers")', 'univers TVDB en lignes');
     await click(client, byLabel('Actions de la fiche'));
     await check(client, ['Partager la fiche', 'Synchroniser la série', 'Téléchargement', 'Abandonner la série', 'Supprimer la série'].map(label => byText('[role=dialog] button', label)).join(' && '), 'menu ⋮ : toutes les actions existantes');

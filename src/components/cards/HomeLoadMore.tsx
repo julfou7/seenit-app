@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import type { Show } from '../../types';
 import { imageUrl } from '../../features/watchlist/seriesCardPresentation';
 import './loadMore.css';
@@ -24,6 +25,25 @@ export function LoadMore({ previews, remainingCount, onLoad, step = 6, lastLabel
     <span className="home-load-more__posters" aria-hidden="true">{previews.slice(0, 3).map(preview => <span key={preview.key}>{preview.initial}{preview.imagePath && <img src={imageUrl(preview.imagePath, 'w92')!} alt="" loading="lazy" decoding="async" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}</span>)}</span>
     <strong>{label || loadMoreLabel(remainingCount, step, lastLabel)}</strong><span>{remainingCount} en attente</span>
   </button>;
+}
+
+/**
+ * #873 — Le focus clavier ne se perd pas quand « Afficher plus » ou « Réduire » disparaît : après un
+ * dépliage il passe au premier élément révélé, après un repli il revient sur « Afficher plus ».
+ */
+export function useRevealFocus<T extends HTMLElement>(itemSelector: string) {
+  const containerRef = useRef<T>(null);
+  const [target, setTarget] = useState<{ index: number } | null>(null);
+  useEffect(() => {
+    if (!target) return;
+    const container = containerRef.current;
+    const item = target.index < 0 ? container?.querySelector<HTMLElement>('[data-load-more]') : container?.querySelectorAll<HTMLElement>(itemSelector)[target.index];
+    // Un élément de grille non focalisable cède le focus à son premier contrôle (fiche ouvrable).
+    const next = item && (item.matches('button, a[href], [tabindex]') ? item : item.querySelector<HTMLElement>('button, a[href], [tabindex]'));
+    next?.focus({ preventScroll: true });
+    setTarget(null);
+  }, [target, itemSelector]);
+  return { containerRef, focusItem: (index: number) => setTarget({ index }), focusLoadMore: () => setTarget({ index: -1 }) };
 }
 
 export function HomeLoadMore({ items, onLoad, tile = false, step = 6, lastLabel, remainingCount = items.length }: { items: Show[]; onLoad: () => void; tile?: boolean; step?: number; lastLabel?: string; remainingCount?: number }) {

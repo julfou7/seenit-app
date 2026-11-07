@@ -4,7 +4,7 @@ import { cn, getTodayStr } from '../../lib/utils';
 import { mediaKeyFrom } from '../../features/shows/mediaRelations';
 import { frenchCharacterName } from '../../features/shows/frenchLabels';
 import { DetailCard, DetailChip, DetailSectionTitle } from './detailUi';
-import { LoadMore } from '../../components/cards/HomeLoadMore';
+import { LoadMore, useRevealFocus } from '../../components/cards/HomeLoadMore';
 import { SeenItWatchedStamp } from '../../components/cards/SeenItWatchedStamp';
 
 type CastMember = { id: number; name: string; gender?: number | null; profile_path?: string | null; character?: string; roles?: Array<{ character?: string; episode_count?: number }>; total_episode_count?: number; episode_count?: number };
@@ -17,17 +17,18 @@ const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 
  */
 export function CastRows({ cast, isSeries, totalEpisodes, loading, onOpenPerson }: { cast: readonly CastMember[]; isSeries: boolean; totalEpisodes: number; loading: boolean; onOpenPerson: (personId: number) => void }) {
   const [showAll, setShowAll] = useState(false);
+  const reveal = useRevealFocus<HTMLElement>('[data-cast-row]');
   const title = isSeries ? 'Personnages' : 'Casting';
   if (loading) return <section className="flex flex-col gap-2.5" aria-hidden="true" data-seenit-casting-loading="true"><DetailSectionTitle>{title}</DetailSectionTitle>{[0, 1, 2].map(index => <div key={index} className="flex items-center gap-3 animate-pulse"><div className="w-12 h-12 rounded-full bg-zinc-800/80" /><div className="flex-1 space-y-2"><div className="h-3.5 w-1/2 rounded bg-zinc-800/80" /><div className="h-1 w-full rounded bg-zinc-800/60" /></div></div>)}</section>;
   if (cast.length === 0) return null;
   const visible = showAll ? cast : cast.slice(0, 6);
-  return <section className="flex flex-col gap-2.5" aria-labelledby="detail-cast-title">
+  return <section ref={reveal.containerRef} className="flex flex-col gap-2.5" aria-labelledby="detail-cast-title">
     <DetailSectionTitle id="detail-cast-title">{title}</DetailSectionTitle>
     {visible.map((actor, index) => {
       const character = frenchCharacterName(actor.roles?.length ? actor.roles.map(role => role.character).filter(Boolean).join(' / ') : actor.character, actor.gender);
       const episodes = Number(actor.total_episode_count || actor.episode_count || 0);
       const presence = isSeries && totalEpisodes > 0 ? Math.min(100, Math.round((episodes / totalEpisodes) * 100)) : 0;
-      return <button type="button" key={`cast-${actor.id}-${index}`} onClick={() => onOpenPerson(actor.id)} aria-label={`Ouvrir la fiche de ${actor.name}`} className="min-h-11 flex items-center gap-3 text-left active:opacity-80">
+      return <button type="button" data-cast-row key={`cast-${actor.id}-${index}`} onClick={() => onOpenPerson(actor.id)} aria-label={`Ouvrir la fiche de ${actor.name}`} className="min-h-11 flex items-center gap-3 text-left active:opacity-80">
         <span className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 shrink-0 flex items-center justify-center text-[14px] font-extrabold text-white/45">{actor.profile_path ? <img src={`https://image.tmdb.org/t/p/w185${actor.profile_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover object-[50%_25%]" /> : initialsOf(character || actor.name)}</span>
         <span className="flex-1 min-w-0 flex flex-col gap-[3px]">
           <span className="flex justify-between gap-2"><span className="text-[15px] font-bold text-white line-clamp-2 min-h-[1.1em]">{character || 'Rôle inconnu'}</span>{isSeries && episodes > 0 && <span className="text-[12px] text-zinc-400 shrink-0">{episodes} ép.</span>}</span>
@@ -37,8 +38,8 @@ export function CastRows({ cast, isSeries, totalEpisodes, loading, onOpenPerson 
       </button>;
     })}
     {/* #873 : le seul « Afficher plus » de l'app (portraits des suivants) ; « Réduire » reste une action secondaire. */}
-    {cast.length > 6 && !showAll && <LoadMore round previews={cast.slice(6, 9).map((actor, index) => ({ key: `cast-more-${actor.id}-${index}`, initial: initialsOf(actor.name || '?'), imagePath: actor.profile_path }))} remainingCount={cast.length - 6} step={cast.length} onLoad={() => setShowAll(true)} />}
-    {cast.length > 6 && showAll && <button type="button" onClick={() => setShowAll(false)} aria-expanded className="self-center min-h-11 px-4 text-[13px] font-bold text-zinc-400">Réduire</button>}
+    {cast.length > 6 && !showAll && <LoadMore round previews={cast.slice(6, 9).map((actor, index) => ({ key: `cast-more-${actor.id}-${index}`, initial: initialsOf(actor.name || '?'), imagePath: actor.profile_path }))} remainingCount={cast.length - 6} step={cast.length} onLoad={() => { setShowAll(true); reveal.focusItem(6); }} />}
+    {cast.length > 6 && showAll && <button type="button" onClick={() => { setShowAll(false); reveal.focusLoadMore(); }} aria-expanded className="self-center min-h-11 px-4 text-[13px] font-bold text-zinc-400">Réduire</button>}
   </section>;
 }
 

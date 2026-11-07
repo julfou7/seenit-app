@@ -194,6 +194,10 @@
           "contains": "SEENIT-UX-020 #873 toutes les paginations réutilisent le contrôle partagé, sans bouton texte « voir plus »"
         },
         {
+          "file": "tests/loadMore.test.ts",
+          "contains": "SEENIT-UX-020 #873 le focus clavier suit le dépliage et le repli sans se perdre"
+        },
+        {
           "file": "tests/durableVisualRules.test.ts",
           "contains": "SEENIT-UX-020 les titres média déjà livrés en or le restent, même lus"
         }
