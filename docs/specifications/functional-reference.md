@@ -250,7 +250,8 @@ basse. Si elle est ouverte depuis une fiche personne de l'onglet, Retour restaur
 et le focus du bouton utilisé ; un dialogue bloquant couvre la navigation et rend le fond inerte.
 
 Un toast fait 76 px de haut ; un toast d'épisode (épisode vu, Plex) fait 104 px pour afficher le titre
-entier, l'épisode en pastille or « S01 | E03 » et l'action (`SEENIT-UX-004`).
+entier, l'épisode en pastille or « S01 | E03 » et l'action (`SEENIT-UX-004`). Ce sont des hauteurs
+minimales : avec une police Android agrandie, la carte grandit au lieu de rogner le titre.
 
 Les toasts internes qui confirment l'ajout à **À voir** ou le passage à **Vu / Terminée** sont aussi des
 raccourcis de navigation : leur surface principale ouvre la fiche Film/Série uniquement avec l'identité

@@ -13,7 +13,8 @@ test('le conteneur toast conserve une respiration globale compatible safe area',
 });
 
 test('le correctif ne réduit pas le contenu tactile des toasts compacts ou média', () => {
-  assert.ok(toast.includes('min-h-[64px]'));
+  // Hauteurs minimales (76 px, 104 px pour un épisode), toutes supérieures aux 64 px tactiles d'origine.
+  assert.ok(toast.includes("isEpisodeToast ? 'min-h-[104px]' : 'min-h-[76px]'"));
   assert.ok(toast.includes('py-2.5'));
   assert.ok(toast.includes('Ignorer les suivants'));
   assert.ok(toast.includes('Annuler'));
