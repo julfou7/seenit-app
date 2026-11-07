@@ -440,6 +440,7 @@ Le contrat E-01..33 du [handoff Explorer](../design/explorer-refonte-2026-10-28.
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
+- Dans les résultats de recherche, les titres restent blancs et seule la partie qui correspond au texte saisi est en or (exception à la règle des titres en or).
 - Recherche multi-pages TMDB en listes : bibliothèque locale, films et séries, puis personnes. La page 1 des films et séries s'affiche sans attendre la page 2. Les en-têtes ne montrent ni source (« TMDB »), ni durée, ni « instantané » ; seul « recherche… » signale une attente.
 - Les personnages de fiction de la bibliothèque et des univers prouvés (manifeste, collections TMDB) viennent d'un **index local des distributions** : construit en arrière-plan dès l'ouverture de la recherche, gardé quatorze jours sur l'appareil, puis filtré à chaque frappe sans appel réseau ni anti-rebond. Seuls les titres manquants ou expirés sont lus, par lots, un rôle déjà connu sur l'appareil passant en tête. Un titre non indexé (quota, panne) est signalé « liste incomplète, nouvel essai bientôt » et repris à la réouverture du quota, jamais présenté comme une absence. Un personnage ouvre la fiche dédiée P-01..12 ; la section reste masquée sans source.
 - Filtres par plateformes choisies dans les réglages, genres, **Âge conseillé** maximal et note minimale.
@@ -518,11 +519,15 @@ diffuseur/Plex, **Moyenne par saison**, pastilles de saison, barres de notes et 
 **Où regarder** en lignes, **Personnages**. Le film affiche « Si tu lances maintenant · Fin à HH:MM »,
 sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L'épisode ajoute la soirée de
 trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
-et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮ ;
+et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮,
+ancré sous le bouton (290 px, une ligne de détail par action, séparateur avant les actions de cycle de vie,
+jamais de feuille du bas) ;
 hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Une série
 n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
-ligne à la place de la navigation). Dans la liste d'une saison, un épisode vu
+ligne à la place de la navigation). Chaque pastille de saison montre sa part vue en mini-barre et, avec
+Téléchargements activé, un point bleu quand un téléchargement de cette saison est actif. Un épisode
+présent dans Sonarr est reconnu comme téléchargé dans la fiche et la popup. Dans la liste d'une saison, un épisode vu
 a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »
 à droite, sans bouton Vu. Depuis les retours de la v1.4.247, le bouton
 or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, genres et thèmes sont sous le synopsis, tout est
