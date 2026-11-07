@@ -218,6 +218,11 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   digest exhaustif des documents sans journaliser leur contenu, refuse tout trigger Firestore non inventorié
   et recrée `default` en Standard `eur3` avec Delete Protection avant de rétablir le trafic. Une erreur après
   le début de la bascule conserve le service en maintenance tant que `default` n’est pas restaurée et vérifiée.
+- **SEENIT-DATA-007** — Une date TMDB `YYYY-MM-DD` est une date calendaire, copiée telle quelle dans la
+  bibliothèque : aucun décalage n’est déduit du réseau de diffusion (#407, MobLand sur Paramount+). Une
+  série enregistrée avant la révision de dates 2 (`calendarDatesRevision` absent ou inférieur) est
+  resynchronisée une fois depuis TMDB, même si son prochain épisode paraît futur, et chaque écriture de
+  synchronisation marque la révision 2 ; aucune autre donnée de progression n’est modifiée par ce rattrapage.
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant
   son écriture.
 - La PWA et l'APK d'un même UID partagent Firestore et convergent vers les mêmes données, sans

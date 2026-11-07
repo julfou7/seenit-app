@@ -674,6 +674,24 @@
       ]
     },
     {
+      "id": "SEENIT-DATA-007",
+      "title": "Dates TMDB calendaires sans décalage réseau, rattrapage unique des séries enregistrées",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/tmdbCalendarDates.test.ts",
+          "contains": "#407 une date calendaire TMDB n’est jamais décalée à cause du réseau (Paramount+, HBO)"
+        },
+        {
+          "file": "tests/tmdbCalendarDates.test.ts",
+          "contains": "#407 une série copiée avec l’ancien J+1 est resynchronisée une fois, même si son épisode paraît futur"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-IDENTITY-001",
       "title": "Identité média fondée uniquement sur des identifiants vérifiés",
       "targets": [

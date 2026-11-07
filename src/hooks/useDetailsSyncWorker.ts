@@ -1,4 +1,5 @@
 import type { Show } from '../types';
+import { CALENDAR_DATES_REVISION, needsCalendarDatesRefresh } from '../features/shows/calendarDatesRevision';
 import { appLogger } from '../store/logStore';
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
@@ -88,6 +89,10 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         return false;
       }
 
+      // #407 : une série copiée avec l'ancien +1 jour est resynchronisée une fois, même si son prochain
+      // épisode (décalé) paraît futur — sinon « dans 7 jours » resterait faux jusqu'à cette fausse date.
+      if (needsCalendarDatesRefresh(s)) return true;
+
       const now = Date.now();
 
       // RÈGLE D'OR DU AIR_DATE : vérification stricte avant tout appel API
@@ -176,7 +181,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         }
 
         const details = detailsRes.value;
-        const seasons = (details.seasons || []).filter((s: any) => s.season_number > 0);
+        const seasons = (details.seasons || []).filter((s: { season_number: number }) => s.season_number > 0);
 
         // 2. Fetch details for each season to populate the episodes list
         const seasonsCache: any[] = [];
@@ -205,7 +210,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const seasonForNextEp = nextEp ? seasonsCache.find(s => s.season_number === nextEp.season) : null;
         let airedEpisodesInSeason = seasonForNextEp?.episode_count || 1;
         if (seasonForNextEp?.episodes && seasonForNextEp.episodes.length > 0) {
-          airedEpisodesInSeason = seasonForNextEp.episodes.filter((ep: any) => ep.air_date && ep.air_date <= todayStr).length;
+          airedEpisodesInSeason = seasonForNextEp.episodes.filter((ep: { air_date?: string | null }) => ep.air_date && ep.air_date <= todayStr).length;
         }
         if (details.next_episode_to_air && details.next_episode_to_air.season_number === nextEp?.season && typeof details.next_episode_to_air.episode_number === 'number') {
           if (details.next_episode_to_air.air_date && details.next_episode_to_air.air_date > todayStr) {
@@ -405,6 +410,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
            await updateDoc(docRef, {
              isSynced: true,
              lastSyncedAt: Date.now(),
+             calendarDatesRevision: CALENDAR_DATES_REVISION,
              seriesEnded: isEnded,
              tmdbStatus: details.status || null,
              isArchived: shouldBeArchived
@@ -426,6 +432,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           detailsSyncedAt: Date.now(),
           isSynced: true,
           lastSyncedAt: Date.now(),
+          calendarDatesRevision: CALENDAR_DATES_REVISION,
           updatedAt: Date.now(),
           seriesEnded: isEnded,
           tmdbStatus: details.status || null,
@@ -595,7 +602,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     }
 
     const details = detailsRes.value;
-    const seasons = (details.seasons || []).filter((s: any) => s.season_number > 0);
+    const seasons = (details.seasons || []).filter((s: { season_number: number }) => s.season_number > 0);
 
     const seasonsCache: any[] = [];
     for (const season of seasons) {
@@ -623,7 +630,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     const seasonForNextEp = nextEp ? seasonsCache.find(s => s.season_number === nextEp.season) : null;
     let airedEpisodesInSeason = seasonForNextEp?.episode_count || 1;
     if (seasonForNextEp?.episodes && seasonForNextEp.episodes.length > 0) {
-      airedEpisodesInSeason = seasonForNextEp.episodes.filter((ep: any) => ep.air_date && ep.air_date <= todayStr).length;
+      airedEpisodesInSeason = seasonForNextEp.episodes.filter((ep: { air_date?: string | null }) => ep.air_date && ep.air_date <= todayStr).length;
     }
     if (details.next_episode_to_air && details.next_episode_to_air.season_number === nextEp?.season && typeof details.next_episode_to_air.episode_number === 'number') {
       if (details.next_episode_to_air.air_date && details.next_episode_to_air.air_date > todayStr) {
@@ -717,6 +724,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       detailsSyncedAt: Date.now(),
       isSynced: true,
       lastSyncedAt: Date.now(),
+      calendarDatesRevision: CALENDAR_DATES_REVISION,
       updatedAt: Date.now(),
       seriesEnded: isEnded,
       tmdbStatus: details.status || null,

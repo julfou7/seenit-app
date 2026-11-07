@@ -92,7 +92,8 @@ Hiérarchie des sources :
 2. **TMDB** fournit l'identité canonique, les fiches, saisons, épisodes, personnes, dates,
    disponibilités éditoriales et l'**Ordre de visionnage des films** via ses collections explicites.
    Une date TMDB `YYYY-MM-DD` est une date calendaire conservée telle quelle : aucun décalage (« +1 jour »)
-   n'est déduit du réseau de diffusion (#407, MobLand sur Paramount+).
+   n'est déduit du réseau de diffusion (#407, MobLand sur Paramount+). Une série enregistrée avec l'ancien
+   décalage est resynchronisée une fois (`SEENIT-DATA-007`), même si son prochain épisode paraît futur.
 3. **TVDB** fournit la relation **franchise / univers** des fiches Film et Série, uniquement après
    résolution par identifiant externe exact depuis TMDB et selon `SEENIT-RELATION-001`.
 4. **Plex** fournit seulement des preuves de watchlist, visionnage/non-vu et disponibilité, jamais
