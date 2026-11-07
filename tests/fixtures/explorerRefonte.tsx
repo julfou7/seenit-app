@@ -30,7 +30,9 @@ function Harness() {
   clearToast:()=>useToastStore.setState({message:''}),
   undoToast:()=>useToastStore.getState().undo?.(),
   uid:(uid:string)=>{auth.currentUser.uid=uid;useShowsStore.setState({shows:[...useShowsStore.getState().shows]});},
-  keyboard: (height: number) => { viewport.height = height; viewport.dispatchEvent(new Event('resize')); } } });
+  keyboard: (height: number, offsetTop = 0) => { viewport.height = height; viewport.offsetTop = offsetTop; viewport.dispatchEvent(new Event('resize')); },
+  // Zone visible restée « clavier ouvert » sans événement (WebView Android) : #872.
+  staleKeyboard: (height: number, offsetTop: number) => { viewport.height = height; viewport.offsetTop = offsetTop; } } });
  return <main style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
    <div data-app-tab="discover" aria-hidden={tab !== 'discover'} style={{ display: tab === 'discover' ? 'flex' : 'none', flex: 1, minHeight: 0 }}>
      {library ? <LibraryScreen onShowClick={openMedia} /> : <DiscoverScreen navigationShortcut={request} onShowClick={openMedia} />}

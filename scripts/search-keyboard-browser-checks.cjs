@@ -167,6 +167,10 @@ async function testCharacterJourney(client,root,width,shot) {
  await check(client,'document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman" && document.activeElement!==document.querySelector("[data-navigation-search]")','P-01/E-19 personnage, clavier fermé');
  await evaluate(client,'window.__explorer.keyboard(915)');
  await check(client,'document.querySelector(".character-stats").getAttribute("aria-busy")==="false" && document.querySelector(".character-stats").textContent.includes("0/3")','preuves exactes avant ratio');
+ // #872 : zone visible restée « clavier ouvert » (décalée de 300 px) sans champ actif : la fiche occupe tout l'écran et se lit jusqu'en bas.
+ await evaluate(client,'window.__explorer.staleKeyboard(500,300);document.activeElement?.blur();window.dispatchEvent(new Event("resize"))');
+ await check(client,'(()=>{const layer=document.querySelector(".character-overlay"),sheet=document.querySelector(".character-sheet"),r=layer.getBoundingClientRect();sheet.scrollTop=sheet.scrollHeight;const last=document.querySelector(".character-works").lastElementChild.getBoundingClientRect();return r.top===0&&Math.abs(r.height-innerHeight)<=1&&last.bottom<=innerHeight+1})()','#872 fiche personnage plein écran et lisible jusqu’en bas après le clavier');
+ await evaluate(client,'window.__explorer.keyboard(915);document.querySelector(".character-sheet").scrollTop=0');
  await shot('explorer-personnage-'+width);
  await click(q('[aria-label="Suivre ce personnage"]'));
  await check(client,q('[aria-label="Ne plus suivre ce personnage"]')+'?.getAttribute("aria-pressed")==="true"','favori personnage');

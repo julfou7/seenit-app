@@ -1,7 +1,7 @@
 import type { Application, Request, RequestHandler } from 'express';
 import { hasFrenchTheatricalCinemaEvidence } from '../shows/cinemaPolicy.ts';
 import { getManifestGroupsForMedia, type MediaKey } from '../shows/mediaRelations.ts';
-import { buildCharacters, characterId, characterRoleMatches, normalizeCharacterName, type CharacterCast, type CharacterMedia, type CharacterRecord } from '../discover/characters.ts';
+import { buildCharacters, characterId, characterRoleMatches, characterUniverseLabel, normalizeCharacterName, type CharacterCast, type CharacterMedia, type CharacterRecord } from '../discover/characters.ts';
 
 interface Dependencies { authenticate: RequestHandler; fetch?: typeof fetch; secrets?: () => { TMDB_API_KEY?: string }; now?: () => number }
 type Json = Record<string, unknown>;
@@ -46,7 +46,7 @@ function compactMedia(key: string, data: Json): CharacterMedia {
  });
  return { key, id: Number(rawId), type, title: text(data.name || data.title), poster: text(data.poster_path) || null,
   releaseDate: text(data.release_date || data.first_air_date), runtime: positive(data.runtime), cinema: type === 'movie' && hasFrenchTheatricalCinemaEvidence(data),
-  universeId: group?.groupId || (positive(collection.id) ? 'collection:' + collection.id : key), universe: group?.members[0]?.label || text(collection.name) || text(data.name || data.title), cast, collectionId: positive(collection.id) || undefined,
+  universeId: group?.groupId || (positive(collection.id) ? 'collection:' + collection.id : key), universe: characterUniverseLabel(Boolean(group), text(collection.name), text(data.name || data.title)), cast, collectionId: positive(collection.id) || undefined,
   coverageComplete: Array.isArray(castSource) && array(castSource).length <= 200 && array(castSource).every(actor => array(actor.roles).length <= 24) && array(data.seasons).length <= 40,
   seasons: array(data.seasons).filter(season => Number.isInteger(Number(season.season_number)) && Number(season.season_number) >= 0 && positive(season.episode_count)).map(season => ({ number: Number(season.season_number), episodes: Number(season.episode_count) })).slice(0, 40) };
 }

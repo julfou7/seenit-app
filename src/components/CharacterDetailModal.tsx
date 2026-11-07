@@ -54,7 +54,7 @@ export function CharacterDetailModal({ character, shows, onClose, onPersonClick,
       onClick={() => writeUserScopedJson(uid,'favorite-characters', favorites.includes(detail.id) ? favorites.filter(id => id !== detail.id) : [...favorites,detail.id])}><Heart size={20} fill={favorites.includes(detail.id) ? 'currentColor' : 'none'} /></button>
     </header>
     <div className="character-identity"><span className="character-avatar">{characterInitials(detail.name)}</span><div>
-     <p>Personnage · univers {detail.universe}</p><h1>{detail.name}</h1>
+     <p>{detail.universe ? 'Personnage · univers ' + detail.universe : 'Personnage'}</p><h1>{detail.name}</h1>
      {detail.aliases.filter(alias => alias !== detail.name).length > 0 && <small>alias {detail.aliases.filter(alias => alias !== detail.name).join(' · ')}</small>}
     </div></div>
    </div>
@@ -65,7 +65,8 @@ export function CharacterDetailModal({ character, shows, onClose, onPersonClick,
    <div className="character-stats" aria-busy={loading}>
     <div><strong>{progress.complete ? progress.total : credited ?? '—'}</strong><small>{filmOnly ? 'films' : progress.complete ? 'épisodes' : 'ép. crédités'}</small></div>
     <div><strong>{progress.from ? progress.from === progress.to ? progress.from : progress.from + '→' + progress.to?.slice(-2) : '—'}</strong><small>{progress.from && progress.to ? Math.max(1,Number(progress.to)-Number(progress.from))+' an'+(Number(progress.to)-Number(progress.from)>1?'s':'') : 'période'}</small></div>
-    <div className="is-gold"><strong>{progress.complete ? progress.seen+'/'+progress.total : '—'}</strong><small>vus par toi</small></div>
+    {/* #872 : apparitions pas toutes vérifiées → au moins les épisodes et films vus déjà prouvés (« ≥ N »). */}
+    <div className="is-gold"><strong>{progress.complete ? progress.seen+'/'+progress.total : progress.seen > 0 ? '≥ '+progress.seen : '—'}</strong><small>vus par toi</small></div>
    </div>
    {loading && <p role="status" className="character-status">Vérification des apparitions…</p>}
    {!loading && (failed || !progress.complete) && <p className="character-status">Détail partiellement disponible. La progression sera affichée une fois les épisodes vérifiés.</p>}

@@ -1,5 +1,5 @@
 import type { Show } from '../../types.ts';
-import { buildCharacters, normalizeCharacterName, type CharacterCast, type CharacterMedia, type CharacterRecord } from './characters.ts';
+import { buildCharacters, characterUniverseLabel, normalizeCharacterName, type CharacterCast, type CharacterMedia, type CharacterRecord } from './characters.ts';
 import { getManifestGroupsForMedia, type MediaKey } from '../shows/mediaRelations.ts';
 import type { ActorIndex } from '../people/movieActors.ts';
 
@@ -163,7 +163,7 @@ function cachedCharacterMedia(show: Show, details: unknown): CharacterMedia | nu
     runtime: Number.isFinite(Number(payload.runtime)) ? Number(payload.runtime) : null,
     cinema: false,
     universeId: group?.groupId || (collectionId ? `collection:${collectionId}` : key),
-    universe: group?.members[0]?.label || collectionName || show.title,
+    universe: characterUniverseLabel(Boolean(group), collectionName || '', show.title),
     cast,
     collectionId: collectionId || undefined,
     coverageComplete: false,

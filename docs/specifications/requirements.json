@@ -3427,6 +3427,10 @@
       ],
       "tests": [
         {
+          "file": "tests/characterSheetAnomalies.test.ts",
+          "contains": "SEENIT-DISCOVER-004 #872 l’univers d’un personnage vient d’une source exacte, sinon il est masqué"
+        },
+        {
           "file": "tests/characters.test.ts",
           "contains": "SEENIT-DISCOVER-004"
         }

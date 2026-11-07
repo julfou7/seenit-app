@@ -59,6 +59,16 @@ export function characterRoleMatches(character: CharacterRecord, work: Character
  return character.actors.some(actor => actor.id === actorId) && characterAliases(role).some(alias =>
   characterId(work.universeId, alias) === character.id || character.aliases.some(name => normalizeCharacterName(name) === normalizeCharacterName(alias)));
 }
+/**
+ * #872 — Nom d'univers affiché pour un personnage : seulement une source exacte. Un groupe du catalogue n'a
+ * pas de nom propre (son premier membre, « Iron Man » pour le MCU, n'est pas l'univers de Daredevil) :
+ * l'univers est alors masqué. Sinon le nom de la collection TMDB, ou à défaut l'œuvre elle-même.
+ */
+export function characterUniverseLabel(inCatalogGroup: boolean, collectionName: string, ownTitle: string): string {
+ if (inCatalogGroup) return '';
+ return collectionName || ownTitle;
+}
+
 export function characterWorkProgress(work: CharacterWork, shows: readonly Show[]) {
  const show = shows.find(item => item.mediaType === work.type && Number(item.tmdbId) === work.id);
  const episodes = work.episodes || [];
