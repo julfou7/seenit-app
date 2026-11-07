@@ -67,7 +67,7 @@ test('SEENIT-DOWNLOAD-014 #879 version précise : une page, la même voie d’en
   // Page pleine hauteur sous le gate, chargée paresseusement, ouverte pour un seul épisode sorti.
   assert.match(view, /const PreciseVersionPage = lazy\(\(\) => import\('\.\/mediaDetail\/PreciseVersionPage'\)\);/);
   assert.match(view, /\{preciseTarget && downloadsEnabled && effectiveTmdbId && <Suspense/);
-  assert.match(view, /if \(modeSeason === null \|\| pickedNow\.length !== 1 \|\| !effectiveTmdbId\) return;/);
+  assert.match(view, /if \(pickedNow\.length !== 1 \|\| !effectiveTmdbId\) return;/);
   assert.match(page, /className="fixed inset-0 z-\[180\] max-w-md mx-auto/);
   assert.doesNotMatch(page, /bottom-0[^"]*rounded-t/, 'jamais une feuille du bas');
   // Une panne C411 reste une panne, distincte d'une absence de version.

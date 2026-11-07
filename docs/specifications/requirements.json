@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.264",
+  "applicationVersion": "1.4.265",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -29,7 +29,7 @@
         },
         {
           "file": "tests/downloadMode.test.ts",
-          "contains": "SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la saison change vide la sélection, l’onglet ferme le mode"
+          "contains": "SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la sélection traverse les saisons, l’onglet ferme le mode"
         },
         {
           "file": "tests/downloadMode.test.ts",
@@ -73,6 +73,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/programmedCalendar.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sans fichier, triés par date"
+        },
         {
           "file": "tests/downloadSeasonGroups.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 #879 onglet Télécharger : une carte par saison, regroupée par identité exacte"

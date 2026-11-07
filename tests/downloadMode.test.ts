@@ -43,9 +43,14 @@ test('SEENIT-DOWNLOAD-014 #879 hors mode la fiche reste propre ; en mode le cont
   assert.match(view, /if \(canUseDownloadMode\) \{ enterDownloadMode\(\); return; \}/, 'le menu ⋮ ouvre le mode pour une série');
 });
 
-test('SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la saison change vide la sélection, l’onglet ferme le mode', () => {
+test('SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la sélection traverse les saisons, l’onglet ferme le mode', () => {
   assert.match(view, /const nextInSeason = nextEp && nextEp\.season_number === modeSeason \? nextEp\.episode_number : null;\n\s+const next = nextInSeason !== null && selectableEpisodes\.includes\(nextInSeason\) \? \[nextInSeason\] : \[\];/);
-  assert.match(view, /useEffect\(\(\) => \{ setPickedEpisodes\(new Set\(\)\); \}, \[modeSeason\]\);/);
+  // Multi-saison (maquette Good Doctor) : changer de saison garde la sélection, clé « saison x épisode ».
+  assert.doesNotMatch(view, /\}, \[modeSeason\]\);/, 'plus aucun effacement au changement de saison');
+  assert.match(view, /const key = episodePresenceKey\(season, episode\); if \(next\.has\(key\)\) next\.delete\(key\); else next\.set\(key, \{ season, episode, future \}\);/);
+  // Lancement saison par saison, dans l'ordre, arrêté si un lot est interrompu.
+  assert.match(view, /for \(const \[season, episodes\] of toDownload\) \{\n\s+if \(!sameScope\(\)\) return;\n\s+const \{ interrupted \} = await launchArrEpisodeBatch\(\{/);
+  assert.match(view, /if \(interrupted\) return;/);
   assert.match(view, /window\.addEventListener\('app-close-modals', close\);/);
   assert.match(view, /\{downloadMode && canUseDownloadMode && <DownloadModeBar /);
   // La barre d'action recouvre réellement la navigation (z-160) : portail hors du contexte z-150 de la fiche.
@@ -162,7 +167,7 @@ test('SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre com
   assert.match(view, /const row = mainScrollRef\.current\?\.querySelector<HTMLElement>\(`\[data-episode-row="\$\{episodeScroll\.episode\}"\]`\);\n\s+if \(!row\) return;/, 'ligne absente (saison en chargement) : la demande reste en attente');
   assert.match(view, /row\.scrollIntoView\(\{ block: 'center', behavior: reduce \? 'auto' : 'smooth' \}\);\n\s+setEpisodeScroll\(null\);/, 'consommée seulement une fois la ligne atteinte');
   assert.match(view, /\}, \[episodeScroll, mainScrollRef, selectedEpisodes\]\);/, 'rejouée à l’arrivée des épisodes de la saison');
-  assert.match(view, /const exitDownloadMode = \(\) => \{ setDownloadMode\(false\); setPickedEpisodes\(new Set\(\)\); setEpisodeScroll\(null\); \};/, 'quitter le mode annule un défilement en attente');
+  assert.match(view, /const exitDownloadMode = \(\) => \{ setDownloadMode\(false\); setPicked\(new Map\(\)\); setEpisodeScroll\(null\); \};/, 'quitter le mode annule un défilement en attente');
   assert.match(view, /const pickSegment = \(episode: number\) => \{ if \(selectableEpisodes\.includes\(episode\)\) togglePickedEpisode\(episode\); requestEpisodeScroll\(episode\); \};/);
   assert.match(rows, /data-episode-row=\{episode\.episode_number\}/);
 });

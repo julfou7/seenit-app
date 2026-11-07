@@ -3,6 +3,7 @@ import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
 import { ChevronLeft, Heart, MoreVertical, Play, RefreshCw, RotateCcw, Ban, Trash2, Download, Share2 } from 'lucide-react';
 import { cn, getTodayStr, openExternalUrl } from '../lib/utils';
+import { auth } from '../lib/firebase';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { PersonProfile as PersonDetailModal } from '../components/PersonProfile';
 import { TrailerModal } from '../components/TrailerModal';
@@ -35,6 +36,8 @@ interface ShowDetailViewProps {
 const DownloadModal = lazy(() => import('../components/DownloadModal').then(module => ({ default: module.DownloadModal })));
 // #879 — Page « Version précise » chargée au premier usage (services C411/Sonarr hors du chunk de la fiche).
 const PreciseVersionPage = lazy(() => import('./mediaDetail/PreciseVersionPage'));
+/** #879 — épisode coché en mode téléchargement ; `future` : à programmer pour sa sortie. */
+type PickedEpisode = { season: number; episode: number; future: boolean };
 
 const STATUS_LABELS: Record<string, string> = { Ended: 'Terminée', Canceled: 'Annulée', 'Returning Series': 'En cours', 'In Production': 'En production', 'Post Production': 'Post-production', Planned: 'Prévue', Pilot: 'Pilote', ended: 'Terminée', canceled: 'Annulée', returning: 'En cours' };
 
@@ -120,7 +123,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const selectedEpisodes = selectedSeason ? seasonsCache[selectedSeason.season_number]?.episodes || null : null;
   // #879 — Mode téléchargement : la fiche reste propre, la sélection d'épisodes est une surcouche.
   const [downloadMode, setDownloadMode] = useState(false);
-  const [pickedEpisodes, setPickedEpisodes] = useState<Set<number>>(() => new Set());
+  // #879 multi-saison : la sélection est gardée d'une saison à l'autre (clé « saison x épisode »).
+  const [picked, setPicked] = useState<Map<string, PickedEpisode>>(() => new Map());
   const [preciseTarget, setPreciseTarget] = useState<{ season: number; episode: number } | null>(null);
   const canUseDownloadMode = isSeries && downloadsEnabled && Boolean(effectiveTmdbId);
   const modeToday = getTodayStr();
@@ -152,55 +156,62 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     if (!canUseDownloadMode) return;
     const nextInSeason = nextEp && nextEp.season_number === modeSeason ? nextEp.episode_number : null;
     const next = nextInSeason !== null && selectableEpisodes.includes(nextInSeason) ? [nextInSeason] : [];
-    setPickedEpisodes(new Set(next));
+    setPicked(new Map(next.map(episode => [episodePresenceKey(modeSeason!, episode), { season: modeSeason!, episode, future: futureEpisodes.has(episode) }])));
     setDownloadMode(true);
     const target = nextInSeason ?? selectableEpisodes[0] ?? modeStates.find(entry => entry.state !== 'seen')?.episode;
     if (target !== undefined) requestEpisodeScroll(target);
   };
-  const exitDownloadMode = () => { setDownloadMode(false); setPickedEpisodes(new Set()); setEpisodeScroll(null); };
+  const exitDownloadMode = () => { setDownloadMode(false); setPicked(new Map()); setEpisodeScroll(null); };
   const toggleDownloadMode = () => (downloadMode ? exitDownloadMode() : enterDownloadMode());
-  const togglePickedEpisode = (episode: number) => setPickedEpisodes(previous => { const next = new Set(previous); if (next.has(episode)) next.delete(episode); else next.add(episode); return next; });
+  const pickedEpisodes = new Set([...picked.values()].filter(entry => entry.season === modeSeason).map(entry => entry.episode));
+  const togglePickedEpisode = (episode: number) => { if (modeSeason === null) return; const season = modeSeason; const future = futureEpisodes.has(episode); setPicked(previous => { const next = new Map(previous); const key = episodePresenceKey(season, episode); if (next.has(key)) next.delete(key); else next.set(key, { season, episode, future }); return next; }); };
   const allPicked = selectableEpisodes.length > 0 && selectableEpisodes.every(episode => pickedEpisodes.has(episode));
+  const toggleAllHere = () => { if (modeSeason === null) return; const season = modeSeason; setPicked(previous => { const next = new Map(previous); for (const episode of selectableEpisodes) { const key = episodePresenceKey(season, episode); if (allPicked) next.delete(key); else next.set(key, { season, episode, future: futureEpisodes.has(episode) }); } return next; }); };
   const pickSegment = (episode: number) => { if (selectableEpisodes.includes(episode)) togglePickedEpisode(episode); requestEpisodeScroll(episode); };
-  // Changer de saison vide la sélection (la barre d'action ne vise qu'une saison).
-  useEffect(() => { setPickedEpisodes(new Set()); }, [modeSeason]);
   // Changer d'onglet ferme le mode comme toute superposition.
   useEffect(() => {
-    const close = () => { setDownloadMode(false); setPickedEpisodes(new Set()); };
+    const close = () => { setDownloadMode(false); setPicked(new Map()); };
     window.addEventListener('app-close-modals', close);
     return () => window.removeEventListener('app-close-modals', close);
   }, []);
   const episodeCode = (season: number, episode: number) => `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
-  const pickedList = [...pickedEpisodes].sort((a, b) => a - b);
-  const pickedTitle = !pickedList.length ? 'Coche des épisodes' : pickedList.length === 1 && modeSeason !== null
-    ? `${episodeCode(modeSeason, pickedList[0])} · ${selectedEpisodes?.find((entry: { episode_number: number; name?: string }) => entry.episode_number === pickedList[0])?.name || `Épisode ${pickedList[0]}`}`
-    : `${pickedList.length} épisodes`;
-  const pickedNow = pickedList.filter(episode => !futureEpisodes.has(episode));
-  const pickedFuture = pickedList.filter(episode => futureEpisodes.has(episode));
+  const pickedList = [...picked.values()].sort((a, b) => a.season - b.season || a.episode - b.episode);
+  const pickedSeasons = new Set(pickedList.map(entry => entry.season)).size;
+  const pickedTitle = !pickedList.length ? 'Coche des épisodes' : pickedList.length === 1
+    ? `${episodeCode(pickedList[0].season, pickedList[0].episode)} · ${(seasonsCache[pickedList[0].season]?.episodes as Array<{ episode_number: number; name?: string }> | undefined)?.find(entry => entry.episode_number === pickedList[0].episode)?.name || `Épisode ${pickedList[0].episode}`}`
+    : `${pickedList.length} épisodes${pickedSeasons > 1 ? ` · ${pickedSeasons} saisons` : ''}`;
+  const pickedNow = pickedList.filter(entry => !entry.future);
+  const pickedFuture = pickedList.filter(entry => entry.future);
+  const bySeason = (entries: PickedEpisode[]) => entries.reduce((groups, entry) => groups.set(entry.season, [...(groups.get(entry.season) || []), entry.episode]), new Map<number, number[]>());
   // Maquette : « 2 maintenant · 1 programmé pour sa sortie · en quelle qualité ? ».
   const pickedDetail = !pickedList.length ? 'Touche une barre ou un épisode.'
     : `${[pickedNow.length ? `${pickedNow.length} maintenant` : '', pickedFuture.length ? `${pickedFuture.length} programmé${pickedFuture.length > 1 ? 's' : ''} pour sa sortie` : ''].filter(Boolean).join(' · ')} · en quelle qualité ?`;
   /** Lance les épisodes cochés avec les mêmes gardes que la popup : rien n'est remplacé ni relancé en double. */
   const launchPickedEpisodes = async (quality: DownloadQualityChoice) => {
-    if (modeSeason === null || !pickedList.length || !effectiveTmdbId) return;
+    if (!pickedList.length || !effectiveTmdbId) return;
     const config = useDownloadConfigStore.getState();
     if (!isDownloadFeatureEnabled(config)) return;
     // Chargé au premier lancement : les services Sonarr restent hors du chunk de la fiche.
     const { launchArrEpisodeBatch } = await import('../features/downloads/downloadLaunch');
     if (model.presence.loading) { showToast('Vérification de la disponibilité en cours.', 'info'); return; }
     if (!(config.sonarrUrl && config.sonarrApiKey)) { useToastStore.getState().showToast({ title, action: 'Sonarr n’est pas configuré pour ce média.', posterPath: show?.posterPath }, 'error'); return; }
-    const episodes = pickedNow;
-    const toProgram = pickedFuture;
-    const season = modeSeason;
+    const nowCount = pickedNow.length;
+    const toDownload = bySeason(pickedNow);
+    const toProgram = bySeason(pickedFuture);
     exitDownloadMode();
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
-    const single = episodes.length === 1 && !toProgram.length;
+    const single = nowCount === 1 && !pickedFuture.length;
     // Programmation d'abord, attendue : la série n'est jamais ajoutée deux fois en parallèle par le lot immédiat.
-    if (toProgram.length) await programPickedEpisodes(season, toProgram, quality, episodes.length);
-    if (!episodes.length) return;
-    if (!single) useToastStore.getState().showToast({ title, action: `${episodes.length} épisode${episodes.length > 1 ? 's' : ''} · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
-    // Le lot relit compte, gate et serveur Sonarr avant chaque épisode et s'arrête si l'un d'eux change.
-    await launchArrEpisodeBatch({
+    // Portée commune aux deux phases : compte et serveur Sonarr du lancement, relus avant chaque saison.
+    const scope = `${auth.currentUser?.uid || ''}\n${config.sonarrUrl}\n${config.sonarrApiKey}`;
+    const sameScope = () => { const current = useDownloadConfigStore.getState(); return isDownloadFeatureEnabled(current) && `${auth.currentUser?.uid || ''}\n${current.sonarrUrl}\n${current.sonarrApiKey}` === scope; };
+    for (const [season, episodes] of toProgram) { if (!sameScope() || await programPickedEpisodes(season, episodes, quality, nowCount)) return; }
+    if (!nowCount) return;
+    if (!single) useToastStore.getState().showToast({ title, action: `${nowCount} épisode${nowCount > 1 ? 's' : ''} · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
+    // Une saison après l'autre, dans l'ordre ; chaque lot relit compte, gate et serveur avant chaque épisode.
+    for (const [season, episodes] of toDownload) {
+      if (!sameScope()) return;
+      const { interrupted } = await launchArrEpisodeBatch({
       title, year, tmdbId: effectiveTmdbId,
       tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId,
       posterPath: show?.posterPath || undefined, season, episodes, qualityPreference: quality,
@@ -209,28 +220,32 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       skip: episode => Boolean(model.presence.episodesHasFile?.[episodePresenceKey(season, episode)]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
       // Un épisode : tous les messages ; plusieurs : seulement les erreurs (le bilan reste dans Téléchargements).
       notify: (episode, action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: show?.posterPath }, toastType); }
-    });
+      });
+      if (interrupted) return;
+    }
   };
   /** #879 — Les épisodes à venir cochés en bleu sont surveillés par Sonarr, qui les télécharge à leur sortie. */
-  const programPickedEpisodes = async (season: number, episodes: number[], quality: DownloadQualityChoice, launchedNow: number) => {
+  /** Renvoie vrai si la programmation a été interrompue (compte, gate ou serveur changé). */
+  const programPickedEpisodes = async (season: number, episodes: number[], quality: DownloadQualityChoice, launchedNow: number): Promise<boolean> => {
     const { programArrEpisodes, programmingSummary } = await import('../features/downloads/episodeProgramming');
     const outcome = await programArrEpisodes({
       title, tmdbId: effectiveTmdbId!, tvdbId: tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId,
       season, episodes, qualityPreference: quality, readConfig: () => useDownloadConfigStore.getState()
     });
-    if (outcome.interrupted) return;
+    if (outcome.interrupted) return true;
     const toast = useToastStore.getState().showToast;
-    if (outcome.failure && !outcome.programmed.length) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return; }
+    if (outcome.failure && !outcome.programmed.length) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return false; }
     const single = episodes.length === 1 && !launchedNow;
     if (outcome.programmed.length) toast({ title, subtitle: single ? `S${season} | E${episodes[0]}` : undefined, action: single ? `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` : programmingSummary(launchedNow, outcome.programmed.length, quality), posterPath: show?.posterPath }, 'success');
     if (outcome.failure && outcome.programmed.length) toast({ title, action: `${outcome.failed.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.failed.join(', ')} non programmé${outcome.failed.length > 1 ? 's' : ''} : ${outcome.failure}`, posterPath: show?.posterPath }, 'error');
     if (outcome.unannounced.length) toast({ title, action: `${outcome.unannounced.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.unannounced.join(', ')} pas encore annoncé${outcome.unannounced.length > 1 ? 's' : ''} dans Sonarr : réessaie plus tard.`, posterPath: show?.posterPath }, 'info');
     // Relit la présence : les épisodes programmés passent en « Programmé ».
     if (outcome.programmed.length) void refreshPlexAvailability();
+    return false;
   };
   const openPreciseVersion = () => {
-    if (modeSeason === null || pickedNow.length !== 1 || !effectiveTmdbId) return;
-    const target = { season: modeSeason, episode: pickedNow[0] };
+    if (pickedNow.length !== 1 || !effectiveTmdbId) return;
+    const target = { season: pickedNow[0].season, episode: pickedNow[0].episode };
     exitDownloadMode();
     setPreciseTarget(target);
   };
@@ -294,7 +309,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           <SeasonAverageChart averages={averages} />
           <SeasonPills seasons={seasons} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }}
             downloading={canUseDownloadMode ? season => Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season })) : undefined} />
-          {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={() => setPickedEpisodes(allPicked ? new Set() : new Set(selectableEpisodes))} onSegment={pickSegment} />}
+          {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={toggleAllHere} onSegment={pickSegment} />}
           {selectedSeason && <SeasonPanel season={selectedSeason} episodes={selectedEpisodes} show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
             downloadMode={canUseDownloadMode ? { active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode } : null}
             episodesHasFile={model.presence.episodesHasFile} episodesMonitored={model.presence.episodesMonitored}
