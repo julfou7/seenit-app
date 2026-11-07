@@ -54,7 +54,11 @@ export function SeasonAverageChart({ averages }: { averages: readonly SeasonAver
   </DetailCard>;
 }
 
-export function SeasonPills({ seasons, show, selected, onSelect }: { seasons: readonly SeasonMeta[]; show: Show | null | undefined; selected: number | null; onSelect: (season: number) => void }) {
+/**
+ * Pastilles de saison : numéro, avancement (« 12/20 », « ✓ vue », « Bientôt ») et, depuis #879, mini-barre
+ * « vu » et point blanc quand un téléchargement est actif dans la saison (sous le gate téléchargement).
+ */
+export function SeasonPills({ seasons, show, selected, onSelect, downloading }: { seasons: readonly SeasonMeta[]; show: Show | null | undefined; selected: number | null; onSelect: (season: number) => void; downloading?: (season: number) => boolean }) {
   if (seasons.length < 2) return null;
   const today = getTodayStr();
   return <div className="flex gap-1.5 overflow-x-auto hide-scrollbar -mx-4 px-4" role="group" aria-label="Saisons">
@@ -62,7 +66,9 @@ export function SeasonPills({ seasons, show, selected, onSelect }: { seasons: re
       const count = season.episode_count || 0, seen = seenInSeason(show, season.season_number), on = season.season_number === selected;
       const future = count === 0 || Boolean(season.air_date && season.air_date > today);
       const state = future ? 'Bientôt' : seen >= count ? '✓ vue' : `${seen}/${count}`;
-      return <button type="button" key={`pill-${season.season_number}`} onClick={() => onSelect(season.season_number)} aria-pressed={on} aria-label={`Saison ${season.season_number}, ${state}`} className={cn('min-w-[58px] shrink-0 h-12 px-2 rounded-xl flex flex-col items-center justify-center gap-px', on ? 'bg-[#E5A93D] shadow-[inset_0_0_0_1px_#E5A93D]' : 'bg-[#18181b] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]')}><span className={cn('text-[13px] font-extrabold', on ? 'text-black' : 'text-white')}>S{season.season_number}</span><span className={cn('text-[10px] font-bold whitespace-nowrap', on ? 'text-[#1a1206]' : 'text-zinc-400')}>{state}</span></button>;
+      const active = Boolean(downloading?.(season.season_number));
+      const seenPct = count > 0 ? Math.min(100, Math.round((seen / count) * 100)) : 0;
+      return <button type="button" key={`pill-${season.season_number}`} onClick={() => onSelect(season.season_number)} aria-pressed={on} aria-label={`Saison ${season.season_number}, ${state}${active ? ', téléchargement en cours' : ''}`} className={cn('min-w-[58px] shrink-0 h-[54px] px-2 rounded-xl flex flex-col items-center justify-center gap-px', on ? 'bg-[#E5A93D] shadow-[inset_0_0_0_1px_#E5A93D]' : 'bg-[#18181b] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]')}><span className="flex items-center gap-1"><span className={cn('text-[13px] font-extrabold', on ? 'text-black' : 'text-white')}>S{season.season_number}</span>{active && <i aria-hidden="true" data-season-downloading className={cn('block h-[7px] w-[7px] rounded-full', on ? 'bg-black' : 'bg-white')} />}</span><span className={cn('text-[10px] font-bold whitespace-nowrap', on ? 'text-[#1a1206]' : 'text-zinc-400')}>{state}</span><span aria-hidden="true" data-season-bar className={cn('mt-0.5 block h-[3px] w-full overflow-hidden rounded-sm', on ? 'bg-black/20' : 'bg-zinc-700')}><i className={cn('block h-full', on ? 'bg-[#1a1206]' : 'bg-[#E5A93D]')} style={{ width: `${seenPct}%` }} /></span></button>;
     })}
   </div>;
 }

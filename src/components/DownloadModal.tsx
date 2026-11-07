@@ -29,6 +29,8 @@ import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureV
 import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
 import { ReleaseLightFilter } from './ReleaseLightFilter';
 import { useMediaPresence } from '../hooks/useMediaPresence';
+import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
+
 
 export interface SeasonInfo {
   season_number: number;
@@ -201,7 +203,7 @@ export function DownloadModal({
   const maxEpisodes = Math.max(currentSeason.episode_count || 1, 1);
   const alreadyAvailable = mediaType === 'movie'
     ? Boolean(presence.radarrHasFile || presence.plexInfo?.available)
-    : scopeMode === 'episode' ? Boolean(presence.episodesHasFile[`${selectedSeason}x${selectedEpisode}`])
+    : scopeMode === 'episode' ? Boolean(presence.episodesHasFile[episodePresenceKey(selectedSeason, selectedEpisode)])
       : scopeMode === 'season' ? Boolean(presence.seasonsHasFile[selectedSeason]) : false;
 
   const scopeBusy = hasActiveDownloadInScope(downloads, {

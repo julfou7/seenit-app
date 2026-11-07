@@ -48,9 +48,8 @@
 .explorer-row-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .explorer-row-text strong{font-size:15px;font-weight:600;line-height:1.35;color:#d4d4d8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .explorer-row-text small{font-size:12px;color:#71717a;line-height:1.4}
-/* #874 : le titre média est en or, le terme cherché est souligné plutôt que coloré. */
-.explorer-row-text strong.seenit-media-title{color:var(--seenit-media-title)}
-.explorer-row-text mark{color:inherit;font-weight:800;background:transparent;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}
+/* Exception #874 voulue par le propriétaire (07/11) : dans la recherche, titres en blanc et terme cherché en or. */
+.explorer-row-text mark{color:#F2C36B;font-weight:800;background:transparent}
 .explorer-row-status{font-size:10px;font-weight:600;padding:5px 8px;background:#ffffff0d;border-radius:7px;white-space:nowrap}
 .explorer-row-action{height:44px;width:44px;flex-shrink:0;display:grid;place-items:center;border-radius:50%;color:#a1a1aa}
 .explorer-row-action[aria-pressed=true]{color:#F2C36B}

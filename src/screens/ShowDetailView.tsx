@@ -26,6 +26,7 @@ import { DownloadModeBanner, DownloadModeBar, DownloadModeToggle, isEpisodeSelec
 import { SeenItRing } from '../components/SeenItLogo';
 import { episodeDownloadPresentation } from '../features/downloads/episodeDownloadPresentation';
 import type { DownloadQualityChoice } from '../features/downloads/downloadLaunch';
+import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
 
 interface ShowDetailViewProps {
   model: ShowDetailViewModel;
@@ -127,7 +128,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const canUseDownloadMode = isSeries && downloadsEnabled && Boolean(effectiveTmdbId);
   const modeToday = getTodayStr();
   const modeSeason = selectedSeason?.season_number ?? null;
-  const episodePresentation = (episode: number, aired: boolean) => episodeDownloadPresentation(episode, aired, Boolean(modeSeason !== null && model.presence.episodesHasFile?.[`${modeSeason}x${episode}`]), modeSeason !== null ? model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, modeSeason, episode) : null);
+  const episodePresentation = (episode: number, aired: boolean) => episodeDownloadPresentation(episode, aired, Boolean(modeSeason !== null && model.presence.episodesHasFile?.[episodePresenceKey(modeSeason, episode)]), modeSeason !== null ? model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, modeSeason, episode) : null);
   // Pas de mémorisation : la file en direct (lue par une fonction stable du store) doit être relue à chaque rendu.
   const modeStates = modeSeason === null ? [] : seasonModeStates(selectedEpisodes, episode => Boolean(show?.seenEpisodes?.includes(`${modeSeason}x${episode}`)), episodePresentation, modeToday);
   const selectableEpisodes = modeStates.filter(entry => isEpisodeSelectable(entry.state)).map(entry => entry.episode);
@@ -198,7 +199,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       posterPath: show?.posterPath || undefined, season, episodes, qualityPreference: quality,
       readConfig: () => useDownloadConfigStore.getState(),
       // Mêmes gardes que la popup : un fichier présent n'est jamais remplacé, pas de double lancement.
-      skip: episode => Boolean(model.presence.episodesHasFile?.[`${season}x${episode}`]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
+      skip: episode => Boolean(model.presence.episodesHasFile?.[episodePresenceKey(season, episode)]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
       // Un épisode : tous les messages ; plusieurs : seulement les erreurs (le bilan reste dans Téléchargements).
       notify: (episode, action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: show?.posterPath }, toastType); }
     });
@@ -214,7 +215,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const cast = (tmdbDetails?.aggregate_credits?.cast || tmdbDetails?.credits?.cast || []);
   const collectionIds = useMemo(() => new Set<number>((collectionData?.parts || []).map((part: { id: number }) => Number(part.id))), [collectionData]);
   const relationOpen = (part: { id: number; media_type?: string; title?: string }) => onShowClick && onShowClick(part.id, part.media_type === 'tv' || part.media_type === 'movie' ? part.media_type : part.title ? 'movie' : 'tv');
-  const menuItem = 'w-full min-h-12 px-4 text-left text-[14px] font-semibold flex items-center gap-3 active:bg-white/5';
+  const menuItem = 'w-full min-h-[52px] px-3.5 py-2 text-left text-[15.5px] font-bold flex items-center gap-3 active:bg-white/5';
+  const menuSub = (text: string) => <span className="block mt-px text-[12.5px] font-medium text-zinc-400">{text}</span>;
 
   return (
     <div ref={mainScrollRef} style={{ transform: isExiting ? 'translateX(100%)' : undefined }} className="flex-1 overflow-y-auto bg-[#09090b] text-white relative pb-nav w-full h-full transition-transform duration-300 ease-out">
@@ -227,19 +229,19 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           </div>
         </div>
       </div>
-      {showMenu && <DialogLayer label="Actions de la fiche" onDismiss={() => setShowMenu(false)} className="fixed inset-0 z-50 bg-black/50 flex items-end justify-center" onClick={e => { if (e.target === e.currentTarget) setShowMenu(false); }}>
-        <div className="w-full max-w-md rounded-t-[24px] bg-[#111113] shadow-[0_-10px_40px_rgba(0,0,0,0.5)] pb-[max(16px,env(safe-area-inset-bottom))] pt-2 flex flex-col animate-in slide-in-from-bottom duration-200">
-          <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-zinc-700" aria-hidden="true" />
-          <p className="px-4 pb-2 text-[15px] font-bold text-white truncate">{title}</p>
-          {effectiveTmdbId && <button type="button" onClick={() => { setShowMenu(false); void handleShare(); }} className={cn(menuItem, 'text-zinc-100')}><Share2 size={18} className="text-zinc-400" />Partager la fiche</button>}
-          {show && <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleSyncSingle(); }} disabled={isSyncingSingle} className={cn(menuItem, 'text-[#F2C36B] disabled:opacity-50')}><RefreshCw size={18} className={cn(isSyncingSingle && 'animate-spin')} />Synchroniser {isSeries ? 'la série' : 'le film'}</button>}
+      {/* #879 : menu ancré sous le bouton ⋮ (plus de feuille qui monte du bas), fermé par un toucher à côté. */}
+      {showMenu && <DialogLayer label="Actions de la fiche" onDismiss={() => setShowMenu(false)} className="fixed inset-0 z-50 bg-black/40" onClick={e => { if (e.target === e.currentTarget) setShowMenu(false); }}>
+        <div role="menu" aria-label={`Actions pour ${title}`} data-anchored-menu style={{ right: 'max(12px, calc((100vw - 28rem) / 2 + 12px))' }} className="absolute top-[calc(var(--seenit-safe-area-top,env(safe-area-inset-top,0px))+58px)] w-[290px] max-w-[calc(100%-24px)] rounded-[20px] bg-[#1C1C1F] py-1.5 flex flex-col shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12),0_18px_48px_rgba(0,0,0,0.8)] origin-top-right animate-in fade-in zoom-in-95 duration-150 motion-reduce:animate-none">
+          {effectiveTmdbId && <button type="button" role="menuitem" onClick={() => { setShowMenu(false); void handleShare(); }} className={cn(menuItem, 'text-zinc-100')}><Share2 size={19} className="shrink-0 text-zinc-400" />Partager la fiche</button>}
+          {show && <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleSyncSingle(); }} disabled={isSyncingSingle} className={cn(menuItem, 'text-zinc-100 disabled:opacity-50')}><RefreshCw size={19} className={cn('shrink-0 text-zinc-400', isSyncingSingle && 'animate-spin')} /><span className="min-w-0">Synchroniser {isSeries ? 'la série' : 'le film'}{menuSub(isSeries ? 'Épisodes et dates' : 'Dates et disponibilités')}</span></button>}
           {/* Accès existant aux téléchargements, inchangé (SEENIT-DOWNLOAD-VISIBILITY-001) */}
-          {(!movieAvailable && (isSeries || !model.presence.loading)) ? <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); if (canUseDownloadMode) { enterDownloadMode(); return; } setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={18} className="text-zinc-400" />Téléchargement</button> : <button type="button" disabled={model.presence.loading} onClick={() => { setShowMenu(false); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={18} className="text-zinc-400" />{model.presence.loading ? 'Vérification de la disponibilité…' : 'Disponible · autre version'}</button>}
+          {(!movieAvailable && (isSeries || !model.presence.loading)) ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); if (canUseDownloadMode) { enterDownloadMode(); return; } setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={20} className="shrink-0 text-[#E5A93D]" /><span className="min-w-0">Téléchargement{canUseDownloadMode && menuSub(`Mode téléchargement${activeDownloads ? ` · ${activeDownloads} en cours` : ''}`)}</span></button> : <button type="button" role="menuitem" disabled={model.presence.loading} onClick={() => { setShowMenu(false); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><Download size={20} className="shrink-0 text-[#E5A93D]" />{model.presence.loading ? 'Vérification de la disponibilité…' : 'Disponible · autre version'}</button>}
           {show && <>
-            {show.isArchived ? <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? rewatchShow() : toggleMovieSeen(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Revoir la série' : 'Revoir le film'}</button>
-              : show.status === 'dropped' ? <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? resumeShow() : togglePlanToWatchMovie(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Reprendre la série' : 'Ajouter à ma liste'}</button>
-              : <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? dropShow() : togglePlanToWatchMovie(); }} className={cn(menuItem, 'text-zinc-100')}><Ban size={18} className="text-zinc-400" />{isSeries ? 'Abandonner la série' : 'Retirer de ma liste'}</button>}
-            <button type="button" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleDeleteShow(); }} className={cn(menuItem, 'text-red-300')}><Trash2 size={18} />{isSeries ? 'Supprimer la série' : 'Supprimer le film'}</button>
+            <span aria-hidden="true" className="mx-3.5 my-1 h-px bg-white/[0.07]" />
+            {show.isArchived ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? rewatchShow() : toggleMovieSeen(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Revoir la série' : 'Revoir le film'}</button>
+              : show.status === 'dropped' ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? resumeShow() : togglePlanToWatchMovie(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Reprendre la série' : 'Ajouter à ma liste'}</button>
+              : <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? dropShow() : togglePlanToWatchMovie(); }} className={cn(menuItem, 'text-zinc-100')}><Ban size={18} className="text-zinc-400" />{isSeries ? 'Abandonner la série' : 'Retirer de ma liste'}</button>}
+            <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleDeleteShow(); }} className={cn(menuItem, 'text-red-300')}><Trash2 size={18} />{isSeries ? 'Supprimer la série' : 'Supprimer le film'}</button>
           </>}
         </div>
       </DialogLayer>}
@@ -266,7 +268,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
 
         {isSeries && <>
           <SeasonAverageChart averages={averages} />
-          <SeasonPills seasons={seasons} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }} />
+          <SeasonPills seasons={seasons} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }}
+            downloading={canUseDownloadMode ? season => Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season })) : undefined} />
           {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={() => setPickedEpisodes(allPicked ? new Set() : new Set(selectableEpisodes))} onSegment={pickSegment} />}
           {selectedSeason && <SeasonPanel season={selectedSeason} episodes={selectedEpisodes} show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
             downloadMode={canUseDownloadMode ? { active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode } : null}

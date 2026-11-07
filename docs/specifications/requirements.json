@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.262",
+  "applicationVersion": "1.4.263",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -38,6 +38,14 @@
         {
           "file": "tests/downloadMode.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre compacte se quitte et le mode amène l’épisode en cours"
+        },
+        {
+          "file": "tests/downloadMode.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 les pastilles de saison montrent la part vue et un téléchargement actif"
+        },
+        {
+          "file": "tests/episodePresenceKey.test.ts",
+          "contains": "SEENIT-DOWNLOAD-014 #879 un épisode téléchargé dans Sonarr est reconnu par la fiche, le mode et la popup"
         },
         {
           "file": "tests/downloadSearchRuntime.test.ts",
@@ -222,6 +230,10 @@
         {
           "file": "tests/sagaTimeline.test.ts",
           "contains": "SEENIT-UX-019 #871 la saga v2 numérote l’ordre TMDB, situe le film affiché et pose le tampon VU"
+        },
+        {
+          "file": "tests/detailMenu.test.ts",
+          "contains": "SEENIT-UX-019 #879 le menu ⋮ des fiches est ancré sous son bouton, sans feuille du bas"
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",

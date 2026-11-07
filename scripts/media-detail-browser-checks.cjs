@@ -69,6 +69,7 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.body.innerText.includes("Moyenne par saison") && document.querySelectorAll("[role=group][aria-label=Saisons] button").length===5', 'courbe des saisons et pastilles');
     await click(client, byLabel('Saison 1, ✓ vue'));
     await check(client, '' + byLabel('Saison 1, ✓ vue') + '?.getAttribute("aria-pressed")==="true" && document.body.innerText.includes("Saison 1 · 13/13")', 'une pastille sélectionne sa saison');
+    await check(client, '(()=>{const pills=[...document.querySelectorAll("[aria-label^=\\"Saison \\"][aria-pressed]")];const full=' + byLabel('Saison 1, ✓ vue') + '?.querySelector("[data-season-bar] i");return pills.length>1&&pills.every(p=>p.querySelector("[data-season-bar]")&&p.getBoundingClientRect().height>=44)&&full?.style.width==="100%"})()', 'pastilles de saison avec mini-barre « vu » (#879)');
     await click(client, byText('button', 'Tout marquer non vu'));
     await check(client, 'document.body.innerText.includes("Saison 1 · 0/13") && ' + byText('button', 'Tout marquer vu'), 'tout marquer non vu puis vu depuis la carte saison');
     await click(client, byLabel('Marquer l’épisode 1 vu'));
@@ -95,6 +96,7 @@ async function testMediaDetailHarness(client) {
     await check(client, byText('button', 'Better Call Saul') + ' && document.body.innerText.includes("Dans le même univers")', 'univers TVDB en lignes');
     await click(client, byLabel('Actions de la fiche'));
     await check(client, ['Partager la fiche', 'Synchroniser la série', 'Téléchargement', 'Abandonner la série', 'Supprimer la série'].map(label => byText('[role=dialog] button', label)).join(' && '), 'menu ⋮ : toutes les actions existantes');
+    await check(client, '(()=>{const menu=document.querySelector("[data-anchored-menu]"),button=' + byLabel('Actions de la fiche') + ';if(!menu||!button)return false;const m=menu.getBoundingClientRect(),b=button.getBoundingClientRect();return menu.getAttribute("role")==="menu"&&m.top>=b.bottom-1&&m.top<=b.bottom+24&&Math.abs(m.right-b.right)<=12&&m.bottom<innerHeight-40&&m.width<=300})()', 'menu ⋮ ancré sous son bouton, plus de feuille du bas (#879)');
     await evaluate(client, 'document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
     const seriesGeometry = await evaluate(client, geometry);
     if (seriesGeometry.overflow) throw new Error(`SEENIT-UX-019 série ${width}px déborde ${JSON.stringify(seriesGeometry)}`);

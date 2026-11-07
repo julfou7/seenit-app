@@ -14,14 +14,12 @@ test('SEENIT-UX-020 #874 un seul jeton « titre média » en or, utilisé par to
   assert.match(grid, /className="seenit-media-title text-\[22px\] font-extrabold hover:text-\[#E5A93D\]/);
   assert.match(read('src/screens/LibraryScreen.tsx'), /<GridMediaCard/);
   assert.match(read('src/screens/DiscoverHero.tsx'), /<h2 className="seenit-media-title text-\[38px\] font-extrabold uppercase/);
+  // Exception voulue le 07/11 (USR-2026-11-07-001) : résultats de recherche en blanc, terme cherché en or.
   const search = read('src/components/DiscoverSearchResults.tsx');
-  assert.equal((search.match(/<span className="explorer-row-text"><strong className="seenit-media-title"><Highlight/g) || []).length, 2, 'les deux rangées média (bibliothèque et TMDB)');
-  // Personnes et personnages restent hors règle : leur titre n'est pas recoloré.
-  assert.match(search, /<strong><Highlight title=\{character\.name\}/);
-  assert.match(search, /<strong><Highlight title=\{person\.name \|\| ''\}/);
+  assert.doesNotMatch(search, /seenit-media-title/);
   const explorer = read('src/screens/explorer.css');
-  assert.match(explorer, /\.explorer-row-text strong\.seenit-media-title\{color:var\(--seenit-media-title\)\}/);
-  assert.match(explorer, /\.explorer-row-text mark\{color:inherit;font-weight:800;background:transparent;text-decoration:underline;/, 'le terme cherché est souligné, pas recoloré');
+  assert.match(explorer, /\.explorer-row-text strong\{font-size:15px;font-weight:600;line-height:1\.35;color:#d4d4d8;/);
+  assert.match(explorer, /\.explorer-row-text mark\{color:#F2C36B;font-weight:800;background:transparent\}/);
   // Fiche personnage (Son parcours), fiche acteur (Vus ensemble, filmographie), saga et franchise, fiche épisode, Télécharger.
   assert.match(explorer, /\.character-works strong\{[^}]*color:var\(--seenit-media-title\)/);
   const actor = read('src/components/movieActorProfile.css');
