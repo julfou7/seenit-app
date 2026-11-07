@@ -195,7 +195,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     exitDownloadMode();
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
     const single = episodes.length === 1 && !toProgram.length;
-    if (toProgram.length) void programPickedEpisodes(season, toProgram, quality, episodes.length);
+    // Programmation d'abord, attendue : la série n'est jamais ajoutée deux fois en parallèle par le lot immédiat.
+    if (toProgram.length) await programPickedEpisodes(season, toProgram, quality, episodes.length);
     if (!episodes.length) return;
     if (!single) useToastStore.getState().showToast({ title, action: `${episodes.length} épisode${episodes.length > 1 ? 's' : ''} · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
     // Le lot relit compte, gate et serveur Sonarr avant chaque épisode et s'arrête si l'un d'eux change.
@@ -222,6 +223,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     if (outcome.failure && !outcome.programmed.length) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return; }
     const single = episodes.length === 1 && !launchedNow;
     if (outcome.programmed.length) toast({ title, subtitle: single ? `S${season} | E${episodes[0]}` : undefined, action: single ? `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` : programmingSummary(launchedNow, outcome.programmed.length, quality), posterPath: show?.posterPath }, 'success');
+    if (outcome.failure && outcome.programmed.length) toast({ title, action: `${outcome.failed.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.failed.join(', ')} non programmé${outcome.failed.length > 1 ? 's' : ''} : ${outcome.failure}`, posterPath: show?.posterPath }, 'error');
     if (outcome.unannounced.length) toast({ title, action: `${outcome.unannounced.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.unannounced.join(', ')} pas encore annoncé${outcome.unannounced.length > 1 ? 's' : ''} dans Sonarr : réessaie plus tard.`, posterPath: show?.posterPath }, 'info');
     // Relit la présence : les épisodes programmés passent en « Programmé ».
     if (outcome.programmed.length) void refreshPlexAvailability();

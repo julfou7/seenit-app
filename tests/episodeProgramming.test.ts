@@ -15,7 +15,7 @@ const bundle = await build({ entryPoints: ['src/features/downloads/episodeProgra
       : args.path === 'qualityProfileSelection' ? 'export const resolveEffectiveQualityProfileId=(profiles,q)=>profiles.find(p=>p.name===(q==="4k"?"Ultra-HD":"HD-1080p"))?.id;'
       : 'export const isDownloadFeatureEnabled=c=>c.downloadsEnabled===true;' }));
   } }] });
-type Result = { programmed: number[]; unannounced: number[]; failure?: string; interrupted: boolean };
+type Result = { programmed: number[]; unannounced: number[]; failed: number[]; failure?: string; interrupted: boolean };
 const { programArrEpisodes, programmingSummary } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`) as {
   programArrEpisodes: (request: Record<string, unknown>) => Promise<Result>;
   programmingSummary: (now: number, programmed: number, quality: string) => string;
@@ -49,7 +49,7 @@ test('SEENIT-DOWNLOAD-014 #879 programmer surveille seulement les épisodes à v
     { id: 54, seasonNumber: 2, episodeNumber: 9, monitored: false, hasFile: false }
   ]]);
   const result = await programArrEpisodes({ title: 'Série', tmdbId: 42, season: 2, episodes: [5, 6, 7, 8], qualityPreference: '4k', readConfig: () => config, readOwner: () => 'u1', io: sonarr.io });
-  assert.deepEqual({ ...result, programmed: [...result.programmed], unannounced: [...result.unannounced] }, { programmed: [5, 6], unannounced: [8], interrupted: false });
+  assert.deepEqual({ ...result, programmed: [...result.programmed], unannounced: [...result.unannounced], failed: [...result.failed] }, { programmed: [5, 6], unannounced: [8], failed: [], interrupted: false });
   // Identité exacte vérifiée sans recherche ni surveillance globale.
   assert.equal(sonarr.ensure.length, 1);
   assert.equal(sonarr.ensure[0].ensureOnly, true);
@@ -80,6 +80,26 @@ test('SEENIT-DOWNLOAD-014 #879 la programmation s’arrête net si le compte ou 
   assert.equal(signedOut.interrupted, true);
 });
 
+test('SEENIT-DOWNLOAD-014 #879 programmation : portée relue avant l’ajout de la série, échec partiel rendu', async () => {
+  let owner = 'u1';
+  const sonarr = fakeSonarr([[{ id: 81, seasonNumber: 1, episodeNumber: 4, monitored: false }]]);
+  sonarr.io.profiles = async () => { owner = 'u2'; return [{ id: 3, name: 'HD-1080p' }]; };
+  const switched = await programArrEpisodes({ title: 'Série', tmdbId: 42, season: 1, episodes: [4], qualityPreference: '1080p', readConfig: () => config, readOwner: () => owner, io: sonarr.io });
+  assert.equal(switched.interrupted, true);
+  assert.equal(sonarr.ensure.length, 0, 'aucune série ajoutée après un changement de compte');
+  // Échec au milieu du lot : l'épisode programmé reste compté, les suivants sont rendus avec la cause.
+  const partial = fakeSonarr([[5, 6, 7].map(episodeNumber => ({ id: 90 + episodeNumber, seasonNumber: 2, episodeNumber, monitored: false }))]);
+  const put = partial.io.put;
+  partial.io.put = async (url: string, body: Record<string, unknown>) => { if (url.endsWith('/episode/96')) throw new Error('Sonarr a refusé la modification.'); return put(url, body); };
+  const result = await programArrEpisodes({ title: 'Série', tmdbId: 42, season: 2, episodes: [5, 6, 7], qualityPreference: '1080p', readConfig: () => config, readOwner: () => 'u1', io: partial.io });
+  assert.deepEqual([[...result.programmed], [...result.failed], result.failure], [[5], [6, 7], 'Sonarr a refusé la modification.']);
+  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  assert.match(view, /if \(outcome\.failure && outcome\.programmed\.length\) toast\(/, 'un échec partiel reste affiché');
+  // Sélection mixte : la programmation est attendue avant le lot immédiat (pas d'ajout concurrent de la série).
+  const launch = view.slice(view.indexOf('const launchPickedEpisodes'), view.indexOf('const programPickedEpisodes'));
+  assert.ok(launch.indexOf('await programPickedEpisodes(') > 0 && launch.indexOf('await programPickedEpisodes(') < launch.indexOf('await launchArrEpisodeBatch('));
+});
+
 test('SEENIT-DOWNLOAD-014 #879 un épisode à venir surveillé est « programmé », les autres restent programmables', () => {
   assert.equal(episodeDownloadPresentation(8, false, false, null, true).kind, 'programmed');
   assert.equal(episodeDownloadPresentation(8, false, false, null, false).kind, 'future');
@@ -99,7 +119,7 @@ test('SEENIT-DOWNLOAD-014 #879 en mode, les épisodes à venir se cochent en ble
   assert.match(view, /const selectableEpisodes = modeStates\.filter\(entry => isEpisodePickable\(entry\.state\)\)/);
   const launch = view.slice(view.indexOf('const launchPickedEpisodes'), view.indexOf('const programPickedEpisodes'));
   assert.match(launch, /const episodes = pickedNow;/, 'seuls les épisodes sortis sont téléchargés maintenant');
-  assert.match(launch, /if \(toProgram\.length\) void programPickedEpisodes\(/);
+  assert.match(launch, /if \(toProgram\.length\) await programPickedEpisodes\(/);
   assert.match(view, /episodes, qualityPreference: quality, readConfig: \(\) => useDownloadConfigStore\.getState\(\)/);
   // « Version précise » ne concerne qu'un épisode sorti.
   assert.match(view, /onPrecise=\{pickedNow\.length === 1 && !pickedFuture\.length \? openPreciseVersion : undefined\}/);

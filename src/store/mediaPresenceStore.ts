@@ -8,7 +8,7 @@ import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
 /** Champs d'un épisode Sonarr lus par la présence (#879, typés au lieu de `any`). */
 type SonarrEpisodeLike = { seasonNumber: number; episodeNumber: number; hasFile?: boolean; monitored?: boolean };
 type RadarrMovieLike = { tmdbId?: number | string; imdbId?: string; hasFile?: boolean };
-type SonarrSeriesLike = { id?: number; tvdbId?: number | string; tmdbId?: number | string; imdbId?: string };
+type SonarrSeriesLike = { id?: number; tvdbId?: number | string; tmdbId?: number | string; imdbId?: string; monitored?: boolean };
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
@@ -208,7 +208,8 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
                 const sNum = ep.seasonNumber;
                 const eNum = ep.episodeNumber;
                 episodesHasFile[episodePresenceKey(sNum, eNum)] = !!ep.hasFile;
-                episodesMonitored[episodePresenceKey(sNum, eNum)] = ep.monitored === true;
+                // Programmé seulement si Sonarr récupérera vraiment l'épisode : série ET épisode surveillés.
+                episodesMonitored[episodePresenceKey(sNum, eNum)] = ep.monitored === true && match.monitored !== false;
 
                 if (sNum > 0) {
                   if (!episodesBySeason[sNum]) episodesBySeason[sNum] = [];

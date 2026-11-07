@@ -48,8 +48,10 @@ export interface EpisodeProgrammingResult {
   programmed: number[];
   /** Épisodes encore inconnus de Sonarr : impossibles à programmer pour l'instant. */
   unannounced: number[];
-  /** Raison d'un échec global (aucun épisode programmé). */
+  /** Raison d'un échec, global ou en cours de lot. */
   failure?: string;
+  /** Épisodes demandés laissés non programmés par l'échec (à relancer). */
+  failed: number[];
   /** Le compte, le gate ou le serveur a changé en cours de route : arrêt sans écriture supplémentaire. */
   interrupted: boolean;
 }
@@ -64,7 +66,8 @@ const sonarrTarget = (config: DownloadConfig) => `${cleanUrl(config.sonarrUrl ||
  * téléchargement, l'appel reste attaché au compte, au gate et au serveur Sonarr qui l'ont lancé.
  */
 export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season, episodes, qualityPreference, readConfig, readOwner = () => auth.currentUser?.uid, io = defaultIo }: EpisodeProgrammingRequest): Promise<EpisodeProgrammingResult> {
-  const result: EpisodeProgrammingResult = { programmed: [], unannounced: [], interrupted: false };
+  const result: EpisodeProgrammingResult = { programmed: [], unannounced: [], failed: [], interrupted: false };
+  const handled = new Set<number>();
   const owner = readOwner();
   const initial = readConfig();
   if (!owner || !isDownloadFeatureEnabled(initial) || !initial.sonarrUrl || !initial.sonarrApiKey || !episodes.length) return { ...result, interrupted: true };
@@ -81,6 +84,8 @@ export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season
     if (!profileId) profileId = resolveEffectiveQualityProfileId(await io.profiles(initial.sonarrUrl, initial.sonarrApiKey), qualityPreference);
     if (!profileId) return { ...result, failure: `Aucun profil ${qualityLabel} compatible n’est disponible dans Sonarr.` };
 
+    // `ensureOnly` peut ajouter la série : la portée est relue juste avant cette écriture.
+    if (!stillOwned()) return { ...result, interrupted: true };
     const ensured = await io.ensureSeries({ url: initial.sonarrUrl, apiKey: initial.sonarrApiKey, title, tmdbId, tvdbId, imdbId, season, episode: episodes[0], qualityProfileId: profileId, qualityPreference, ensureOnly: true });
     const seriesId = ensured.success ? ensured.target?.seriesId : undefined;
     if (!seriesId) return { ...result, failure: ensured.message || 'Sonarr n’a pas confirmé la série exacte.' };
@@ -102,16 +107,18 @@ export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season
     }
     for (const episode of episodes) {
       const target = known.find(entry => Number(entry.seasonNumber) === Number(season) && Number(entry.episodeNumber) === Number(episode));
-      if (!target?.id) { result.unannounced.push(episode); continue; }
-      if (target.hasFile === true) continue;
+      if (!target?.id) { result.unannounced.push(episode); handled.add(episode); continue; }
+      if (target.hasFile === true) { handled.add(episode); continue; }
       if (target.monitored !== true) {
         if (!stillOwned()) return { ...result, interrupted: true };
         await io.put(`${base}/api/v3/episode/${target.id}`, { ...target, monitored: true }, headers);
       }
       result.programmed.push(episode);
+      handled.add(episode);
     }
   } catch (error: unknown) {
-    return { ...result, failure: (error instanceof Error && error.message) || 'Impossible de joindre Sonarr.' };
+    // Un échec partiel reste visible : les épisodes non traités sont rendus pour être relancés.
+    return { ...result, failed: episodes.filter(episode => !handled.has(episode)), failure: (error instanceof Error && error.message) || 'Impossible de joindre Sonarr.' };
   }
   return result;
 }

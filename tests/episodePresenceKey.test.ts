@@ -10,7 +10,7 @@ const bundle = await build({ entryPoints: ['src/store/mediaPresenceStore.ts'], b
     builder.onLoad({ filter: /.*/, namespace: 'ports' }, args => ({ contents: args.path === 'downloadConfigStore'
       ? 'export const useDownloadConfigStore={getState:()=>({isHydrated:true,downloadsEnabled:true,sonarrUrl:"http://sonarr",sonarrApiKey:"k"})};'
       : args.path === 'sonarrRadarr'
-        ? 'export const cleanUrl=u=>u;export const executeGet=async url=>url.endsWith("/api/v3/series")?[{id:7,tvdbId:123,tmdbId:42}]:url.includes("/api/v3/episode?seriesId=7")?[{seasonNumber:3,episodeNumber:4,hasFile:true},{seasonNumber:3,episodeNumber:5,hasFile:false},{seasonNumber:3,episodeNumber:6,hasFile:false,monitored:true}]:[];'
+        ? 'export const cleanUrl=u=>u;export const executeGet=async url=>url.endsWith("/api/v3/series")?[{id:7,tvdbId:123,tmdbId:42},{id:8,tmdbId:43,monitored:false}]:url.includes("/api/v3/episode?seriesId=8")?[{seasonNumber:1,episodeNumber:1,hasFile:false,monitored:true}]:url.includes("/api/v3/episode?seriesId=7")?[{seasonNumber:3,episodeNumber:4,hasFile:true},{seasonNumber:3,episodeNumber:5,hasFile:false},{seasonNumber:3,episodeNumber:6,hasFile:false,monitored:true}]:[];'
         : args.path === 'plexAvailability' ? 'export const checkPlexAvailability=async()=>({available:false});'
         : args.path === 'firebase' ? 'export const auth={currentUser:{uid:"u1"}};'
         : 'export const onAuthStateChanged=()=>()=>{};' }));
@@ -23,6 +23,9 @@ test('SEENIT-DOWNLOAD-014 #879 un épisode téléchargé dans Sonarr est reconnu
   assert.deepEqual({ ...presence.episodesHasFile }, { '3x4': true, '3x5': false, '3x6': false });
   // #879 — même clé pour la surveillance Sonarr (épisode à venir programmé).
   assert.deepEqual({ ...presence.episodesMonitored }, { '3x4': false, '3x5': false, '3x6': true });
+  // Série désactivée dans Sonarr : ses épisodes surveillés ne seront pas récupérés, donc pas « programmés ».
+  const paused = await useMediaPresenceStore.getState().checkPresence({ tmdbId: 43, mediaType: 'tv', forceRefresh: true });
+  assert.deepEqual({ ...paused.episodesMonitored }, { '1x1': false });
   assert.equal(presence.seasonsHasFile[3], false);
   for (const file of ['src/screens/ShowDetailView.tsx', 'src/components/DownloadModal.tsx', 'src/store/mediaPresenceStore.ts']) {
     const source = readFileSync(file, 'utf8');
