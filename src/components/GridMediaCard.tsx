@@ -45,13 +45,15 @@ export const GridMediaCard = React.memo(function GridMediaCard({
   const openLabel = `Ouvrir la fiche ${isTv ? 'Série' : 'Film'} ${displayTitle}`;
 
   const rating = media.vote_average && media.vote_average > 0 ? media.vote_average.toFixed(1) : null;
-  const characterOrJob = (media as any).character || (media as any).job;
+  // Champs facultatifs des crédits TMDB (rôle, poste, nombre d'épisodes), typés au lieu de `any`.
+  const credit = media as TMDBMedia & { character?: string; job?: string; number_of_episodes?: number };
+  const characterOrJob = credit.character || credit.job;
 
   const isAtCinema = !isTv && (isMovieAtCinema(media) || isMovieAtCinema(show));
   const isUpcoming = !isTv && !isAtCinema && (isMovieUpcoming(media) || isMovieUpcoming(show));
 
   const seenCount = isTv ? (show?.seenEpisodes?.length || 0) : 0;
-  const totalEpisodes = show?.totalAiredEpisodes || show?.totalEpisodes || (media as any).number_of_episodes || 0;
+  const totalEpisodes = show?.totalAiredEpisodes || show?.totalEpisodes || credit.number_of_episodes || 0;
   const progressPercentage = isUpToDate
     ? 100
     : totalEpisodes > 0
