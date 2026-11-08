@@ -128,8 +128,10 @@ export function DialogLayer({ onDismiss, label, historyMode = 'local', canDismis
     document.addEventListener('keydown', handleKey, true);
     document.addEventListener('focusin', handleFocus);
     syncBackground();
+    // Focus initial différé d'une image : il ne reprend jamais un focus déjà posé dans le dialogue
+    // (champ ouvert par un premier toucher, image retardée d'un onglet en arrière-plan).
     const frame = requestAnimationFrame(() => {
-      if (activeSurface() === surface) focusInside(surface);
+      if (activeSurface() === surface && !surface.contains(document.activeElement)) focusInside(surface);
     });
     // #872 : la zone visible ne suit le clavier que pendant une saisie. Sans champ actif (fiche ouverte
     // depuis la recherche, clavier refermé), la couche prend toute la fenêtre, même si visualViewport garde
