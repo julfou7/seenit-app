@@ -64,9 +64,9 @@ test('SEENIT-DOWNLOAD-014 #879 le prochain épisode est coché, la sélection tr
 test('SEENIT-DOWNLOAD-014 #879 le lancement garde les gardes de la popup et une seule voie Sonarr', () => {
   const body = view.slice(view.indexOf('const launchPickedEpisodes'), view.indexOf('const openPreciseVersion'));
   assert.match(body, /if \(!isDownloadFeatureEnabled\(config\)\) return;/);
-  assert.match(body, /if \(model\.presence\.loading\) \{/);
+  assert.match(body, /const presence = await settledPresence\('tv'\);\n\s+if \(!presence\) return;/, 'présence vérifiée avant tout lancement (attendue, plus refusée, 08/11)');
   assert.match(body, /if \(!\(config\.sonarrUrl && config\.sonarrApiKey\)\)/);
-  assert.match(body, /skip: episode => Boolean\(model\.presence\.episodesHasFile\?\.\[episodePresenceKey\(season, episode\)\]\)/, 'un fichier présent n’est jamais remplacé');
+  assert.match(body, /skip: episode => Boolean\(presence\.episodesHasFile\?\.\[episodePresenceKey\(season, episode\)\]\)/, 'un fichier présent n’est jamais remplacé');
   assert.match(body, /\|\| Boolean\(model\.hasActiveDownloadInScope\?\.\(\{ mediaType: 'tv', tmdbId: Number\(effectiveTmdbId\), seasonNumber: season, episodeNumber: episode \}\)\)/, 'pas de double lancement');
   assert.match(body, /readConfig: \(\) => useDownloadConfigStore\.getState\(\),/, 'configuration relue avant chaque épisode');
   assert.match(readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8'), /hasActiveDownloadInScope: scope => hasActiveDownloadInScope\(useLiveDownloadStore\.getState\(\)\.downloads, scope\)/, 'même garde que la popup, fournie par le cœur');
@@ -84,7 +84,7 @@ async function loadBatch() {
   const bundle = await build({ entryPoints: ['src/features/downloads/downloadLaunch.ts'], bundle: true, write: false, platform: 'node', format: 'cjs',
     plugins: [{ name: 'launch-ports', setup(builder) {
       builder.onResolve({ filter: /\/(?:shows\/tmdb|services\/sonarrRadarr|downloadLifecycle|qualityProfileSelection|episodeSeasonPackFallback|downloadAvailability|lib\/firebase)$/ }, args => ({ path: args.path, namespace: 'ports' }));
-      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const tmdb={};export const fetchQualityProfiles=0,searchAndDownloadInRadarr=0,searchAndDownloadInSonarr=0,acceptDownloadRequest=0,beginDownloadRequest=0,failDownloadRequest=0,updateDownloadRequest=0,resolveEffectiveQualityProfileId=0,downloadEpisodeWithSeasonPackFallback=0,availabilityHint=0;export const auth={currentUser:null};' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const tmdb={};export const fetchQualityProfiles=0,searchAndDownloadInRadarr=0,searchAndDownloadInSonarr=0,acceptDownloadRequest=0,beginDownloadRequest=0,failDownloadRequest=0,updateDownloadRequest=0,resolveEffectiveQualityProfileId=0,downloadEpisodeWithSeasonPackFallback=0,availabilityHint=0,noReleaseToastAction=0;export const auth={currentUser:null};' }));
     } }] });
   const module = { exports: {} as Record<string, unknown> };
   vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module, exports: module.exports }));

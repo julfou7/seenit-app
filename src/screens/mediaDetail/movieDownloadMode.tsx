@@ -28,7 +28,7 @@ export function MovieDownloadButton({ state, progress, upcoming, onPress }: { st
           : state === 'active' ? 'relative text-white'
             : 'bg-zinc-800 text-zinc-200 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]')}
     style={state === 'active' ? { background: `conic-gradient(#F4F4F5 0 ${pct}%, #3F3F46 ${pct}% 100%)` } : undefined}>
-    {state === 'active' ? <span className="absolute inset-[4px] rounded-[12px] bg-[#18181B] grid place-items-center text-[13px] font-extrabold">{pct} %</span> : state === 'programmed' ? <CalendarClock size={22} /> : <DownloadMark size={26} />}
+    {state === 'active' ? <span className="absolute inset-[4px] rounded-[12px] bg-[#18181B] grid place-items-center text-[13px] font-extrabold">{pct} %</span> : state === 'programmed' ? <CalendarClock size={22} /> : <DownloadMark size={34} strokeWidth={1.9} />}
   </button>;
 }
 

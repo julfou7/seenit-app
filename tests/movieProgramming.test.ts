@@ -104,7 +104,9 @@ test('DlFilm télécharger un film sorti passe par la voie de la popup (profil R
   assert.doesNotMatch(view, /launchMovieDownload/);
   // Présence confirmée pendant que la barre est ouverte (Plex sans Radarr) : barre fermée, aucun lancement.
   const launchFilm = view.slice(view.indexOf('const launchFilm = async'), view.indexOf('const cancelFilm = async'));
-  assert.ok(launchFilm.indexOf('if (movieAvailable)') > 0 && launchFilm.indexOf('if (movieAvailable)') < launchFilm.indexOf('launchArrDownload') && launchFilm.indexOf('if (movieAvailable)') < launchFilm.indexOf('programArrMovie'), 'la présence est revérifiée avant tout lancement ou programmation');
+  // Depuis le 08/11 (SEENIT-DOWNLOAD-015), la présence vérifiée est attendue au lancement, puis relue.
+  const guard = launchFilm.indexOf('if (presence.radarrHasFile || presence.plexInfo?.available)');
+  assert.ok(guard > launchFilm.indexOf("await settledPresence('movie')") && guard < launchFilm.indexOf('launchArrDownload') && guard < launchFilm.indexOf('programArrMovie'), 'la présence est revérifiée avant tout lancement ou programmation');
   assert.match(view, /useEffect\(\(\) => \{ if \(movieAvailable\) setFilmMode\(false\); \}, \[movieAvailable\]\);/);
   assert.match(view, /\{filmMode && canUseFilmMode && !movieAvailable && <DownloadModeBar/);
   const launch = readFileSync('src/features/downloads/downloadLaunch.ts', 'utf8');

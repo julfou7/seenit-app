@@ -14,7 +14,8 @@ export function loadMoreLabel(remainingCount: number, step: number, lastLabel: s
 /**
  * SEENIT-UX-020 #873 — Le seul « Afficher plus » de l'app : trois prochaines vignettes, libellé du lot et
  * « X en attente ». Variante liste (pastille) ou carrousel (tuile de fin de rail). Toute pagination
- * progressive le réutilise ; aucun bouton texte « voir plus » séparé.
+ * progressive le réutilise ; aucun bouton texte « voir plus » séparé. Retour terrain du 08/11 : quand le
+ * libellé annonce déjà le reste (« Afficher les 46 », « Afficher le dernier »), le compteur n'est pas répété.
  */
 export function LoadMore({ previews, remainingCount, onLoad, step = 6, lastLabel = 'Afficher le dernier', tile = false, tileMovies = false, round = false, label }: {
   previews: readonly LoadMorePreview[]; remainingCount: number; onLoad: () => void; step?: number; lastLabel?: string;
@@ -23,7 +24,7 @@ export function LoadMore({ previews, remainingCount, onLoad, step = 6, lastLabel
   if (remainingCount <= 0) return null;
   return <button type="button" data-load-more className={`home-load-more${tile ? ' home-load-more--tile' : ''}${tileMovies ? ' home-load-more--movies' : ''}${round ? ' home-load-more--round' : ''}`} onClick={onLoad}>
     <span className="home-load-more__posters" aria-hidden="true">{previews.slice(0, 3).map(preview => <span key={preview.key}>{preview.initial}{preview.imagePath && <img src={imageUrl(preview.imagePath, 'w92')!} alt="" loading="lazy" decoding="async" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}</span>)}</span>
-    <strong>{label || loadMoreLabel(remainingCount, step, lastLabel)}</strong><span>{remainingCount} en attente</span>
+    <strong>{label || loadMoreLabel(remainingCount, step, lastLabel)}</strong>{remainingCount > step && <span>{remainingCount} en attente</span>}
   </button>;
 }
 

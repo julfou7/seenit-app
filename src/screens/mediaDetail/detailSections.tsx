@@ -13,15 +13,17 @@ const initialsOf = (name: string) => name.split(/\s+/).filter(Boolean).slice(0, 
 
 /**
  * Personnages (série) ou Casting (film) en lignes du prototype : portrait rond 48 px, personnage,
- * nombre d'épisodes et barre de présence pour une série, interprète en gris. Six lignes, puis tout.
+ * nombre d'épisodes et barre de présence pour une série, interprète en gris. Six lignes, puis dix par dix
+ * (retour terrain du 08/11 : plus de « Afficher les 46 » d'un bloc), et « Réduire » une fois tout affiché.
  */
+const CAST_FIRST = 6, CAST_STEP = 10;
 export function CastRows({ cast, isSeries, totalEpisodes, loading, onOpenPerson }: { cast: readonly CastMember[]; isSeries: boolean; totalEpisodes: number; loading: boolean; onOpenPerson: (personId: number) => void }) {
-  const [showAll, setShowAll] = useState(false);
+  const [limit, setLimit] = useState(CAST_FIRST);
   const reveal = useRevealFocus<HTMLElement>('[data-cast-row]');
   const title = isSeries ? 'Personnages' : 'Casting';
   if (loading) return <section className="flex flex-col gap-2.5" aria-hidden="true" data-seenit-casting-loading="true"><DetailSectionTitle>{title}</DetailSectionTitle>{[0, 1, 2].map(index => <div key={index} className="flex items-center gap-3 animate-pulse"><div className="w-12 h-12 rounded-full bg-zinc-800/80" /><div className="flex-1 space-y-2"><div className="h-3.5 w-1/2 rounded bg-zinc-800/80" /><div className="h-1 w-full rounded bg-zinc-800/60" /></div></div>)}</section>;
   if (cast.length === 0) return null;
-  const visible = showAll ? cast : cast.slice(0, 6);
+  const visible = cast.slice(0, limit);
   return <section ref={reveal.containerRef} className="flex flex-col gap-2.5" aria-labelledby="detail-cast-title">
     <DetailSectionTitle id="detail-cast-title">{title}</DetailSectionTitle>
     {visible.map((actor, index) => {
@@ -38,8 +40,8 @@ export function CastRows({ cast, isSeries, totalEpisodes, loading, onOpenPerson 
       </button>;
     })}
     {/* #873 : le seul « Afficher plus » de l'app (portraits des suivants) ; « Réduire » reste une action secondaire. */}
-    {cast.length > 6 && !showAll && <LoadMore round previews={cast.slice(6, 9).map((actor, index) => ({ key: `cast-more-${actor.id}-${index}`, initial: initialsOf(actor.name || '?'), imagePath: actor.profile_path }))} remainingCount={cast.length - 6} step={cast.length} onLoad={() => { setShowAll(true); reveal.focusItem(6); }} />}
-    {cast.length > 6 && showAll && <button type="button" onClick={() => { setShowAll(false); reveal.focusLoadMore(); }} aria-expanded className="self-center min-h-11 px-4 text-[13px] font-bold text-zinc-400">Réduire</button>}
+    {cast.length > limit && <LoadMore round previews={cast.slice(limit, limit + 3).map((actor, index) => ({ key: `cast-more-${actor.id}-${index}`, initial: initialsOf(actor.name || '?'), imagePath: actor.profile_path }))} remainingCount={cast.length - limit} step={CAST_STEP} onLoad={() => { reveal.focusItem(limit); setLimit(limit + CAST_STEP); }} />}
+    {cast.length > CAST_FIRST && cast.length <= limit && <button type="button" onClick={() => { setLimit(CAST_FIRST); reveal.focusLoadMore(); }} aria-expanded className="self-center min-h-11 px-4 text-[13px] font-bold text-zinc-400">Réduire</button>}
   </section>;
 }
 

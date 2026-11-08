@@ -3,7 +3,7 @@ import { fetchQualityProfiles, searchAndDownloadInRadarr, searchAndDownloadInSon
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from './downloadLifecycle';
 import { resolveEffectiveQualityProfileId } from './qualityProfileSelection';
 import { downloadEpisodeWithSeasonPackFallback } from './episodeSeasonPackFallback';
-import { availabilityHint, type DownloadAvailability } from './downloadAvailability';
+import { noReleaseToastAction, type DownloadAvailability } from './downloadAvailability';
 import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
 import { auth } from '../../lib/firebase';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
@@ -171,7 +171,7 @@ export async function launchArrDownload({ config, mediaType, title, year, tmdbId
     } else {
       failDownloadRequest(requestId, result.message, result.failureCode, result.availability);
       notify(result.failureCode === 'no_release'
-        ? `En attente de disponibilité · ${availabilityHint(result.availability)}` : result.message,
+        ? noReleaseToastAction(result.availability) : result.message,
         result.failureCode === 'no_release' ? 'download' : 'error');
     }
   } catch (error: unknown) {
