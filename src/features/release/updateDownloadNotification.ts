@@ -41,7 +41,7 @@ export async function notifyVerifiedUpdateDownload(version: string): Promise<voi
         ...presentation,
         smallIcon: 'ic_stat_seenit',
         iconColor: '#E5A93D',
-        channelId: 'seenit_app',
+        channelId: 'seenit_updates',
         subText: 'Mise à jour',
         extra: {
           type: 'APP_UPDATE_DOWNLOADED',

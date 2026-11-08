@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.277**
+Version applicative : **1.4.278**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1214,7 +1214,7 @@ pour le cache des sagas et univers.
 ## 8. Webhooks et notifications
 
 - **SEENIT-NOTIFICATION-005** — [Refonte #778](notification-refactor-2026-10-27.md) : titre œuvre, type `subText`, compact sans emoji et code épisode unique, détail distinct et actions réelles. L’affiche entière reste en contain, sans bitmap dans AlarmManager.
-- **SEENIT-NOTIFICATION-006** — Sept canaux dédiés et `seenit_downloads` conservé ; création idempotente au démarrage, accès aux réglages système, préférences fusionnées sans écraser les choix et reprogrammation v8. Les Réglages ouvrent aussi le réglage système d'un canal précis (rappels, téléchargements/Plex, mise à jour) ; le plugin natif n'accepte qu'un identifiant `seenit_*` et retombe sur l'écran de notifications de l'application avant Android 8 ou en cas d'échec.
+- **SEENIT-NOTIFICATION-006** — Huit canaux dédiés et `seenit_downloads` conservé ; depuis #909 (retour terrain du 08/11, `USR-2026-11-08-008`), la nouvelle version (push serveur et mise à jour téléchargée) passe par `seenit_updates` « Mises à jour de SeenIt », en importance haute avec vibration, car `seenit_app` (importance basse) la rendait silencieuse et Android interdit de relever l'importance d'un canal existant ; un appareil sans ce canal la reçoit sur le canal par défaut de Firebase ; création idempotente au démarrage, accès aux réglages système, préférences fusionnées sans écraser les choix et reprogrammation v8. Les Réglages ouvrent aussi le réglage système d'un canal précis (rappels, téléchargements/Plex, mise à jour) ; le plugin natif n'accepte qu'un identifiant `seenit_*` et retombe sur l'écran de notifications de l'application avant Android 8 ou en cas d'échec.
 - **SEENIT-NOTIFICATION-007** — Identité stable par œuvre pour les alertes visibles, alarmes futures distinctes ; mises à jour silencieuses, retrait des alertes vues/archivées et isolation UID. Les téléchargements restent distincts par demande/épisode.
 - **SEENIT-NOTIFICATION-008** — Rappels existants, actualités, versions et téléchargements adoptent la même grammaire. Un Vu de notification ouvre SeenIt sur l’épisode exact et actualise son état. Aucune plateforme, disponibilité, progression ou durée inconnue n’est inventée. Les nouveaux déclencheurs backend restent un lot séparé tant que non opérationnels.
 

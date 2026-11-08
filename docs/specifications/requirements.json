@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.277",
+  "applicationVersion": "1.4.278",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -3571,6 +3571,10 @@
         "backend"
       ],
       "tests": [
+        {
+          "file": "tests/notificationChannels.test.ts",
+          "contains": "SEENIT-NOTIFICATION-006 #909 la nouvelle version sonne et vibre : canal dédié en importance haute, partout"
+        },
         {
           "file": "tests/notificationRefactor.test.ts",
           "contains": "SEENIT-NOTIFICATION-006 fusionne les préférences sans écraser les choix"
