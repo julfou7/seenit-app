@@ -201,12 +201,11 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     filmTrackRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
   /**
-   * Retour terrain du 08/11 : un lancement pendant la vérification Plex/Radarr/Sonarr l'attend (toast court)
-   * au lieu d'être refusé ; `null` si personne n'a répondu, et rien n'est lancé.
+   * Retour terrain du 08/11 : un lancement pendant la vérification Plex/Radarr/Sonarr l'attend en silence
+   * (un seul toast par lancement) au lieu d'être refusé ; `null` si personne n'a répondu, et rien n'est lancé.
    */
   const settledPresence = async (mediaType: 'movie' | 'tv') => {
     if (!model.presence.loading) return model.presence;
-    useToastStore.getState().showToast({ title, action: 'Vérification de la disponibilité…', posterPath: show?.posterPath }, 'download');
     const { waitForSettledPresence } = await import('../store/mediaPresenceStore');
     const presence = await waitForSettledPresence(effectiveTmdbId!, mediaType);
     if (!presence) useToastStore.getState().showToast({ title, action: 'Vérification impossible, réessaie.', posterPath: show?.posterPath }, 'error');
@@ -291,7 +290,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     const sameScope = () => { const current = useDownloadConfigStore.getState(); return isDownloadFeatureEnabled(current) && `${auth.currentUser?.uid || ''}\n${current.sonarrUrl}\n${current.sonarrApiKey}` === scope; };
     for (const [season, episodes] of toProgram) { if (!sameScope() || await programPickedEpisodes(season, episodes, quality, nowCount)) return; }
     if (!nowCount) return;
-    if (!single) useToastStore.getState().showToast({ title, action: `${nowCount} épisode${nowCount > 1 ? 's' : ''} · recherche ${qualityLabel} en cours…`, posterPath: show?.posterPath }, 'download');
+    // Lot mixte : la programmation a déjà résumé « N ajoutés · M programmés » dans son unique toast.
+    if (!single && !toProgram.size) useToastStore.getState().showToast({ title, action: `${nowCount} épisode${nowCount > 1 ? 's' : ''} lancé${nowCount > 1 ? 's' : ''} · ${qualityLabel}`, posterPath: show?.posterPath }, 'download');
     // Une saison après l'autre, dans l'ordre ; chaque lot relit compte, gate et serveur avant chaque épisode.
     for (const [season, episodes] of toDownload) {
       if (!sameScope()) return;
@@ -302,8 +302,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       readConfig: () => useDownloadConfigStore.getState(),
       // Mêmes gardes que la popup : un fichier présent n'est jamais remplacé, pas de double lancement.
       skip: episode => Boolean(presence.episodesHasFile?.[episodePresenceKey(season, episode)]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
-      // Un épisode : tous les messages ; plusieurs : seulement les erreurs (le bilan reste dans Téléchargements).
-      notify: (episode, action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: show?.posterPath }, toastType); }
+      // Un seul toast par lancement : celui de l'épisode seul, ou le bilan du lot ci-dessus ; la suite est dans Télécharger.
+      notify: (episode, action, toastType = 'download') => { if (single) useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: show?.posterPath }, toastType); }
       });
       if (interrupted) return;
     }
@@ -317,12 +317,18 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       season, episodes, qualityPreference: quality, readConfig: () => useDownloadConfigStore.getState()
     });
     if (outcome.interrupted) return true;
+    // Retour terrain du 08/11 : un seul toast par lancement, qui résume la programmation (et les épisodes
+    // lancés en même temps) ; un échec partiel ou un épisode pas encore annoncé y est ajouté, pas empilé.
     const toast = useToastStore.getState().showToast;
-    if (outcome.failure && !outcome.programmed.length) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return false; }
+    const plural = (count: number, word: string) => `${count > 1 ? 'Épisodes' : 'Épisode'} ${word}`;
+    const unannounced = outcome.unannounced.length ? `${plural(outcome.unannounced.length, outcome.unannounced.join(', '))} pas encore annoncé${outcome.unannounced.length > 1 ? 's' : ''}` : '';
+    if (!outcome.programmed.length) {
+      if (outcome.failure || unannounced) toast({ title, action: outcome.failure || `${unannounced} dans Sonarr : réessaie plus tard.`, posterPath: show?.posterPath }, outcome.failure ? 'error' : 'info');
+      return false;
+    }
     const single = episodes.length === 1 && !launchedNow;
-    if (outcome.programmed.length) toast({ title, subtitle: single ? `S${season} | E${episodes[0]}` : undefined, action: single ? `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` : programmingSummary(launchedNow, outcome.programmed.length, quality), posterPath: show?.posterPath }, 'success');
-    if (outcome.failure && outcome.programmed.length) toast({ title, action: `${outcome.failed.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.failed.join(', ')} non programmé${outcome.failed.length > 1 ? 's' : ''} : ${outcome.failure}`, posterPath: show?.posterPath }, 'error');
-    if (outcome.unannounced.length) toast({ title, action: `${outcome.unannounced.length > 1 ? 'Épisodes' : 'Épisode'} ${outcome.unannounced.join(', ')} pas encore annoncé${outcome.unannounced.length > 1 ? 's' : ''} dans Sonarr : réessaie plus tard.`, posterPath: show?.posterPath }, 'info');
+    const notes = [outcome.failure ? `${plural(outcome.failed.length, outcome.failed.join(', '))} non programmé${outcome.failed.length > 1 ? 's' : ''}` : '', unannounced].filter(Boolean);
+    toast({ title, subtitle: single ? `S${season} | E${episodes[0]}` : undefined, action: [single ? `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` : programmingSummary(launchedNow, outcome.programmed.length, quality), ...notes].join(' · '), posterPath: show?.posterPath }, notes.length ? 'info' : 'success');
     // Relit la présence : les épisodes programmés passent en « Programmé ».
     if (outcome.programmed.length) void refreshPlexAvailability();
     return false;

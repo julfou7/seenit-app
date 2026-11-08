@@ -3,7 +3,7 @@ import { fetchQualityProfiles, searchAndDownloadInRadarr, searchAndDownloadInSon
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from './downloadLifecycle';
 import { resolveEffectiveQualityProfileId } from './qualityProfileSelection';
 import { downloadEpisodeWithSeasonPackFallback } from './episodeSeasonPackFallback';
-import { noReleaseToastAction, type DownloadAvailability } from './downloadAvailability';
+import { type DownloadAvailability } from './downloadAvailability';
 import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
 import { auth } from '../../lib/firebase';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
@@ -80,7 +80,9 @@ export async function launchArrDownload({ config, mediaType, title, year, tmdbId
     quality: qualityLabel
   });
 
-  notify(`Recherche ${qualityLabel} en cours…`, 'download');
+  // Retour terrain du 08/11 : un seul toast, au lancement ; la suite (recherche, transfert, attente, échec)
+  // se lit dans l'onglet Télécharger, avec le badge de la navigation pour un problème.
+  notify(`Téléchargement lancé · ${qualityLabel}`, 'download');
   onStarted?.();
 
   try {
@@ -164,20 +166,13 @@ export async function launchArrDownload({ config, mediaType, title, year, tmdbId
         });
       }
 
-      if (result.fallbackUsed) {
-        notify(statusText, 'download');
-      }
       return result.packEpisodes || [];
     } else {
       failDownloadRequest(requestId, result.message, result.failureCode, result.availability);
-      notify(result.failureCode === 'no_release'
-        ? noReleaseToastAction(result.availability) : result.message,
-        result.failureCode === 'no_release' ? 'download' : 'error');
     }
   } catch (error: unknown) {
     const message = (error instanceof Error && error.message) || `Impossible de joindre ${client}.`;
     failDownloadRequest(requestId, message);
-    notify(message, 'error');
   }
   return [];
 }

@@ -3,6 +3,7 @@ import { Clock3, Film, Tv } from 'lucide-react';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { fetchProgrammedCalendar, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem } from '../features/downloads/programmedCalendar';
+import type { LiveDownloadItem } from '../services/sonarrRadarrLive';
 
 type EpisodeItem = Extract<ProgrammedItem, { kind: 'episode' }>;
 const movieRelease = (date?: string) => {
@@ -12,12 +13,24 @@ const movieRelease = (date?: string) => {
 };
 const code = (item: EpisodeItem) => `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
 
+const pad = (value: number) => String(value).padStart(2, '0');
+const requestScope = (item: LiveDownloadItem) => item.mediaType === 'movie' ? 'Film'
+  : item.seasonNumber != null ? item.episodeNumber != null ? `S${pad(item.seasonNumber)}E${pad(item.episodeNumber)}` : `Saison ${item.seasonNumber}` : 'Série';
+const posterUrl = (path?: string | null) => !path ? null : path.startsWith('http') ? path : `https://image.tmdb.org/t/p/w185${path}`;
+/** Même périmètre exact (TMDB, saison et épisode), jamais le titre. */
+const coveredBy = (item: ProgrammedItem, request: LiveDownloadItem) => Number(request.tmdbId) > 0 && Number(item.tmdbId) === Number(request.tmdbId)
+  && (item.kind === 'movie' ? request.mediaType === 'movie'
+    : request.mediaType === 'tv' && Number(request.seasonNumber) === item.season && Number(request.episodeNumber) === item.episode);
+
 /**
  * #879 — Section « Programmés » de l'onglet Télécharger : épisodes et films que Sonarr et Radarr
  * récupéreront à leur sortie, regroupés par série (identifiant Sonarr exact). « Annuler » retire la
  * surveillance de l'élément, sans rien supprimer ; une source injoignable est dite, pas masquée.
+ * Retour terrain du 08/11 (« Le Chat Chapeauté ») : une demande lancée sans version disponible, dont la
+ * surveillance est confirmée (`watching`), y figure aussi avec la raison (« Pas encore de version ») ;
+ * l'entrée du calendrier du même périmètre exact n'est pas répétée, sa date est reprise sur la carte.
  */
-export function ProgrammedSection({ refreshKey = 0, onShowClick }: { refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void }) {
+export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], onRemoveWatching }: { refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void }) {
   const [items, setItems] = useState<ProgrammedItem[]>([]);
   const [failures, setFailures] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
@@ -64,10 +77,13 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick }: { refreshKey?
     }
   };
 
-  if (!items.length && !failures.length) return null;
+  if (!items.length && !failures.length && !watching.length) return null;
   const series = new Map<number, EpisodeItem[]>();
   const movies: Extract<ProgrammedItem, { kind: 'movie' }>[] = [];
+  const dates = new Map<string, string | undefined>();
   for (const item of items) {
+    const request = watching.find(entry => coveredBy(item, entry));
+    if (request) { dates.set(request.id, item.date); continue; }
     if (item.kind === 'movie') movies.push(item);
     else series.set(item.seriesId, [...(series.get(item.seriesId) || []), item]);
   }
@@ -76,6 +92,24 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick }: { refreshKey?
   return <section className="downloads-section" data-programmed>
     <h2>Programmés</h2>
     {failures.length > 0 && <p className="download-card__meta" role="status">{failures.join(' et ')} injoignable pour l’instant : la liste peut être incomplète.</p>}
+    {watching.map(request => {
+      const isTv = request.mediaType === 'tv';
+      const name = request.movieTitle || request.seriesTitle || request.title;
+      const poster = posterUrl(request.posterPath);
+      const open = () => request.tmdbId && onShowClick?.(request.tmdbId, request.mediaType);
+      const date = dates.get(request.id);
+      return <article key={`w${request.id}`} className="download-card programmed" data-programmed-request={request.id}>
+        <div className="download-card__head">
+          <button type="button" className="download-card__poster download-season__poster" disabled={!request.tmdbId || !onShowClick} aria-label={`Ouvrir ${name}`} onClick={open}>{poster ? <img src={poster} alt="" loading="lazy" decoding="async" /> : isTv ? <Tv size={22} /> : <Film size={22} />}</button>
+          <div className="download-card__body">
+            <button type="button" className="download-card__title" disabled={!request.tmdbId || !onShowClick} onClick={open}>{name}</button>
+            <p className="download-card__scope">{requestScope(request)} · {date ? movieRelease(date) : 'Pas encore de version'}</p>
+            <p className="download-season__state programmed__state"><Clock3 size={13} aria-hidden="true" />{isTv ? 'Sonarr' : 'Radarr'} le récupère dès qu’une version sort</p>
+          </div>
+          {onRemoveWatching && <button type="button" onClick={() => onRemoveWatching(request)} aria-label={`Annuler la programmation de ${name}`} className="programmed__cancel">Annuler</button>}
+        </div>
+      </article>;
+    })}
     {[...series.values()].map(group => {
       const first = group[0];
       const open = () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv');

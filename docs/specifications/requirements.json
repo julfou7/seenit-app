@@ -5,7 +5,7 @@
   "requirements": [
     {
       "id": "SEENIT-DOWNLOAD-015",
-      "title": "Demande visible tout de suite dans « En attente » et lancement qui attend la vérification de présence",
+      "title": "Demande visible tout de suite, un seul toast au lancement, attente surveillée dans « Programmés »",
       "targets": [
         "pwa",
         "apk"
@@ -13,7 +13,15 @@
       "tests": [
         {
           "file": "tests/detailFieldFeedback.test.ts",
-          "contains": "SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente », puis y reste tant qu’aucune version n’est sortie"
+          "contains": "SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente », puis passe dans « Programmés » si aucune version n’est sortie"
+        },
+        {
+          "file": "tests/detailFieldFeedback.test.ts",
+          "contains": "SEENIT-DOWNLOAD-015 un seul toast au lancement ; le résultat (trouvé, pas de version, panne) va dans l’onglet, sans toast"
+        },
+        {
+          "file": "tests/downloadAvailabilityRuntime.test.ts",
+          "contains": "SEENIT-DOWNLOAD-015 vrai chemin Radarr : une alerte de santé hors indexers ne bloque pas « pas encore disponible », une alerte d’indexer est nommée"
         },
         {
           "file": "tests/detailFieldFeedback.test.ts",

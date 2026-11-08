@@ -97,7 +97,8 @@ test('SEENIT-DOWNLOAD-014 #879 programmation : portée relue avant l’ajout de 
   const result = await programArrEpisodes({ title: 'Série', tmdbId: 42, season: 2, episodes: [5, 6, 7], qualityPreference: '1080p', readConfig: () => config, readOwner: () => 'u1', io: partial.io });
   assert.deepEqual([[...result.programmed], [...result.failed], result.failure], [[5], [6, 7], 'Sonarr a refusé la modification.']);
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
-  assert.match(view, /if \(outcome\.failure && outcome\.programmed\.length\) toast\(/, 'un échec partiel reste affiché');
+  // Depuis le 08/11 (un seul toast par lancement), l'échec partiel est ajouté au résumé, pas empilé.
+  assert.match(view, /const notes = \[outcome\.failure \? `\$\{plural\(outcome\.failed\.length, outcome\.failed\.join\(', '\)\)\} non programmé/, 'un échec partiel reste affiché');
   // Sélection mixte : la programmation est attendue avant le lot immédiat (pas d'ajout concurrent de la série).
   const launch = view.slice(view.indexOf('const launchPickedEpisodes'), view.indexOf('const programPickedEpisodes'));
   assert.ok(launch.indexOf('await programPickedEpisodes(') > 0 && launch.indexOf('await programPickedEpisodes(') < launch.indexOf('await launchArrEpisodeBatch('));

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import { pickHeroProvider } from '../src/features/providers/heroProvider.ts';
-import { downloadGroup, isPreTransferRequest } from '../src/features/downloads/downloadGroups.ts';
+import { downloadGroup, isPreTransferRequest, isWatchedWaitingRequest } from '../src/features/downloads/downloadGroups.ts';
 import { availabilityHint, noReleaseToastAction } from '../src/features/downloads/downloadAvailability.ts';
 
 // Retours terrain du 08/11 (v1.4.273) sur la fiche série (The Killing), la fiche film (Le Chat Chapeauté)
@@ -23,25 +23,68 @@ test('SEENIT-PROVIDER-003 un seul diffuseur près du bouton principal : celui de
   assert.doesNotMatch(view, /mainProvider|plexProvider/, 'plus de seconde tuile');
 });
 
-test('SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente », puis y reste tant qu’aucune version n’est sortie', () => {
+test('SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente », puis passe dans « Programmés » si aucune version n’est sortie', () => {
   assert.equal(isPreTransferRequest({ status: 'searching', progress: 0 }), true);
   assert.equal(isPreTransferRequest({ status: 'submitting', progress: 0 }), true);
   assert.equal(isPreTransferRequest({ status: 'searching', progress: 12 }), false, 'un transfert commencé est « En cours »');
   assert.equal(isPreTransferRequest({ status: 'downloading', progress: 0 }), false);
+  // Retour terrain du 08/11 : sans version et surveillé = programmé ; surveillance non confirmée = à régler.
+  assert.equal(isWatchedWaitingRequest({ status: 'waiting', progress: 0, availability: { reason: 'no_release', automatic: true } }), true);
+  assert.equal(isWatchedWaitingRequest({ status: 'waiting', progress: 0, availability: { reason: 'no_release', automatic: false } }), false);
+  assert.equal(isWatchedWaitingRequest({ status: 'waiting', progress: 0, availability: { reason: 'unconfirmed', automatic: false } }), false);
+  assert.equal(isWatchedWaitingRequest({ status: 'warning', progress: 0, errorMessage: 'x', availability: { reason: 'no_release', automatic: true } }), false, 'une erreur reste une erreur');
   assert.equal(downloadGroup({ status: 'waiting', progress: 0 }), 'waiting');
   const screen = read('src/screens/DownloadsScreenCore.tsx');
   assert.match(screen, /downloadGroup\(item\) === 'active' && !isPreTransferRequest\(item\)/);
-  assert.match(screen, /downloadGroup\(item\) === 'waiting' \|\| \(downloadGroup\(item\) === 'active' && isPreTransferRequest\(item\)\)/);
-  assert.match(screen, /\{errorDownloads\.length > 0 && renderSection\('À régler', errorDownloads\)\}\n\s+\{activeDownloads\.length > 0 && renderSection\('En cours', activeDownloads, undefined, true\)\}\n\s+\{waitingDownloads\.length > 0 && renderSection\('En attente', waitingDownloads\)\}/);
+  assert.match(screen, /downloadGroup\(item\) === 'attention' \|\| \(downloadGroup\(item\) === 'waiting' && !isWatchedWaitingRequest\(item\)\)/);
+  assert.match(screen, /const waitingDownloads = useMemo\(\(\) => sortDownloadsByAddedAt\(downloads\.filter\(item => downloadGroup\(item\) === 'active' && isPreTransferRequest\(item\)\), 'asc'\), \[downloads\]\);/);
+  assert.match(screen, /<ProgrammedSection refreshKey=\{programmedRefresh\} onShowClick=\{onShowClick\} watching=\{watchedRequests\} onRemoveWatching=\{handleRemove\} \/>/);
+  const programmed = read('src/components/ProgrammedSection.tsx');
+  assert.match(programmed, /data-programmed-request=\{request\.id\}/);
+  assert.match(programmed, /\{date \? movieRelease\(date\) : 'Pas encore de version'\}/);
+  assert.match(programmed, /Number\(item\.tmdbId\) === Number\(request\.tmdbId\)/, 'doublon calendrier reconnu par TMDB exact, jamais le titre');
   const card = read('src/components/DownloadItemCard.tsx');
-  assert.match(card, /waiting \? 'Pas encore disponible'/);
-  assert.match(card, /\$\{attention \? ' download-card--attention' : ''\}\$\{waiting \? ' download-card--waiting' : ''\}/, 'l’attente n’est plus stylée comme une erreur');
-  // Toast d'une ligne : le détail reste sur la carte.
+  assert.match(card, /waiting \? \(item\.availability\?\.reason === 'no_release' \? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier'\)/);
+  assert.match(card, /\$\{toFix \? ' download-card--attention' : ''\}/);
   for (const availability of [{ reason: 'no_release', automatic: true }, { reason: 'no_release', automatic: false }, undefined] as const) {
     assert.ok(noReleaseToastAction(availability).length <= 36, noReleaseToastAction(availability));
   }
-  assert.equal(noReleaseToastAction({ reason: 'no_release', automatic: true }), 'Pas encore disponible · en attente');
   assert.equal(availabilityHint({ reason: 'no_release', automatic: true }), 'Surveillé : il partira seul dès qu’une version compatible sortira.');
+});
+
+// Vrai lancement partagé (popup, fiche film, épisodes, « Ajouter E6 ») : seuls ses services sont simulés.
+async function loadLaunch(outcome: () => Promise<Record<string, unknown>>) {
+  const key = `__launchToast${Math.random().toString(36).slice(2)}`;
+  (globalThis as Record<string, unknown>)[key] = { outcome, failed: [] as unknown[] };
+  const launchBundle = await build({ entryPoints: ['src/features/downloads/downloadLaunch.ts'], bundle: true, write: false, platform: 'node', format: 'esm',
+    plugins: [{ name: 'launch-ports', setup(builder) {
+      builder.onResolve({ filter: /\/(?:shows\/tmdb|services\/sonarrRadarr|downloadLifecycle|qualityProfileSelection|episodeSeasonPackFallback|lib\/firebase)$/ }, args => ({ path: args.path, namespace: 'ports' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: `const s=globalThis.${key};export const tmdb={};export const fetchQualityProfiles=async()=>[];export const resolveEffectiveQualityProfileId=()=>1;
+        export const searchAndDownloadInRadarr=()=>s.outcome();export const searchAndDownloadInSonarr=()=>s.outcome();export const downloadEpisodeWithSeasonPackFallback=()=>s.outcome();
+        export const beginDownloadRequest=()=>'request';export const acceptDownloadRequest=()=>{};export const updateDownloadRequest=()=>{};export const failDownloadRequest=(...args)=>{s.failed.push(args)};export const auth={currentUser:{uid:'owner'}};` }));
+    } }] });
+  const module = await import(`data:text/javascript;base64,${Buffer.from(launchBundle.outputFiles[0].text).toString('base64')}`) as { launchArrDownload: (input: Record<string, unknown>) => Promise<unknown> };
+  return { launch: module.launchArrDownload, state: (globalThis as Record<string, unknown>)[key] as { failed: unknown[][] } };
+}
+
+test('SEENIT-DOWNLOAD-015 un seul toast au lancement ; le résultat (trouvé, pas de version, panne) va dans l’onglet, sans toast', async () => {
+  const outcomes: Array<[string, () => Promise<Record<string, unknown>>]> = [
+    ['trouvé', async () => ({ success: true, message: 'ok', status: 'queued', fallbackUsed: true })],
+    ['pas de version', async () => ({ success: false, message: 'Aucune release', failureCode: 'no_release', availability: { reason: 'no_release', automatic: true } })],
+    ['refus', async () => ({ success: false, message: 'Radarr refuse' })],
+    ['panne', async () => { throw new Error('Radarr injoignable'); }]
+  ];
+  for (const [label, outcome] of outcomes) {
+    const { launch, state } = await loadLaunch(outcome);
+    const toasts: string[] = [];
+    await launch({ config: { radarr1080pProfileId: 1 }, mediaType: 'movie', title: 'Le Chat Chapeauté', tmdbId: 11, qualityPreference: '1080p', notify: (action: string) => toasts.push(action) });
+    assert.deepEqual(toasts, ['Téléchargement lancé · 1080p'], label);
+    assert.equal(state.failed.length, label === 'trouvé' ? 0 : 1, `${label} : l’issue est inscrite dans la demande, visible dans Télécharger`);
+  }
+  assert.doesNotMatch(read('src/store/liveDownloadStoreCore.ts'), /showToast|sendLocalNotification/, 'plus de toast à la fin d’un transfert');
+  const view = read('src/screens/ShowDetailView.tsx');
+  assert.doesNotMatch(view, /Vérification de la disponibilité…', posterPath/, 'l’attente de la présence est silencieuse');
+  assert.match(view, /if \(!single && !toProgram\.size\) useToastStore/, 'lot mixte : le résumé de programmation est l’unique toast');
 });
 
 // Vrai store de présence : seules ses dépendances réseau et Firebase sont simulées.

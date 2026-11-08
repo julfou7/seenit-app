@@ -5,7 +5,7 @@ import { ProgrammedSection } from '../components/ProgrammedSection';
 import { RecentImportsRail, useRecentImports } from '../components/RecentImportsRail';
 import { coveredByRecentImport } from '../features/downloads/recentImports';
 import { groupSeasonDownloads } from '../features/downloads/downloadSeriesGroups';
-import { downloadGroup, isPreTransferRequest } from '../features/downloads/downloadGroups';
+import { downloadGroup, isPreTransferRequest, isWatchedWaitingRequest } from '../features/downloads/downloadGroups';
 import { describeReleases, matchesVersionFilter, releaseAgeLabel, type VersionFilter } from '../features/downloads/releaseVersions';
 import { ReleaseVersionCard, VersionFilterChips } from '../components/ReleaseVersionCard';
 import './downloads.css';
@@ -139,9 +139,9 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     || config.qbittorrentUrl
   );
 
-  // Retour terrain du 08/11 : une demande apparaît tout de suite dans « En attente » (« Recherche en cours »)
-  // et y reste en « Pas encore disponible » tant qu'aucune version n'est sortie ; « En cours » ne garde que
-  // les transferts réels et « À régler » les échecs.
+  // Retours terrain du 08/11 : une demande apparaît tout de suite dans « En attente » (« Recherche en cours… ») ;
+  // sans version disponible et surveillée, elle passe dans « Programmés » ; « En cours » ne garde que les
+  // transferts réels et « À régler » les échecs et les attentes dont la surveillance n'est pas confirmée.
   const activeDownloads = useMemo(
     () => sortDownloadsByAddedAt(
       downloads.filter(item => downloadGroup(item) === 'active' && !isPreTransferRequest(item)),
@@ -150,10 +150,11 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     [downloads]
   );
   const errorDownloads = useMemo(
-    () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'attention'), 'desc'),
+    () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'attention' || (downloadGroup(item) === 'waiting' && !isWatchedWaitingRequest(item))), 'desc'),
     [downloads]
   );
-  const waitingDownloads = useMemo(() => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'waiting' || (downloadGroup(item) === 'active' && isPreTransferRequest(item))), 'asc'), [downloads]);
+  const waitingDownloads = useMemo(() => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'active' && isPreTransferRequest(item)), 'asc'), [downloads]);
+  const watchedRequests = useMemo(() => sortDownloadsByAddedAt(downloads.filter(isWatchedWaitingRequest), 'asc'), [downloads]);
   const cancelledDownloads = useMemo(
     () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'cancelled'), 'desc'),
     [downloads]
@@ -443,7 +444,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
             {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
-            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} />}
+            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} onRemoveWatching={handleRemove} />}
             <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
             {listedCompleted.length > 0 && renderSection('Terminés', listedCompleted, 'completed')}
             {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'cancelled')}

@@ -14,7 +14,6 @@ import {
   extractQualityFromTitle,
   formatCleanMediaInfo
 } from '../services/sonarrRadarr';
-import { useToastStore } from './toastStore';
 import { appLogger } from './logStore';
 import { useShowsStore } from './showsStore';
 import { auth, db } from '../lib/firebase';
@@ -403,32 +402,6 @@ function sameCancellationIdentity(cancelled: LiveDownloadItem, remote: LiveDownl
     now,
     5 * 60_000
   );
-}
-
-function sendLocalNotification(title: string, body: string, isSuccess = false, item?: LiveDownloadItem) {
-  try {
-    if (item) {
-      const mediaTitle = item.movieTitle || item.seriesTitle;
-      if (!mediaTitle) return;
-      const subtitle = item.mediaType === 'tv' && item.seasonNumber != null
-        ? item.episodeNumber != null
-          ? `S${String(item.seasonNumber).padStart(2, '0')}E${String(item.episodeNumber).padStart(2, '0')}`
-          : `Saison ${item.seasonNumber}`
-        : undefined;
-      useToastStore.getState().showToast({
-        title: mediaTitle,
-        subtitle,
-        action: isSuccess ? 'Téléchargement terminé' : body,
-        posterPath: item.posterPath
-      }, isSuccess ? 'success' : 'download');
-    } else {
-      useToastStore.getState().showToast(`${title}: ${body}`, isSuccess ? 'success' : 'download');
-    }
-  } catch {}
-
-  // Les notifications système de téléchargement sont désormais exclusivement
-  // émises par les webhooks Sonarr/Radarr → FCM. Le polling local ne produit qu'un
-  // toast dans SeenIt afin d'éviter les doubles notifications et les noms de torrent.
 }
 
 function clearPollingTimer() {
@@ -1118,15 +1091,11 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               continue;
             }
             if (!isTerminalDownload(finalItem)) continue;
+            // Retour terrain du 08/11 : plus de toast à la fin d'un transfert ; l'onglet Télécharger le montre et
+            // la notification système (webhooks Sonarr/Radarr → FCM) l'annonce. L'éligibilité reste consommée
+            // une seule fois par transfert.
             const previous = currentDownloads.find(oldItem => sameDownloadIdentity(oldItem, finalItem));
-            if (previous && !isTerminalDownload(previous) && consumeCompletionNotificationEligibility(finalItem)) {
-              sendLocalNotification(
-                'Téléchargement terminé 🍿',
-                `Le téléchargement de "${finalItem.movieTitle || finalItem.seriesTitle || finalItem.title}" est terminé !`,
-                true,
-                finalItem
-              );
-            }
+            if (previous && !isTerminalDownload(previous)) consumeCompletionNotificationEligibility(finalItem);
           }
 
           if (!isCurrentScope()) return;
