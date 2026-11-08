@@ -172,7 +172,9 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   );
   // Sans bouton Actualiser (maquette : deux boutons ronds tiennent en 360 px) : Programmés et Téléchargés
   // se rechargent quand un téléchargement change d'état et quand l'app revient au premier plan.
-  const transitions = `${activeDownloads.length}:${completedDownloads.length}:${errorDownloads.length}`;
+  // Revue de #907 : annuler une attente surveillée retire sa surveillance ; Programmés est rechargé pour ne pas
+  // laisser réapparaître l'entrée du calendrier qu'elle masquait.
+  const transitions = `${activeDownloads.length}:${completedDownloads.length}:${errorDownloads.length}:${watchedRequests.map(item => item.id).join(',')}`;
   const lastTransitions = useRef(transitions);
   useEffect(() => {
     if (lastTransitions.current === transitions) return;

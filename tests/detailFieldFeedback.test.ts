@@ -39,6 +39,9 @@ test('SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente
   assert.match(screen, /downloadGroup\(item\) === 'attention' \|\| \(downloadGroup\(item\) === 'waiting' && !isWatchedWaitingRequest\(item\)\)/);
   assert.match(screen, /const waitingDownloads = useMemo\(\(\) => sortDownloadsByAddedAt\(downloads\.filter\(item => downloadGroup\(item\) === 'active' && isPreTransferRequest\(item\)\), 'asc'\), \[downloads\]\);/);
   assert.match(screen, /<ProgrammedSection refreshKey=\{programmedRefresh\} onShowClick=\{onShowClick\} watching=\{watchedRequests\} onRemoveWatching=\{handleRemove\} \/>/);
+  // Revue de #907 : annuler une attente surveillée recharge Programmés (l'entrée du calendrier masquée ne revient pas).
+  assert.match(screen, /const transitions = `\$\{activeDownloads\.length\}:\$\{completedDownloads\.length\}:\$\{errorDownloads\.length\}:\$\{watchedRequests\.map\(item => item\.id\)\.join\(','\)\}`;/);
+  assert.match(screen, /if \(lastTransitions\.current === transitions\) return;[\s\S]{0,80}setProgrammedRefresh\(key => key \+ 1\);/);
   const programmed = read('src/components/ProgrammedSection.tsx');
   assert.match(programmed, /data-programmed-request=\{request\.id\}/);
   assert.match(programmed, /\{date \? movieRelease\(date\) : 'Pas encore de version'\}/);
