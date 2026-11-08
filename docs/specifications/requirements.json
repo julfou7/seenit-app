@@ -2193,6 +2193,27 @@
       ]
     },
     {
+      "id": "SEENIT-UPDATE-008",
+      "title": "Téléchargement de mise à jour résistant aux pannes GitHub, vérifié par SHA-256",
+      "targets": [
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/updateDownloadFallback.test.ts",
+          "contains": "SEENIT-UPDATE-008 secours GitHub : route « latest » du même fichier, seulement si le SHA-256 officiel est connu"
+        },
+        {
+          "file": "tests/updateDownloadFallback.test.ts",
+          "contains": "SEENIT-UPDATE-008 GitHub en 504 sur le lien de la release : le même APK arrive par la route « latest », vérifié puis installé"
+        },
+        {
+          "file": "tests/updateDownloadFallback.test.ts",
+          "contains": "SEENIT-UPDATE-008 un fichier de secours qui ne correspond pas au SHA-256 officiel n’est jamais installé"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UPDATE-006",
       "title": "Reprise contrôlée de SeenIt après remplacement APK",
       "targets": [

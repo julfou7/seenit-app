@@ -1329,6 +1329,14 @@ pour le cache des sagas et univers.
   avant le handoff vers Package Installer. Aucun succès n'est émis pour un fichier incomplet ou un
   digest invalide. Une permission de notification refusée ou une erreur d'affichage ne bloque jamais
   l'installation d'une APK déjà vérifiée ; la PWA est inchangée et DownloadManager n'est pas réintroduit.
+- **SEENIT-UPDATE-008** — Retour terrain du 08/11/2026 (v1.4.273) : GitHub peut répondre 504 sur le lien de
+  la release par tag (`/releases/download/vX.Y.Z/SeenIt-vX.Y.Z.apk`) tout en servant le même asset par
+  `/releases/latest/download/SeenIt-vX.Y.Z.apk`. Le téléchargement essaie le lien de la release, puis cette
+  route de secours, liée au nom exact du fichier, et seulement quand l'empreinte SHA-256 officielle est
+  connue : le fichier reçu est vérifié avant le Package Installer et un écart bloque l'installation. Sans
+  empreinte, pas de secours. Les deux routes en panne donnent un message clair (« GitHub ne répond pas pour
+  le moment… »), jamais l'erreur brute du plugin ; le lien « Ouvrir dans le navigateur » pointe vers la
+  route de secours.
 - Après téléchargement et vérification, l'ouverture réussie du Package Installer est un succès
   observable nommé « Installeur lancé » à 100 %. Elle ne doit jamais être rendue comme une erreur,
   même si Android conserve SeenIt visible derrière sa boîte de dialogue système.

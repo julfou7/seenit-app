@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { openExternalUrl } from '../lib/utils';
 import {
+  apkDownloadCandidates,
   isTrustedSeenItApkUrl,
   normalizeSha256Digest,
   type SeenItReleaseInfo
@@ -94,14 +95,27 @@ export async function downloadAndInstallApk(
 
     onProgress?.({ percent: 15, status: 'downloading', message: 'Téléchargement de la mise à jour...' });
 
-    // 3. Téléchargement HTTP natif Android (exécuté en Java, sans restrictions CORS de WebView)
-    const downloadRes = await Filesystem.downloadFile({
-      url: apkUrl,
-      path: fileName,
-      directory: Directory.Cache,
-      progress: true,
-      recursive: true
-    });
+    // 3. Téléchargement HTTP natif Android (exécuté en Java, sans restrictions CORS de WebView). Retour
+    // terrain du 08/11 : GitHub peut répondre 504 sur le lien de la release ; le même fichier est alors
+    // demandé par la route « latest », seulement quand l'empreinte SHA-256 officielle le vérifiera.
+    let downloadRes: { path?: string } | null = null;
+    let lastError: unknown = null;
+    for (const [attempt, url] of apkDownloadCandidates(release).entries()) {
+      if (attempt > 0) onProgress?.({ percent: 15, status: 'downloading', message: 'GitHub ne répond pas : nouvel essai par un autre lien…' });
+      try {
+        await Filesystem.deleteFile({ path: fileName, directory: Directory.Cache }).catch(() => undefined);
+        const result = await Filesystem.downloadFile({ url, path: fileName, directory: Directory.Cache, progress: true, recursive: true });
+        // 4. Vérification de la taille du fichier téléchargé
+        const stat = await Filesystem.stat({ path: fileName, directory: Directory.Cache });
+        if (!stat || stat.size < 1024 * 500) {
+          throw new Error(`Le fichier téléchargé est invalide ou incomplet (${Math.round((stat?.size || 0) / 1024)} Ko). Veuillez réessayer.`);
+        }
+        downloadRes = result;
+        break;
+      } catch (error: unknown) {
+        lastError = error;
+      }
+    }
 
     if (progressListener) {
       try {
@@ -110,14 +124,11 @@ export async function downloadAndInstallApk(
       progressListener = null;
     }
 
-    // 4. Vérification de l'intégrité et de la taille du fichier téléchargé
-    const stat = await Filesystem.stat({
-      path: fileName,
-      directory: Directory.Cache
-    });
-
-    if (!stat || stat.size < 1024 * 500) {
-      throw new Error(`Le fichier téléchargé est invalide ou incomplet (${Math.round((stat?.size || 0) / 1024)} Ko). Veuillez réessayer.`);
+    if (!downloadRes) {
+      const raw = lastError instanceof Error ? lastError.message : '';
+      throw new Error(/^Error downloading file/i.test(raw) || !raw
+        ? 'GitHub ne répond pas pour le moment. Réessaie dans quelques minutes ou ouvre le lien dans le navigateur.'
+        : raw);
     }
 
     const expectedSha256 = normalizeSha256Digest(release.apkSha256);

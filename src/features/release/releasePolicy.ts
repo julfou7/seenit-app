@@ -81,6 +81,35 @@ export function isTrustedSeenItApkUrl(input: unknown, version: string): boolean 
   }
 }
 
+/**
+ * Retour terrain du 08/11 (v1.4.273) : la route GitHub par tag (`/releases/download/vX.Y.Z/…`) répondait
+ * 504 sept fois sur dix pendant que la route `/releases/latest/download/…` servait le même asset. Le
+ * téléchargement retombe donc sur cette route, liée au nom exact `SeenIt-vX.Y.Z.apk` : si une release
+ * plus récente est sortie entre-temps, le fichier n'existe plus sous ce nom et rien n'est installé.
+ */
+export function getLatestRouteApkUrl(version: string): string | null {
+  if (!normalizeSemanticVersion(version)) return null;
+  return `https://github.com/${SEENIT_GITHUB_REPOSITORY}/releases/latest/download/${getExpectedApkName(version)}`;
+}
+
+export function isTrustedSeenItApkFallbackUrl(input: unknown, version: string): boolean {
+  const expected = getLatestRouteApkUrl(version);
+  return Boolean(expected) && String(input || '') === expected;
+}
+
+/**
+ * Liens à essayer, dans l'ordre : l'asset exact de la release, puis la route « latest » du même fichier.
+ * La route de secours n'est proposée que si l'empreinte SHA-256 officielle est connue : le fichier reçu
+ * est alors prouvé identique à l'asset publié avant toute installation (SEENIT-UPDATE-002).
+ */
+export function apkDownloadCandidates(release: Pick<SeenItReleaseInfo, 'version' | 'apkDownloadUrl' | 'apkSha256'>): string[] {
+  const candidates: string[] = [];
+  if (isTrustedSeenItApkUrl(release.apkDownloadUrl, release.version)) candidates.push(release.apkDownloadUrl);
+  const fallback = getLatestRouteApkUrl(release.version);
+  if (candidates.length && fallback && normalizeSha256Digest(release.apkSha256)) candidates.push(fallback);
+  return candidates;
+}
+
 export function parseSeenItRelease(payload: unknown): SeenItReleaseInfo | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
   const release = payload as GitHubReleasePayload;
