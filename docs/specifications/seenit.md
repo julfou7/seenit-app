@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.271**
+Version applicative : **1.4.272**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1083,7 +1083,12 @@ pour le cache des sagas et univers.
 - Une recherche ou un test C411 possède un timeout et distingue « aucun résultat » d'une panne.
 - **SEENIT-C411-003** — La recherche manuelle globale (« Recherche avancée ») n'impose aucun type :
   depuis la refonte du 07/11/2026, elle n'a plus de filtre Film/Série, seulement les filtres de version
-  (Toutes, 1080p, 4K, Français, VO), la conseillée en tête et dépliée. Le type d'une release provient uniquement de sa sous-catégorie C411 explicite (`6` Film, `7` Série),
+  (Toutes, 1080p, 4K, Français, VO), la conseillée en tête et dépliée. Recherche technique (retour du
+  08/11, `USR-2026-11-08-002`) : la ligne repliée montre la taille et le nombre de sources (pas de vitesse),
+  la carte dépliée le type de release en badges (IMAX, MULTI, VFF, HDR10, Dolby Vision, Atmos, AC3 5.1, WEB,
+  H.265, Netflix…) et le nom technique du fichier reste masqué derrière « Nom du fichier ». Le caractère
+  manuel du téléchargement est dit par le toast et la carte de suivi, plus par une phrase sous chaque
+  version. Le type d'une release provient uniquement de sa sous-catégorie C411 explicite (`6` Film, `7` Série),
   jamais de son nom. Avec qBittorrent configuré et un type prouvé, SeenIt lui transmet une seule fois
   le Magnet BTIH exact **sans catégorie qBittorrent gérée par Sonarr/Radarr** : ce flux global reste
   explicitement manuel et ne peut pas être repris comme un import *Arr automatique sans identité canonique.
@@ -1570,6 +1575,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   tout refus laisse le lecteur utilisable. Le desktop conserve la modal normale. Aucun changement
   d'identité média ni de position de la fiche n'est introduit.
 - **SEENIT-UX-020** — Règles visuelles durables du 06/11/2026 (`USR-2026-11-06-002`, `USR-2026-11-06-003`,
+  et `USR-2026-11-08-001` pour le logo Télécharger : une flèche dans un cercle, celle du contrôle d'épisode du
+  mode téléchargement, sur toute la fonction — onglet de navigation, fiches série et film, menu ⋮, onglet
+  Télécharger, popup et réglages ; l'icône de mise à jour de l'application, autre action, n'en fait pas partie ;
   détail dans `docs/specifications/ux-reference.md` §9). Tout titre de film ou de série s'affiche en or
   `#F2C36B` sur toutes les surfaces PWA/APK (cartes, grilles, listes, rails, fiches, téléchargements,
   notifications in-app), y compris une fois lu ; les titres d'épisode, personnes, personnages, noms de

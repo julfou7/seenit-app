@@ -1,4 +1,5 @@
-import { Download, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { DownloadMark } from './SeenItLogo';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
@@ -36,7 +37,7 @@ export function DownloadFeatureSettingsRow() {
   const { enabled, isHydrated, isSaving, handleToggle } = useDownloadFeatureToggle();
   return (
     <SettingsRow
-      icon={Download}
+      icon={DownloadMark}
       label="Téléchargements"
       sub={enabled ? "L'onglet et les actions de téléchargement sont visibles" : "Masqués par défaut pour ce compte"}
       toggle={enabled}
@@ -53,7 +54,7 @@ export function DownloadFeatureSettingsCard() {
   return (
     <section className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-4 sm:p-5" aria-labelledby="downloads-visibility-title">
       <h2 id="downloads-visibility-title" className="font-bold text-sm text-zinc-100 mb-3 flex items-center gap-2.5">
-        <Download className="text-blue-400" size={18} />
+        <DownloadMark className="text-blue-400" size={20} />
         Fonctionnalité personnelle
       </h2>
 

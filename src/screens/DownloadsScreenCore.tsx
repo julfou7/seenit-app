@@ -16,13 +16,13 @@ import {
   ChevronLeft,
   Check,
   Copy,
-  Download,
   Loader2,
   Search,
   Settings,
   Trash2,
   X
 } from 'lucide-react';
+import { DownloadMark } from '../components/SeenItLogo';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import {
@@ -448,7 +448,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {!downloads.length && !recentImports.items.length && (
               <div className="py-16 flex flex-col items-center text-center gap-3 text-zinc-500">
                 <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center">
-                  <Download size={24} />
+                  <DownloadMark size={26} />
                 </div>
                 <div>
                   <p className="text-sm font-bold text-zinc-300">Aucun téléchargement suivi</p>
@@ -503,19 +503,18 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
                   const actionLabel = manualRoute.kind === 'qbittorrent' ? 'Télécharger' : manualRoute.kind === 'magnet' ? 'Ouvrir Magnet' : 'Indisponible';
                   const kind = resolveC411ManualMediaType(torrent);
                   return (
-                    <ReleaseVersionCard key={torrent.id} entry={entry} open={isOpen} onToggle={() => setOpenVersion(isOpen ? null : torrent.id)}
-                      details={[kind === 'movie' ? 'Film' : kind === 'tv' ? 'Série' : '', `${torrent.seeders || 0} source${(torrent.seeders || 0) > 1 ? 's' : ''}`, releaseAgeLabel(entry.ageDays)].filter(Boolean).join(' · ')}>
+                    <ReleaseVersionCard key={torrent.id} entry={entry} open={isOpen} technical onToggle={() => setOpenVersion(isOpen ? null : torrent.id)}
+                      details={[kind === 'movie' ? 'Film' : kind === 'tv' ? 'Série' : '', releaseAgeLabel(entry.ageDays)].filter(Boolean).join(' · ')}>
                       <div className="flex gap-2 mt-1">
                         <button type="button" disabled={sendingTorrentId !== null || manualRoute.kind === 'blocked'} onClick={() => void handleSendTorrent(torrent)}
                           className="flex-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-60">
-                          {sendingTorrentId === torrent.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}{actionLabel}
+                          {sendingTorrentId === torrent.id ? <Loader2 size={18} className="animate-spin" /> : <DownloadMark size={20} />}{actionLabel}
                         </button>
                         <button type="button" onClick={() => void copyMagnet(torrent)} aria-label="Copier le lien Magnet"
                           className="h-12 shrink-0 px-4 rounded-[14px] text-[14.5px] font-bold text-zinc-200 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center gap-1.5">
                           {copiedHash === torrent.infoHash ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}Magnet
                         </button>
                       </div>
-                      <span className="text-[12px] leading-snug text-zinc-500">Envoi direct à qBittorrent, sans import automatique Radarr/Sonarr/Plex : pour cela, télécharge depuis la fiche du film ou de la série.</span>
                     </ReleaseVersionCard>
                   );
                 })}

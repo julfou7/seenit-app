@@ -4,10 +4,10 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
-  Download,
   Loader2,
   Search
 } from 'lucide-react';
+import { DownloadMark } from './SeenItLogo';
 import { type LiveDownloadItem, formatBytes } from '../services/sonarrRadarr';
 import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
 import { availabilityHint } from '../features/downloads/downloadAvailability';
@@ -45,7 +45,7 @@ function PhaseIcon({ kind }: { kind: ReturnType<typeof getPhase>['kind'] }) {
   if (kind === 'submitting') return <Loader2 size={14} className="text-blue-400 animate-spin" />;
   if (kind === 'searching') return <Search size={14} className="text-cyan-400" />;
   if (kind === 'queued' || kind === 'waiting') return <Clock size={14} className="text-zinc-300" />;
-  return <Download size={14} className="text-cyan-400" />;
+  return <DownloadMark size={16} className="text-cyan-400" />;
 }
 
 export const LiveDownloadBanner: React.FC<LiveDownloadBannerProps> = ({ items, compact = false }) => {

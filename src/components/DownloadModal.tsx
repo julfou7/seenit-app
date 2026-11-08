@@ -6,11 +6,11 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
-  Download,
   Loader2,
   Search,
   X
 } from 'lucide-react';
+import { DownloadMark } from './SeenItLogo';
 import { type C411Torrent, formatTorrentSize, searchC411Torrents } from '../services/c411';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
@@ -406,7 +406,7 @@ export function DownloadModal({
             {hasAutomationClient ? <div className="download-dialog__choices">
               {([{ id: '1080p', label: '1080p', hint: 'Full HD' }, { id: '4k', label: '4K', hint: 'Ultra HD · 2160p' }] as const).map(quality =>
                 <button key={quality.id} type="button" aria-label={`Télécharger en ${quality.label}`} disabled={isTriggeringAuto || scopeBusy || presence.loading || (alreadyAvailable && !replaceExisting)} onClick={() => handleAutoSearchClient(quality.id)}>
-                  <span className="download-dialog__quality-icon">{isTriggeringAuto ? <Loader2 size={19} className="animate-spin" /> : <Download size={19} />}</span>
+                  <span className="download-dialog__quality-icon">{isTriggeringAuto ? <Loader2 size={19} className="animate-spin" /> : <DownloadMark size={21} />}</span>
                   <span><strong>{quality.label}</strong><small>{quality.hint}</small></span><ChevronRight size={18} />
                 </button>)}
             </div> : <p className="download-dialog__muted">Configure les téléchargements dans les réglages pour choisir une qualité.</p>}
@@ -502,7 +502,7 @@ export function DownloadModal({
                             onClick={() => void handleSendToClient(torrent)}
                             className="flex-1 min-h-11 rounded-lg bg-[#E5A93D] hover:bg-[#f0b84c] text-black text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
                           >
-                            {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+                            {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <DownloadMark size={15} />}
                             Envoyer
                           </button>
                           <button

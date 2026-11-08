@@ -39,3 +39,11 @@ test('SEENIT-UX-012 isole les dialogues frères et les démontages hors ordre', 
   stack.closeTop();
   assert.deepEqual(calls, ['latest', 'latest']);
 });
+
+test('SEENIT-UX-012 le focus initial différé ne reprend jamais un focus déjà posé dans le dialogue', async () => {
+  // Une image retardée (onglet en arrière-plan, appareil chargé) ne doit pas voler le focus d'un champ
+  // que le premier toucher a déjà ouvert dans ce même dialogue (« Chercher sous un autre nom… »).
+  const { readFileSync } = await import('node:fs');
+  const source = readFileSync('src/components/ui/DialogLayer.tsx', 'utf8');
+  assert.match(source, /requestAnimationFrame\(\(\) => \{\n\s+if \(activeSurface\(\) === surface && !surface\.contains\(document\.activeElement\)\) focusInside\(surface\);/);
+});

@@ -12,8 +12,8 @@ const launch = readFileSync('src/features/downloads/downloadLaunch.ts', 'utf8');
 async function loadMode() {
   const bundle = await build({ entryPoints: ['src/screens/mediaDetail/downloadMode.tsx'], bundle: true, write: false, platform: 'node', format: 'cjs',
     plugins: [{ name: 'mode-ports', setup(builder) {
-      builder.onResolve({ filter: /^(?:react(?:\/jsx-runtime)?|react-dom|lucide-react)$|\/lib\/utils$/ }, args => ({ path: args.path, namespace: 'ports' }));
-      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="f";export const Download=()=>null;export const X=()=>null;export const cn=(...a)=>a.filter(Boolean).join(" ");export const createPortal=(n)=>n;export default {};' }));
+      builder.onResolve({ filter: /^(?:react(?:\/jsx-runtime)?|react-dom|lucide-react)$|\/lib\/utils$|\/SeenItLogo$/ }, args => ({ path: args.path, namespace: 'ports' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const jsx=(type,props)=>({type,props});export const jsxs=jsx;export const Fragment="f";export const Download=()=>null;export const DownloadMark=()=>null;export const X=()=>null;export const cn=(...a)=>a.filter(Boolean).join(" ");export const createPortal=(n)=>n;export default {};' }));
     } }] });
   const module = { exports: {} as Record<string, unknown> };
   vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module, exports: module.exports }));
