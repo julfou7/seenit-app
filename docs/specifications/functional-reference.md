@@ -883,13 +883,14 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   brute est masquée : aucune identité ne lui est attribuée sans preuve exacte.
 - Cartes « billet » comme l'accueil (refonte du 07/11/2026) : affiche inclinée qui déborde en haut à
   gauche, fond teinté par section (rose À régler, ambre En cours, bleu En attente et Programmés), titre or.
-- Sections dans l'ordre : **À régler** (erreurs, avec « Choisir une version » et « Retirer » visibles sans
-  passer par « … »), **En cours** (transferts réels ; film : « Film · 1080p », barre or, « 63 % » et
-  « ≈ 25 min » en bas du billet), **En attente** (depuis le 08/11 : une demande y apparaît tout de suite
-  en « Recherche en cours… », puis « Pas encore disponible » tant qu'aucune version n'est sortie, avec
-  « Choisir une version » et « Retirer »), **Programmés**, **Téléchargés · 7 derniers jours**, puis
-  Terminés et Annulés. Un lancement depuis la fiche pendant la vérification de présence l'attend au lieu
-  d'être refusé. Une erreur explicite d'import reste dans
+- Sections dans l'ordre : **À régler** (erreurs et attentes dont la surveillance n'est pas confirmée, avec
+  « Choisir une version » et « Retirer » visibles sans passer par « … »), **En cours** (transferts réels ;
+  film : « Film · 1080p », barre or, « 63 % » et « ≈ 25 min » en bas du billet), **En attente** (depuis le
+  08/11 : une demande y apparaît tout de suite en « Recherche en cours… »), **Programmés** (calendrier, et
+  une demande sans version disponible mais surveillée : « Film · Pas encore de version », « Radarr le récupère
+  dès qu'une version sort »), **Téléchargés · 7 derniers jours**, puis Terminés et Annulés. Un lancement
+  produit un seul toast (« Téléchargement lancé · 1080p ») ; la suite se lit ici, sans toast. Un lancement
+  depuis la fiche pendant la vérification de présence l'attend au lieu d'être refusé. Une erreur explicite d'import reste dans
   « À régler » même si qBittorrent a physiquement atteint 100 %. La fiche Film/Série réutilise la même
   priorité : elle n'affiche jamais « Téléchargement terminé » et ne relance pas la présence Plex pour
   un transfert dont l'import est encore explicitement en erreur.

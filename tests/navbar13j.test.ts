@@ -26,6 +26,10 @@ test('SEENIT-UX-017 privilégie les transferts actifs puis les actions requises 
   assert.deepEqual(resolveDownloadNavState([active], []), { kind: 'active', count: 1, label: 'Télécharger · en cours' });
   assert.equal(resolveDownloadNavState([active, { ...active, id: 'other' }], []).label, 'Télécharger · 2 en cours');
   assert.equal(resolveDownloadNavState([ready, { id: 'manual', status: 'warning', progress: 100 }], []).kind, 'attention');
+  // Revue de #907 : sans toast de résultat, une attente non surveillée est une action à faire ; surveillée, elle est programmée.
+  assert.equal(resolveDownloadNavState([{ id: 'rss-off', status: 'waiting', availability: { reason: 'no_release', automatic: false } }], []).kind, 'attention');
+  assert.equal(resolveDownloadNavState([{ id: 'unconfirmed', status: 'waiting', availability: { reason: 'unconfirmed', automatic: false } }], []).kind, 'attention');
+  assert.equal(resolveDownloadNavState([{ id: 'watched', status: 'waiting', availability: { reason: 'no_release', automatic: true } }], []).kind, 'none');
   assert.equal(resolveDownloadNavState([ready], [], true).kind, 'attention');
   assert.equal(resolveDownloadNavState([ready], []).kind, 'ready');
   assert.equal(resolveDownloadNavState([{ id: 'standby', status: 'waiting' }], []).kind, 'none');

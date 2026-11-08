@@ -33,7 +33,7 @@ async function fixture(storage = new Map<string, string>()) {
       if(p==='movie')return structuredClone(s.movies);
       if(p==='series')return structuredClone(s.series);
       if(p.startsWith('episode?'))return structuredClone(s.episodes);
-      if(p==='health')return [];
+      if(p==='health')return structuredClone(s.health||[]);
       if(p==='indexer')return [{enableAutomaticSearch:true,enableInteractiveSearch:true,enableRss:s.rss}];
       if(p==='config/indexer')return {rssSyncInterval:s.interval};
       if(p==='qualityprofile')return [{id:1,name:'1080p'}];
@@ -114,6 +114,23 @@ test('SEENIT-DOWNLOAD-012 le service et le lifecycle conservent zéro release en
   assert.equal(state.movies[0].monitored, true);
   assert.equal(state.posts.length, 0);
   assert.ok(state.published.some(value => value.status === 'waiting' && Number(value.sharedExpiresAt) > Date.now() + 86400_000));
+});
+
+// Retour terrain du 08/11 (« Le Chat Chapeauté », v1.4.275) : Radarr signalait une mise à jour disponible ;
+// le film pas encore sorti finissait « Une intervention est nécessaire » au lieu d'être programmé.
+test('SEENIT-DOWNLOAD-015 vrai chemin Radarr : une alerte de santé hors indexers ne bloque pas « pas encore disponible », une alerte d’indexer est nommée', async () => {
+  const { runtime, state } = await fixture();
+  Object.assign(state, { health: [{ source: 'UpdateCheck', type: 'warning', message: 'New update is available' }, { source: 'ImportMechanismCheck', type: 'warning', message: 'Completed download handling is disabled' }] });
+  const result = await runtime.searchAndDownloadInRadarr({ ...watch, title: movieInput.title, qualityProfileId: 1 });
+  assert.equal(result.failureCode, 'no_release', result.message);
+  assert.equal(result.availability.automatic, true, 'surveillance Radarr confirmée : le film est programmé');
+  assert.equal(state.posts.length, 0);
+
+  const blocked = await fixture();
+  Object.assign(blocked.state, { health: [{ source: 'IndexerLongTermStatusCheck', type: 'error', message: 'Indexers unavailable due to failures for more than 6 hours: YggAPI' }] });
+  const unconfirmed = await blocked.runtime.searchAndDownloadInRadarr({ ...watch, title: movieInput.title, qualityProfileId: 1 });
+  assert.equal(unconfirmed.failureCode, undefined, 'indexer en panne : jamais une fausse absence');
+  assert.match(unconfirmed.message, /Indexers en défaut : Indexers unavailable due to failures for more than 6 hours: YggAPI/);
 });
 
 test('le téléchargement futur exige RSS actif, surveillance confirmée et compte exact', async () => {

@@ -73,9 +73,6 @@
 .download-card__more { margin-top:-4px; margin-right:-4px; }
 .download-card--attention { --dl-tint:oklch(.36 .09 20 / .75); --dl-edge:#fb718573; }
 .download-card.programmed { --dl-tint:oklch(.36 .09 210 / .75); --dl-edge:#7dd3fc4d; }
-/* 08/11 : une demande pas encore disponible attend en bleu (comme Programmés), jamais en rouge d'erreur. */
-.download-card--waiting { --dl-tint:oklch(.34 .08 230 / .7); --dl-edge:#7dd3fc40; }
-.download-card--waiting .download-card__status { margin-top:4px; color:#7dd3fc; }
 .download-card--terminal { --dl-tint:oklch(.26 .02 250 / .45); }
 .download-card__quick { display:flex; align-items:center; gap:10px; margin-top:10px; }
 .download-card__quick button:first-child { flex:1; min-height:44px; border-radius:12px; background:#ffffff14; box-shadow:inset 0 0 0 1px #ffffff26; color:#f4f4f5; font-size:13.5px; font-weight:800; }

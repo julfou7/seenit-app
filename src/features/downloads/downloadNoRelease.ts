@@ -37,12 +37,27 @@ function record(value: unknown): Record<string, unknown> | null {
     ? value as Record<string, unknown> : null;
 }
 
+/**
+ * Retour terrain du 08/11 (« Le Chat Chapeauté », v1.4.275) : n'importe quel avertissement de santé (mise à
+ * jour disponible, dossier, client de téléchargement…) rendait une recherche vide non concluante, et un
+ * film pas encore sorti finissait en « Une intervention est nécessaire » au lieu d'être surveillé. Seule une
+ * alerte d'indexer peut fausser une absence de release ; elle est alors nommée telle que le service la donne.
+ */
+export function indexerHealthProblem(health: readonly unknown[]): string | null {
+  const blocking = health.map(record).filter((item): item is Record<string, unknown> => item !== null
+    && (/indexer/i.test(String(item.source ?? '')) || (!item.source && item.type === 'error')));
+  if (!blocking.length) return null;
+  const detail = blocking.map(item => String(item.message ?? '').trim()).find(Boolean);
+  return detail ? `Indexers en défaut : ${detail}` : 'Les indexers signalent un problème ; la recherche ne peut pas être confirmée.';
+}
+
 /** Un tableau vide peut aussi venir d'indexers désactivés ou en panne. */
 export async function confirmNoArrRelease(read: (path: string) => Promise<unknown>): Promise<ArrSearchOutcome> {
   try {
     const [health, indexers] = await Promise.all([read('health'), read('indexer')]);
     if (!Array.isArray(health) || !Array.isArray(indexers)) throw new Error('Diagnostic du service indisponible.');
-    if (health.length > 0) throw new Error('Le service signale un problème ; la recherche ne peut pas être confirmée.');
+    const problem = indexerHealthProblem(health);
+    if (problem) throw new Error(problem);
     const automatic = indexers.map(record).filter(item => item?.enableAutomaticSearch === true);
     if (!automatic.length || automatic.some(item => item?.enableInteractiveSearch !== true)) {
       throw new Error('Les indexers de recherche ne permettent pas de confirmer le résultat.');

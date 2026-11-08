@@ -23,8 +23,8 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
   const { cleanTitle, subTitle, isTv } = formatCleanMediaInfo(item);
   const group = downloadGroup(item);
   const attention = group === 'attention', waiting = group === 'waiting', terminal = group === 'completed' || group === 'cancelled';
-  // Une carte en échec ou pas encore disponible garde ses deux actions visibles ; depuis le 08/11, l'attente a
-  // sa propre section « En attente », en bleu, et n'est plus présentée comme une erreur.
+  // Une carte à régler garde ses deux actions visibles. Depuis le 08/11, une attente surveillée est dans
+  // « Programmés » (ProgrammedSection) ; une attente affichée ici est donc un problème à régler, nommé.
   const toFix = attention || waiting;
   const progress = truncateDownloadProgressPercent(Math.min(100, Math.max(0, Number(item.progress) || 0)));
   const problem = downloadProblem(item.errorMessage || item.statusText);
@@ -32,9 +32,9 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
   const audio = getReleaseAudio(item.releaseTitle).label;
   const scope = isTv ? subTitle : ['Film', item.quality].filter(Boolean).join(' · ');
   const meta = [isTv ? item.quality : '', audio, item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
-  const label = attention ? problem.title : waiting ? 'Pas encore disponible' : group === 'cancelled' ? 'Annulé' : group === 'completed' ? 'Terminé' : item.importState === 'pending' && progress >= 100 ? 'Transfert terminé · import à confirmer' : item.status === 'searching' ? 'Recherche en cours…' : item.status === 'submitting' ? 'Envoi au client' : item.status === 'paused' ? 'En pause' : item.status === 'queued' ? 'En file d’attente' : null;
+  const label = attention ? problem.title : waiting ? (item.availability?.reason === 'no_release' ? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier') : group === 'cancelled' ? 'Annulé' : group === 'completed' ? 'Terminé' : item.importState === 'pending' && progress >= 100 ? 'Transfert terminé · import à confirmer' : item.status === 'searching' ? 'Recherche en cours…' : item.status === 'submitting' ? 'Envoi au client' : item.status === 'paused' ? 'En pause' : item.status === 'queued' ? 'En file d’attente' : null;
   const showTrack = group === 'active' && !(item.importState === 'pending' && progress >= 100) && (label === null || progress > 0);
-  return <article className={`download-card${attention ? ' download-card--attention' : ''}${waiting ? ' download-card--waiting' : ''}${terminal ? ' download-card--terminal' : ''}`} data-download-id={item.id}>
+  return <article className={`download-card${toFix ? ' download-card--attention' : ''}${terminal ? ' download-card--terminal' : ''}`} data-download-id={item.id}>
     <div className="download-card__head">
       <button type="button" className="download-card__poster" disabled={!id || !onShowClick} aria-label={`Ouvrir ${cleanTitle}`} onClick={() => id && onShowClick?.(id, item.mediaType)}>
         {src && !posterFailed ? <img src={src} alt="" loading="lazy" decoding="async" onError={() => setPosterFailed(true)} /> : isTv ? <Tv size={22} /> : <Film size={22} />}
