@@ -14,6 +14,7 @@ import {
   RefreshCw,
   ArrowRight
 } from 'lucide-react';
+import { getLatestRouteApkUrl } from '../features/release/releasePolicy';
 import { cn } from '../lib/utils';
 
 // Notes de version chargées à l'ouverture de la mise à jour : le rendu Markdown reste hors du bundle de démarrage.
@@ -260,7 +261,7 @@ export function AppUpdateBanner() {
                     <div className="pt-1 flex items-center justify-between text-[11px]">
                       <span className="text-zinc-400">Besoin d'aide ?</span>
                       <a
-                        href={latestRelease.browserDownloadUrl || latestRelease.htmlUrl}
+                        href={getLatestRouteApkUrl(latestRelease.version) || latestRelease.browserDownloadUrl || latestRelease.htmlUrl}
                         target="_blank"
                         rel="noreferrer"
                         className="text-amber-400 hover:text-amber-300 underline flex items-center gap-1 font-medium"
