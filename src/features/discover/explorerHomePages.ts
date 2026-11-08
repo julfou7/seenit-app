@@ -27,6 +27,8 @@ export interface ExplorerHomePage {
   hasMore: boolean;
   /** Message d'état d'une catégorie (Top C411 : panne, clé refusée, classement vide). */
   notice?: string | null;
+  /** Page suivante en échec (Top C411) : la page reste à recharger, le classement n'est pas fini. */
+  pageError?: string | null;
 }
 
 /** Ajoute à `prev` les éléments de `next` absents (clé type + id), dans l'ordre. */
@@ -73,13 +75,13 @@ export async function loadExplorerHomePage(
   let persons: TMDBMedia[] | null = null;
   let hasMore = false;
 
-  // SEENIT-C411-004 (#900) : le classement C411 passe avant les filtres TMDB ; une seule page (100 releases).
+  // SEENIT-C411-004 (#900) : le classement C411 passe avant les filtres TMDB, une page C411 par page d'Explorer.
   if (activeCategory === 'Top C411') {
-    if (page > 1) return { popular: [], trending: [], persons: null, hasMore: false, notice: null };
     const { loadC411TopMedia } = await import('./c411TopMedia');
-    const top = await loadC411TopMedia(isCurrent);
+    const top = await loadC411TopMedia(page, isCurrent);
     if (!isCurrent()) return null;
-    return { popular: top.media, trending: top.media.slice(0, 10), persons: null, hasMore: false, notice: top.notice };
+    // Revue Codex (#917) : une page suivante en échec est signalée (Réessayer), jamais lue comme la fin du classement.
+    return { popular: top.media, trending: page === 1 ? top.media.slice(0, 10) : [], persons: null, hasMore: top.hasMore, notice: page === 1 ? top.notice : null, pageError: page > 1 && top.failed ? top.notice : null };
   }
   if (activeCategory === 'Personnes') {
     const personRes = await tmdb.getPopularPersons(page);

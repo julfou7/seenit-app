@@ -198,24 +198,24 @@ export interface C411TopItem { mediaType: 'movie' | 'tv'; tmdbId: number; rank: 
  * SEENIT-C411-004 (#900) — Top C411 par le backend SeenIt authentifié (Web et Capacitor). Une panne ou une
  * clé refusée lève une erreur au message lisible : jamais un classement vide.
  */
-export async function getC411Top(scope: 'videos' | 'movie' | 'tv' = 'videos'): Promise<{ items: C411TopItem[]; unresolved: number }> {
+export async function getC411Top(scope: 'videos' | 'movie' | 'tv' = 'videos', page = 1): Promise<{ items: C411TopItem[]; unresolved: number; hasMore: boolean }> {
   let lastError: Error | null = null;
   for (const endpoint of getBackendEndpoints('/api/c411/top')) {
     try {
       let status = 0;
-      let data: { items?: unknown; unresolved?: unknown; error?: unknown; code?: unknown } | null = null;
+      let data: { items?: unknown; unresolved?: unknown; hasMore?: unknown; error?: unknown; code?: unknown } | null = null;
       if (Capacitor.isNativePlatform()) {
-        const response = await CapacitorHttp.post({ url: endpoint, headers: await getAuthenticatedHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }), data: { scope }, connectTimeout: 15000, readTimeout: 15000 });
+        const response = await CapacitorHttp.post({ url: endpoint, headers: await getAuthenticatedHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }), data: { scope, page }, connectTimeout: 15000, readTimeout: 15000 });
         status = response.status;
         data = parseResponseData(response.data);
       } else {
-        const response = await authenticatedFetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ scope }), signal: AbortSignal.timeout(15000) });
+        const response = await authenticatedFetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ scope, page }), signal: AbortSignal.timeout(15000) });
         status = response.status;
         data = await response.json().catch(() => null);
       }
       if (status >= 200 && status < 300 && Array.isArray(data?.items)) {
         const items = (data.items as C411TopItem[]).filter(item => (item.mediaType === 'movie' || item.mediaType === 'tv') && Number.isSafeInteger(item.tmdbId) && item.tmdbId > 0);
-        return { items, unresolved: Number(data.unresolved) || 0 };
+        return { items, unresolved: Number(data.unresolved) || 0, hasMore: data.hasMore === true };
       }
       const message = typeof data?.error === 'string' ? data.error : `Classement C411 indisponible (${status}).`;
       // Réponse métier du backend (réglage, clé, limite) : définitive, pas de second essai.
@@ -243,7 +243,7 @@ export async function testC411Connection(apiKey: string): Promise<{ success: boo
   for (const endpoint of getBackendEndpoints('/api/c411/test')) {
     try {
       let status = 0;
-      let data: any = null;
+      let data: { success?: boolean; message?: string; error?: string } | null = null;
 
       if (Capacitor.isNativePlatform()) {
         const response = await CapacitorHttp.post({

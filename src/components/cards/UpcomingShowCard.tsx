@@ -1,15 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, Bell } from 'lucide-react';
 import { type Show } from '../../types';
-import { requestNotificationPermission, auth, db } from '../../lib/firebase';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { auth } from '../../lib/firebase';
+import { writeEpisodeReminder } from '../../features/notifications/episodeReminder';
 import { useToastStore } from '../../store/toastStore';
 import { useShowActions } from '../../hooks/useShows';
 import { useShowsStore } from '../../store/showsStore';
 import { cn, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
-import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
+import { readUserScopedJson } from '../../lib/userIsolation';
 import { SeriesEpisodeCard, type SeriesCardAction } from './SeriesEpisodeCard';
 import { buildMovieCollectionProgress, type CollectionPart } from '../../features/watchlist/movieCollectionProgress';
 import { loadMovieCollection } from '../../features/watchlist/movieCollectionLoader';
@@ -131,40 +131,8 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
   }, [show.tmdbId, show.mediaType, visible, compact]);
 
   const performReminder = async (target: Show, ownerUid: string, nextState: boolean) => {
-    const targetStorageField = `reminder_${target.id}_S${ep.season_number}E${ep.episode_number}`;
-    const sNumStr = String(ep.season_number).padStart(2, '0');
-    const eNumStr = String(ep.episode_number).padStart(2, '0');
-    const episodeString = `S${sNumStr}E${eNumStr}`;
-    let fcmToken: string | null = null;
-    if (nextState) {
-      try { fcmToken = await requestNotificationPermission(); }
-      catch (error) { appLogger.warn('system', 'Autorisation des notifications indisponible', error); }
-    }
-    if (auth.currentUser?.uid !== ownerUid) return;
-    const preferenceChanged = Boolean(target.notificationsEnabled) !== nextState;
-    try {
-      if (preferenceChanged) await updateShow(target.id, { notificationsEnabled: nextState });
-      if (auth.currentUser?.uid !== ownerUid) return;
-      const reminderRef = doc(db, 'users', ownerUid, 'reminders', `${target.id}_${episodeString}`);
-      if (nextState) await setDoc(reminderRef, {
-        showId: target.id, showTitle: target.title, episodeString,
-        seasonNumber: ep.season_number, episodeNumber: ep.episode_number,
-        episodeTitle: ep.name || '', air_date: ep.air_date,
-        fcmToken: fcmToken || '', createdAt: Date.now(),
-      });
-      else await deleteDoc(reminderRef);
-    } catch (error) {
-      if (preferenceChanged && auth.currentUser?.uid === ownerUid) {
-        try { await updateShow(target.id, { notificationsEnabled: Boolean(target.notificationsEnabled) }); }
-        catch (rollbackError) { appLogger.warn('system', 'Restauration du rappel impossible', rollbackError); }
-      }
-      throw error;
-    }
-    if (auth.currentUser?.uid !== ownerUid) return;
-    setIsReminderSet(nextState);
-    if (nextState) writeUserScopedJson(ownerUid, targetStorageField, true);
-    else removeUserScopedValue(ownerUid, targetStorageField);
-
+    // Écriture partagée avec la fiche série et la fiche épisode (episodeReminder).
+    if (await writeEpisodeReminder({ target, ownerUid, nextState, episode: ep, updateShow })) setIsReminderSet(nextState);
   };
   const toggleReminder = async (event: React.MouseEvent) => {
     event.stopPropagation();

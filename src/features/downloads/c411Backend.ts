@@ -1,4 +1,4 @@
-import { buildC411TopParams, c411TmdbIdentity, parseC411TopRelease, rankC411TopMedia, C411_TOP_DETAIL_LOOKUPS, C411_TOP_MAX_PAGES, C411_TOP_RELEASE_LIMIT, type C411TmdbIdentity, type C411TopEntry, type C411TopRelease, type C411TopScope } from './c411Top.ts';
+import { buildC411TopParams, c411TmdbIdentity, parseC411TopRelease, rankC411TopMedia, C411_TOP_DETAIL_LOOKUPS, C411_TOP_MAX_PAGES, C411_TOP_PAGE_SIZE, type C411TmdbIdentity, type C411TopEntry, type C411TopRelease, type C411TopScope } from './c411Top.ts';
 /** Transport C411 côté serveur. Une réponse invalide ou un échec n'est jamais un catalogue vide. */
 export async function fetchC411Torrents(options: { apiKey: string; query: string; searchParams: URLSearchParams; signal: () => AbortSignal; fetcher?: typeof fetch }): Promise<unknown[]> {
   const request = options.fetcher || fetch;
@@ -41,12 +41,12 @@ const topRecord = (value: unknown): Record<string, unknown> | null => value && t
 const IDENTITY_CACHE_LIMIT = 5_000;
 
 /**
- * SEENIT-C411-004 (#900) — Top C411 côté serveur : catalogue vidéo trié par seeders (au plus 4 pages, 100 releases),
- * puis, pour les 30 premières releases sans identité dans la liste, leur détail (une identité de release ne change
- * pas : cache par BTIH). Une panne ou une réponse invalide n'est jamais un classement vide ; une clé refusée
- * arrête tout. Les releases d'un même titre (type + TMDB exact) sont regroupées.
+ * SEENIT-C411-004 (#900) — Une page du Top C411 côté serveur : 25 releases du catalogue vidéo trié par seeders,
+ * puis le détail des 10 premières releases sans identité dans la liste (une identité de release ne change pas :
+ * cache par BTIH). Une panne ou une réponse invalide n'est jamais une page vide ; une clé refusée arrête tout.
+ * Les releases d'un même titre (type + TMDB exact) sont regroupées ; Explorer fusionne les pages.
  */
-export async function fetchC411TopMedia(options: { apiKey: string; scope: C411TopScope; signal: () => AbortSignal; fetcher?: typeof fetch; identityCache?: Map<string, C411TmdbIdentity | null> }): Promise<{ entries: C411TopEntry[]; unresolved: number; scanned: number }> {
+export async function fetchC411TopPage(options: { apiKey: string; scope: C411TopScope; page: number; signal: () => AbortSignal; fetcher?: typeof fetch; identityCache?: Map<string, C411TmdbIdentity | null> }): Promise<{ entries: C411TopEntry[]; unresolved: number; scanned: number; hasMore: boolean }> {
   const request = options.fetcher || fetch;
   const get = async (url: string): Promise<unknown> => {
     const response = await request(url, { headers: { Authorization: `Bearer ${options.apiKey}`, Accept: 'application/json', 'User-Agent': 'SeenIt-App', Referer: 'https://c411.org/torrents' }, signal: options.signal(), redirect: 'error' });
@@ -55,32 +55,29 @@ export async function fetchC411TopMedia(options: { apiKey: string; scope: C411To
     if (!response.ok) throw new C411TopError('C411_UNAVAILABLE', `C411 indisponible (${response.status}).`);
     return response.json();
   };
+  const page = Math.min(C411_TOP_MAX_PAGES, Math.max(1, Math.floor(options.page) || 1));
+  const payload = topRecord(await get(`https://c411.org/api/torrents?${buildC411TopParams(options.scope, page)}`));
+  const data = payload?.data;
+  if (!Array.isArray(data)) throw new C411TopError('C411_INVALID_RESPONSE', 'Réponse C411 invalide.');
   const releases: C411TopRelease[] = [];
   const seen = new Set<string>();
-  let pageSize = 0;
-  for (let page = 1; page <= C411_TOP_MAX_PAGES && releases.length < C411_TOP_RELEASE_LIMIT; page++) {
-    const payload = topRecord(await get(`https://c411.org/api/torrents?${buildC411TopParams(options.scope, page)}`));
-    const data = payload?.data;
-    if (!Array.isArray(data)) throw new C411TopError('C411_INVALID_RESPONSE', 'Réponse C411 invalide.');
-    for (const item of data) {
-      const release = parseC411TopRelease(item);
-      if (release && !seen.has(release.key)) { seen.add(release.key); releases.push(release); }
-    }
-    const meta = topRecord(payload?.meta);
-    if (page === 1) pageSize = Number(meta?.perPage ?? meta?.per_page) || data.length;
-    const totalPages = Number(meta?.totalPages ?? meta?.last_page ?? meta?.lastPage);
-    if (!data.length || data.length < pageSize || (Number.isFinite(totalPages) && totalPages > 0 && page >= totalPages)) break;
+  for (const item of data) {
+    const release = parseC411TopRelease(item);
+    if (release && !seen.has(release.key)) { seen.add(release.key); releases.push(release); }
   }
-  const top = releases.slice(0, C411_TOP_RELEASE_LIMIT);
+  const meta = topRecord(payload?.meta);
+  const totalPages = Number(meta?.totalPages ?? meta?.last_page ?? meta?.lastPage);
+  const pageSize = Number(meta?.perPage ?? meta?.per_page) || C411_TOP_PAGE_SIZE;
+  const hasMore = page < C411_TOP_MAX_PAGES && data.length >= Math.min(pageSize, C411_TOP_PAGE_SIZE) && !(Number.isFinite(totalPages) && totalPages > 0 && page >= totalPages);
   const cache = options.identityCache;
-  const missing = top.filter(release => !release.identity && release.infoHash).slice(0, C411_TOP_DETAIL_LOOKUPS);
+  const missing = releases.filter(release => !release.identity && release.infoHash).slice(0, C411_TOP_DETAIL_LOOKUPS);
   const toFetch: C411TopRelease[] = [];
   for (const release of missing) {
     if (cache?.has(release.infoHash!)) release.identity = cache.get(release.infoHash!) ?? null;
     else toFetch.push(release);
   }
-  for (let index = 0; index < toFetch.length; index += 4) {
-    await Promise.all(toFetch.slice(index, index + 4).map(async release => {
+  for (let index = 0; index < toFetch.length; index += 5) {
+    await Promise.all(toFetch.slice(index, index + 5).map(async release => {
       try {
         const detail = await get(`https://c411.org/api/torrents/${release.infoHash}`);
         release.identity = c411TmdbIdentity(topRecord(detail)?.data ?? detail);
@@ -94,5 +91,5 @@ export async function fetchC411TopMedia(options: { apiKey: string; scope: C411To
       }
     }));
   }
-  return { ...rankC411TopMedia(top), scanned: top.length };
+  return { ...rankC411TopMedia(releases), scanned: releases.length, hasMore };
 }

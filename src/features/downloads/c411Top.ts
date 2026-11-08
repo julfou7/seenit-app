@@ -8,15 +8,19 @@ import { normalizeBtih } from './magnetLink.ts';
  */
 export type C411TopScope = 'videos' | 'movie' | 'tv';
 export const C411_TOP_SCOPES: readonly C411TopScope[] = ['videos', 'movie', 'tv'];
-export const C411_TOP_RELEASE_LIMIT = 100;
-export const C411_TOP_MAX_PAGES = 4;
-/** Releases sans identité dans la liste dont le détail est lu (une requête chacune), au plus. */
-export const C411_TOP_DETAIL_LOOKUPS = 30;
+/**
+ * Retour terrain du 08/11 (v1.4.279 : « 27 résultats, d'un coup après 10 s ») : le classement se lit page par
+ * page au défilement d'Explorer — 25 releases par page C411, 12 pages au plus — au lieu de 100 releases d'un bloc.
+ */
+export const C411_TOP_PAGE_SIZE = 25;
+export const C411_TOP_MAX_PAGES = 12;
+/** Releases sans identité d'une page dont le détail est lu (une requête chacune), au plus. */
+export const C411_TOP_DETAIL_LOOKUPS = 10;
 
 export const isC411TopScope = (value: unknown): value is C411TopScope => C411_TOP_SCOPES.includes(value as C411TopScope);
 
 /** Catalogue vidéo C411 trié par seeders, releases individuelles (mode plat). */
-export function buildC411TopParams(scope: C411TopScope, page: number, perPage = C411_TOP_RELEASE_LIMIT): URLSearchParams {
+export function buildC411TopParams(scope: C411TopScope, page: number, perPage = C411_TOP_PAGE_SIZE): URLSearchParams {
   const params = new URLSearchParams({ category: '1', sortBy: 'seeders', sortOrder: 'desc', page: String(page), perPage: String(perPage), viewMode: 'flat' });
   if (scope === 'movie') params.set('subcat', '6');
   if (scope === 'tv') params.set('subcat', '7');

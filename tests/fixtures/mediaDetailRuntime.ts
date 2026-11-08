@@ -52,8 +52,12 @@ export const useDownloadConfigStore = Object.assign(<T>(selector: (state: { down
 export const doc = (..._parts: unknown[]) => ({});
 export const getDoc = async () => ({ exists: () => false, data: () => ({}) });
 export const setDoc = async () => {};
+// Cloche des épisodes à venir (episodeReminder, 08/11) : écriture simulée, sans Firebase.
+export const deleteDoc = async () => {};
+export const requestNotificationPermission = async () => null;
 export const onSnapshot = () => () => {};
 export const onAuthStateChanged = () => () => {};
 
 // #879 : le lancement Sonarr/Radarr reste hors du harnais de la fiche (aucun réseau).
 export const launchArrDownload = async () => {};
+export const useShowActions = () => ({ updateShow: async () => {} });

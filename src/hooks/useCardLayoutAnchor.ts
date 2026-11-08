@@ -38,7 +38,10 @@ export function useCardLayoutAnchor() {
       const original = hosts.current.get(anchor.host)!;
       anchor.host.style.paddingBottom = original.padding;
       const viewport = scroller === document.scrollingElement ? window.innerHeight : scroller.clientHeight;
-      const deficit = Math.max(0, desired + viewport - scroller.scrollHeight);
+      // Retour terrain du 08/11 : en repassant en vue horizontale, la page raccourcit ; ajouter une marge pour
+      // garder la carte au même endroit laissait un grand vide sous la dernière section. Le défilement se
+      // recale simplement ; la marge ne sert plus qu'au passage en liste.
+      const deficit = anchor.list ? Math.max(0, desired + viewport - scroller.scrollHeight) : 0;
       if (deficit) anchor.host.style.paddingBottom = `${original.pixels + deficit}px`;
       scroller.scrollTop = desired;
     }
