@@ -14,6 +14,11 @@ const movieRelease = (date?: string) => {
 const code = (item: EpisodeItem) => `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
 
 const pad = (value: number) => String(value).padStart(2, '0');
+/**
+ * Retour terrain du 08/11 (Harry Potter) : Sonarr connaît les épisodes et leurs dates avant TMDB, mais pas
+ * encore leurs titres (« TBA »). L'épisode reste listé avec sa date ; son titre s'affiche « Titre à venir ».
+ */
+export const isUntitledEpisode = (item: EpisodeItem) => !item.title?.trim() || /^(?:tba|tbd|to be announced)$/i.test(item.title.trim());
 const requestScope = (item: LiveDownloadItem) => item.mediaType === 'movie' ? 'Film'
   : item.seasonNumber != null ? item.episodeNumber != null ? `S${pad(item.seasonNumber)}E${pad(item.episodeNumber)}` : `Saison ${item.seasonNumber}` : 'Série';
 const posterUrl = (path?: string | null) => !path ? null : path.startsWith('http') ? path : `https://image.tmdb.org/t/p/w185${path}`;
@@ -124,7 +129,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
         <ul className="download-season__rows">
           {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
             <span className="download-season__code">{code(item)}</span>
-            <span className="download-season__text"><span className="download-season__title">{item.title}</span><span className="download-season__state programmed__state"><Clock3 size={13} aria-hidden="true" />Programmé · {programmedDateLabel(item.date)}</span></span>
+            <span className="download-season__text"><span className="download-season__title" data-untitled={isUntitledEpisode(item) || undefined}>{isUntitledEpisode(item) ? 'Titre à venir' : item.title}</span><span className="download-season__state programmed__state"><Clock3 size={13} aria-hidden="true" />Programmé · {programmedDateLabel(item.date)}</span></span>
             {cancelButton(item, `${first.seriesTitle} ${code(item)}`)}
           </li>)}
         </ul>

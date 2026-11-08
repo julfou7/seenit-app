@@ -1,8 +1,34 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.276",
+  "applicationVersion": "1.4.277",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
+    {
+      "id": "SEENIT-UX-021",
+      "title": "Accueil : Nouveautés réservé à l'épisode 1 d'une saison ; un nouvel épisode en tête de Continuer",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/homeSections.test.ts",
+          "contains": "SEENIT-UX-021 un nouvel épisode d’une saison en cours n’est jamais une nouveauté, même pour une série récente"
+        },
+        {
+          "file": "tests/homeSections.test.ts",
+          "contains": "SEENIT-UX-021 Nouveautés = une saison dont tu en es à l’épisode 1, sortie depuis 60 jours au plus"
+        },
+        {
+          "file": "tests/homeSections.test.ts",
+          "contains": "SEENIT-UX-021 Continuer : le nouvel épisode passe en tête, puis le visionnage le plus récent"
+        },
+        {
+          "file": "tests/homeSections.test.ts",
+          "contains": "SEENIT-UX-021 l’accueil classe avec ces règles, et la section garde le même ordre"
+        }
+      ]
+    },
     {
       "id": "SEENIT-DOWNLOAD-015",
       "title": "Demande visible tout de suite, un seul toast au lancement, attente surveillée dans « Programmés »",

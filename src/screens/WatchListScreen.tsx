@@ -6,7 +6,7 @@ import { cn, getNextEpisodeNumber, scrollAllCarouselsToStart, checkIsUpToDate, g
 import { ContinueWatchingCard } from '../components/cards/ContinueWatchingCard';
 import { MovieWatchCard } from '../components/cards/MovieWatchCard';
 import { ShowNewsFeed } from '../components/ShowNewsFeed';
-import { UpToDateShowCard, getUpToDateOrNewSeasonCategory } from '../components/cards/UpToDateShowCard';
+import { UpToDateShowCard } from '../components/cards/UpToDateShowCard';
 import { UpcomingShowCard, getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
 import { HistoryFeed } from '../components/HistoryFeed';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
@@ -32,6 +32,7 @@ import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
 import { createWatchProviderRequestLimiter } from '../features/providers/watchProviderRequestPolicy';
 import { createPassiveCardEnrichmentGate } from '../features/providers/passiveCardEnrichmentPolicy';
 import { hasAiredEpisodeEvidence } from '../features/watchlist/watchAvailability';
+import { compareContinueWatching, continueWatchingKey, isSeasonStartNouveaute, newEpisodeArrival } from '../features/watchlist/homeSections';
 import {
   WATCHLIST_BATCH_SIZE,
   getAddedTime,
@@ -401,33 +402,10 @@ export function WatchListScreen({
       return false;
     };
 
-    const isNouveaute = (s: Show): boolean => {
-      const cat = getUpToDateOrNewSeasonCategory(s);
-      if (cat?.type === 'NEW_SEASON') return true;
-
-      if (s.nextEpisodeToWatch) {
-        if (s.nextEpisodeToWatch.season_number > 1 && s.nextEpisodeToWatch.episode_number === 1) {
-          const airMs = parseTimestamp(s.nextEpisodeToWatch.air_date);
-          if (airMs > 0 && (now - airMs) <= SIXTY_DAYS_MS && airMs <= (now + 24 * 60 * 60 * 1000)) {
-            return true;
-          }
-        }
-      }
-
-      const watchedCount = s.seenEpisodes ? s.seenEpisodes.length : 0;
-      if (watchedCount === 0) {
-        const releaseDateStr = s.firstAirDate || s.nextEpisodeToWatch?.air_date;
-        const releaseTime = parseTimestamp(releaseDateStr) || parseTimestamp(s.createdAt);
-        if (releaseTime > 0) {
-          const diff = now - releaseTime;
-          if (diff >= 0 && diff <= SIXTY_DAYS_MS) {
-            return true;
-          }
-        }
-      }
-
-      return false;
-    };
+    // Retour terrain du 08/11 : « Nouveautés » = une saison dont tu en es à l'épisode 1 (nouvelle saison ou
+    // série pas encore commencée), sortie depuis 60 jours au plus ; un nouvel épisode d'une saison en cours
+    // va dans « Continuer à regarder », en tête (homeSections).
+    const isNouveaute = (s: Show): boolean => isSeasonStartNouveaute(s, todayIso, now);
 
     const nouveautesShows = candidateWatchShows
       .filter(isNouveaute)
@@ -441,15 +419,16 @@ export function WatchListScreen({
 
     const nouveautesIds = new Set(nouveautesShows.map(s => s.id));
 
+    // Une série à jour dont un nouvel épisode est sorti depuis le dernier visionnage y entre aussi, même
+    // après une pause de plus de 60 jours, tant que cet épisode a 60 jours au plus.
+    const hasRecentArrival = (s: Show): boolean => {
+      const arrival = newEpisodeArrival(s, todayIso, getShowLastWatchedTime(s), now);
+      return arrival > 0 && now - arrival <= SIXTY_DAYS_MS;
+    };
+    const continueWatchingKeys = new Map(candidateWatchShows.map(s => [s.id, continueWatchingKey(s, getShowLastWatchedTime(s), todayIso, now)]));
     const continueWatchingShows = candidateWatchShows
-      .filter(s => !nouveautesIds.has(s.id) && (s.seenEpisodes?.length || 0) > 0 && isWatchedRecently(s))
-      .sort((a, b) => {
-        const timeA = getShowLastWatchedTime(a);
-        const timeB = getShowLastWatchedTime(b);
-        const diff = timeB - timeA;
-        if (diff !== 0) return diff;
-        return a.title.localeCompare(b.title);
-      });
+      .filter(s => !nouveautesIds.has(s.id) && (s.seenEpisodes?.length || 0) > 0 && (isWatchedRecently(s) || hasRecentArrival(s)))
+      .sort((a, b) => compareContinueWatching(continueWatchingKeys.get(a.id)!, continueWatchingKeys.get(b.id)!) || a.title.localeCompare(b.title));
 
     const continueWatchingIds = new Set(continueWatchingShows.map(s => s.id));
 

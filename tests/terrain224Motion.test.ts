@@ -23,6 +23,7 @@ test('SEENIT-UX-018 Continuer suit le dernier visionnage et un Vu annulé rend l
   const harness = readFileSync('scripts/home-terrain224-browser-checks.cjs','utf8');
   for (const requirement of ['undo-after-transfer','last-watched-first']) assert.ok(harness.includes(requirement),requirement);
   const section = readFileSync('src/screens/WatchNextSection.tsx','utf8');
-  assert.match(section,/index === 0 \? watchTime\(b\) - watchTime\(a\)/,'Continuer est trié du visionnage le plus récent au plus ancien');
+  // Depuis le 08/11 (SEENIT-UX-021) : dernière activité en tête — visionnage, ou sortie d'un nouvel épisode depuis celui-ci.
+  assert.match(section,/continueWatchingKey\(show, watchTime\(show\), today, now\)/,'Continuer est trié par dernière activité : visionnage, ou nouvel épisode sorti depuis');
   assert.match(section,/hasSeenEpisodeKey\(/,'une arrivée dont l’épisode n’est plus vu quitte Continuer');
 });
