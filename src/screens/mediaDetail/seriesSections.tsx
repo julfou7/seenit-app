@@ -9,6 +9,7 @@ import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
 import { SeenItRing } from '../../components/SeenItLogo';
+import { EpisodeReminderBell } from '../../components/EpisodeReminderBell';
 import { EpisodeModeControl, EpisodePassiveChip, EpisodeProgramControl, isEpisodePickable, type EpisodeModeState } from './downloadMode';
 
 type SeasonMeta = { season_number: number; episode_count?: number; air_date?: string | null; vote_average?: number; name?: string };
@@ -132,7 +133,9 @@ export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, 
           <span className="relative w-[76px] h-[47px] rounded-lg overflow-hidden bg-zinc-800 shrink-0">{episode.still_path && <img src={`https://image.tmdb.org/t/p/w300${episode.still_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" style={{ opacity: watched ? 0.55 : 1, filter: watched ? 'grayscale(1)' : undefined }} />}{downloadMode && !inMode && <EpisodePassiveChip state={modeState} progress={live?.progress} />}{downloadMode && modeState === 'active' && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-black/60"><i className="block h-full bg-zinc-100" style={{ width: `${Math.max(0, Math.min(100, Number(live?.progress) || 0))}%` }} /></span>}</span>
           <span className="flex-1 min-w-0 flex flex-col gap-[3px]"><span className={cn('text-[14px] leading-[1.35] font-bold line-clamp-2 break-words decoration-[1.5px]', watched ? 'text-zinc-500 line-through' : 'text-white')}>{episode.name || `Épisode ${episode.episode_number}`}</span><span className="text-[12px] text-zinc-400"><b data-episode-code className={cn('font-extrabold', watched ? 'text-zinc-500' : aired ? 'text-[#F2C36B]' : 'text-sky-300')}>{episodeCode}</b>{' · '}{watchedOn ? <span className="text-zinc-500">{watchedOn}</span> : releaseDay ? <span>{releaseDay}</span> : <>{runtime} min{isNext && <b className="font-extrabold text-[#F2C36B]"> · prochain</b>}</>}</span></span>
           {/* #857 : même bouton Vu que l'Accueil ; #859 : animation au toucher, dessinée par le compositeur. */}
-          {!aired && until && <span className="shrink-0 pr-2 text-[12.5px] font-extrabold text-sky-300 whitespace-nowrap">{until}</span>}
+          {!aired && until && <span className="shrink-0 pr-1 text-[12.5px] font-extrabold text-sky-300 whitespace-nowrap">{until}</span>}
+          {/* Retour terrain du 08/11 : cloche de rappel sur un épisode à venir (hors mode téléchargement). */}
+          {!aired && !inMode && <EpisodeReminderBell show={show} episode={{ season_number: number, episode_number: episode.episode_number, name: episode.name, air_date: episode.air_date }} />}
           {aired && inMode && <EpisodeModeControl episode={episode.episode_number} state={modeState} picked={picked} progress={live?.progress} onToggle={() => downloadMode!.onToggle(episode.episode_number)} />}
           {!aired && inMode && <EpisodeProgramControl episode={episode.episode_number} state={modeState} picked={picked} onToggle={() => downloadMode!.onToggle(episode.episode_number)} />}
           {aired && !inMode && <SeenItCheckButton className="seenit-check--compositor" celebrationLayer={<CompositorCelebration />} isWatched={watched} title={watched ? `Marquer l’épisode ${episode.episode_number} non vu` : `Marquer l’épisode ${episode.episode_number} vu`} onClick={event => settleSeenToggle(onToggleEpisode(event, episode.episode_number))} />}

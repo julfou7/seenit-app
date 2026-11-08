@@ -40,7 +40,7 @@ import {
   selectUserNotificationDevices
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
-import { C411TopError, fetchC411TopMedia, fetchC411Torrents } from "./src/features/downloads/c411Backend.ts";
+import { C411TopError, fetchC411TopPage, fetchC411Torrents } from "./src/features/downloads/c411Backend.ts";
 import { isC411TopScope, type C411TmdbIdentity } from "./src/features/downloads/c411Top.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { downloadServiceTimeoutMs } from "./src/features/downloads/downloadServiceTimeout.ts";
@@ -1571,7 +1571,7 @@ async function startServer() {
         syncProgress.serverScanning(serverId);
 
         const sortedConnections = [...(server.connections || [])].sort((a, b) => connectionRank(a) - connectionRank(b));
-        const hasRemoteConnection = sortedConnections.some((c: any) => c.uri && !isPrivateOrLocalUri(c.uri));
+        const hasRemoteConnection = sortedConnections.some(c => c.uri && !isPrivateOrLocalUri(c.uri));
         let attemptedConnection = false;
 
         for (const conn of sortedConnections) {
@@ -2363,11 +2363,16 @@ async function startServer() {
 
   // SEENIT-C411-004 (#900) — Top C411 d'Explorer : réglage Téléchargements et clé relus pour l'UID authentifié,
   // clé jamais renvoyée ; une panne n'est jamais un classement vide.
+  // Page par page au défilement (retour terrain du 08/11) ; une page déjà lue pour la même clé est servie depuis
+  // un cache de 5 minutes (empreinte de la clé, jamais la clé elle-même).
   const c411TopIdentityCache = new Map<string, C411TmdbIdentity | null>();
-  app.post('/api/c411/top', requireAuth, rateLimit('c411-top', 6, 60_000), async (req: AuthRequest, res) => {
+  const c411TopPageCache = new Map<string, { at: number; value: Awaited<ReturnType<typeof fetchC411TopPage>> }>();
+  app.post('/api/c411/top', requireAuth, rateLimit('c411-top', 20, 60_000), async (req: AuthRequest, res) => {
     res.setHeader('Cache-Control', 'private, no-store');
     const scope = req.body?.scope ?? 'videos';
     if (!isC411TopScope(scope)) return res.status(400).json({ code: 'INVALID_SCOPE', error: 'Périmètre inconnu.' });
+    const page = Number(req.body?.page ?? 1);
+    if (!Number.isInteger(page) || page < 1 || page > 12) return res.status(400).json({ code: 'INVALID_PAGE', error: 'Page inconnue.' });
     const userId = req.user?.uid;
     if (!userId) return res.status(401).json({ code: 'UNAUTHENTICATED', error: 'Utilisateur non authentifié.' });
     try {
@@ -2379,8 +2384,15 @@ async function startServer() {
       const controller = new AbortController();
       req.once('aborted', () => controller.abort());
       const deadline = AbortSignal.timeout(12_000);
-      const top = await fetchC411TopMedia({ apiKey, scope, signal: () => AbortSignal.any([controller.signal, deadline]), identityCache: c411TopIdentityCache });
-      return res.json({ scope, items: top.entries, unresolved: top.unresolved, scanned: top.scanned });
+      const cacheKey = `${createHash('sha256').update(apiKey).digest('hex').slice(0, 16)}:${scope}:${page}`;
+      const cached = c411TopPageCache.get(cacheKey);
+      const top = cached && Date.now() - cached.at < 5 * 60_000 ? cached.value
+        : await fetchC411TopPage({ apiKey, scope, page, signal: () => AbortSignal.any([controller.signal, deadline]), identityCache: c411TopIdentityCache });
+      if (!cached || cached.value !== top) {
+        if (c411TopPageCache.size >= 200) c411TopPageCache.delete(c411TopPageCache.keys().next().value as string);
+        c411TopPageCache.set(cacheKey, { at: Date.now(), value: top });
+      }
+      return res.json({ scope, page, items: top.entries, unresolved: top.unresolved, scanned: top.scanned, hasMore: top.hasMore });
     } catch (error: unknown) {
       const errorCode = error instanceof C411TopError ? error.code : operationalErrorCode(error, 'C411_TOP_FAILED');
       emitOperationalEvent({ code: 'DOWNLOAD_C411_FAILED', context: { action: 'top', errorCode }, domain: 'downloads', level: 'warn' });

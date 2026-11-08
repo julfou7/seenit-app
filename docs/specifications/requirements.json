@@ -4,6 +4,24 @@
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
+      "id": "SEENIT-NOTIFICATION-009",
+      "title": "Cloche de rappel sur les épisodes à venir de la fiche série et de la fiche épisode",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/episodeReminderBell.test.ts",
+          "contains": "SEENIT-NOTIFICATION-009 cloche d’épisode à venir : même écriture que la carte À venir, retour arrière, jamais sous un autre compte"
+        },
+        {
+          "file": "tests/episodeReminderBell.test.ts",
+          "contains": "SEENIT-NOTIFICATION-009 cloche câblée sur les épisodes à venir de la fiche série et de la fiche épisode"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-021",
       "title": "Accueil : Nouveautés réservé à l'épisode 1 d'une saison ; un nouvel épisode en tête de Continuer",
       "targets": [
@@ -2735,6 +2753,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/episodeReminderBell.test.ts",
+          "contains": "SEENIT-UX-014 carte en pause sans ligne sous le titre ; retour en vue horizontale sans marge ajoutée"
+        },
         {
           "file": "tests/plexResumeWorker.test.ts",
           "contains": "SEENIT-UX-014 le vrai worker franchit une sortie"

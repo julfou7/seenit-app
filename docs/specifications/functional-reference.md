@@ -451,7 +451,8 @@ Le contrat E-01..33 du [handoff Explorer](../design/explorer-refonte-2026-10-28.
 
 Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Top C411** (sous le réglage
 Téléchargements avec une clé C411 : les titres les plus partagés sur C411, rang et seeders sur la carte,
-fiches rattachées par l'identifiant TMDB exact fourni par C411, `SEENIT-C411-004`), **Pépites**,
+fiches rattachées par l'identifiant TMDB exact fourni par C411, chargées page par page au défilement depuis
+la v1.4.280, `SEENIT-C411-004`), **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
 - Dans les résultats de recherche, les titres restent blancs et seule la partie qui correspond au texte saisi est en or (exception à la règle des titres en or).
 - Recherche multi-pages TMDB en listes : bibliothèque locale, films et séries, puis personnes. La page 1 des films et séries s'affiche sans attendre la page 2. Les en-têtes ne montrent ni source (« TMDB »), ni durée, ni « instantané » ; seul « recherche… » signale une attente.
@@ -572,7 +573,8 @@ Depuis les retours de la v1.4.251 (#857) :
 - le bouton **Vu** des épisodes, en liste comme dans la fiche épisode, est celui de l'Accueil (anneau SeenIt
   animé) ;
 - un épisode à venir reste net et dit quand il sort (« Demain », « Dans 5 jours », « Dans 12 jours ·
-  16 nov. ») ;
+  16 nov. ») ; pour une série suivie, sa ligne porte une cloche de rappel (44 px) et sa fiche « Me prévenir
+  à la sortie » à la place de « Bientôt disponible » (v1.4.280, `SEENIT-NOTIFICATION-009`) ;
 - la fiche épisode charge avec un squelette à son gabarit actuel.
 Depuis les retours de la v1.4.252 (#859), le film n'a qu'un bouton à états (Suivre le film → Marquer vu → ✓ Vu ·
 annuler) suivi des tuiles diffuseur et Plex comme la série, et le bouton Vu des fiches anime dès le toucher, de
@@ -918,8 +920,10 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   une source injoignable est signalée.
 - Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
   (120 jours) — épisodes et films surveillés, sans fichier, dont la série est surveillée — regroupés par
-  série (identifiant Sonarr exact), avec « Programmé · ven. 14 nov. » en bleu et « Annuler » (44 px),
-  qui retire la surveillance sans rien supprimer. Une source injoignable est signalée, jamais confondue
+  série (identifiant Sonarr exact). Depuis la v1.4.280, chaque carte a une méta grise courte (« Film ·
+  Radarr », « Série · Sonarr · 3 épisodes »), une seule pastille de date (« Sortie mar. 10 nov. ») et
+  « Annuler » discret sur la même ligne ; les épisodes sont des lignes compactes code · titre · date avec une
+  croix (44 px). Annuler retire la surveillance sans rien supprimer. Une source injoignable est signalée, jamais confondue
   avec une liste vide.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.

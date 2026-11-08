@@ -1,16 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Clock3, Film, Tv } from 'lucide-react';
+import { Clock3, Film, Tv, X } from 'lucide-react';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { fetchProgrammedCalendar, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem } from '../features/downloads/programmedCalendar';
 import type { LiveDownloadItem } from '../services/sonarrRadarrLive';
 
 type EpisodeItem = Extract<ProgrammedItem, { kind: 'episode' }>;
-const movieRelease = (date?: string) => {
+/** Pastille de date (refonte du 08/11) : « Sortie mar. 10 nov. », « Sortie demain ». */
+const releasePill = (date?: string) => {
   if (!date) return 'Date à venir';
   const label = programmedDateLabel(date);
-  return label === 'Demain' || label === "Aujourd'hui" ? `Sort ${label.toLowerCase()}` : `Sort le ${label}`;
+  return label === 'Demain' || label === "Aujourd'hui" ? `Sortie ${label.toLowerCase()}` : `Sortie ${label}`;
 };
+const When = ({ children }: { children: React.ReactNode }) => <span className="programmed__when"><Clock3 size={13} aria-hidden="true" />{children}</span>;
 const code = (item: EpisodeItem) => `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
 
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -93,6 +95,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
     else series.set(item.seriesId, [...(series.get(item.seriesId) || []), item]);
   }
   const cancelButton = (item: ProgrammedItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => void cancel(item)} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel">Annuler</button>;
+  const rowCancel = (item: ProgrammedItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => void cancel(item)} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel programmed__cancel--icon"><X size={18} aria-hidden="true" /></button>;
 
   return <section className="downloads-section" data-programmed>
     <h2>Programmés</h2>
@@ -108,10 +111,10 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
           <button type="button" className="download-card__poster download-season__poster" disabled={!request.tmdbId || !onShowClick} aria-label={`Ouvrir ${name}`} onClick={open}>{poster ? <img src={poster} alt="" loading="lazy" decoding="async" /> : isTv ? <Tv size={22} /> : <Film size={22} />}</button>
           <div className="download-card__body">
             <button type="button" className="download-card__title" disabled={!request.tmdbId || !onShowClick} onClick={open}>{name}</button>
-            <p className="download-card__scope">{requestScope(request)} · {date ? movieRelease(date) : 'Pas encore de version'}</p>
-            <p className="download-season__state programmed__state"><Clock3 size={13} aria-hidden="true" />{isTv ? 'Sonarr' : 'Radarr'} le récupère dès qu’une version sort</p>
+            <p className="programmed__meta">{requestScope(request)} · {isTv ? 'Sonarr' : 'Radarr'}</p>
+            <div className="programmed__foot"><When>{date ? releasePill(date) : 'Pas encore de version'}</When>
+              {onRemoveWatching && <button type="button" onClick={() => onRemoveWatching(request)} aria-label={`Annuler la programmation de ${name}`} className="programmed__cancel">Annuler</button>}</div>
           </div>
-          {onRemoveWatching && <button type="button" onClick={() => onRemoveWatching(request)} aria-label={`Annuler la programmation de ${name}`} className="programmed__cancel">Annuler</button>}
         </div>
       </article>;
     })}
@@ -123,14 +126,16 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
           <button type="button" className="download-card__poster download-season__poster" disabled={!first.tmdbId || !onShowClick} aria-label={`Ouvrir ${first.seriesTitle}`} onClick={open}>{first.posterUrl ? <img src={first.posterUrl} alt="" loading="lazy" decoding="async" /> : <Tv size={22} />}</button>
           <div className="download-card__body">
             <button type="button" className="download-card__title" disabled={!first.tmdbId || !onShowClick} onClick={open}>{first.seriesTitle}</button>
-            <p className="download-card__scope">{group.length} épisode{group.length > 1 ? 's' : ''} · récupéré{group.length > 1 ? 's' : ''} à la sortie</p>
+            <p className="programmed__meta">Série · Sonarr · {group.length} épisode{group.length > 1 ? 's' : ''}</p>
+            <div className="programmed__foot"><When>{releasePill(group.map(item => item.date).filter((value): value is string => Boolean(value)).sort()[0])}</When></div>
           </div>
         </div>
         <ul className="download-season__rows">
           {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
             <span className="download-season__code">{code(item)}</span>
-            <span className="download-season__text"><span className="download-season__title" data-untitled={isUntitledEpisode(item) || undefined}>{isUntitledEpisode(item) ? 'Titre à venir' : item.title}</span><span className="download-season__state programmed__state"><Clock3 size={13} aria-hidden="true" />Programmé · {programmedDateLabel(item.date)}</span></span>
-            {cancelButton(item, `${first.seriesTitle} ${code(item)}`)}
+            <span className="programmed__row-title" data-untitled={isUntitledEpisode(item) || undefined}>{isUntitledEpisode(item) ? 'Titre à venir' : item.title}</span>
+            <span className="programmed__row-date">{programmedDateLabel(item.date)}</span>
+            {rowCancel(item, `${first.seriesTitle} ${code(item)}`)}
           </li>)}
         </ul>
       </article>;
@@ -140,10 +145,9 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
         <button type="button" className="download-card__poster download-season__poster" disabled={!movie.tmdbId || !onShowClick} aria-label={`Ouvrir ${movie.title}`} onClick={() => movie.tmdbId && onShowClick?.(movie.tmdbId, 'movie')}>{movie.posterUrl ? <img src={movie.posterUrl} alt="" loading="lazy" decoding="async" /> : <Film size={22} />}</button>
         <div className="download-card__body">
           <button type="button" className="download-card__title" disabled={!movie.tmdbId || !onShowClick} onClick={() => movie.tmdbId && onShowClick?.(movie.tmdbId, 'movie')}>{movie.title}</button>
-          <p className="download-card__scope">Film · {movieRelease(movie.date)}</p>
-          <p className="download-season__state programmed__state"><Clock3 size={13} aria-hidden="true" />Radarr le récupère dès sa sortie</p>
+          <p className="programmed__meta">Film · Radarr</p>
+          <div className="programmed__foot"><When>{releasePill(movie.date)}</When>{cancelButton(movie, movie.title)}</div>
         </div>
-        {cancelButton(movie, movie.title)}
       </div>
     </article>)}
   </section>;

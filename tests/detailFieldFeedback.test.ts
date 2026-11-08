@@ -44,7 +44,8 @@ test('SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente
   assert.match(screen, /if \(lastTransitions\.current === transitions\) return;[\s\S]{0,80}setProgrammedRefresh\(key => key \+ 1\);/);
   const programmed = read('src/components/ProgrammedSection.tsx');
   assert.match(programmed, /data-programmed-request=\{request\.id\}/);
-  assert.match(programmed, /\{date \? movieRelease\(date\) : 'Pas encore de version'\}/);
+  // Refonte du 08/11 : une pastille de date d'une ligne au lieu de la phrase bleue sur deux lignes.
+  assert.match(programmed, /<When>\{date \? releasePill\(date\) : 'Pas encore de version'\}<\/When>/);
   assert.match(programmed, /Number\(item\.tmdbId\) === Number\(request\.tmdbId\)/, 'doublon calendrier reconnu par TMDB exact, jamais le titre');
   const card = read('src/components/DownloadItemCard.tsx');
   assert.match(card, /waiting \? \(item\.availability\?\.reason === 'no_release' \? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier'\)/);

@@ -25,6 +25,7 @@ import { filterRemoteSearch } from '../features/discover/searchRemoteFilters';
 import { resolveParentalRatingBatch } from '../features/discover/progressiveAgeFilter';
 import { getParentalRatingOverride } from '../store/parentalRatingStore';
 import { useNavigationSearchShortcut } from '../features/navigation/useTabShortcut';
+import type { TrailerVideo } from '../features/trailers/trailerPolicy';
 
 /** Prépare la page suivante quand le fil principal est libre, pour ne jamais gêner le défilement en cours. */
 const scheduleExplorerIdle = (task: () => void) => {
@@ -440,7 +441,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const homePrefetchRef = useRef(createExplorerHomePrefetch());
   const searchRequestGenerationRef = useRef(0);
 
-  const [trailerModalVideos, setTrailerModalVideos] = useState<any[] | null>(null);
+  const [trailerModalVideos, setTrailerModalVideos] = useState<TrailerVideo[] | null>(null);
 
   const handleOpenTrailer = async (mediaId: number, mediaType: 'tv' | 'movie') => {
     const details = heroDetails[mediaId];
@@ -733,6 +734,11 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
         }
         return true;
       });
+    }
+
+    // SEENIT-C411-004 : rangs continus parmi les cartes affichées (titres vus masqués, fiches introuvables écartées).
+    if (activeCategory === 'Top C411' && !qClean) {
+      list = list.map((item, index) => item.seenitC411 ? { ...item, seenitC411: { ...item.seenitC411, rank: index + 1 } } : item);
     }
 
     return list;

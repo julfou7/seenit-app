@@ -3,6 +3,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } fr
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, useDragControls } from 'motion/react';
 import { type Show } from '../types';
 import { X, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles } from 'lucide-react';
+import { EpisodeReminderBell } from '../components/EpisodeReminderBell';
 import { computeAutoArchiveStatus, formatAirDateSafe, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
@@ -708,7 +709,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
        nextEpisodeToWatch: optimisticNextEp,
        isArchived: autoArchived
     });
-    syncSingleItem(currentShow.id, true).catch(console.error);
+    syncSingleItem(currentShow.id, true).catch(error => appLogger.warn('plex', 'Synchronisation Plex de la série impossible', error));
     scrollAllCarouselsToStart();
 
     const sNumStr = String(currentSeason).padStart(2, '0');
@@ -1071,7 +1072,9 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                   <span className="text-[18px] text-[#E5A93D]" aria-hidden="true">›</span>
                 </button>}
 
-                {isFutureEpisode ? <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>
+                {/* Retour terrain du 08/11 : un épisode à venir d'une série suivie a sa cloche de rappel. */}
+                {isFutureEpisode ? (activeShow?.id ? <EpisodeReminderBell variant="wide" show={activeShow} episode={{ season_number: currentSeason, episode_number: currentNumber, name: currentEpisode.name, air_date: currentEpisode.air_date }} />
+                  : <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>)
                   : watchProviders.length > 0 && <WhereToWatchCard providers={watchProviders} loading={false} userPlatforms={userPlatforms} title={activeShow?.title || tmdbShowTitle || ''} onOpenPlex={openPlex} emptyLabel="" />}
 
                 <RedditSection

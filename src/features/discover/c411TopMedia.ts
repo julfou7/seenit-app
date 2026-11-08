@@ -1,5 +1,6 @@
 import { tmdb, type TMDBMedia } from '../shows/tmdb';
 import { getC411Top, type C411TopItem } from '../../services/c411';
+import { auth } from '../../lib/firebase';
 
 /** Catégorie d'Explorer (SEENIT-C411-004, #900), proposée sous le réglage Téléchargements avec une clé C411. */
 export const TOP_C411_CATEGORY = 'Top C411';
@@ -7,17 +8,27 @@ const DETAIL_CONCURRENCY = 6;
 
 type MediaDetails = TMDBMedia & { genres?: Array<{ id: number }> };
 
+const CACHE_MS = 10 * 60_000;
+const pageCache = new Map<string, { at: number; value: { media: TMDBMedia[]; notice: string | null; hasMore: boolean } }>();
+
 /**
  * Titres du Top C411 en cartes d'Explorer : chaque fiche est lue chez TMDB par l'identifiant exact fourni par
  * C411 (jamais par titre) ; une fiche introuvable est écartée sans décaler les autres rangs. Une panne C411 ou un
  * classement sans fiche rattachable donne un message, jamais une liste vide muette.
+
+ *
+ * Retour terrain du 08/11 (v1.4.279 : « 27 résultats, d'un coup après 10 s ») : une page C411 par page
+ * d'Explorer, chargée au défilement ; une page déjà lue revient instantanément pendant 10 minutes.
  */
-export async function loadC411TopMedia(isCurrent: () => boolean = () => true, load: typeof getC411Top = getC411Top): Promise<{ media: TMDBMedia[]; notice: string | null }> {
-  let top: { items: C411TopItem[]; unresolved: number };
+export async function loadC411TopMedia(page = 1, isCurrent: () => boolean = () => true, load: typeof getC411Top = getC411Top): Promise<{ media: TMDBMedia[]; notice: string | null; hasMore: boolean }> {
+  const key = `${auth.currentUser?.uid || ''}:${page}`;
+  const cached = pageCache.get(key);
+  if (cached && Date.now() - cached.at < CACHE_MS) return cached.value;
+  let top: { items: C411TopItem[]; unresolved: number; hasMore: boolean };
   try {
-    top = await load('videos');
+    top = await load('videos', page);
   } catch (error: unknown) {
-    return { media: [], notice: error instanceof Error && error.message ? error.message : 'Classement C411 indisponible.' };
+    return { media: [], notice: error instanceof Error && error.message ? error.message : 'Classement C411 indisponible.', hasMore: false };
   }
   const media: Array<TMDBMedia | null> = new Array(top.items.length).fill(null);
   for (let index = 0; index < top.items.length && isCurrent(); index += DETAIL_CONCURRENCY) {
@@ -37,6 +48,8 @@ export async function loadC411TopMedia(isCurrent: () => boolean = () => true, lo
     }));
   }
   const list = media.filter((entry): entry is TMDBMedia => entry !== null);
-  if (list.length) return { media: list, notice: null };
-  return { media: [], notice: top.items.length || top.unresolved ? 'Aucun titre du classement C411 n’a pu être relié à une fiche.' : 'Le classement C411 est vide pour le moment.' };
+  const value = list.length || page > 1 ? { media: list, notice: null, hasMore: top.hasMore }
+    : { media: [], notice: top.items.length || top.unresolved ? 'Aucun titre du classement C411 n’a pu être relié à une fiche.' : 'Le classement C411 est vide pour le moment.', hasMore: top.hasMore };
+  if (isCurrent()) pageCache.set(key, { at: Date.now(), value });
+  return value;
 }

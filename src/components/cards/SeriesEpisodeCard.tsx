@@ -101,7 +101,9 @@ export function SeriesEpisodeCard({ show, today: day, episode, context, detail, 
   const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;
   const status = context.kind !== 'history' && !(context.kind === 'watch' && context.upToDate) ? seriesBadge(show, episode, progress, hideStatus, today) : null;
   const pause = hideStatus ? seriesPause(show) : null;
-  const staleDetail = pause ? (layout === 'list' ? pause.description : null) : visibleDetail && /pas vu|délaissé/i.test(visibleDetail) ? visibleDetail : null;
+  // Retour terrain du 08/11 : « En pause depuis 3 mois » répétait le badge « ⏸ 3 MOIS » de l'affiche, en vue liste
+  // seulement ; plus de ligne sous le titre de l'épisode, dans aucune vue.
+  const staleDetail = pause ? null : visibleDetail && /pas vu|délaissé/i.test(visibleDetail) ? visibleDetail : null;
   const secondaryDetail = visibleDetail && !pause && !/plus que|restant|dispo|pas vu|délaissé/i.test(visibleDetail) ? visibleDetail : null;
   const watchedDate = context.kind === 'history' ? new Date(context.watchedAt) : null;
   const validWatchedDate = watchedDate && Number.isFinite(watchedDate.getTime());

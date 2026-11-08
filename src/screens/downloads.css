@@ -48,11 +48,19 @@
 .download-season__remove { flex:none; width:44px; height:44px; display:grid; place-items:center; border-radius:50%; color:#a1a1aa; }
 @media(prefers-reduced-motion:reduce) { .download-season__progress i { transition:none; } }
 /* #879 — section « Programmés » : état bleu, bouton Annuler de 44 px. */
-.programmed__state { display:flex; align-items:center; gap:5px; color:#7dd3fc; }
-.programmed__cancel { flex:none; min-height:44px; min-width:44px; padding:0 10px; border-radius:12px; color:#d4d4d8; font-size:13.5px; font-weight:700; }
+/* Refonte du 08/11 (« la ligne en bleu » sur deux lignes) : une ligne grise courte, une pastille de date d'une
+   ligne et « Annuler » discret ; lignes d'épisode compactes (code, titre, date, ✕). */
+.programmed__meta { margin-top:4px; font-size:12.5px; font-weight:600; color:#a1a1aa; }
+.programmed__foot { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; min-width:0; }
+.programmed__when { display:inline-flex; align-items:center; gap:5px; min-width:0; height:28px; padding:0 10px; border-radius:999px; background:#0b2531; box-shadow:inset 0 0 0 1px #7dd3fc40; color:#7dd3fc; font-size:12.5px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.programmed__when svg { flex:none; }
+.programmed__cancel { flex:none; min-height:44px; min-width:44px; margin-right:-6px; padding:0 8px; border-radius:12px; color:#a1a1aa; font-size:13px; font-weight:700; }
+.programmed__cancel--icon { display:grid; place-items:center; padding:0; margin-right:0; }
+.programmed__row-title { flex:1; min-width:0; font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.programmed__row-date { flex:none; font-size:12px; font-weight:800; color:#7dd3fc; white-space:nowrap; }
 .programmed__cancel:disabled { opacity:.5; }
 /* 08/11 (Harry Potter) : épisode connu de Sonarr avec sa date, titre pas encore annoncé. */
-.download-season__title[data-untitled] { color:#a1a1aa; font-weight:600; }
+.download-season__title[data-untitled], .programmed__row-title[data-untitled] { color:#a1a1aa; font-weight:600; }
 /* #879 — « Ajouter E6 » et choix de qualité en ligne dans la carte de saison. */
 .download-season__add { margin-top:10px; width:100%; min-height:44px; border-radius:12px; color:#f2c36b; font-size:14px; font-weight:800; box-shadow:inset 0 0 0 1px #e5a93d66; }
 .download-season__pick { margin-top:10px; padding:10px; border-radius:14px; background:#1e1a12; box-shadow:inset 0 0 0 1.5px #e5a93d99; }
