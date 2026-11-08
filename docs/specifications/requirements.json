@@ -1,8 +1,58 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.280",
+  "applicationVersion": "1.4.281",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
+    {
+      "id": "SEENIT-DOWNLOAD-016",
+      "title": "État Sonarr/Radarr synchronisé : une copie par compte et serveur, relue après chaque écriture",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/arrSync281.test.ts",
+          "contains": "SEENIT-DOWNLOAD-016 un seul état Sonarr/Radarr synchronisé : relu en un endroit, après chaque écriture, jamais d’une autre portée"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-017",
+      "title": "Un épisode précis ne programme jamais toute sa saison",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/arrSync281.test.ts",
+          "contains": "SEENIT-DOWNLOAD-017 un épisode précis ne laisse pas sa saison surveillée en bloc (MobLand : E09 seul, pas E10)"
+        },
+        {
+          "file": "tests/episodeProgramming.test.ts",
+          "contains": "SEENIT-DOWNLOAD-017 programmer E09 de MobLand ne programme pas E10 : la saison n’est plus surveillée en bloc"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-018",
+      "title": "Programmer ou annuler le téléchargement d’un épisode à venir depuis la fiche épisode",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/arrSync281.test.ts",
+          "contains": "SEENIT-DOWNLOAD-018 fiche épisode : programmer ou annuler le téléchargement d’un épisode à venir"
+        },
+        {
+          "file": "tests/episodeProgramming.test.ts",
+          "contains": "SEENIT-DOWNLOAD-018 annuler depuis la fiche épisode : cet épisode seul, jamais d’ajout de série"
+        }
+      ]
+    },
     {
       "id": "SEENIT-NOTIFICATION-009",
       "title": "Cloche de rappel sur les épisodes à venir de la fiche série et de la fiche épisode",
@@ -74,6 +124,10 @@
         {
           "file": "tests/detailFieldFeedback.test.ts",
           "contains": "SEENIT-DOWNLOAD-015 un lancement pendant la vérification de présence l’attend au lieu d’être refusé"
+        },
+        {
+          "file": "tests/programmedCalendar.test.ts",
+          "contains": "SEENIT-DOWNLOAD-015 Programmés : qualité réelle, sortie numérique distinguée du cinéma, qualité modifiable"
         }
       ]
     },
@@ -171,6 +225,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/arrSync281.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 messages du client en français, transfert sans source = attente, pas une panne"
+        },
         {
           "file": "tests/downloadSeasonGroups.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 #879 « Ajouter E6 » : premier épisode sorti, ni vu, ni présent, ni déjà suivi"

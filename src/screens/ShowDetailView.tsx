@@ -1,3 +1,4 @@
+import { notifyArrWrite } from '../store/arrSyncStore';
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
@@ -237,6 +238,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     const toast = useToastStore.getState().showToast;
     if (outcome.failure) { toast({ title, action: outcome.failure, posterPath: show?.posterPath }, 'error'); return; }
     toast({ title, action: outcome.present ? 'Déjà présent dans Radarr.' : `Programmé pour sa sortie · ${qualityLabel}`, posterPath: show?.posterPath }, outcome.present ? 'info' : 'success');
+    // SEENIT-DOWNLOAD-016 : l'état Sonarr/Radarr synchronisé (Programmés) est relu avec la fiche.
+    notifyArrWrite();
     void refreshPlexAvailability();
   };
   const cancelFilm = async () => {
@@ -246,7 +249,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       const outcome = await unprogramArrMovie({ tmdbId: effectiveTmdbId, readConfig: () => useDownloadConfigStore.getState() });
       if (outcome.interrupted) return;
       toast({ title, action: outcome.done ? 'N’est plus programmé.' : outcome.failure || 'Annulation non confirmée.', posterPath: show?.posterPath }, outcome.done ? 'info' : 'error');
-      if (outcome.done) void refreshPlexAvailability();
+      if (outcome.done) { notifyArrWrite(); void refreshPlexAvailability(); }
       return;
     }
     if (!filmItem) return;
@@ -330,7 +333,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     const notes = [outcome.failure ? `${plural(outcome.failed.length, outcome.failed.join(', '))} non programmé${outcome.failed.length > 1 ? 's' : ''}` : '', unannounced].filter(Boolean);
     toast({ title, subtitle: single ? `S${season} | E${episodes[0]}` : undefined, action: [single ? `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` : programmingSummary(launchedNow, outcome.programmed.length, quality), ...notes].join(' · '), posterPath: show?.posterPath }, notes.length ? 'info' : 'success');
     // Relit la présence : les épisodes programmés passent en « Programmé ».
-    if (outcome.programmed.length) void refreshPlexAvailability();
+    if (outcome.programmed.length) { notifyArrWrite(); void refreshPlexAvailability(); }
     return false;
   };
   const openPreciseVersion = () => {

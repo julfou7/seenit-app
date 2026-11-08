@@ -4,6 +4,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, animate, useDrag
 import { type Show } from '../types';
 import { X, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles } from 'lucide-react';
 import { EpisodeReminderBell } from '../components/EpisodeReminderBell';
+import { EpisodeProgramCard } from '../components/EpisodeProgramCard';
 import { computeAutoArchiveStatus, formatAirDateSafe, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
@@ -1073,8 +1074,10 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 </button>}
 
                 {/* Retour terrain du 08/11 : un épisode à venir d'une série suivie a sa cloche de rappel. */}
-                {isFutureEpisode ? (activeShow?.id ? <EpisodeReminderBell variant="wide" show={activeShow} episode={{ season_number: currentSeason, episode_number: currentNumber, name: currentEpisode.name, air_date: currentEpisode.air_date }} />
-                  : <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>)
+                {/* Retour terrain du 08/11 : depuis la fiche épisode, on programme aussi son téléchargement. */}
+                {isFutureEpisode ? <>{activeShow?.id ? <EpisodeReminderBell variant="wide" show={activeShow} episode={{ season_number: currentSeason, episode_number: currentNumber, name: currentEpisode.name, air_date: currentEpisode.air_date }} />
+                  : <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>}
+                  <EpisodeProgramCard title={tmdbShowTitle || activeShow?.title || ''} tmdbId={tmdbShowId || activeShow?.tmdbId} tvdbId={activeShow?.tvdbId} imdbId={activeShow?.imdbId} season={currentSeason} episode={currentNumber} presence={presence} /></>
                   : watchProviders.length > 0 && <WhereToWatchCard providers={watchProviders} loading={false} userPlatforms={userPlatforms} title={activeShow?.title || tmdbShowTitle || ''} onOpenPlex={openPlex} emptyLabel="" />}
 
                 <RedditSection

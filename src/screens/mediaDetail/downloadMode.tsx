@@ -138,7 +138,8 @@ export function EpisodeProgramControl({ episode, state, picked, onToggle }: { ep
 export function EpisodePassiveChip({ state, progress }: { state: EpisodeModeState; progress?: number }) {
   const label = state === 'active' ? `${Math.max(0, Math.min(99, Math.round(Number(progress) || 0)))} %` : state === 'present' ? '✓ Prêt' : state === 'attention' ? '!' : state === 'programmed' ? 'Programmé' : null;
   if (!label) return null;
-  return <span aria-hidden="true" className={cn('absolute right-1 bottom-1 rounded-md px-1.5 text-[10.5px] font-extrabold leading-[1.45]', state === 'attention' ? 'bg-rose-400 text-rose-950' : state === 'programmed' ? 'bg-black/85 text-sky-300' : 'bg-black/85 text-zinc-100')}>{label}</span>;
+  // Retour terrain du 08/11 : « Programmé » était rogné sur la vignette de 76 px ; il tient sur toute sa largeur.
+  return <span aria-hidden="true" className={cn('absolute bottom-1 rounded-md font-extrabold leading-[1.45]', state === 'programmed' ? 'left-1 right-1 px-1 text-center text-[9.5px] whitespace-nowrap bg-black/85 text-sky-300' : 'right-1 px-1.5 text-[10.5px]', state === 'attention' ? 'bg-rose-400 text-rose-950' : state === 'programmed' ? '' : 'bg-black/85 text-zinc-100')}>{label}</span>;
 }
 
 /** État de chaque épisode d'une saison pour le bandeau du mode (même calcul que les lignes). */

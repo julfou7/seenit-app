@@ -1,3 +1,4 @@
+import { frenchArrMessages, isStalledWithoutSources } from '../features/downloads/arrStatusMessages';
 import { Capacitor, CapacitorHttp } from '@capacitor/core';
 import type { C411Torrent } from './c411';
 import type { DownloadAvailability } from '../features/downloads/downloadAvailability';
@@ -223,7 +224,9 @@ export function matchMovieDownload(
   return false;
 }
 
-function parseQueueRecordStatus(rec: any): { status: string; statusText: string; errorMessage?: string } {
+type ArrQueueStatusRecord = { statusMessages?: Array<{ title?: string; messages?: string[] } | null>; errorMessage?: string; trackedDownloadStatus?: string; status?: string };
+
+function parseQueueRecordStatus(rec: ArrQueueStatusRecord): { status: string; statusText: string; errorMessage?: string } {
   const statusMsgs: string[] = [];
   if (Array.isArray(rec.statusMessages)) {
     for (const sm of rec.statusMessages) {
@@ -240,24 +243,19 @@ function parseQueueRecordStatus(rec: any): { status: string; statusText: string;
   const isTrackedWarning = rec.trackedDownloadStatus?.toLowerCase() === 'warning';
   const isFailed = rec.status?.toLowerCase() === 'failed' || rec.status?.toLowerCase() === 'error';
 
+  // Retour terrain du 08/11 : un transfert sans source connectée attend (« En attente de sources »), il n'est pas
+  // en panne ; les autres messages sont traduits, jamais affichés en anglais (arrStatusMessages).
+  if (!isTrackedError && !isFailed && isStalledWithoutSources(statusMsgs)) {
+    return { status: 'stalled', statusText: 'En attente de sources' };
+  }
+
   let errorMessage: string | undefined;
   if (statusMsgs.length > 0) {
-    errorMessage = statusMsgs.join(' • ');
+    errorMessage = frenchArrMessages(statusMsgs);
   } else if (isTrackedError || isFailed) {
     errorMessage = 'Erreur lors du téléchargement (espace disque ou client torrent)';
   } else if (isTrackedWarning) {
     errorMessage = 'Avertissement de téléchargement';
-  }
-
-  // Traductions des erreurs courantes en français
-  if (errorMessage) {
-    if (/disk is full|not enough free space|no space left|space left on device/i.test(errorMessage)) {
-      errorMessage = 'Disque plein : espace de stockage insuffisant';
-    } else if (/access denied|permission denied/i.test(errorMessage)) {
-      errorMessage = 'Erreur d\'accès / permissions disque';
-    } else if (/client unavailable|could not connect/i.test(errorMessage)) {
-      errorMessage = 'Client de téléchargement injoignable';
-    }
   }
 
   const hasError = Boolean(errorMessage || isTrackedError || isFailed);
@@ -607,7 +605,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           const qbitErrorMsg = isQbitError ? 'Erreur de téléchargement (espace disque insuffisant ou fichier manquant)' : undefined;
           const qbitStatus = isQbitError
             ? 'error'
-            : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'warning' : (t.state === 'pausedDL' ? 'paused' : 'downloading')));
+            : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'stalled' : (t.state === 'pausedDL' ? 'paused' : 'downloading')));
           const qbitStatusText = isQbitError
             ? 'Erreur'
             : (isDone

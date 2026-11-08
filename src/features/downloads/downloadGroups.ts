@@ -1,5 +1,6 @@
 import type { LiveDownloadItem } from '../../services/sonarrRadarrLive';
 import { hasExplicitDownloadError, isDownloadCompleted } from './downloadStatePolicy.ts';
+import { frenchArrMessage } from './arrStatusMessages.ts';
 
 export type DownloadGroup = 'attention' | 'active' | 'waiting' | 'completed' | 'cancelled';
 /** Une carte unique ; une panne ou un import en attente ne disparaît jamais derrière 100 %. */
@@ -30,6 +31,7 @@ export function isWatchedWaitingRequest(item: Pick<LiveDownloadItem, 'status' | 
 
 export function downloadProblem(message: string): { title: string; hint: string } {
   if (/manual import|import manuel/i.test(message)) return { title: 'Import manuel requis', hint: 'Le fichier est arrivé, mais le client n’a pas confirmé son import. Choisis une autre version ou vérifie l’import dans le client.' };
-  if (/not an upgrade/i.test(message)) return { title: 'Une version équivalente existe déjà', hint: 'Choisis une autre qualité pour chercher une amélioration. Aucun remplacement n’a été confirmé.' };
-  return { title: 'Une intervention est nécessaire', hint: message || 'Vérifie le client de téléchargement ou cherche une autre version.' };
+  if (/not an upgrade|pas une amélioration/i.test(message)) return { title: 'Une version équivalente existe déjà', hint: 'Choisis une autre qualité pour chercher une amélioration. Aucun remplacement n’a été confirmé.' };
+  // Jamais d'anglais dans la carte (retour terrain du 08/11) : le message du client est traduit.
+  return { title: 'Une intervention est nécessaire', hint: frenchArrMessage(message) || 'Vérifie le client de téléchargement ou cherche une autre version.' };
 }

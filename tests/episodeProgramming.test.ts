@@ -17,9 +17,10 @@ const bundle = await build({ entryPoints: ['src/features/downloads/episodeProgra
       : 'export const isDownloadFeatureEnabled=c=>c.downloadsEnabled===true;' }));
   } }] });
 type Result = { programmed: number[]; unannounced: number[]; failed: number[]; failure?: string; interrupted: boolean };
-const { programArrEpisodes, programmingSummary } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`) as {
+const { programArrEpisodes, programmingSummary, unprogramArrEpisode } = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`) as {
   programArrEpisodes: (request: Record<string, unknown>) => Promise<Result>;
   programmingSummary: (now: number, programmed: number, quality: string) => string;
+  unprogramArrEpisode: (request: Record<string, unknown>) => Promise<string | null>;
 };
 
 const config = { downloadsEnabled: true, sonarrUrl: 'http://sonarr/', sonarrApiKey: 'k' };
@@ -131,4 +132,30 @@ test('SEENIT-DOWNLOAD-014 #879 en mode, les épisodes à venir se cochent en ble
   assert.match(view, /episodes, qualityPreference: quality, readConfig: \(\) => useDownloadConfigStore\.getState\(\)/);
   // « Version précise » ne concerne qu'un épisode sorti.
   assert.match(view, /onPrecise=\{pickedNow\.length === 1 && !pickedFuture\.length \? openPreciseVersion : undefined\}/);
+});
+
+test('SEENIT-DOWNLOAD-017 programmer E09 de MobLand ne programme pas E10 : la saison n’est plus surveillée en bloc', async () => {
+  const sonarr = fakeSonarr([[
+    { id: 205, seasonNumber: 2, episodeNumber: 5, monitored: true, hasFile: false, airDateUtc: '2026-10-20T20:00:00Z' },
+    { id: 209, seasonNumber: 2, episodeNumber: 9, monitored: false, hasFile: false, airDateUtc: '2026-11-13T20:00:00Z' },
+    { id: 210, seasonNumber: 2, episodeNumber: 10, monitored: true, hasFile: false, airDateUtc: '2026-11-20T20:00:00Z' }
+  ]], { id: 7, qualityProfileId: 3, monitored: true, seasons: [{ seasonNumber: 1, monitored: false }, { seasonNumber: 2, monitored: true }] });
+  const result = await programArrEpisodes({ title: 'MobLand', tmdbId: 42, season: 2, episodes: [9], qualityPreference: '1080p', readConfig: () => config, readOwner: () => 'u1', io: sonarr.io, now: () => Date.parse('2026-11-08T20:00:00Z') });
+  assert.deepEqual([...result.programmed], [9]);
+  const puts = sonarr.calls.filter(call => call.method === 'PUT');
+  assert.deepEqual(puts.map(call => call.url), ['http://sonarr/api/v3/series', 'http://sonarr/api/v3/episode/205', 'http://sonarr/api/v3/episode/209'], 'E05 (sorti, sans fichier) garde sa surveillance ; E10 n’est plus programmé');
+  assert.deepEqual(puts[0].body?.seasons, [{ seasonNumber: 1, monitored: false }, { seasonNumber: 2, monitored: false }]);
+  assert.ok(puts.every(call => call.url.endsWith('/series') || call.body?.monitored === true));
+  assert.ok(sonarr.calls.every(call => isAllowedServiceProxyPath(call.url, call.method)), 'passe le proxy PWA');
+});
+
+test('SEENIT-DOWNLOAD-018 annuler depuis la fiche épisode : cet épisode seul, jamais d’ajout de série', async () => {
+  const sonarr = fakeSonarr([[{ id: 301, seasonNumber: 1, episodeNumber: 2, monitored: true, hasFile: false }]]);
+  assert.equal(await unprogramArrEpisode({ title: 'Série', tmdbId: 42, season: 1, episode: 2, readConfig: () => config, readOwner: () => 'u1', io: sonarr.io }), null);
+  assert.equal(sonarr.ensure[0].canWrite instanceof Function && (sonarr.ensure[0].canWrite as () => boolean)(), false, 'la recherche de la série ne peut rien ajouter');
+  const puts = sonarr.calls.filter(call => call.method === 'PUT');
+  assert.deepEqual(puts.map(call => [call.url, call.body?.monitored]), [['http://sonarr/api/v3/episode/301', false]]);
+  const absent = fakeSonarr([[]]);
+  absent.io.ensureSeries = async (params: Record<string, unknown>) => { absent.ensure.push(params); return { success: false, message: 'La configuration a changé : rien n’a été ajouté.' } as never; };
+  assert.equal(await unprogramArrEpisode({ title: 'Série', tmdbId: 42, season: 1, episode: 2, readConfig: () => config, readOwner: () => 'u1', io: absent.io }), 'Cette série n’est pas dans Sonarr : rien à annuler.');
 });

@@ -19,6 +19,7 @@ import {
   type ExactSonarrSeriesIdentity
 } from '../features/downloads/sonarrCanonicalIdentity';
 import { tmdb } from '../features/shows/tmdb';
+import { seasonBlanketPlan, type SeasonPlanEpisode } from '../features/downloads/sonarrSeasonMonitoring';
 import { confirmNoArrRelease, executeProvenArrSearch, requireArrReleaseArray, sonarrSeriesSearchQueries, type ArrRelease, type ArrSearchOutcome } from '../features/downloads/downloadNoRelease';
 import {
   cleanUrl,
@@ -169,6 +170,16 @@ async function launchSearchAndDownloadInSonarr(params: {
           );
 
           if (targetEp && targetEp.id) {
+            // Retour terrain du 08/11 : un épisode précis ne laisse pas sa saison surveillée en bloc.
+            const seasonEpisodes: unknown = await executeGet(`${base}/api/v3/episode?seriesId=${seriesId}`, headers).catch(() => []);
+            const plan = seasonBlanketPlan(existingSeries, Number(params.season), Array.isArray(seasonEpisodes) ? seasonEpisodes as SeasonPlanEpisode[] : [], [Number(params.episode)]);
+            if (plan.seasons) {
+              await executePut(`${base}/api/v3/series`, { ...existingSeries, qualityProfileId: targetQualityProfileId, seasons: plan.seasons }, headers);
+              for (const entry of plan.restore) {
+                if (Number(entry.id) !== Number(targetEp.id)) await executePut(`${base}/api/v3/episode/${entry.id}`, { ...entry, monitored: true }, headers);
+              }
+              targetEp.monitored = false;
+            }
             await ensureEpisodeMonitored(targetEp);
             if (targetEp.hasFile && params.replaceExisting !== true) {
               return { success: false, message: 'Cet épisode est déjà disponible. Choisis explicitement une autre version pour le remplacer.' };
@@ -322,11 +333,13 @@ async function launchSearchAndDownloadInSonarr(params: {
     const isSeasonSearch = !isEpisodeSearch && params.season !== undefined && params.season !== null;
 
     // Ajouter la série dans Sonarr avec recherche ciblée
-    const addPayload: any = {
+    // Retour terrain du 08/11 : pour un épisode précis (téléchargé ou programmé), la saison n'est pas surveillée
+    // en bloc — Sonarr surveillerait sinon chaque épisode annoncé ensuite (seasonBlanketPlan).
+    const addPayload: Record<string, unknown> = {
       title: lookupResult.title,
       seasons: Array.isArray(lookupResult.seasons) ? lookupResult.seasons.map((s: { seasonNumber?: number }) => ({
         ...s,
-        monitored: (!isEpisodeSearch && !isSeasonSearch) || (isSeasonSearch && Number(s.seasonNumber) === Number(params.season)) || (isEpisodeSearch && Number(s.seasonNumber) === Number(params.season))
+        monitored: (!isEpisodeSearch && !isSeasonSearch) || (isSeasonSearch && Number(s.seasonNumber) === Number(params.season))
       })) : [],
       rootFolderPath,
       qualityProfileId: targetQualityProfileId,
