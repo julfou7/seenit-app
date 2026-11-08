@@ -1660,6 +1660,10 @@
           "contains": "SEENIT-C411-003 badges de release : ni qualité, ni groupe, ni faux positif sur le titre"
         },
         {
+          "file": "tests/releaseBadges.test.ts",
+          "contains": "SEENIT-C411-003 titre lisible de la release : reconnaître le bon torrent sans le nom technique"
+        },
+        {
           "file": "tests/c411ManualRouting.test.ts",
           "contains": "SEENIT-C411-003 route le mode Tous vers qBittorrent sans choix redondant"
         },

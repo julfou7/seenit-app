@@ -1084,9 +1084,11 @@ pour le cache des sagas et univers.
 - **SEENIT-C411-003** — La recherche manuelle globale (« Recherche avancée ») n'impose aucun type :
   depuis la refonte du 07/11/2026, elle n'a plus de filtre Film/Série, seulement les filtres de version
   (Toutes, 1080p, 4K, Français, VO), la conseillée en tête et dépliée. Recherche technique (retour du
-  08/11, `USR-2026-11-08-002`) : la ligne repliée montre la taille et le nombre de sources (pas de vitesse),
-  la carte dépliée le type de release en badges (IMAX, MULTI, VFF, HDR10, Dolby Vision, Atmos, AC3 5.1, WEB,
-  H.265, Netflix…) et le nom technique du fichier reste masqué derrière « Nom du fichier ». Le caractère
+  08/11, `USR-2026-11-08-002`) : la carte repliée montre d'emblée le titre lisible de la release (« Spider
+  Man Brand New Day · 2026 », lu dans son nom, pour reconnaître le bon torrent), puis la taille, ↑ seeders en
+  vert et ↓ leechers en rouge (pas de vitesse) ; la carte dépliée montre le type de release en badges (IMAX,
+  VFF, HDR10, Dolby Vision, Atmos, AC3 5.1, WEB, H.265, Netflix…, sans répéter la langue déjà affichée :
+  ni MULTI, ni VF, ni VOSTFR) et le nom technique du fichier reste masqué derrière « Nom du fichier ». Le caractère
   manuel du téléchargement est dit par le toast et la carte de suivi, plus par une phrase sous chaque
   version. Le type d'une release provient uniquement de sa sous-catégorie C411 explicite (`6` Film, `7` Série),
   jamais de son nom. Avec qBittorrent configuré et un type prouvé, SeenIt lui transmet une seule fois
