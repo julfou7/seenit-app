@@ -60,23 +60,36 @@ export async function writeEpisodeReminder(options: { target: Show; ownerUid: st
   return true;
 }
 
+/** Écriture réussie de cette cloche, valable seulement pour la fiche sur laquelle elle a été faite. */
+export interface StoredReminder { value: boolean; basis: Show | null | undefined }
+
+/**
+ * État affiché d'une cloche. Revue Codex (#917) : la préférence `notificationsEnabled` est partagée par toutes
+ * les cloches de la série ; dès qu'une nouvelle fiche arrive (écriture relue, autre épisode basculé), l'état lu
+ * sur la fiche reprend la main au lieu du dernier clic local, qui ne couvre que l'attente de cette relecture.
+ */
+export function displayedEpisodeReminder(stored: StoredReminder | null, show: Show | null | undefined, episode: ReminderEpisode): boolean {
+  return stored && stored.basis === show ? stored.value : readEpisodeReminder(show, episode);
+}
+
 /** Cloche d'un épisode à venir d'une série suivie : état affiché, attente et bascule (une seule à la fois). */
 export function useEpisodeReminder(show: Show | null | undefined, episode: ReminderEpisode) {
   const { updateShow } = useShowActions();
-  const [stored, setStored] = useState<boolean | null>(null);
+  const [stored, setStored] = useState<StoredReminder | null>(null);
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const [pending, setPending] = useState(false);
   const flight = useRef(false);
-  const current = stored ?? readEpisodeReminder(show, episode);
+  const current = displayedEpisodeReminder(stored, show, episode);
   const toggle = async () => {
     const ownerUid = auth.currentUser?.uid;
     if (flight.current || !ownerUid || !show?.id) return;
     flight.current = true;
     const nextState = !current;
+    const basis = show;
     setOptimistic(nextState);
     setPending(true);
     try {
-      if (await writeEpisodeReminder({ target: show, ownerUid, nextState, episode, updateShow })) setStored(nextState);
+      if (await writeEpisodeReminder({ target: show, ownerUid, nextState, episode, updateShow })) setStored({ value: nextState, basis });
     } catch (error) {
       if (auth.currentUser?.uid === ownerUid) useToastStore.getState().showToast('Rappel impossible. Réessaie.', 'error');
       appLogger.warn('system', 'Activation du rappel impossible', error);

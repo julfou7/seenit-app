@@ -60,6 +60,9 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [trending, setTrending] = useState<TMDBMedia[]>([]);
   const [popular, setPopular] = useState<TMDBMedia[]>([]);
   const [homeNotice, setHomeNotice] = useState<string | null>(null);
+  // Revue Codex (#917) : page suivante du Top C411 en échec, rechargée par « Réessayer ».
+  const [homePageError, setHomePageError] = useState<string | null>(null);
+  const [homeRetry, setHomeRetry] = useState(0);
   // SEENIT-C411-004 (#900) : Top C411 seulement sous le réglage Téléchargements, avec une clé C411.
   const c411Available = useDownloadConfigStore(state => isDownloadFeatureEnabled(state) && Boolean(state.c411ApiKey?.trim()));
   const [popularPersons, setPopularPersons] = useState<TMDBMedia[]>([]);
@@ -436,7 +439,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [page, setPage] = useState(1);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [homeHasMore, setHomeHasMore] = useState(true);
-  const hasMore = !debouncedQuery.trim() && homeHasMore;
+  const hasMore = !debouncedQuery.trim() && homeHasMore && !homePageError;
   const homeRequestGenerationRef = useRef(0);
   const homePrefetchRef = useRef(createExplorerHomePrefetch());
   const searchRequestGenerationRef = useRef(0);
@@ -469,6 +472,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     setPopular([]);
     setTrending([]);
     setHomeNotice(null);
+    setHomePageError(null);
     if (activeCategory === 'Tout') {
       setHomeEnrichmentReady(false);
     }
@@ -510,6 +514,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       if (!isCurrentRequest() || !result) return;
       const { popular: nextPopular, trending: nextTrending, persons: nextPersons, hasMore: nextHasMore } = result;
       if (page === 1) setHomeNotice(result.notice ?? null);
+      setHomePageError(result.pageError ?? null);
       if (page === 1 && activeCategory === 'Tout') setHomeEnrichmentReady(true);
       if (nextPopular !== null) {
         setPopular(prev => page === 1 ? nextPopular! : mergeMedia(prev, nextPopular!));
@@ -537,7 +542,13 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     return () => {
       if (isCurrentRequest()) homeRequestGenerationRef.current += 1;
     };
-  }, [isOffline, activeCategory, page, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder, hasActiveFilters]);
+  }, [isOffline, activeCategory, page, homeRetry, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder, hasActiveFilters]);
+
+  const retryHomePage = useCallback(() => {
+    setHomePageError(null);
+    setIsLoadingMore(true);
+    setHomeRetry(count => count + 1);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -868,5 +879,5 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     && sortBy === 'popular'
     && activeCategory === 'Tout';
 
-  return <DiscoverView model={{ homeNotice, c411Available, shows, isSearchMode, enterSearch, exitSearch, searchElapsedMs, activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleToggleWatched, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchFocused, loading, minRating, movieReleaseAfterYear, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
+  return <DiscoverView model={{ homeNotice, homePageError, retryHomePage, c411Available, shows, isSearchMode, enterSearch, exitSearch, searchElapsedMs, activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleToggleWatched, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchFocused, loading, minRating, movieReleaseAfterYear, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
 }

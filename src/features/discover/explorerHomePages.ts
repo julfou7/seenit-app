@@ -27,6 +27,8 @@ export interface ExplorerHomePage {
   hasMore: boolean;
   /** Message d'état d'une catégorie (Top C411 : panne, clé refusée, classement vide). */
   notice?: string | null;
+  /** Page suivante en échec (Top C411) : la page reste à recharger, le classement n'est pas fini. */
+  pageError?: string | null;
 }
 
 /** Ajoute à `prev` les éléments de `next` absents (clé type + id), dans l'ordre. */
@@ -78,7 +80,8 @@ export async function loadExplorerHomePage(
     const { loadC411TopMedia } = await import('./c411TopMedia');
     const top = await loadC411TopMedia(page, isCurrent);
     if (!isCurrent()) return null;
-    return { popular: top.media, trending: page === 1 ? top.media.slice(0, 10) : [], persons: null, hasMore: top.hasMore, notice: page === 1 ? top.notice : null };
+    // Revue Codex (#917) : une page suivante en échec est signalée (Réessayer), jamais lue comme la fin du classement.
+    return { popular: top.media, trending: page === 1 ? top.media.slice(0, 10) : [], persons: null, hasMore: top.hasMore, notice: page === 1 ? top.notice : null, pageError: page > 1 && top.failed ? top.notice : null };
   }
   if (activeCategory === 'Personnes') {
     const personRes = await tmdb.getPopularPersons(page);

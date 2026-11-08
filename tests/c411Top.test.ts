@@ -91,13 +91,20 @@ test('SEENIT-C411-004 Explorer : catégorie sous le réglage Téléchargements, 
   assert.deepEqual(top.media[0].genre_ids, [18], 'genres disponibles pour les filtres d’Explorer');
   assert.equal(top.notice, null);
   assert.equal(top.hasMore, true, 'la page suivante se charge au défilement');
-  assert.equal((await module.loadC411TopMedia(2, () => true, async () => { throw new Error('Clé C411 refusée.'); })).notice, 'Clé C411 refusée.', 'une panne est dite, jamais une grille vide muette');
+  const failed = await module.loadC411TopMedia(2, () => true, async () => { throw new Error('Clé C411 refusée.'); });
+  assert.equal(failed.notice, 'Clé C411 refusée.', 'une panne est dite, jamais une grille vide muette');
+  assert.equal((failed as { failed?: boolean }).failed, true, 'revue Codex #917 : une page en échec n’est pas la fin du classement');
+  assert.equal((await module.loadC411TopMedia(2, () => true, async () => ({ unresolved: 0, hasMore: false, items: [{ mediaType: 'movie', tmdbId: 550, rank: 1, seeders: 9, releases: 1 }] }))).media.length, 1, 'page en échec non mise en cache : Réessayer la relit');
 
   const screen = read('src/screens/DiscoverScreen.tsx');
   assert.match(screen, /const c411Available = useDownloadConfigStore\(state => isDownloadFeatureEnabled\(state\) && Boolean\(state\.c411ApiKey\?\.trim\(\)\)\);/);
   assert.match(screen, /if \(activeCategory === 'Top C411'\) return true;/, 'sans les seuils de popularité ni de date');
   assert.match(read('src/screens/DiscoverViewCore.tsx'), /CATEGORIES\.filter\(category => category\.id !== 'Top C411' \|\| model\.c411Available\)/);
-  assert.match(read('src/features/discover/explorerHomePages.ts'), /if \(activeCategory === 'Top C411'\) \{[\s\S]{0,300}loadC411TopMedia\(page, isCurrent\)[\s\S]{0,200}hasMore: top\.hasMore/);
+  assert.match(read('src/features/discover/explorerHomePages.ts'), /if \(activeCategory === 'Top C411'\) \{[\s\S]{0,300}loadC411TopMedia\(page, isCurrent\)[\s\S]{0,400}hasMore: top\.hasMore, notice: page === 1 \? top\.notice : null, pageError: page > 1 && top\.failed \? top\.notice : null/);
+  assert.match(screen, /const hasMore = !debouncedQuery\.trim\(\) && homeHasMore && !homePageError;/, 'pas de page suivante sautée tant que l’échec est affiché');
+  assert.match(screen, /setHomePageError\(result\.pageError \?\? null\);/);
+  assert.match(screen, /const retryHomePage = useCallback\(\(\) => \{\n\s+setHomePageError\(null\);\n\s+setIsLoadingMore\(true\);\n\s+setHomeRetry\(count => count \+ 1\);/, 'Réessayer relit la même page');
+  assert.match(read('src/screens/DiscoverViewCore.tsx'), /model\.homePageError \? <p role="alert" className="explorer-page-error">\{model\.homePageError\}<button type="button" className="explorer-page-retry" onClick=\{model\.retryHomePage\}>Réessayer<\/button><\/p> : !hasMore/, 'jamais « Fin des résultats » après une page en échec');
   assert.match(screen, /if \(activeCategory === 'Top C411' && !qClean\) \{\n\s+list = list\.map\(\(item, index\) => item\.seenitC411 \? \{ \.\.\.item, seenitC411: \{ \.\.\.item\.seenitC411, rank: index \+ 1 \} \} : item\);/, 'rangs continus parmi les cartes affichées');
   assert.match(read('src/components/GridMediaCard.tsx'), /media\.seenitC411 \? \(/, 'rang et seeders sur la carte');
 });

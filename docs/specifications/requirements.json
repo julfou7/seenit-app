@@ -17,6 +17,10 @@
         },
         {
           "file": "tests/episodeReminderBell.test.ts",
+          "contains": "SEENIT-NOTIFICATION-009 la cloche suit la préférence de la série après le clic d’une autre cloche (revue Codex #917)"
+        },
+        {
+          "file": "tests/episodeReminderBell.test.ts",
           "contains": "SEENIT-NOTIFICATION-009 cloche câblée sur les épisodes à venir de la fiche série et de la fiche épisode"
         }
       ]

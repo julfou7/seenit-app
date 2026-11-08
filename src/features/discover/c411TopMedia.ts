@@ -9,7 +9,8 @@ const DETAIL_CONCURRENCY = 6;
 type MediaDetails = TMDBMedia & { genres?: Array<{ id: number }> };
 
 const CACHE_MS = 10 * 60_000;
-const pageCache = new Map<string, { at: number; value: { media: TMDBMedia[]; notice: string | null; hasMore: boolean } }>();
+type C411TopPage = { media: TMDBMedia[]; notice: string | null; hasMore: boolean; failed?: boolean };
+const pageCache = new Map<string, { at: number; value: C411TopPage }>();
 
 /**
  * Titres du Top C411 en cartes d'Explorer : chaque fiche est lue chez TMDB par l'identifiant exact fourni par
@@ -20,7 +21,7 @@ const pageCache = new Map<string, { at: number; value: { media: TMDBMedia[]; not
  * Retour terrain du 08/11 (v1.4.279 : « 27 résultats, d'un coup après 10 s ») : une page C411 par page
  * d'Explorer, chargée au défilement ; une page déjà lue revient instantanément pendant 10 minutes.
  */
-export async function loadC411TopMedia(page = 1, isCurrent: () => boolean = () => true, load: typeof getC411Top = getC411Top): Promise<{ media: TMDBMedia[]; notice: string | null; hasMore: boolean }> {
+export async function loadC411TopMedia(page = 1, isCurrent: () => boolean = () => true, load: typeof getC411Top = getC411Top): Promise<C411TopPage> {
   const key = `${auth.currentUser?.uid || ''}:${page}`;
   const cached = pageCache.get(key);
   if (cached && Date.now() - cached.at < CACHE_MS) return cached.value;
@@ -28,7 +29,8 @@ export async function loadC411TopMedia(page = 1, isCurrent: () => boolean = () =
   try {
     top = await load('videos', page);
   } catch (error: unknown) {
-    return { media: [], notice: error instanceof Error && error.message ? error.message : 'Classement C411 indisponible.', hasMore: false };
+    // Revue Codex (#917) : une page en échec n'est ni mise en cache ni confondue avec la fin du classement.
+    return { media: [], notice: error instanceof Error && error.message ? error.message : 'Classement C411 indisponible.', hasMore: false, failed: true };
   }
   const media: Array<TMDBMedia | null> = new Array(top.items.length).fill(null);
   for (let index = 0; index < top.items.length && isCurrent(); index += DETAIL_CONCURRENCY) {

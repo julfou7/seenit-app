@@ -60,6 +60,23 @@ test('SEENIT-NOTIFICATION-009 cloche d’épisode à venir : même écriture que
   assert.deepEqual([calls.updates, calls.writes], [[], []], 'changement de compte pendant la demande d’autorisation : rien n’est écrit');
 });
 
+test('SEENIT-NOTIFICATION-009 la cloche suit la préférence de la série après le clic d’une autre cloche (revue Codex #917)', async () => {
+  const { displayedEpisodeReminder } = await loadModule();
+  const episodeA = { season_number: 1, episode_number: 4 };
+  const before = { id: 's1', notificationsEnabled: true } as never;
+  // A désactivé : le clic couvre l'attente de la relecture de la fiche…
+  const storedA = { value: false, basis: before };
+  assert.equal(displayedEpisodeReminder(storedA, before, episodeA), false);
+  // … la fiche relue (préférence coupée) reprend la main…
+  const afterA = { id: 's1', notificationsEnabled: false } as never;
+  assert.equal(displayedEpisodeReminder(storedA, afterA, episodeA), false);
+  // … puis B active la préférence de la série : A s'affiche activé, son prochain clic le désactive.
+  const afterB = { id: 's1', notificationsEnabled: true } as never;
+  assert.equal(displayedEpisodeReminder(storedA, afterB, episodeA), true);
+  assert.equal(displayedEpisodeReminder(null, afterB, episodeA), true);
+  assert.match(read('src/features/notifications/episodeReminder.ts'), /setStored\(\{ value: nextState, basis \}\)/);
+});
+
 test('SEENIT-NOTIFICATION-009 cloche câblée sur les épisodes à venir de la fiche série et de la fiche épisode', () => {
   const sections = read('src/screens/mediaDetail/seriesSections.tsx');
   assert.match(sections, /\{!aired && !inMode && <EpisodeReminderBell show=\{show\} episode=\{\{ season_number: number, episode_number: episode\.episode_number, name: episode\.name, air_date: episode\.air_date \}\} \/>\}/, 'ligne à venir, hors mode téléchargement');

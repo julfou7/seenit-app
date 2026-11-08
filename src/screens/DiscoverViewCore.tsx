@@ -90,7 +90,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
           <BoundedDiscoverGrid items={visibleProcessedResults} scrollRootRef={containerRef} showsByTmdbId={showsByTmdbId}
             onShowClick={onShowClick} onAddClick={handleAddMedia} onToggleWatched={handleToggleWatched} onLongPress={handleLongPress} />}
         {!loading && !debouncedQuery && <div ref={observerTargetRef} className="explorer-page-sentinel">
-          {isLoadingMore ? <span role="status">Chargement…</span> : !hasMore && !model.suppressEndOfResults && visibleProcessedResults.length > 0 && <span>Fin des résultats</span>}
+          {isLoadingMore ? <span role="status">Chargement…</span> : model.homePageError ? <p role="alert" className="explorer-page-error">{model.homePageError}<button type="button" className="explorer-page-retry" onClick={model.retryHomePage}>Réessayer</button></p> : !hasMore && !model.suppressEndOfResults && visibleProcessedResults.length > 0 && <span>Fin des résultats</span>}
         </div>}
       </div>
     </div>
