@@ -14,7 +14,7 @@ import type { Show } from '../types';
 
 export interface GridMediaCardProps {
   media: TMDBMedia;
-  onShowClick: (id: any, mediaType?: 'tv' | 'movie') => void;
+  onShowClick: (id: number, mediaType?: 'tv' | 'movie') => void;
   isNewlyLoaded?: boolean;
   show?: Show;
   onAddClick?: (media: TMDBMedia) => void;
@@ -210,7 +210,13 @@ export const GridMediaCard = React.memo(function GridMediaCard({
 
           <div className="absolute inset-x-0 top-0 h-1/4 bg-gradient-to-b from-black/60 to-transparent pointer-events-none" />
 
-          {rating && (
+          {/* SEENIT-C411-004 (#900) : dans le Top C411, le rang et les seeders de la release la plus partagée. */}
+          {media.seenitC411 ? (
+            <div data-c411-rank={media.seenitC411.rank} className="absolute top-0 left-0 bg-black/70 backdrop-blur-md px-1.5 py-1 rounded-br-lg text-[10px] font-bold text-white flex items-center gap-1 shadow-sm border-b border-r border-white/10">
+              <span className="text-[#F2C36B]">#{media.seenitC411.rank}</span>
+              <span className="text-[#86EFAC]"><span aria-hidden="true">↑ </span>{media.seenitC411.seeders.toLocaleString('fr-FR')}<span className="sr-only"> seeders</span></span>
+            </div>
+          ) : rating && (
             <div className="absolute top-0 left-0 bg-black/60 backdrop-blur-md px-1.5 py-1 rounded-br-lg text-[10px] font-bold text-white flex items-center gap-1 shadow-sm border-b border-r border-white/10">
               <Star size={10} className="text-[#E5A93D] fill-[#E5A93D]" />
               <span>{rating}</span>

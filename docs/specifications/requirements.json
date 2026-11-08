@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.278",
+  "applicationVersion": "1.4.279",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -1688,6 +1688,33 @@
         {
           "file": "tests/magnetLink.test.ts",
           "contains": "SEENIT-C411-002 refuse les URL externes"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-C411-004",
+      "title": "Top C411 dans Explorer : identité TMDB exacte des métadonnées C411, jamais le titre",
+      "targets": [
+        "pwa",
+        "apk",
+        "backend"
+      ],
+      "tests": [
+        {
+          "file": "tests/c411Top.test.ts",
+          "contains": "SEENIT-C411-004 identité TMDB exacte lue dans les métadonnées C411, jamais le titre"
+        },
+        {
+          "file": "tests/c411Top.test.ts",
+          "contains": "SEENIT-C411-004 un titre par identité exacte, au rang de sa release la plus partagée"
+        },
+        {
+          "file": "tests/c411Top.test.ts",
+          "contains": "SEENIT-C411-004 serveur : pages de C411, détail des releases sans identité (cache), pannes distinctes"
+        },
+        {
+          "file": "tests/c411Top.test.ts",
+          "contains": "SEENIT-C411-004 Explorer : catégorie sous le réglage Téléchargements, fiches TMDB exactes, panne dite"
         }
       ]
     },

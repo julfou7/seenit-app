@@ -74,7 +74,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
         <div className="explorer-category-row">
           {!isSearchMode && <><button type="button" className="explorer-control-search" aria-label="Rechercher" onClick={enterSearch}><Search size={20} /></button>
             <button type="button" className="explorer-control-filter" aria-label="Filtres" onClick={() => openFilter()}><SlidersHorizontal size={20} />{activeFilterCount > 0 && <span className="explorer-count">{activeFilterCount}</span>}</button></>}
-          {CATEGORIES.map(category => <button type="button" key={category.id} className="explorer-category" aria-pressed={activeCategory === category.id}
+          {CATEGORIES.filter(category => category.id !== 'Top C411' || model.c411Available).map(category => <button type="button" key={category.id} className="explorer-category" aria-pressed={activeCategory === category.id}
             disabled={Boolean(query.trim()) && !isSearchCompatibleCategory(category.id)} onClick={() => setActiveCategory(category.id)}>{category.label}</button>)}
         </div>
         {hasActiveFilters && <div className="explorer-chips">{chips.map(chip => <span key={chip.label}>
@@ -83,6 +83,8 @@ export function DiscoverView({ model }: DiscoverViewProps) {
         </span>)}<button type="button" onClick={clearFilters}>Tout effacer</button></div>}
       </div>
       <div className="explorer-content">
+        {/* SEENIT-C411-004 : panne C411, clé refusée ou classement vide sont dits, jamais une grille vide muette. */}
+        {!isSearchMode && activeCategory === 'Top C411' && !loading && model.homeNotice && !visibleProcessedResults.length && <p role="status" className="explorer-c411-notice">{model.homeNotice}</p>}
         {isSearchMode && query.trim() ? <DiscoverSearchResults model={resultModel} characters={characterSearch.results} charactersLoading={characterSearch.loading} charactersPartial={characterSearch.partial} onCharacterClick={openCharacter} /> : loading && !visibleProcessedResults.length ? <GridSkeletons /> : activeCategory === 'Personnes' ?
           <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">{visibleProcessedResults.map(person => <PersonCard key={person.id} person={person} onClick={model.openPersonModal} />)}</div> :
           <BoundedDiscoverGrid items={visibleProcessedResults} scrollRootRef={containerRef} showsByTmdbId={showsByTmdbId}

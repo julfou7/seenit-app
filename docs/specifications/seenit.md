@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.278**
+Version applicative : **1.4.279**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1113,6 +1113,23 @@ pour le cache des sagas et univers.
 
 ### 7.3 Identité, réconciliation et sécurité destructive
 
+- **SEENIT-C411-004** — Top C411 dans Explorer (décision du propriétaire du 08/11, `USR-2026-11-08-009`, #900 :
+  « un filtre dans Explorer, car au final c'est presque plus pertinent que TMDB parfois »). Sous le réglage
+  Téléchargements et avec une clé C411 enregistrée, Explorer propose la catégorie « Top C411 » à côté de
+  « Top 100 » ; sinon elle n'apparaît pas et une sélection retombe sur « Tout ». Le serveur
+  (`POST /api/c411/top`, session SeenIt exigée, réglage et clé relus pour l'UID authentifié, clé jamais
+  renvoyée, `Cache-Control: private, no-store`, 6 appels par minute) lit le catalogue vidéo trié par seeders
+  (`sortBy=seeders`, `sortOrder=desc`, `viewMode=flat`, au plus 4 pages, 100 releases). Chaque release n'est
+  rattachée à une fiche que par l'identifiant TMDB exact de ses métadonnées C411 (`metadata.tmdbData`), son type
+  venant du type TMDB déclaré par C411 ou, à défaut, de la sous-catégorie explicite (`6` Film, `7` Série) ; un
+  désaccord ou une identité absente écarte la release, jamais de rapprochement par titre, année ou nom de
+  fichier. Pour les 30 premières releases sans identité dans la liste, le détail C411 est lu (cache serveur par
+  BTIH). Les releases d'un même titre sont regroupées : le titre prend le rang de sa release la plus partagée,
+  dont la carte montre le rang et les seeders (« #1 · ↑ 2 400 ») à la place de la note. La fiche est lue chez
+  TMDB par cette même identité ; une fiche introuvable est écartée sans décaler les autres rangs. Le classement
+  passe sans les seuils de popularité ni de date d'Explorer (le tri d'Explorer reste possible) et masque comme
+  ailleurs les titres déjà vus. Réglage désactivé, clé absente ou refusée, limite, panne, délai dépassé ou
+  classement vide donnent chacun un message à la place de la grille, jamais une grille vide muette.
 - **SEENIT-DOWNLOAD-001** — Une intention SeenIt et un transfert distant ne sont jamais reliés
   par titre, titre original, année ou nom de release. L'association média requiert un **TMDB ID exact** ;
   TVDB/IMDb seuls ne suffisent pas. La corrélation d'un même transfert sans TMDB n'est permise que par

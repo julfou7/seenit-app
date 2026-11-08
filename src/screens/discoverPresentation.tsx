@@ -115,6 +115,8 @@ export const CATEGORIES = [
   { id: "Séries", label: "Séries" },
   { id: "Films", label: "Films" },
   { id: "Top 100", label: "Top 100" },
+  // SEENIT-C411-004 (#900) : proposé seulement sous le réglage Téléchargements avec une clé C411.
+  { id: "Top C411", label: "Top C411" },
   { id: "Pépites", label: "Pépites" },
   { id: "Au cinéma", label: "Au cinéma" },
   { id: "Documentaires", label: "Documentaires" },

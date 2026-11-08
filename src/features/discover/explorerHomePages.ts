@@ -25,6 +25,8 @@ export interface ExplorerHomePage {
   trending: TMDBMedia[] | null;
   persons: TMDBMedia[] | null;
   hasMore: boolean;
+  /** Message d'état d'une catégorie (Top C411 : panne, clé refusée, classement vide). */
+  notice?: string | null;
 }
 
 /** Ajoute à `prev` les éléments de `next` absents (clé type + id), dans l'ordre. */
@@ -56,7 +58,7 @@ export function explorerHomeQueryKey(query: ExplorerHomeQuery): string {
  * publie des résultats partiels pour la page en cours : la page suivante n'est préchargée ici que sans lui.
  */
 export function canPrefetchExplorerHomePage(query: ExplorerHomeQuery): boolean {
-  return query.activeCategory !== 'Personnes' && parseMaxAgeFilter(query.pegi || 'Tous') === null;
+  return query.activeCategory !== 'Personnes' && query.activeCategory !== 'Top C411' && parseMaxAgeFilter(query.pegi || 'Tous') === null;
 }
 
 export async function loadExplorerHomePage(
@@ -71,6 +73,14 @@ export async function loadExplorerHomePage(
   let persons: TMDBMedia[] | null = null;
   let hasMore = false;
 
+  // SEENIT-C411-004 (#900) : le classement C411 passe avant les filtres TMDB ; une seule page (100 releases).
+  if (activeCategory === 'Top C411') {
+    if (page > 1) return { popular: [], trending: [], persons: null, hasMore: false, notice: null };
+    const { loadC411TopMedia } = await import('./c411TopMedia');
+    const top = await loadC411TopMedia(isCurrent);
+    if (!isCurrent()) return null;
+    return { popular: top.media, trending: top.media.slice(0, 10), persons: null, hasMore: false, notice: top.notice };
+  }
   if (activeCategory === 'Personnes') {
     const personRes = await tmdb.getPopularPersons(page);
     if (!isCurrent()) return null;
