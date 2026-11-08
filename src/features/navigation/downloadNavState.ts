@@ -1,5 +1,11 @@
 import { hasExplicitDownloadError, isDownloadActiveOrAttention, isDownloadCompleted, type DownloadStateLike } from '../downloads/downloadStatePolicy.ts';
-export interface NavigationDownload extends DownloadStateLike { id: string; requestId?: string; addedAt?: number }
+export interface NavigationDownload extends DownloadStateLike { id: string; requestId?: string; addedAt?: number; availability?: { reason?: string; automatic?: boolean } }
+/**
+ * 08/11 (revue de #907) : sans toast de résultat, une attente dont la surveillance n'est pas confirmée (RSS
+ * désactivé, recherche interrompue) doit porter le badge « ! » ; une attente surveillée est programmée.
+ */
+const unwatchedWaiting = (item: NavigationDownload) => item.status === 'waiting' && Boolean(item.availability)
+  && !hasExplicitDownloadError(item) && !(item.availability?.reason === 'no_release' && item.availability.automatic === true);
 export type DownloadNavState = { kind: 'none' | 'active' | 'attention' | 'ready'; count: number; label: string };
 export const completionKey = (item: NavigationDownload) => `${item.requestId || item.id}:${item.addedAt || ''}`;
 export function completedNavigationKeys(items: readonly NavigationDownload[]) {
@@ -12,7 +18,7 @@ export function acknowledgeCompletedDownloads(items: readonly NavigationDownload
 export function resolveDownloadNavState(items: readonly NavigationDownload[], acknowledged: readonly string[], sourceError = false): DownloadNavState {
   const active = items.filter(item => item.status !== 'waiting' && item.status !== 'warning' && !hasExplicitDownloadError(item) && isDownloadActiveOrAttention(item));
   if (active.length) return { kind: 'active', count: active.length, label: active.length === 1 ? 'Télécharger · en cours' : `Télécharger · ${active.length} en cours` };
-  if (sourceError || items.some(item => hasExplicitDownloadError(item) || item.status === 'warning')) return { kind: 'attention', count: 0, label: 'Télécharger · action à faire' };
+  if (sourceError || items.some(item => hasExplicitDownloadError(item) || item.status === 'warning' || unwatchedWaiting(item))) return { kind: 'attention', count: 0, label: 'Télécharger · action à faire' };
   const seen = new Set(acknowledged);
   if (completedNavigationKeys(items).some(key => !seen.has(key))) return { kind: 'ready', count: 0, label: 'Télécharger · prêt' };
   return { kind: 'none', count: 0, label: 'Télécharger' };
