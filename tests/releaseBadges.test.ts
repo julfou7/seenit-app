@@ -45,4 +45,11 @@ test('SEENIT-C411-003 titre lisible de la release : reconnaître le bon torrent 
   assert.equal(releaseReadableTitle('Show.S01E01E02.MULTI.1080p.WEB.H264-GRP').episode, 'S01E01E02');
   assert.equal(releaseReadableTitle('Show.S01E03-NoTag').episode, 'S01E03');
   assert.equal(releaseReadableTitle('Show.S01E01-E02.FRENCH.1080p.WEB.H264-GRP').title, 'Show');
+  // Revue Codex : un épisode sans préfixe de saison garde son numéro (E01 et E02 restent distincts).
+  assert.deepEqual(releaseReadableTitle('Show.E01.FRENCH.1080p.WEB.H264-GRP'), { title: 'Show', year: undefined, episode: 'E01' });
+  assert.equal(releaseReadableTitle('Show.E02.FRENCH.1080p.WEB.H264-GRP').episode, 'E02');
+  assert.equal(releaseReadableTitle('Show.E01-E04.FRENCH.1080p.WEB.H264-GRP').episode, 'E01-E04');
+  // Un « E » isolé ou un mot du titre n'est jamais pris pour un épisode.
+  assert.equal(releaseReadableTitle('WALL.E.2008.MULTi.1080p.BluRay.x264').episode, undefined);
+  assert.equal(releaseReadableTitle('WALL.E.2008.MULTi.1080p.BluRay.x264').title, 'WALL E');
 });

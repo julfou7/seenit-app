@@ -48,8 +48,10 @@ const STRONG_MARKER = /^(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|2160p|1080p|1080i|720p
 // retirés qu'en fin de titre, faute d'année pour borner celui-ci.
 const WEAK_TRAILING = /^(?:FRENCH|VF|VFI|VF2|VO|IMAX|UHD|4K|HDR|DV|NF|COMPLETE|INTEGRALE|PROPER|REPACK)$/i;
 const YEAR = /^(?:19|20)\d{2}$/;
-// Épisode, épisodes enchaînés (« S01E01E02 ») ou plage (« S01E01-E10 », « S01E01-10 », « S01-S05 »).
-const EPISODE_RANGE = /^S\d{1,2}(?:E\d{1,3})*(?:-(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|\d{1,3}))?$/i;
+// Épisode avec ou sans saison (« S01E03 », « E01 »), épisodes enchaînés (« S01E01E02 ») ou plage
+// (« S01E01-E10 », « S01E01-10 », « E01-E04 », « S01-S05 ») : tout marqueur qui borne le titre et porte la
+// portée de la release est gardé dans le libellé lisible.
+const EPISODE_RANGE = /^(?:S\d{1,2}(?:E\d{1,3})*|E\d{1,3})(?:-(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|\d{1,3}))?$/i;
 
 export function releaseReadableTitle(name: string): { title: string; year?: string; episode?: string } {
   const tokens = name.replace(/\.(?:mkv|mp4|avi)$/i, '').replace(/[._]+/g, ' ').trim().split(/\s+/);
