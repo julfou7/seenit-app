@@ -1,6 +1,7 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { Download, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import { DownloadMark } from '../../components/SeenItLogo';
 import { cn } from '../../lib/utils';
 import type { EpisodeDownloadPresentation } from '../../features/downloads/episodeDownloadPresentation';
 
@@ -24,7 +25,7 @@ const HATCH = 'repeating-linear-gradient(135deg,#2a2a2f 0 2px,#141417 2px 4px)';
 export function DownloadModeToggle({ active, badge, onToggle }: { active: boolean; badge: number; onToggle: () => void }) {
   return <button type="button" onClick={onToggle} aria-pressed={active} aria-label={active ? 'Quitter le mode téléchargement' : `Mode téléchargement${badge ? `, ${badge} en cours` : ''}`}
     className={cn('relative w-[52px] h-[52px] shrink-0 rounded-[15px] grid place-items-center active:scale-95', active ? 'bg-[#E5A93D] text-black' : 'bg-zinc-800 text-zinc-200 shadow-[0_0_0_1px_rgba(255,255,255,0.12)]')}>
-    <Download size={22} />
+    <DownloadMark size={26} />
     {badge > 0 && <span aria-hidden="true" className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-zinc-100 text-black text-[11px] font-extrabold grid place-items-center shadow-[0_0_0_2px_#141417]">{badge}</span>}
   </button>;
 }

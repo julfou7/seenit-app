@@ -4,6 +4,7 @@ import { hydratePlatformPreferences } from '../features/providers/platformPrefer
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Cloud, LogIn, FileText, CheckCircle2, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronRight, Check, AlertCircle, Sparkles, Download, X, UploadCloud, DownloadCloud, LayoutGrid, Server, MonitorSmartphone, Package, Tv, Clock, Newspaper, Film, Smartphone, FlaskConical, Sun } from 'lucide-react';
+import { DownloadMark } from '../components/SeenItLogo';
 import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { registerPlugin } from '@capacitor/core';
@@ -86,7 +87,7 @@ const describeError = (error: unknown) => error instanceof Error ? error.message
 // Types sans préférence SeenIt : leurs canaux Android (#778) se règlent dans le système.
 const ANDROID_ALERTS = [
   { channelId: 'seenit_reminders', icon: Bell, label: 'Rappels', sub: 'Les cloches posées sur un épisode ou un film' },
-  { channelId: 'seenit_downloads', icon: Download, label: 'Téléchargements et Plex', sub: 'Import terminé, disponible dans Plex, échec' },
+  { channelId: 'seenit_downloads', icon: DownloadMark, label: 'Téléchargements et Plex', sub: 'Import terminé, disponible dans Plex, échec' },
   { channelId: 'seenit_app', icon: Package, label: 'Mise à jour de SeenIt', sub: 'Nouvelle version disponible ou téléchargée' },
 ] as const;
 
@@ -366,7 +367,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
                             errorMessage.toLowerCase().includes('offline') ||
                             (typeof e === 'object' && e !== null && 'code' in e && e.code === 'unavailable');
           if (isOffline) {
-            console.warn('[Settings] Client is offline, using local cached settings:', errorMessage);
+            // Hors ligne, les réglages locaux en cache suffisent : pas de bruit dans la console.
           } else {
             console.error('[Settings] Error syncing cloud settings', e);
           }

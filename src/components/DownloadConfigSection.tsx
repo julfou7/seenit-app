@@ -8,7 +8,6 @@ import {
   ChevronDown,
   Cloud,
   Copy,
-  Download,
   Eye,
   EyeOff,
   HardDrive,
@@ -20,6 +19,7 @@ import {
   Wifi,
   X
 } from 'lucide-react';
+import { DownloadMark } from './SeenItLogo';
 import { Capacitor } from '@capacitor/core';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
@@ -203,8 +203,8 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
       if (service === 'sonarr') setSonarrProfiles(profiles);
       else setRadarrProfiles(profiles);
       setProfileErrors(previous => ({ ...previous, [service]: undefined }));
-    } catch (error: any) {
-      const message = error?.message || `Impossible de charger les profils ${service}.`;
+    } catch (error: unknown) {
+      const message = (error instanceof Error && error.message) || `Impossible de charger les profils ${service}.`;
       setProfileErrors(previous => ({ ...previous, [service]: message }));
       showToast(message, 'error');
     } finally {
@@ -294,7 +294,7 @@ export function DownloadConfigSection({ defaultOpen = false, hideToggle = false 
     <div className="mb-4">
       <div className="flex items-center justify-between gap-3 mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <Download className="text-[#E5A93D] shrink-0" size={15} />
+          <DownloadMark className="text-[#E5A93D] shrink-0" size={17} />
           <h3 className="font-bold text-xs text-zinc-200 truncate">Téléchargements & clients</h3>
         </div>
         {!hideToggle && (

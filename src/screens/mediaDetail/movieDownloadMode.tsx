@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { CalendarClock, Download, Loader2 } from 'lucide-react';
+import { CalendarClock, Loader2 } from 'lucide-react';
+import { DownloadMark } from '../../components/SeenItLogo';
 import { cn } from '../../lib/utils';
 
 /**
@@ -27,7 +28,7 @@ export function MovieDownloadButton({ state, progress, upcoming, onPress }: { st
           : state === 'active' ? 'relative text-white'
             : 'bg-zinc-800 text-zinc-200 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]')}
     style={state === 'active' ? { background: `conic-gradient(#F4F4F5 0 ${pct}%, #3F3F46 ${pct}% 100%)` } : undefined}>
-    {state === 'active' ? <span className="absolute inset-[4px] rounded-[12px] bg-[#18181B] grid place-items-center text-[13px] font-extrabold">{pct} %</span> : state === 'programmed' ? <CalendarClock size={22} /> : <Download size={22} />}
+    {state === 'active' ? <span className="absolute inset-[4px] rounded-[12px] bg-[#18181B] grid place-items-center text-[13px] font-extrabold">{pct} %</span> : state === 'programmed' ? <CalendarClock size={22} /> : <DownloadMark size={26} />}
   </button>;
 }
 
@@ -50,7 +51,7 @@ export function MovieDownloadTrack({ state, quality, progress, timeleft, waiting
   };
   return <section aria-label="Téléchargement du film" data-film-track={state} className="rounded-[20px] bg-[#141417] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)]">
     <div className="flex items-center gap-3 px-3.5 py-3">
-      <span aria-hidden="true" className={cn('w-[42px] h-[42px] shrink-0 rounded-[10px] grid place-items-center', programmed ? 'bg-[#0E1A20] text-[#7DD3FC]' : 'bg-zinc-800 text-zinc-100')}>{programmed ? <CalendarClock size={20} /> : <Download size={20} />}</span>
+      <span aria-hidden="true" className={cn('w-[42px] h-[42px] shrink-0 rounded-[10px] grid place-items-center', programmed ? 'bg-[#0E1A20] text-[#7DD3FC]' : 'bg-zinc-800 text-zinc-100')}>{programmed ? <CalendarClock size={20} /> : <DownloadMark size={22} />}</span>
       <div className="flex-1 min-w-0">
         <strong className="block text-[15px] font-extrabold text-white">{confirming ? 'Annuler le téléchargement ?' : title}</strong>
         <small className={cn('block text-[13px] font-bold', programmed ? 'text-[#7DD3FC]' : 'text-zinc-300')}>{confirming ? 'Le fichier déjà reçu est conservé.' : sub}</small>

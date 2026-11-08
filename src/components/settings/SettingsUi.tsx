@@ -1,4 +1,4 @@
-import { useRef, type ReactNode } from 'react';
+import { useRef, type ComponentType, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import { DialogLayer } from '../ui/DialogLayer';
 import '../../screens/reglages.css';
@@ -70,7 +70,8 @@ export function SettingsGroup({ title, foot, children }: { title?: string; foot?
 }
 
 export interface SettingsRowProps {
-  icon?: LucideIcon;
+  /** Icône Lucide, ou une icône SeenIt de même forme (logo Télécharger). */
+  icon?: LucideIcon | ComponentType<{ size?: number; strokeWidth?: number }>;
   label: string;
   sub?: ReactNode;
   tone?: SettingsTone;

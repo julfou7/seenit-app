@@ -11,6 +11,19 @@ export function SeenItRing({ size = 42, active = true, className = '' }: { size?
     <path className="brand-ring-tick" pathLength="1" d="M36 51 L46 61 L65 40" fill="none" stroke={active ? 'url(#'+id+')' : '#A1A1AA'} strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>;
 }
+/** Flèche du logo Télécharger (repère 24 px), la même que le contrôle d'épisode du mode téléchargement. */
+const DOWNLOAD_ARROW = 'M12 7.2v8.4M8.6 12.3l3.4 3.4 3.4-3.4';
+/**
+ * Logo Télécharger de SeenIt (08/11/2026) : une flèche dans un cercle, repris du contrôle d'épisode du
+ * mode téléchargement et appliqué à toute la fonction (navigation, fiches, onglet, réglages). Contour
+ * par défaut ; `filled` remplit le cercle et passe la flèche en sombre. La couleur suit `currentColor`.
+ */
+export function DownloadMark({ size = 24, filled = false, className = '', strokeWidth = 2 }: { size?: number; filled?: boolean; className?: string; strokeWidth?: number }) {
+  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true" data-download-mark={filled ? 'filled' : 'outline'}>
+    {filled ? <circle cx="12" cy="12" r="10" fill="currentColor"/> : <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth={strokeWidth}/>}
+    <path d={DOWNLOAD_ARROW} stroke={filled ? '#0B0B0D' : 'currentColor'} strokeWidth={filled ? strokeWidth + 0.4 : strokeWidth} strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>;
+}
 export function SeenItGlyph({ size = 32, className = '', symbol = 'check', active = true, color, navigation = false }: { size?: number; className?: string; symbol?: SeenItSymbolType; glow?: boolean; active?: boolean; idPrefix?: string; color?: 'gold' | 'blue'; navigation?: boolean }) {
   if (symbol === 'check') return <SeenItRing size={size} active={active} className={className}/>;
   const ink = active ? color === 'blue' ? '#60a5fa' : '#E5A93D' : '#71717A';
@@ -18,7 +31,7 @@ export function SeenItGlyph({ size = 32, className = '', symbol = 'check', activ
     {(symbol === 'watch' || symbol === 'play' || symbol === 'library') && <><path d="M7.5 4H18a3 3 0 0 1 3 3v9"/><rect x="3" y="7.5" width="15" height="12.5" rx="3" fill={active ? ink : 'none'}/><path d="M6.5 16.5h5" stroke={active ? '#08080C' : ink}/></>}
     {symbol === 'discover' && <><circle cx="12" cy="12" r="9"/><path d="m15.6 8.4-2 5.2-5.2 2 2-5.2z" fill={active ? ink : 'none'}/></>}
     {(symbol === 'profile' || symbol === 'vip') && <><circle cx="12" cy="8.5" r="3.8" fill={active ? ink : 'none'}/><path d="M4.5 20c1.2-3.6 4.2-5.5 7.5-5.5s6.3 1.9 7.5 5.5" fill={active ? ink : 'none'}/></>}
-    {symbol === 'download' && <path d="M12 3v12m-5-5 5 5 5-5M4 16v4h16v-4"/>}
+    {symbol === 'download' && <><circle cx="12" cy="12" r="9" fill={active ? ink : 'none'}/><path d={DOWNLOAD_ARROW} stroke={active ? '#08080C' : ink}/></>}
     {symbol === 'cinema' && <><rect x="3" y="8" width="18" height="13" rx="2"/><path d="m3 8 17-5 1 5M6 7l2-3m4 2 2-3M3 13h18"/></>}
   </svg>;
 }

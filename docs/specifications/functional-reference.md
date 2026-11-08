@@ -536,7 +536,8 @@ les saisons partent dans l'ordre. En mode, un épisode à venir se coche en bleu
 Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sans recherche immédiate ; un
 épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Avec un seul épisode sorti
 coché, « Version précise › » ouvre une page pleine hauteur : versions C411 filtrables (Toutes, 1080p, 4K, Français, VO),
-la conseillée en tête et dépliée (nom du fichier, sources, date, **Télécharger cette version**), et « Chercher sous un
+la conseillée en tête et dépliée (type de release en badges, sources, date, « Nom du fichier » masqué par défaut,
+**Télécharger cette version**), et « Chercher sous un
 autre nom… ». **Fiche film** (maquette DlFilm, 07/11/2026) : sous le gate et tant que le film n'est pas présent,
 un bouton ⬇ de 56 px suit le bouton principal ; il ouvre la même barre (✕, titre et « Version précise › »,
 1080p, 4K). Un film sorti part dans Radarr ; un film à venir se programme en bleu (« Programmer · Dès sa
@@ -945,9 +946,12 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
 - **Recherche avancée** (refonte du 07/11/2026, même langage que « Version précise ») : en-tête ‹ +
   « Recherche avancée », un champ (« Titre, ou titre S02E05 ») avec un bouton loupe de 48 px, puis les
   filtres de version Toutes, 1080p, 4K, Français, VO. Les résultats sont des cartes de version (qualité,
-  langue, Light, taille, vitesse), la conseillée en tête et dépliée ; déplier montre le nom du fichier,
-  le type (Film/Série quand C411 fournit la sous-catégorie exacte `6` ou `7`), les sources, l'âge,
-  « Télécharger » et « Magnet » (copie). Plus de filtre Film/Série, de qualité 720p, de liste Light ni de tri.
+  langue, Light, taille et nombre de sources — pas de vitesse dans cette recherche technique), la conseillée
+  en tête et dépliée ; déplier montre le type de release en badges (IMAX, MULTI, VFF, HDR10, Dolby Vision,
+  Atmos, AC3 5.1, WEB, H.265, Netflix…), le type Film/Série quand C411 fournit la sous-catégorie exacte
+  (`6` ou `7`), l'âge, « Nom du fichier » (masqué par défaut), « Télécharger » et « Magnet » (copie). Plus
+  de filtre Film/Série, de qualité 720p, de liste Light, de tri ni de phrase sous chaque version : le
+  caractère manuel est dit par le toast et la carte de suivi. Logo Télécharger : flèche dans un cercle (08/11).
 - Depuis cette recherche globale sans fiche associée, un type et une identité ne sont jamais déduits du
   nom de release. Si qBittorrent est configuré et que C411 fournit le type exact, le Magnet BTIH validé
   lui est transmis directement **sans catégorie qBittorrent gérée par Sonarr/Radarr** ; ce téléchargement

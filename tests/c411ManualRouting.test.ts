@@ -100,5 +100,8 @@ test('SEENIT-C411-003 isole le téléchargement manuel des catégories qBittorre
   assert.match(serviceSource, /payload\.qbittorrentCategory === undefined/);
   assert.match(serviceSource, /const categoryField = requestedCategory\?\.trim\(\)/);
   assert.match(screenSource, /qbittorrentCategory:\s*route\.qbittorrentCategory/);
-  assert.match(screenSource, /sans import automatique Radarr\/Sonarr\/Plex/);
+  // Le caractère manuel est dit par la carte de suivi et le toast, plus par une phrase sous chaque version (08/11).
+  assert.match(screenSource, /statusText: 'Téléchargement manuel qBittorrent • hors import automatique'/);
+  assert.match(screenSource, /Téléchargement manuel lancé dans qBittorrent\./);
+  assert.doesNotMatch(screenSource, /Envoi direct à qBittorrent/);
 });

@@ -234,6 +234,10 @@
       ],
       "tests": [
         {
+          "file": "tests/downloadMark.test.ts",
+          "contains": "SEENIT-UX-020 le logo Télécharger est la flèche dans un cercle, partout dans la fonction"
+        },
+        {
           "file": "tests/durableVisualRules.test.ts",
           "contains": "SEENIT-UX-020 le contrat canonique, la référence UX et le registre portent les mêmes règles visuelles"
         },
@@ -1646,6 +1650,14 @@
         {
           "file": "tests/c411ManualRouting.test.ts",
           "contains": "SEENIT-C411-003 dérive Film et Série uniquement des sous-catégories C411 exactes"
+        },
+        {
+          "file": "tests/releaseBadges.test.ts",
+          "contains": "SEENIT-C411-003 badges de release : édition, image, langue, son, source, vidéo et plateforme"
+        },
+        {
+          "file": "tests/releaseBadges.test.ts",
+          "contains": "SEENIT-C411-003 badges de release : ni qualité, ni groupe, ni faux positif sur le titre"
         },
         {
           "file": "tests/c411ManualRouting.test.ts",
