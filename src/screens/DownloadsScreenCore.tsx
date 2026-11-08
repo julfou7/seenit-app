@@ -5,7 +5,7 @@ import { ProgrammedSection } from '../components/ProgrammedSection';
 import { RecentImportsRail, useRecentImports } from '../components/RecentImportsRail';
 import { coveredByRecentImport } from '../features/downloads/recentImports';
 import { groupSeasonDownloads } from '../features/downloads/downloadSeriesGroups';
-import { downloadGroup } from '../features/downloads/downloadGroups';
+import { downloadGroup, isPreTransferRequest } from '../features/downloads/downloadGroups';
 import { describeReleases, matchesVersionFilter, releaseAgeLabel, type VersionFilter } from '../features/downloads/releaseVersions';
 import { ReleaseVersionCard, VersionFilterChips } from '../components/ReleaseVersionCard';
 import './downloads.css';
@@ -139,9 +139,12 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     || config.qbittorrentUrl
   );
 
+  // Retour terrain du 08/11 : une demande apparaît tout de suite dans « En attente » (« Recherche en cours »)
+  // et y reste en « Pas encore disponible » tant qu'aucune version n'est sortie ; « En cours » ne garde que
+  // les transferts réels et « À régler » les échecs.
   const activeDownloads = useMemo(
     () => sortDownloadsByAddedAt(
-      downloads.filter(item => downloadGroup(item) === 'active'),
+      downloads.filter(item => downloadGroup(item) === 'active' && !isPreTransferRequest(item)),
       'asc'
     ),
     [downloads]
@@ -150,7 +153,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'attention'), 'desc'),
     [downloads]
   );
-  const waitingDownloads = useMemo(() => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'waiting'), 'asc'), [downloads]);
+  const waitingDownloads = useMemo(() => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'waiting' || (downloadGroup(item) === 'active' && isPreTransferRequest(item))), 'asc'), [downloads]);
   const cancelledDownloads = useMemo(
     () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'cancelled'), 'desc'),
     [downloads]
@@ -180,8 +183,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
   }, []);
-  const toFixDownloads = useMemo(() => [...errorDownloads, ...waitingDownloads], [errorDownloads, waitingDownloads]);
-  const subtitle = [activeDownloads.length ? `${activeDownloads.length} en cours` : '', toFixDownloads.length ? `${toFixDownloads.length} à régler` : ''].filter(Boolean).join(' · ') || 'Rien en cours';
+  const subtitle = [activeDownloads.length ? `${activeDownloads.length} en cours` : '', waitingDownloads.length ? `${waitingDownloads.length} en attente` : '', errorDownloads.length ? `${errorDownloads.length} à régler` : ''].filter(Boolean).join(' · ') || 'Rien en cours';
 
   const performSearch = async () => {
     const query = searchQuery.trim();
@@ -437,8 +439,9 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
               </button>
             )}
 
-            {toFixDownloads.length > 0 && renderSection('À régler', toFixDownloads)}
+            {errorDownloads.length > 0 && renderSection('À régler', errorDownloads)}
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
+            {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
             {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} />}
             <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />

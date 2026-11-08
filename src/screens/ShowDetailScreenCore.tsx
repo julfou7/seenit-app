@@ -28,7 +28,7 @@ import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
 import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
-import { availabilityHint } from '../features/downloads/downloadAvailability';
+import { noReleaseToastAction } from '../features/downloads/downloadAvailability';
 import { hasExplicitDownloadError, isDownloadCompleted } from '../features/downloads/downloadStatePolicy';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
@@ -147,7 +147,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         void useLiveDownloadStore.getState().fetchDownloads();
       } else {
         failDownloadRequest(requestId, res.message, res.failureCode, res.availability);
-        showToast(res.failureCode === 'no_release' ? `En attente de disponibilité · ${availabilityHint(res.availability)}` : res.message || 'Erreur lors du lancement dans Sonarr', res.failureCode === 'no_release' ? 'download' : 'error');
+        showToast(res.failureCode === 'no_release' ? noReleaseToastAction(res.availability) : res.message || 'Erreur lors du lancement dans Sonarr', res.failureCode === 'no_release' ? 'download' : 'error');
       }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Erreur réseau Sonarr";
@@ -187,7 +187,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         useLiveDownloadStore.getState().fetchDownloads();
       } else {
         failDownloadRequest(requestId, res.message, res.failureCode, res.availability);
-        showToast(res.failureCode === 'no_release' ? `En attente de disponibilité · ${availabilityHint(res.availability)}` : res.message || 'Erreur lors du lancement de la saison', res.failureCode === 'no_release' ? 'download' : 'error');
+        showToast(res.failureCode === 'no_release' ? noReleaseToastAction(res.availability) : res.message || 'Erreur lors du lancement de la saison', res.failureCode === 'no_release' ? 'download' : 'error');
       }
     } catch (err: unknown) {
       const message = err instanceof Error && err.message ? err.message : "Erreur réseau Sonarr";
@@ -225,7 +225,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
         useLiveDownloadStore.getState().fetchDownloads();
       } else {
         failDownloadRequest(requestId, res.message, res.failureCode, res.availability);
-        showToast(res.failureCode === 'no_release' ? `En attente de disponibilité · ${availabilityHint(res.availability)}` : res.message || 'Erreur lors du lancement dans Radarr', res.failureCode === 'no_release' ? 'download' : 'error');
+        showToast(res.failureCode === 'no_release' ? noReleaseToastAction(res.availability) : res.message || 'Erreur lors du lancement dans Radarr', res.failureCode === 'no_release' ? 'download' : 'error');
       }
     } catch (err: unknown) {
       const message = err instanceof Error && err.message ? err.message : "Erreur réseau Radarr";
@@ -616,7 +616,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     if (wasSeen) { newSeen.delete(epKey); delete newRecords[epKey]; }
     else {
       newSeen.add(epKey);
-      const epObj = seasonsCache[season]?.episodes?.find((x: any) => x.episode_number === episode);
+      const epObj = seasonsCache[season]?.episodes?.find((x: { episode_number: number }) => x.episode_number === episode);
       newRecords[epKey] = { watchedAt: Date.now(), episodeTitle: epObj?.name || null };
     }
     const computeOptimisticNextEp = async (seenSet: Set<string>) => {
@@ -629,7 +629,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               const res = await tmdb.getSeasonDetails(effectiveTmdbId, s.season_number);
               if (res.ok && res.value) { seasonData = res.value; setSeasonsCache(prev => ({ ...prev, [s.season_number]: res.value })); }
             }
-            const cachedEp = seasonData?.episodes?.find((x: any) => x.episode_number === ep);
+            const cachedEp = seasonData?.episodes?.find((x: { episode_number: number }) => x.episode_number === ep);
             return { season_number: s.season_number, episode_number: ep, air_date: cachedEp?.air_date || null, name: cachedEp?.name || null, still_path: cachedEp?.still_path || null };
           }
         }
@@ -706,7 +706,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
               const res = await tmdb.getSeasonDetails(effectiveTmdbId, s.season_number);
               if (res.ok && res.value) { seasonData = res.value; setSeasonsCache(prev => ({ ...prev, [s.season_number]: res.value })); }
             }
-            const cachedEp = seasonData?.episodes?.find((x: any) => x.episode_number === ep);
+            const cachedEp = seasonData?.episodes?.find((x: { episode_number: number }) => x.episode_number === ep);
             return { season_number: s.season_number, episode_number: ep, air_date: cachedEp?.air_date || null, name: cachedEp?.name || null, still_path: cachedEp?.still_path || null };
           }
         }
@@ -932,7 +932,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const fullEpCode = `S${String(sNum).padStart(2, '0')} | E${String(eNum).padStart(2, '0')}`;
     let airDate = nextEp.air_date;
     if (!airDate && seasonsCache[nextEp.season_number]?.episodes) {
-      const cachedEp = seasonsCache[nextEp.season_number].episodes.find((x: any) => x.episode_number === nextEp.episode_number);
+      const cachedEp = seasonsCache[nextEp.season_number].episodes.find((x: { episode_number: number }) => x.episode_number === nextEp.episode_number);
       if (cachedEp?.air_date) airDate = cachedEp.air_date;
     }
     const todayStr = getTodayStr();

@@ -17,6 +17,7 @@ import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditMovieSearchQuery } from '../components/community/redditEpisodeSearch';
 import { getProviderLinkPresentation } from '../features/providers/providerLink';
+import { pickHeroProvider } from '../features/providers/heroProvider';
 import { seasonAverages, formatRating } from '../features/shows/detailPlanning';
 import { frenchGenres } from '../features/shows/frenchLabels';
 import { DetailChip, DetailHero, DetailSynopsis, GoldCta, RoundHeaderButton, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
@@ -93,8 +94,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     const link = getProviderLinkPresentation({ providerId: provider.provider_id, providerName: provider.provider_name, title, fallbackLink: providers?.link || '#' });
     if (link.url && link.url !== '#') openExternalUrl(link.url);
   };
-  const mainProvider: WhereToWatchProvider | undefined = sortedProviders.find((provider: WhereToWatchProvider) => !provider.isPlex && userPlatforms.includes(provider.provider_id)) || sortedProviders.find((provider: WhereToWatchProvider) => !provider.isPlex);
-  const plexProvider: WhereToWatchProvider | undefined = sortedProviders.find((provider: WhereToWatchProvider) => provider.isPlex);
+  // SEENIT-PROVIDER-003 : un seul diffuseur à côté du bouton principal (réglages, sinon Plex).
+  const heroProvider: WhereToWatchProvider | undefined = pickHeroProvider<WhereToWatchProvider>(sortedProviders, userPlatforms);
   const providerTile = (provider: WhereToWatchProvider) => {
     const logo = provider.isPlex ? PLEX_LOGO_SVG : getFormattedProviderLogo(provider.logo_path, provider.provider_name);
     return <button type="button" key={`tile-${provider.provider_id}`} onClick={() => openProvider(provider)} aria-label={`Ouvrir ${provider.isPlex ? 'Plex' : provider.provider_name}`} className="w-[52px] h-[52px] shrink-0 rounded-[15px] overflow-hidden bg-zinc-800 shadow-[0_0_0_1px_rgba(255,255,255,0.12)] active:scale-95">{logo ? <img src={logo} alt="" className="w-full h-full object-cover" /> : <span className="text-[12px] font-bold">{provider.provider_name.slice(0, 2)}</span>}</button>;
@@ -199,12 +200,26 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     if (filmState === 'idle' || filmState === 'mode') { setFilmMode(!filmMode); return; }
     filmTrackRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   };
+  /**
+   * Retour terrain du 08/11 : un lancement pendant la vérification Plex/Radarr/Sonarr l'attend (toast court)
+   * au lieu d'être refusé ; `null` si personne n'a répondu, et rien n'est lancé.
+   */
+  const settledPresence = async (mediaType: 'movie' | 'tv') => {
+    if (!model.presence.loading) return model.presence;
+    useToastStore.getState().showToast({ title, action: 'Vérification de la disponibilité…', posterPath: show?.posterPath }, 'download');
+    const { waitForSettledPresence } = await import('../store/mediaPresenceStore');
+    const presence = await waitForSettledPresence(effectiveTmdbId!, mediaType);
+    if (!presence) useToastStore.getState().showToast({ title, action: 'Vérification impossible, réessaie.', posterPath: show?.posterPath }, 'error');
+    return presence;
+  };
   const launchFilm = async (quality: DownloadQualityChoice) => {
     setFilmMode(false);
     if (!effectiveTmdbId) return;
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
+    const presence = await settledPresence('movie');
+    if (!presence) return;
     // Comme la popup (alreadyAvailable) : un film déjà présent, même seulement dans Plex, n'est jamais relancé.
-    if (movieAvailable) { useToastStore.getState().showToast({ title, action: 'Déjà disponible : rien n’a été lancé.', posterPath: show?.posterPath }, 'info'); return; }
+    if (presence.radarrHasFile || presence.plexInfo?.available) { useToastStore.getState().showToast({ title, action: 'Déjà disponible : rien n’a été lancé.', posterPath: show?.posterPath }, 'info'); return; }
     if (model.hasActiveDownloadInScope?.({ mediaType: 'movie', tmdbId: Number(effectiveTmdbId) })) { useToastStore.getState().showToast({ title, action: 'Déjà en cours de téléchargement.', posterPath: show?.posterPath }, 'info'); return; }
     if (!filmUpcoming) {
       // Même voie que la popup (launchArrDownload) : profil Radarr configuré pour la qualité choisie,
@@ -213,7 +228,6 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       const posterPath = show?.posterPath || tmdbDetails?.poster_path || undefined;
       const notify = (action: string, kind: 'download' | 'success' | 'error' | 'info' = 'download') => useToastStore.getState().showToast({ title, action, posterPath }, kind);
       if (!isDownloadFeatureEnabled(config) || !config.radarrUrl || !config.radarrApiKey) { notify('Configure Radarr dans les réglages des téléchargements.', 'error'); return; }
-      if (model.presence.loading) { notify('Vérification de la disponibilité en cours, réessaie dans un instant.', 'info'); return; }
       const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
       await launchArrDownload({ config, mediaType: 'movie', title, year: releaseYear || undefined, tmdbId: effectiveTmdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || show?.imdbId, posterPath, qualityPreference: quality, notify });
       return;
@@ -261,12 +275,14 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
     if (!isDownloadFeatureEnabled(config)) return;
     // Chargé au premier lancement : les services Sonarr restent hors du chunk de la fiche.
     const { launchArrEpisodeBatch } = await import('../features/downloads/downloadLaunch');
-    if (model.presence.loading) { showToast('Vérification de la disponibilité en cours.', 'info'); return; }
     if (!(config.sonarrUrl && config.sonarrApiKey)) { useToastStore.getState().showToast({ title, action: 'Sonarr n’est pas configuré pour ce média.', posterPath: show?.posterPath }, 'error'); return; }
     const nowCount = pickedNow.length;
     const toDownload = bySeason(pickedNow);
     const toProgram = bySeason(pickedFuture);
+    // La barre se ferme avant l'attente éventuelle de la présence : un second appui ne relance rien.
     exitDownloadMode();
+    const presence = await settledPresence('tv');
+    if (!presence) return;
     const qualityLabel = quality === '4k' ? '4K' : '1080p';
     const single = nowCount === 1 && !pickedFuture.length;
     // Programmation d'abord, attendue : la série n'est jamais ajoutée deux fois en parallèle par le lot immédiat.
@@ -285,7 +301,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       posterPath: show?.posterPath || undefined, season, episodes, qualityPreference: quality,
       readConfig: () => useDownloadConfigStore.getState(),
       // Mêmes gardes que la popup : un fichier présent n'est jamais remplacé, pas de double lancement.
-      skip: episode => Boolean(model.presence.episodesHasFile?.[episodePresenceKey(season, episode)]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
+      skip: episode => Boolean(presence.episodesHasFile?.[episodePresenceKey(season, episode)]) || Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season, episodeNumber: episode })),
       // Un épisode : tous les messages ; plusieurs : seulement les erreurs (le bilan reste dans Téléchargements).
       notify: (episode, action, toastType = 'download') => { if (single || toastType === 'error') useToastStore.getState().showToast({ title, subtitle: `S${season} | E${episode}`, action, posterPath: show?.posterPath }, toastType); }
       });
@@ -366,8 +382,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
             {hasTrailer && <button type="button" onClick={() => setTrailerModalVideos(ytVideos)} className="inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-[#18181b] px-2.5 text-[12px] font-bold text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"><Play size={12} className="fill-current" />Bande-annonce</button>}
           </>}
         </div>
-        {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}{canUseDownloadMode && show && <DownloadModeToggle active={downloadMode} badge={activeDownloads} onToggle={toggleDownloadMode} />}</SeriesProgressCard>
-          : <div className="flex gap-2">{movieCta}{mainProvider && providerTile(mainProvider)}{plexProvider && providerTile(plexProvider)}{canUseFilmMode && !movieAvailable && <MovieDownloadButton state={filmState} progress={Number(filmItem?.progress) || 0} upcoming={filmUpcoming} onPress={pressFilmButton} />}</div>}
+        {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{heroProvider && providerTile(heroProvider)}{canUseDownloadMode && show && <DownloadModeToggle active={downloadMode} badge={activeDownloads} onToggle={toggleDownloadMode} />}</SeriesProgressCard>
+          : <div className="flex gap-2">{movieCta}{heroProvider && providerTile(heroProvider)}{canUseFilmMode && !movieAvailable && <MovieDownloadButton state={filmState} progress={Number(filmItem?.progress) || 0} upcoming={filmUpcoming} onPress={pressFilmButton} />}</div>}
         {!isSeries && !hasSeenMedia && !isUnreleased && !isAtCinema && <MovieEndCard runtime={tmdbDetails?.runtime} />}
         {canUseFilmMode && (filmState === 'active' || filmState === 'waiting' || filmState === 'programmed') && <div ref={filmTrackRef}><MovieDownloadTrack state={filmState} quality={filmItem?.quality} progress={Number(filmItem?.progress) || 0} timeleft={filmItem?.timeleft} waitingHint={filmItem ? availabilityHint(filmItem.availability) : undefined} onCancel={cancelFilm} /></div>}
 

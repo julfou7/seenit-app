@@ -1,8 +1,26 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.274",
+  "applicationVersion": "1.4.275",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
+    {
+      "id": "SEENIT-DOWNLOAD-015",
+      "title": "Demande visible tout de suite dans « En attente » et lancement qui attend la vérification de présence",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/detailFieldFeedback.test.ts",
+          "contains": "SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente », puis y reste tant qu’aucune version n’est sortie"
+        },
+        {
+          "file": "tests/detailFieldFeedback.test.ts",
+          "contains": "SEENIT-DOWNLOAD-015 un lancement pendant la vérification de présence l’attend au lieu d’être refusé"
+        }
+      ]
+    },
     {
       "id": "SEENIT-DOWNLOAD-014",
       "title": "Mode téléchargement de la fiche série et du film, sans commandes permanentes",
@@ -3272,6 +3290,20 @@
         {
           "file": "tests/watchProviderBatch.test.ts",
           "contains": "SEENIT-PROVIDER-002 #853 la marge de préchargement des logos agit dans la liste qui défile"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PROVIDER-003",
+      "title": "Un seul diffuseur près du bouton principal des fiches : plateforme choisie, sinon Plex",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/detailFieldFeedback.test.ts",
+          "contains": "SEENIT-PROVIDER-003 un seul diffuseur près du bouton principal : celui des réglages, sinon Plex, jamais un public non choisi"
         }
       ]
     },

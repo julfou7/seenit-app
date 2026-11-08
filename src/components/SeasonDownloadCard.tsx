@@ -23,7 +23,7 @@ const percent = (item: LiveDownloadItem) => truncateDownloadProgressPercent(Math
 function rowState(item: LiveDownloadItem, kind: RowKind): string {
   if (kind === 'done') return item.importState === 'pending' ? 'Transfert terminé · import à confirmer' : 'Téléchargé · prêt à regarder';
   if (kind === 'attention') return item.errorMessage || item.statusText || 'Une intervention est nécessaire';
-  if (kind === 'waiting') return 'En attente de disponibilité';
+  if (kind === 'waiting') return 'Pas encore disponible';
   if (kind === 'active') return [`${percent(item)} %`, item.timeleft && item.timeleft !== '--' ? `≈ ${item.timeleft}` : ''].filter(Boolean).join(' · ');
   return item.status === 'searching' ? 'Recherche en cours' : item.status === 'paused' ? 'En pause' : 'En attente';
 }

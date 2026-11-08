@@ -276,6 +276,29 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
   }
 }));
 
+/**
+ * Retour terrain du 08/11 (« Le Chat Chapeauté ») : un lancement pendant la vérification de présence était
+ * refusé par un toast « réessaie » tronqué, et rien ne partait. Le lancement attend désormais la fin de la
+ * vérification : renvoie la présence vérifiée, ou `null` si Plex, Radarr ou Sonarr n'ont pas répondu à temps
+ * (rien n'est alors lancé, un fichier présent n'est jamais remplacé).
+ */
+export function waitForSettledPresence(tmdbId: number | string, mediaType: 'movie' | 'tv', timeoutMs = 20_000): Promise<MediaPresenceData | null> {
+  const read = () => useMediaPresenceStore.getState().getPresence(tmdbId, mediaType);
+  const current = read();
+  if (current && !current.loading) return Promise.resolve(current);
+  return new Promise(resolve => {
+    let unsubscribe = () => {};
+    const timer = setTimeout(() => { unsubscribe(); resolve(null); }, timeoutMs);
+    unsubscribe = useMediaPresenceStore.subscribe(() => {
+      const next = read();
+      if (!next || next.loading) return;
+      clearTimeout(timer);
+      unsubscribe();
+      resolve(next);
+    });
+  });
+}
+
 function resetMediaPresenceState() {
   mediaPresenceEpoch += 1;
   useMediaPresenceStore.setState({

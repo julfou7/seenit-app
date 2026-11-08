@@ -34,12 +34,26 @@ test('SEENIT-UX-020 #873 un seul « Afficher plus » : libellé du lot, des N re
   control.props.onClick();
   assert.equal(loads, 1);
   assert.equal(LoadMore({ previews: [], remainingCount: 0, onLoad: () => {} }), null, 'rien quand il ne reste rien');
+  // Retour terrain du 08/11 : « Afficher les 46 · 46 en attente » répétait le compte ; le libellé suffit.
+  for (const [remaining, expected] of [[46, 'Afficher les 46'], [1, 'Afficher le dernier']] as const) {
+    const [, rest, counter] = LoadMore({ previews: [], remainingCount: remaining, step: 46, onLoad: () => {} })!.props.children as unknown[];
+    assert.equal(text(rest), expected);
+    assert.equal(counter, false, `${expected} : pas de « ${remaining} en attente » répété`);
+  }
+});
+
+test('SEENIT-UX-020 les Personnages se déplient dix par dix, puis « Réduire »', () => {
+  const cast = read('src/screens/mediaDetail/detailSections.tsx');
+  assert.match(cast, /const CAST_FIRST = 6, CAST_STEP = 10;/);
+  assert.match(cast, /remainingCount=\{cast\.length - limit\} step=\{CAST_STEP\} onLoad=\{\(\) => \{ reveal\.focusItem\(limit\); setLimit\(limit \+ CAST_STEP\); \}\}/);
+  assert.match(cast, /\{cast\.length > CAST_FIRST && cast\.length <= limit && <button type="button" onClick=\{\(\) => \{ setLimit\(CAST_FIRST\); reveal\.focusLoadMore\(\); \}\}/);
+  assert.doesNotMatch(cast, /step=\{cast\.length\}/, 'plus de dépliage d’un bloc');
 });
 
 test('SEENIT-UX-020 #873 toutes les paginations réutilisent le contrôle partagé, sans bouton texte « voir plus »', () => {
   const surfaces: Array<[string, RegExp]> = [
     ['src/components/MovieActorProfile.tsx', /<LoadMore previews=\{grid\.slice\(limit, limit \+ 3\)/],
-    ['src/screens/mediaDetail/detailSections.tsx', /<LoadMore round previews=\{cast\.slice\(6, 9\)/],
+    ['src/screens/mediaDetail/detailSections.tsx', /<LoadMore round previews=\{cast\.slice\(limit, limit \+ 3\)/],
     ['src/components/ProAnalyticsDashboard.tsx', /<LoadMore round previews=\{people\.slice\(PEOPLE_PREVIEW, PEOPLE_PREVIEW \+ 3\)/],
     ['src/screens/PersonDetailModal.tsx', /<LoadMore previews=\{filteredCredits\.slice\(visibleCredits\.length, visibleCredits\.length \+ 3\)/]
   ];
@@ -59,8 +73,8 @@ test('SEENIT-UX-020 #873 le focus clavier suit le dépliage et le repli sans se 
   const control = read('src/components/cards/HomeLoadMore.tsx');
   assert.match(control, /export function useRevealFocus<T extends HTMLElement>\(itemSelector: string\)/);
   assert.match(control, /next\?\.focus\(\{ preventScroll: true \}\);/);
-  assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /onLoad=\{\(\) => \{ setShowAll\(true\); reveal\.focusItem\(6\); \}\}/);
-  assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /onClick=\{\(\) => \{ setShowAll\(false\); reveal\.focusLoadMore\(\); \}\}/);
+  assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /onLoad=\{\(\) => \{ reveal\.focusItem\(limit\); setLimit\(limit \+ CAST_STEP\); \}\}/);
+  assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /onClick=\{\(\) => \{ setLimit\(CAST_FIRST\); reveal\.focusLoadMore\(\); \}\}/);
   assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /reveal\.focusItem\(PEOPLE_PREVIEW\)/);
   assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /setExpanded\(false\); reveal\.focusLoadMore\(\);/);
   assert.match(read('src/components/MovieActorProfile.tsx'), /filmographyReveal\.focusItem\(limit\); setLimit/);

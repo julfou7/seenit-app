@@ -25,8 +25,16 @@ interface AvailabilityItem {
 export function availabilityHint(availability?: DownloadAvailability): string {
   if (availability?.reason !== 'no_release') return 'Recherche interrompue · disponibilité à vérifier';
   return availability.automatic
-    ? 'Surveillance active · téléchargement automatique dès disponibilité d’une release compatible'
-    : 'Aucune release compatible · surveillance automatique à vérifier';
+    ? 'Surveillé : il partira seul dès qu’une version compatible sortira.'
+    : 'Aucune version compatible · surveillance automatique à vérifier';
+}
+
+/**
+ * Retour terrain du 08/11 : le toast d'une demande sans release tient sur une ligne ; le détail de
+ * l'attente reste sur sa carte, dans la section « En attente » de l'onglet Télécharger.
+ */
+export function noReleaseToastAction(availability?: DownloadAvailability): string {
+  return availability?.reason === 'no_release' && availability.automatic ? 'Pas encore disponible · en attente' : 'Pas encore disponible · à vérifier';
 }
 
 /** Un transfert ancien, un autre scope ou un titre similaire ne clôt jamais l'attente. */

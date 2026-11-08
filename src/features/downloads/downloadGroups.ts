@@ -11,6 +11,14 @@ export function downloadGroup(item: Pick<LiveDownloadItem, 'status' | 'progress'
   return 'active';
 }
 
+/**
+ * Retour terrain du 08/11 : une demande pas encore confiée au client (recherche ou envoi sans progression)
+ * s'affiche dans « En attente » avec les releases introuvables, pas dans « En cours ».
+ */
+export function isPreTransferRequest(item: Pick<LiveDownloadItem, 'status' | 'progress'>): boolean {
+  return (item.status === 'searching' || item.status === 'submitting') && !(Number(item.progress) > 0);
+}
+
 export function downloadProblem(message: string): { title: string; hint: string } {
   if (/manual import|import manuel/i.test(message)) return { title: 'Import manuel requis', hint: 'Le fichier est arrivé, mais le client n’a pas confirmé son import. Choisis une autre version ou vérifie l’import dans le client.' };
   if (/not an upgrade/i.test(message)) return { title: 'Une version équivalente existe déjà', hint: 'Choisis une autre qualité pour chercher une amélioration. Aucun remplacement n’a été confirmé.' };

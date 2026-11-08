@@ -110,7 +110,7 @@ async function testWatchNextHarness(client, root) {
     await click(client,'[data-actor-credit="movie:998"] .actor-upcoming__reminder');
     await check(client,`document.querySelector('[data-actor-credit="movie:998"] .actor-upcoming__reminder').getAttribute("aria-pressed")==="false" && window.__watch18c.telemetry.writes.some(write=>write.path.includes("reminders") && write.payload.deleted) && window.__watch18c.snapshot().find(show=>show.tmdbId===998).notificationsEnabled===false`,'second appui : suppression du rappel et état désactivé');
     await check(client, 'document.querySelector(".actor-profile__bio button")', 'Lire la suite seulement pour une bio qui déborde');
-    await check(client, 'document.querySelector(".actor-profile__filmography [data-load-more]")?.textContent.includes("en attente")', 'filmographie : le seul « Afficher plus » de l’app (#873)');
+    await check(client, '(()=>{const more=document.querySelector(".actor-profile__filmography [data-load-more]")?.textContent||"";return more.includes("Afficher les 9")&&!more.includes("en attente")})()', 'filmographie : le seul « Afficher plus » de l’app, sans compte répété (#873, 08/11)');
     await click(client, '.actor-profile__filmography [data-load-more]');
     await check(client, 'document.querySelectorAll(".actor-profile__grid > button").length>9', 'filmographie neuf puis neuf');
     await click(client, '.actor-profile__heart');
