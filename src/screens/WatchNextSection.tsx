@@ -7,6 +7,7 @@ import { MovieTicketCard } from '../components/cards/MovieTicketCard';
 import { resolveWatchCardResume } from '../features/watchlist/watchCardResume';
 import { type SeriesCardEpisode } from '../features/watchlist/seriesCardPresentation';
 import { mergeWatchGroups, orderWatchMovies } from '../features/watchlist/watchNext18c';
+import { compareContinueWatching, continueWatchingKey } from '../features/watchlist/homeSections';
 import { tmdb } from '../features/shows/tmdb';
 import { selectTicketActor, type TicketActor } from '../features/people/movieActors';
 import { useCardLayoutAnchor } from '../hooks/useCardLayoutAnchor';
@@ -249,7 +250,12 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const start = now;
   const renderSeriesGroup = (index: number) => {
       const label = ['Continuer à regarder', 'Nouveautés', 'Pas vu depuis un moment'][index];
-      const items = series.filter(show => memberships.current.get(show.id) === index).sort((a, b) => index === 0 ? watchTime(b) - watchTime(a) : index === 2 ? Number(Boolean(b.seenEpisodes?.length)) - Number(Boolean(a.seenEpisodes?.length)) : 0);
+      // Continuer : activité la plus récente en tête — dernier visionnage, ou sortie d'un nouvel épisode depuis
+      // celui-ci (SEENIT-UX-021) ; pendant un Vu, la carte garde sa date d'avant (watchTime).
+      const members = series.filter(show => memberships.current.get(show.id) === index);
+      const today = getTodayStr();
+      const keys = index === 0 ? new Map(members.map(show => [show.id, continueWatchingKey(show, watchTime(show), today, now)])) : null;
+      const items = members.sort((a, b) => keys ? compareContinueWatching(keys.get(a.id)!, keys.get(b.id)!) : index === 2 ? Number(Boolean(b.seenEpisodes?.length)) - Number(Boolean(a.seenEpisodes?.length)) : 0);
       if (!items.length) return null;
       const expanded = Boolean(expandedGroups[index]);
       const limit = expanded ? groupLimits[index] || 3 : railLimits[index] || HOME_PAGE_SIZE;

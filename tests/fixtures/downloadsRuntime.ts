@@ -62,7 +62,9 @@ export const executeGet = async (url: string) => {
     { id: 802, seriesId: 5, seasonNumber: 1, episodeNumber: 9, title: 'Épisode 9', airDateUtc: inDays(14), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
     // Non surveillé, présent ou série désactivée : jamais « programmé ».
     { id: 803, seriesId: 5, seasonNumber: 1, episodeNumber: 10, title: 'Épisode 10', airDateUtc: inDays(21), monitored: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
-    { id: 804, seriesId: 6, seasonNumber: 2, episodeNumber: 1, title: 'Pilote', airDateUtc: inDays(3), monitored: true, hasFile: false, series: { title: 'Série en pause', tmdbId: 78, monitored: false } }
+    { id: 804, seriesId: 6, seasonNumber: 2, episodeNumber: 1, title: 'Pilote', airDateUtc: inDays(3), monitored: true, hasFile: false, series: { title: 'Série en pause', tmdbId: 78, monitored: false } },
+    // Retour terrain du 08/11 (Harry Potter) : épisodes provisoires « TBA », nombre et dates non annoncés.
+    ...[1, 2, 3].map(episodeNumber => ({ id: 810 + episodeNumber, seriesId: 7, seasonNumber: 1, episodeNumber, title: 'TBA', airDateUtc: inDays(10 + 7 * episodeNumber), monitored: true, hasFile: false, series: { title: 'Harry Potter', tmdbId: 79, monitored: true } }))
   ];
   if (url.includes('/api/v3/calendar')) return [{ id: 901, title: 'Avatar : De feu et de cendres', tmdbId: 83533, monitored: true, hasFile: false, digitalRelease: inDays(40) }];
   if (/\/api\/v3\/(?:episode|movie)\/\d+$/.test(url)) return { id: Number(url.split('/').pop()), monitored: true };

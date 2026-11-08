@@ -160,7 +160,10 @@ prévues ; ce dernier n'accorde aucune confiance à l'appelant et exige les preu
   demande le mode d'affichage le plus rapide de l'écran (`SEENIT-APK-007`). La synchro Plex cède le fil toutes
   les 6 ms (`SEENIT-PLEX-010`). Sur À voir, l'anneau du bouton Vu démarre au tap ; le tampon et l'épisode
   suivant attendent la confirmation de l'écriture, et un échec annule l'anneau (`SEENIT-UX-016`).
-- Continuer à regarder affiche d'abord la série vue le plus récemment. Annuler un Vu qui avait fait passer
+- Continuer à regarder affiche en tête la dernière activité : la série vue le plus récemment, ou celle dont un
+  nouvel épisode est sorti depuis ton dernier visionnage (un épisode sorti aujourd'hui passe devant ce que tu
+  as vu avant). Nouveautés est réservé aux saisons dont tu en es à
+  l'épisode 1 (nouvelle saison ou série pas commencée, `SEENIT-UX-021`). Annuler un Vu qui avait fait passer
   une série de Nouveautés à Continuer la ramène aussitôt dans Nouveautés (`SEENIT-UX-018`).
 - Une synchro Plex delta sans nouveauté (aucun visionnage, Watchlist identique et déjà suivie) se termine
   juste après la réponse Plex, sans relecture de la bibliothèque (`SEENIT-PLEX-011`).
@@ -291,8 +294,10 @@ rappels et actualités des séries restent visibles.
 
 ### 5.1 À Regarder
 
-- **Nouveautés** est prioritaire pour une série/nouvelle saison récente ;
-- **Continuer à regarder** reçoit les séries commencées vues dans les 60 derniers jours inclus ;
+- **Nouveautés** est prioritaire et réservé aux saisons dont tu en es à l'épisode 1 (nouvelle saison ou série
+  pas commencée), sorti depuis 60 jours au plus ; un nouvel épisode d'une saison en cours n'y va jamais ;
+- **Continuer à regarder** reçoit les séries commencées vues dans les 60 derniers jours inclus, ou dont un
+  nouvel épisode est sorti depuis le dernier visionnage, classées par dernière activité ;
 - **Pas vu depuis un moment** reçoit les autres séries encore regardables ;
 - **Films à voir** reçoit les films suivis non vus dont la sortie n'est pas future.
 

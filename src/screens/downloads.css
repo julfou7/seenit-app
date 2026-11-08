@@ -51,6 +51,8 @@
 .programmed__state { display:flex; align-items:center; gap:5px; color:#7dd3fc; }
 .programmed__cancel { flex:none; min-height:44px; min-width:44px; padding:0 10px; border-radius:12px; color:#d4d4d8; font-size:13.5px; font-weight:700; }
 .programmed__cancel:disabled { opacity:.5; }
+/* 08/11 (Harry Potter) : épisode connu de Sonarr avec sa date, titre pas encore annoncé. */
+.download-season__title[data-untitled] { color:#a1a1aa; font-weight:600; }
 /* #879 — « Ajouter E6 » et choix de qualité en ligne dans la carte de saison. */
 .download-season__add { margin-top:10px; width:100%; min-height:44px; border-radius:12px; color:#f2c36b; font-size:14px; font-weight:800; box-shadow:inset 0 0 0 1px #e5a93d66; }
 .download-season__pick { margin-top:10px; padding:10px; border-radius:14px; background:#1e1a12; box-shadow:inset 0 0 0 1.5px #e5a93d99; }
