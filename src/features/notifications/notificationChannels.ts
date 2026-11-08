@@ -9,6 +9,7 @@ export const SEENIT_NOTIFICATION_CHANNELS = {
   plex: 'seenit_plex',
   news: 'seenit_news',
   app: 'seenit_app',
+  updates: 'seenit_updates',
   downloads: 'seenit_downloads',
 } as const;
 
@@ -20,12 +21,16 @@ const CHANNELS: ReadonlyArray<Channel> = [
   { id: SEENIT_NOTIFICATION_CHANNELS.plex, name: 'Plex', importance: 2 },
   { id: SEENIT_NOTIFICATION_CHANNELS.news, name: 'Actualités et reprises', importance: 2 },
   { id: SEENIT_NOTIFICATION_CHANNELS.app, name: 'Application', importance: 2 },
+  // #909 (retour terrain du 08/11 : « mon téléphone ne vibre pas ») : la nouvelle version passait par
+  // `seenit_app`, en importance basse (silencieuse). Android interdit de relever l'importance d'un canal
+  // existant : la mise à jour a son propre canal, en importance haute (son, vibration, bannière).
+  { id: SEENIT_NOTIFICATION_CHANNELS.updates, name: 'Mises à jour de SeenIt', description: 'Nouvelle version disponible ou téléchargée', importance: 4, vibration: true },
 ];
 
 let ensurePromise: Promise<void> | null = null;
 
 /**
- * SEENIT-NOTIFICATION-006 — crée uniquement les nouveaux canaux SeenIt.
+ * SEENIT-NOTIFICATION-006 — crée uniquement les nouveaux canaux SeenIt (huit depuis #909).
  * `seenit_downloads` est volontairement absent : il existe déjà et ses choix système
  * doivent être conservés au lieu d'être recréés/réinitialisés par la refonte #778.
  */

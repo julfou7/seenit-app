@@ -88,7 +88,7 @@ const describeError = (error: unknown) => error instanceof Error ? error.message
 const ANDROID_ALERTS = [
   { channelId: 'seenit_reminders', icon: Bell, label: 'Rappels', sub: 'Les cloches posées sur un épisode ou un film' },
   { channelId: 'seenit_downloads', icon: DownloadMark, label: 'Téléchargements et Plex', sub: 'Import terminé, disponible dans Plex, échec' },
-  { channelId: 'seenit_app', icon: Package, label: 'Mise à jour de SeenIt', sub: 'Nouvelle version disponible ou téléchargée' },
+  { channelId: 'seenit_updates', icon: Package, label: 'Mise à jour de SeenIt', sub: 'Nouvelle version disponible ou téléchargée' },
 ] as const;
 
 type SettingsPage = 'plats' | 'notifs' | 'plex' | 'devices' | 'compte' | 'app';
@@ -369,7 +369,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
           if (isOffline) {
             // Hors ligne, les réglages locaux en cache suffisent : pas de bruit dans la console.
           } else {
-            console.error('[Settings] Error syncing cloud settings', e);
+            appLogger.error('system', 'Synchronisation des réglages cloud impossible', e);
           }
         }
       } else {

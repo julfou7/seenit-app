@@ -240,8 +240,8 @@ export async function verifyOfficialReleaseNotification(
   const apkName = `SeenIt-v${version}.apk`;
   const shaName = `${apkName}.sha256`;
   const assets = Array.isArray(release.assets) ? release.assets : [];
-  const apkAssets = assets.filter((asset: any) => asset?.name === apkName);
-  const shaAssets = assets.filter((asset: any) => asset?.name === shaName);
+  const apkAssets = assets.filter((asset: { name?: unknown } | null) => asset?.name === apkName);
+  const shaAssets = assets.filter((asset: { name?: unknown } | null) => asset?.name === shaName);
   if (apkAssets.length !== 1 || shaAssets.length !== 1) {
     throw new ReleaseNotificationSourceError(502, 'release_assets_missing', 'Paire APK/SHA-256 officielle manquante ou ambiguë');
   }
@@ -311,7 +311,7 @@ export interface ReleasePushMessage {
     priority: 'high';
     collapseKey: string;
     notification: {
-      channelId: 'seenit_app';
+      channelId: 'seenit_updates';
       icon: 'ic_stat_seenit';
       color: '#E5A93D';
       tag: string;
@@ -333,6 +333,10 @@ export interface ReleaseDeliverySummary {
   exhausted: number;
 }
 
+/**
+ * #909 : la nouvelle version part sur le canal `seenit_updates` (importance haute : son, vibration, bannière),
+ * créé par l'app au démarrage. Un appareil encore sans ce canal la reçoit sur le canal par défaut de Firebase.
+ */
 export function buildReleaseUpdatePushMessage(version: string): ReleasePushMessage {
   const stableKey = version.replace(/\./g, '_');
   return {
@@ -348,7 +352,7 @@ export function buildReleaseUpdatePushMessage(version: string): ReleasePushMessa
       priority: 'high',
       collapseKey: `seenit-update-${version}`,
       notification: {
-        channelId: 'seenit_app',
+        channelId: 'seenit_updates',
         icon: 'ic_stat_seenit',
         color: '#E5A93D',
         tag: `seenit_update_${stableKey}`

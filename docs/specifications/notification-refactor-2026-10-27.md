@@ -31,6 +31,7 @@ Les canaux sont créés idempotemment au démarrage et chaque notification local
 | `seenit_plex` | Plex | LOW | oui |
 | `seenit_news` | Actualités et reprises | LOW | non pour les nouveaux choix ; une migration ne coupe pas silencieusement un comportement existant |
 | `seenit_app` | Application | LOW | oui |
+| `seenit_updates` | Mises à jour de SeenIt (#909, nouvelle version) | HIGH, vibration | oui |
 | `seenit_downloads` | Téléchargements | canal existant conservé | choix système existant conservé |
 
 L'importance d'un canal Android déjà créé n'est pas réécrite pour tenter de contourner le choix système. Les réglages exposent l'accès aux réglages Android de notifications lorsqu'il est techniquement disponible.

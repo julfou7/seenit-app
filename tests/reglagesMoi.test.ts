@@ -74,7 +74,7 @@ const navCss = readFileSync('src/components/bottomNav.css', 'utf8');
 const logos = readFileSync('src/features/providers/platformLogos.ts', 'utf8');
 
 test('SEENIT-NOTIFICATION-006 les Réglages ouvrent le canal Android exact, limité aux canaux SeenIt', () => {
-  for (const channel of ['seenit_reminders', 'seenit_downloads', 'seenit_app']) assert.match(core, new RegExp(`channelId: '${channel}'`));
+  for (const channel of ['seenit_reminders', 'seenit_downloads', 'seenit_updates']) assert.match(core, new RegExp(`channelId: '${channel}'`));
   assert.match(core, /NotificationSettings\.openChannel\(\{ channelId: alert\.channelId \}\)/);
   assert.match(plugin, /public void openChannel\(PluginCall call\)/);
   assert.match(plugin, /Settings\.ACTION_CHANNEL_NOTIFICATION_SETTINGS/);
