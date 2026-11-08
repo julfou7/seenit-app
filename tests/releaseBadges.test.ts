@@ -38,4 +38,11 @@ test('SEENIT-C411-003 titre lisible de la release : reconnaître le bon torrent 
   assert.deepEqual(releaseReadableTitle('La.French.2014.FRENCH.1080p.BluRay.x264-GRP'), { title: 'La French', year: '2014', episode: undefined });
   assert.deepEqual(releaseReadableTitle('French.Kiss.1995.FRENCH.720p.x264'), { title: 'French Kiss', year: '1995', episode: undefined });
   assert.equal(releaseReadableTitle('Charlottes.Web.FRENCH.1080p.x264').title, 'Charlottes Web');
+  // Revue Codex : une plage d'épisodes ou de saisons est gardée entière (un pack n'est pas un épisode).
+  assert.equal(releaseReadableTitle('Show.S01E01-E02.FRENCH.1080p.WEB.H264-GRP').episode, 'S01E01-E02');
+  assert.equal(releaseReadableTitle('Show.S01E01-E10.FRENCH.1080p.WEB.H264-GRP').episode, 'S01E01-E10');
+  assert.equal(releaseReadableTitle('Show.S01-S05.MULTI.1080p.WEB.H264-GRP').episode, 'S01-S05');
+  assert.equal(releaseReadableTitle('Show.S01E01E02.MULTI.1080p.WEB.H264-GRP').episode, 'S01E01E02');
+  assert.equal(releaseReadableTitle('Show.S01E03-NoTag').episode, 'S01E03');
+  assert.equal(releaseReadableTitle('Show.S01E01-E02.FRENCH.1080p.WEB.H264-GRP').title, 'Show');
 });

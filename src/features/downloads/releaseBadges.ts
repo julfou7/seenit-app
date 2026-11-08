@@ -48,6 +48,8 @@ const STRONG_MARKER = /^(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|2160p|1080p|1080i|720p
 // retirés qu'en fin de titre, faute d'année pour borner celui-ci.
 const WEAK_TRAILING = /^(?:FRENCH|VF|VFI|VF2|VO|IMAX|UHD|4K|HDR|DV|NF|COMPLETE|INTEGRALE|PROPER|REPACK)$/i;
 const YEAR = /^(?:19|20)\d{2}$/;
+// Épisode, épisodes enchaînés (« S01E01E02 ») ou plage (« S01E01-E10 », « S01E01-10 », « S01-S05 »).
+const EPISODE_RANGE = /^S\d{1,2}(?:E\d{1,3})*(?:-(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|\d{1,3}))?$/i;
 
 export function releaseReadableTitle(name: string): { title: string; year?: string; episode?: string } {
   const tokens = name.replace(/\.(?:mkv|mp4|avi)$/i, '').replace(/[._]+/g, ' ').trim().split(/\s+/);
@@ -59,7 +61,10 @@ export function releaseReadableTitle(name: string): { title: string; year?: stri
   const yearIndex = head.reduce((found, token, index) => (index > 0 && YEAR.test(token) ? index : found), -1);
   let titleTokens = yearIndex > 0 ? head.slice(0, yearIndex) : head;
   if (yearIndex < 0) while (titleTokens.length > 1 && WEAK_TRAILING.test(core(titleTokens[titleTokens.length - 1]))) titleTokens = titleTokens.slice(0, -1);
-  const episodeToken = tokens.find(token => /^S\d{1,2}(?:E\d{1,3})?$/i.test(core(token)));
+  // Une plage (« S01E01-E02 », « S01E01-E10 », « S01-S05 ») est gardée entière : seul un suffixe de groupe
+  // (« S01E03-NoTag ») est retiré.
+  const fullEpisode = (token: string) => EPISODE_RANGE.test(token) ? token : EPISODE_RANGE.test(core(token)) ? core(token) : null;
+  const episodeToken = tokens.map(fullEpisode).find((token): token is string => token !== null);
   const title = titleTokens.join(' ').replace(/-+$/, '').trim() || name;
-  return { title, year: yearIndex > 0 ? head[yearIndex] : undefined, episode: episodeToken ? core(episodeToken).toUpperCase() : undefined };
+  return { title, year: yearIndex > 0 ? head[yearIndex] : undefined, episode: episodeToken?.toUpperCase() };
 }
