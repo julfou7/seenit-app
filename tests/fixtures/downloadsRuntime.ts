@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
 
-export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], pushed: [] as string[], programmed: false, unmonitored: [] as string[], added: [] as string[] };
+export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], qualities: [] as string[], presence: [] as string[], pushed: [] as string[], programmed: false, unmonitored: [] as string[], added: [] as string[] };
 // #879 — versions de la page « Version précise » (C411 simulé) : la conseillée n'est pas la première reçue.
 const day = 86_400_000;
 const FIXTURE_RELEASES = [
@@ -32,6 +32,8 @@ export const acceptDownloadRequest = () => {};
 export const failDownloadRequest = () => {};
 export const updateDownloadRequest = () => {};
 export const useMediaPresence = () => ({ loading: false, episodesHasFile: {}, seasonsHasFile: {}, radarrHasFile: false, plexInfo: null });
+// v1.4.281 : une annulation dans « Programmés » relit la présence de la fiche (épisode à nouveau sélectionnable).
+export const useMediaPresenceStore = { getState: () => ({ checkPresence: async (params: { tmdbId?: number | string; forceRefresh?: boolean }) => { telemetry.presence.push(`${params.tmdbId}:${params.forceRefresh === true}`); return {}; } }) };
 export const fetchQualityProfiles = async () => [{ id: 1, name: 'HD-1080p' }, { id: 2, name: 'UltraHD-4K' }];
 export const searchAndDownloadInRadarr = async () => ({ success: true, message: 'Demande acceptée', status: 'searching' });
 export const searchAndDownloadInSonarr = searchAndDownloadInRadarr;
@@ -56,18 +58,20 @@ const SONARR_IMPORTS = [
 const RADARR_IMPORTS = [{ eventType: 3, date: ago(3), movieId: 40, movie: { title: 'Dune', tmdbId: 4 } }];
 export const executeGet = async (url: string) => {
   if (url.includes('/api/v3/history/since')) return telemetry.programmed ? [] : url.includes('includeMovie=true') ? RADARR_IMPORTS : SONARR_IMPORTS;
+  if (url.includes('/api/v3/qualityprofile')) return [{ id: 4, name: 'HD-1080p' }, { id: 5, name: 'Ultra-HD' }];
   if (!telemetry.programmed) return [];
-  if (url.includes('/api/v3/calendar') && url.includes('includeSeries=true')) return [
-    { id: 801, seriesId: 5, seasonNumber: 1, episodeNumber: 8, title: 'Épisode 8', airDateUtc: inDays(7), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
-    { id: 802, seriesId: 5, seasonNumber: 1, episodeNumber: 9, title: 'Épisode 9', airDateUtc: inDays(14), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
+  // Un épisode déprogrammé n'apparaît plus au calendrier, comme dans Sonarr (l'état est relu après l'écriture).
+  if (url.includes('/api/v3/calendar') && url.includes('includeSeries=true')) return ([
+    { id: 801, seriesId: 5, seasonNumber: 1, episodeNumber: 8, title: 'Épisode 8', airDateUtc: inDays(7), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4 } },
+    { id: 802, seriesId: 5, seasonNumber: 1, episodeNumber: 9, title: 'Épisode 9', airDateUtc: inDays(14), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4 } },
     // Non surveillé, présent ou série désactivée : jamais « programmé ».
     { id: 803, seriesId: 5, seasonNumber: 1, episodeNumber: 10, title: 'Épisode 10', airDateUtc: inDays(21), monitored: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
     { id: 804, seriesId: 6, seasonNumber: 2, episodeNumber: 1, title: 'Pilote', airDateUtc: inDays(3), monitored: true, hasFile: false, series: { title: 'Série en pause', tmdbId: 78, monitored: false } },
     // Retour terrain du 08/11 (Harry Potter) : épisodes provisoires « TBA », nombre et dates non annoncés.
-    ...[1, 2, 3].map(episodeNumber => ({ id: 810 + episodeNumber, seriesId: 7, seasonNumber: 1, episodeNumber, title: 'TBA', airDateUtc: inDays(10 + 7 * episodeNumber), monitored: true, hasFile: false, series: { title: 'Harry Potter', tmdbId: 79, monitored: true } }))
-  ];
-  if (url.includes('/api/v3/calendar')) return [{ id: 901, title: 'Avatar : De feu et de cendres', tmdbId: 83533, monitored: true, hasFile: false, digitalRelease: inDays(40) }];
+    ...[1, 2, 3].map(episodeNumber => ({ id: 810 + episodeNumber, seriesId: 7, seasonNumber: 1, episodeNumber, title: 'TBA', airDateUtc: inDays(10 + 7 * episodeNumber), monitored: true, hasFile: false, series: { title: 'Harry Potter', tmdbId: 79, monitored: true, qualityProfileId: 4 } }))
+  ]).filter(entry => !telemetry.unmonitored.some(url => url.endsWith(`/api/v3/episode/${entry.id}`)));
+  if (url.includes('/api/v3/calendar')) return [{ id: 901, title: 'Avatar : De feu et de cendres', tmdbId: 83533, monitored: true, hasFile: false, qualityProfileId: 5, inCinemas: inDays(5), digitalRelease: inDays(40) }];
   if (/\/api\/v3\/(?:episode|movie)\/\d+$/.test(url)) return { id: Number(url.split('/').pop()), monitored: true };
   return [];
 };
-export const executePut = async (url: string, body: { monitored?: boolean }) => { if (body.monitored === false) telemetry.unmonitored.push(url); return body; };
+export const executePut = async (url: string, body: { monitored?: boolean; qualityProfileId?: number }) => { if (body.monitored === false) telemetry.unmonitored.push(url); if (body.qualityProfileId) telemetry.qualities.push(`${url}:${body.qualityProfileId}`); return body; };

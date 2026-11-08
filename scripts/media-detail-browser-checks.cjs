@@ -10,7 +10,7 @@ async function buildMediaDetailHarness(root) {
     plugins: [{ name: 'media-detail-ports', setup(builder) {
       // La fiche épisode réelle est montée par la fixture ; seule ShowDetailView reçoit le bouchon.
       builder.onResolve({ filter: /\/EpisodeDetailModal$/ }, args => args.importer.endsWith('ShowDetailView.tsx') ? { path: runtime } : undefined);
-      builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:firebase|tmdb|showsStore|syncPlex|DownloadModal|PreciseVersionPage|PersonDetailModal|PersonProfile|TrailerModal|useShows|toastStore|useDetailsSyncWorker|useMediaPresence|downloadConfigStore|downloadLaunch)$/ }, () => ({ path: runtime }));
+      builder.onResolve({ filter: /^firebase\/(?:firestore|auth)$|\/(?:firebase|tmdb|showsStore|syncPlex|DownloadModal|PreciseVersionPage|PersonDetailModal|PersonProfile|TrailerModal|useShows|toastStore|useDetailsSyncWorker|useMediaPresence|downloadConfigStore|downloadLaunch|arrSyncStore)$/ }, () => ({ path: runtime }));
     } }],
   });
   const fonts = fs.readFileSync(path.join(root, 'index.html'), 'utf8').match(/<link[^>]+fonts.googleapis.com\/css[^>]*>/)?.[0] || '';

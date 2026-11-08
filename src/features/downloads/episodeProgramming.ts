@@ -2,14 +2,15 @@ import { cleanUrl, executeGet, fetchQualityProfiles, searchAndDownloadInSonarr }
 import { executePut } from '../../services/sonarrRadarrTransport';
 import { resolveEffectiveQualityProfileId } from './qualityProfileSelection';
 import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
+import { seasonBlanketPlan, type SeasonPlanEpisode, type SeasonPlanSeries } from './sonarrSeasonMonitoring';
 import { auth } from '../../lib/firebase';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
 import type { DownloadQualityChoice } from './downloadLaunch';
 
 type DownloadConfig = ReturnType<typeof useDownloadConfigStore.getState>;
 type SonarrRecord = Record<string, unknown>;
-type SonarrEpisode = SonarrRecord & { id?: number; seasonNumber?: number; episodeNumber?: number; hasFile?: boolean; monitored?: boolean };
-type SonarrSeries = SonarrRecord & { id?: number; qualityProfileId?: number; monitored?: boolean };
+type SonarrEpisode = SeasonPlanEpisode;
+type SonarrSeries = SeasonPlanSeries & { id?: number; qualityProfileId?: number; monitored?: boolean };
 
 /** Accès Sonarr injectables (tests) ; par défaut, les services réels. */
 export interface EpisodeProgrammingIo {
@@ -41,6 +42,8 @@ export interface EpisodeProgrammingRequest {
   /** Compte courant ; par défaut l'utilisateur Firebase connecté. */
   readOwner?: () => string | undefined;
   io?: EpisodeProgrammingIo;
+  /** Horloge (tests) : un épisode déjà sorti garde sa surveillance quand la saison cesse d'être surveillée. */
+  now?: () => number;
 }
 
 export interface EpisodeProgrammingResult {
@@ -65,7 +68,7 @@ const sonarrTarget = (config: DownloadConfig) => `${cleanUrl(config.sonarrUrl ||
  * Rien n'est recherché ni téléchargé maintenant ; un épisode présent n'est jamais touché. Comme le lot de
  * téléchargement, l'appel reste attaché au compte, au gate et au serveur Sonarr qui l'ont lancé.
  */
-export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season, episodes, qualityPreference, readConfig, readOwner = () => auth.currentUser?.uid, io = defaultIo }: EpisodeProgrammingRequest): Promise<EpisodeProgrammingResult> {
+export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season, episodes, qualityPreference, readConfig, readOwner = () => auth.currentUser?.uid, io = defaultIo, now = Date.now }: EpisodeProgrammingRequest): Promise<EpisodeProgrammingResult> {
   const result: EpisodeProgrammingResult = { programmed: [], unannounced: [], failed: [], interrupted: false };
   const handled = new Set<number>();
   const owner = readOwner();
@@ -92,13 +95,6 @@ export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season
     const seriesId = ensured.success ? ensured.target?.seriesId : undefined;
     if (!seriesId) return { ...result, failure: ensured.message || 'Sonarr n’a pas confirmé la série exacte.' };
 
-    // La qualité choisie s'applique à la série, comme pour un téléchargement immédiat.
-    const series = await io.get(`${base}/api/v3/series/${seriesId}`, headers) as SonarrSeries | null;
-    if (series && (series.qualityProfileId !== profileId || series.monitored !== true)) {
-      if (!stillOwned()) return { ...result, interrupted: true };
-      await io.put(`${base}/api/v3/series`, { ...series, qualityProfileId: profileId, monitored: true }, headers);
-    }
-
     // Une série tout juste ajoutée n'a ses épisodes qu'après son premier rafraîchissement Sonarr.
     let known: SonarrEpisode[] = [];
     for (let attempt = 0; attempt < 4 && !known.length; attempt += 1) {
@@ -106,11 +102,25 @@ export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season
       const list = await io.get(`${base}/api/v3/episode?seriesId=${seriesId}`, headers);
       known = Array.isArray(list) ? list as SonarrEpisode[] : [];
     }
+
+    // La qualité choisie s'applique à la série, comme pour un téléchargement immédiat ; une saison surveillée en
+    // bloc ne l'est plus (seasonBlanketPlan) : seuls les épisodes demandés seront programmés.
+    const series = await io.get(`${base}/api/v3/series/${seriesId}`, headers) as SonarrSeries | null;
+    const plan = seasonBlanketPlan(series, season, known, episodes, now());
+    if (series && (series.qualityProfileId !== profileId || series.monitored !== true || plan.seasons)) {
+      if (!stillOwned()) return { ...result, interrupted: true };
+      await io.put(`${base}/api/v3/series`, { ...series, qualityProfileId: profileId, monitored: true, ...(plan.seasons ? { seasons: plan.seasons } : {}) }, headers);
+    }
+    for (const entry of plan.restore) {
+      if (episodes.includes(Number(entry.episodeNumber))) continue;
+      if (!stillOwned()) return { ...result, interrupted: true };
+      await io.put(`${base}/api/v3/episode/${entry.id}`, { ...entry, monitored: true }, headers);
+    }
     for (const episode of episodes) {
       const target = known.find(entry => Number(entry.seasonNumber) === Number(season) && Number(entry.episodeNumber) === Number(episode));
       if (!target?.id) { result.unannounced.push(episode); handled.add(episode); continue; }
       if (target.hasFile === true) { handled.add(episode); continue; }
-      if (target.monitored !== true) {
+      if (target.monitored !== true || plan.seasons) {
         if (!stillOwned()) return { ...result, interrupted: true };
         await io.put(`${base}/api/v3/episode/${target.id}`, { ...target, monitored: true }, headers);
       }
@@ -122,6 +132,45 @@ export async function programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season
     return { ...result, failed: episodes.filter(episode => !handled.has(episode)), failure: (error instanceof Error && error.message) || 'Impossible de joindre Sonarr.' };
   }
   return result;
+}
+
+export interface EpisodeUnprogrammingRequest {
+  title: string;
+  tmdbId: number | string;
+  tvdbId?: number | string;
+  imdbId?: string;
+  season: number;
+  episode: number;
+  readConfig: () => DownloadConfig;
+  readOwner?: () => string | undefined;
+  io?: EpisodeProgrammingIo;
+}
+
+/**
+ * Retour terrain du 08/11 : annuler depuis la fiche épisode la programmation d'un épisode à venir. La série est
+ * retrouvée par la même identité exacte, sans jamais l'ajouter (`canWrite` refuse tout ajout) ; seul l'épisode
+ * cesse d'être surveillé, rien n'est supprimé. Renvoie un message d'échec, ou `null` si c'est fait.
+ */
+export async function unprogramArrEpisode({ title, tmdbId, tvdbId, imdbId, season, episode, readConfig, readOwner = () => auth.currentUser?.uid, io = defaultIo }: EpisodeUnprogrammingRequest): Promise<string | null> {
+  const owner = readOwner();
+  const initial = readConfig();
+  if (!owner || !isDownloadFeatureEnabled(initial) || !initial.sonarrUrl || !initial.sonarrApiKey) return 'Téléchargements non configurés.';
+  const stillOwned = () => { const config = readConfig(); return readOwner() === owner && isDownloadFeatureEnabled(config) && sonarrTarget(config) === sonarrTarget(initial); };
+  const base = cleanUrl(initial.sonarrUrl);
+  const headers = { 'X-Api-Key': initial.sonarrApiKey, 'Content-Type': 'application/json', Accept: 'application/json' };
+  try {
+    const found = await io.ensureSeries({ url: initial.sonarrUrl, apiKey: initial.sonarrApiKey, title, tmdbId, tvdbId, imdbId, season, episode, qualityPreference: '1080p', ensureOnly: true, canWrite: () => false });
+    const seriesId = found.success ? found.target?.seriesId : undefined;
+    if (!seriesId) return 'Cette série n’est pas dans Sonarr : rien à annuler.';
+    const list = await io.get(`${base}/api/v3/episode?seriesId=${seriesId}`, headers);
+    const target = (Array.isArray(list) ? list as SonarrEpisode[] : []).find(entry => Number(entry.seasonNumber) === Number(season) && Number(entry.episodeNumber) === Number(episode));
+    if (!target?.id || target.monitored !== true) return null;
+    if (!stillOwned()) return 'La configuration a changé : rien n’a été modifié.';
+    await io.put(`${base}/api/v3/episode/${target.id}`, { ...target, monitored: false }, headers);
+    return null;
+  } catch (error: unknown) {
+    return (error instanceof Error && error.message) || 'Impossible de joindre Sonarr.';
+  }
 }
 
 /** Ligne de toast du bilan (maquette : « 2 ajoutés · 1 programmé · 1080p »). */

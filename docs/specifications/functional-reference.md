@@ -574,7 +574,9 @@ Depuis les retours de la v1.4.251 (#857) :
   animé) ;
 - un épisode à venir reste net et dit quand il sort (« Demain », « Dans 5 jours », « Dans 12 jours ·
   16 nov. ») ; pour une série suivie, sa ligne porte une cloche de rappel (44 px) et sa fiche « Me prévenir
-  à la sortie » à la place de « Bientôt disponible » (v1.4.280, `SEENIT-NOTIFICATION-009`) ;
+  à la sortie » à la place de « Bientôt disponible » (v1.4.280, `SEENIT-NOTIFICATION-009`) ; depuis la v1.4.281,
+  la cloche active est bleue, la fiche d'un épisode à venir propose « Télécharger à la sortie » en 1080p ou 4K
+  puis « Annuler la programmation » (`SEENIT-DOWNLOAD-018`), et l'épisode suivant n'est plus entouré ;
 - la fiche épisode charge avec un squelette à son gabarit actuel.
 Depuis les retours de la v1.4.252 (#859), le film n'a qu'un bouton à états (Suivre le film → Marquer vu → ✓ Vu ·
 annuler) suivi des tuiles diffuseur et Plex comme la série, et le bouton Vu des fiches anime dès le toucher, de
@@ -918,13 +920,21 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   titre or et « 2 épisodes · S02E09–E10 », « S01E03 · hier » ou « Film · lun. ». Toucher une affiche ouvre
   sa fiche. Un terminé déjà dans la rangée (TMDB et épisode exacts) n'est pas répété dans « Terminés » ;
   une source injoignable est signalée.
+  Depuis la v1.4.281 : mini-cartes au style d'Explorer (cadre arrondi, « 8 ép. » et coche dans les coins,
+  titre or et repère sous l'affiche) et bouton « Vider », qui masque la liste sur l'appareil sans rien supprimer.
 - Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
   (120 jours) — épisodes et films surveillés, sans fichier, dont la série est surveillée — regroupés par
   série (identifiant Sonarr exact). Depuis la v1.4.280, chaque carte a une méta grise courte (« Film ·
   Radarr », « Série · Sonarr · 3 épisodes »), une seule pastille de date (« Sortie mar. 10 nov. ») et
   « Annuler » discret sur la même ligne ; les épisodes sont des lignes compactes code · titre · date avec une
   croix (44 px). Annuler retire la surveillance sans rien supprimer. Une source injoignable est signalée, jamais confondue
-  avec une liste vide.
+  avec une liste vide. Depuis la v1.4.281 : aucun texte coupé (date et titres passent à la ligne), qualité
+  affichée (« Film · Radarr · 1080p »), date du film selon la sortie (« Sortie numérique… », « Au cinéma… »,
+  « Déjà au cinéma · sortie numérique pas encore annoncée »), menu ⋯ sur chaque carte (qualité 1080p/4K,
+  annulation). Programmés et Téléchargés affichent l'état Sonarr/Radarr synchronisé (`SEENIT-DOWNLOAD-016`) :
+  plus de saut à l'ouverture, et une annulation rend l'épisode aussitôt programmable dans sa fiche. Un
+  transfert sans source connectée reste dans « En cours » (« En attente de sources ») ; les messages du client
+  sont en français. Programmer un épisode précis ne programme plus le reste de sa saison (`SEENIT-DOWNLOAD-017`).
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
 - « Vider » ne touche que la section d'historique visée, jamais un actif.

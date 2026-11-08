@@ -61,3 +61,10 @@ export const onAuthStateChanged = () => () => {};
 // #879 : le lancement Sonarr/Radarr reste hors du harnais de la fiche (aucun réseau).
 export const launchArrDownload = async () => {};
 export const useShowActions = () => ({ updateShow: async () => {} });
+
+// SEENIT-DOWNLOAD-016 : l'état Sonarr/Radarr synchronisé est relu après chaque écriture de la fiche.
+export const arrWrites: unknown[] = [];
+export const notifyArrWrite = (target?: unknown) => { arrWrites.push(target ?? null); };
+export const useArrSnapshot = () => null;
+export const useArrSyncStore = Object.assign(() => 0, { getState: () => ({ sync: async () => undefined, afterWrite: notifyArrWrite, snapshot: null, revision: 0 }) });
+export const arrSyncKey = () => '';

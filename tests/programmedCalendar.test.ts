@@ -19,6 +19,9 @@ const calendar = await import(`data:text/javascript;base64,${Buffer.from(bundle.
   programmedScope: (config: Record<string, unknown>) => string;
   unprogramItem: (config: Record<string, unknown>, item: Item, io: Record<string, unknown>) => Promise<void>;
   programmedDateLabel: (date: string | undefined, now: number) => string;
+  movieRelease: (movie: Record<string, string>, now: number) => { date?: string; kind?: string; inCinemasPast: boolean };
+  changeProgrammedQuality: (config: Record<string, unknown>, target: { kind: string; id: number }, preference: string, io: Record<string, unknown>) => Promise<void>;
+  fetchWatchedMovie: (config: Record<string, unknown>, tmdbId: number, io: Record<string, unknown>, now: number) => Promise<Record<string, unknown> | null>;
 };
 
 const now = Date.parse('2026-11-07T12:00:00Z');
@@ -48,7 +51,7 @@ test('SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sa
   assert.deepEqual(result.items.map(item => `${item.kind}:${item.id}`), ['episode:1', 'episode:2', 'movie:9']);
   assert.equal(result.items[2].date, '2026-12-17', 'la sortie future la plus proche, pas le cinéma passé');
   assert.deepEqual(result.failures, []);
-  assert.ok(urls.every(url => url.includes('unmonitored=false')));
+  assert.ok(urls.filter(url => url.includes('/calendar')).every(url => url.includes('unmonitored=false')));
   // En PWA, le calendrier passe par le proxy serveur : chaque URL émise doit y être acceptée.
   assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), urls.join(' '));
   // Panne d'une source : signalée, jamais confondue avec « rien de programmé ».
@@ -78,8 +81,49 @@ test('SEENIT-DOWNLOAD-013 #879 Annuler une programmation retire seulement la sur
   assert.notEqual(calendar.programmedScope(config), calendar.programmedScope({ ...config, sonarrUrl: 'http://autre' }));
   assert.equal(calendar.programmedScope(config), calendar.programmedScope({ ...config, sonarrUrl: 'http://sonarr' }));
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
-  assert.match(section, /if \(programmedScope\(config\) !== loadedScope\.current\) \{/, 'Annuler refuse une portée changée');
-  assert.match(section, /useEffect\(\(\) => \{ void load\(\); \}, \[load, refreshKey, scope\]\);/, 'rechargée quand la portée change');
-  assert.match(section, /if \(id !== request\.current \|\| programmedScope\(useDownloadConfigStore\.getState\(\)\) !== at\) return;/, 'réponse d’une ancienne portée ignorée');
+  // SEENIT-DOWNLOAD-016 : la liste vient de l'état Sonarr/Radarr synchronisé, lié au compte et au serveur.
+  assert.match(section, /if \(useArrSyncStore\.getState\(\)\.snapshot\?\.key === arrSyncKey\(\)\) return true;/, 'Annuler refuse une portée changée');
+  assert.match(section, /useEffect\(\(\) => \{ void useArrSyncStore\.getState\(\)\.sync\(\); \}, \[refreshKey, scope\]\);/, 'resynchronisée quand la portée change');
+  assert.match(readFileSync('src/store/arrSyncStore.ts', 'utf8'), /if \(arrSyncKey\(\) !== key \|\| id !== sequence\) return;/, 'réponse d’une ancienne portée ignorée');
   assert.match(section, /else series\.set\(item\.seriesId, /, 'groupé par identifiant Sonarr exact, jamais par titre');
+});
+
+// Retour terrain du 08/11 sur la v1.4.280 : qualité affichée, menu ⋯ « changer la qualité », date d'un film
+// selon la sortie dont il s'agit (« Le Chat Chapeauté » : déjà au cinéma, numérique pas encore annoncé).
+test('SEENIT-DOWNLOAD-015 Programmés : qualité réelle, sortie numérique distinguée du cinéma, qualité modifiable', async () => {
+  const profiles = [{ id: 4, name: 'HD-1080p' }, { id: 5, name: 'Ultra-HD' }, { id: 6, name: 'Any' }];
+  const io = {
+    get: async (url: string) => {
+      if (url.endsWith('/api/v3/qualityprofile')) return profiles;
+      if (url.startsWith('http://sonarr/api/v3/calendar')) return [{ id: 1, seriesId: 5, seasonNumber: 1, episodeNumber: 8, airDateUtc: '2026-11-14T20:00:00Z', monitored: true, series: { title: 'A', tmdbId: 77, monitored: true, qualityProfileId: 4 } }];
+      if (url.startsWith('http://radarr/api/v3/calendar')) return [
+        { id: 9, title: 'Avant le cinéma', tmdbId: 1, monitored: true, qualityProfileId: 5, inCinemas: '2026-11-20', digitalRelease: '2027-01-20' },
+        { id: 10, title: 'Cinéma seul', tmdbId: 2, monitored: true, qualityProfileId: 6, inCinemas: '2026-12-09' }];
+      if (url.startsWith('http://radarr/api/v3/movie?tmdbId=3')) return [{ id: 30, tmdbId: 3, qualityProfileId: 4, inCinemas: '2026-11-04' }];
+      if (url.startsWith('http://radarr/api/v3/movie?tmdbId=')) return [];
+      throw new Error(url);
+    },
+    put: async () => undefined
+  };
+  const { items } = await calendar.fetchProgrammedCalendar(config, { now, io });
+  assert.deepEqual(items.map(item => [item.id, (item as Record<string, unknown>).quality, item.date, (item as Record<string, unknown>).dateKind]), [
+    [1, '1080p', '2026-11-14T20:00:00Z', undefined],
+    [10, 'Any', '2026-12-09', 'cinema'],
+    [9, '4K', '2027-01-20', 'digital'],
+  ], 'la date utile est la sortie numérique, pas la salle ; le profil inconnu garde son nom');
+  assert.deepEqual(calendar.movieRelease({ inCinemas: '2026-11-04' }, now), { date: undefined, kind: undefined, inCinemasPast: true });
+  // Film suivi absent du calendrier : déjà au cinéma, sans date numérique ; un film inconnu de Radarr rend null.
+  assert.deepEqual(await calendar.fetchWatchedMovie(config, 3, io, now), { id: 30, date: undefined, dateKind: undefined, inCinemasPast: true, quality: '1080p' });
+  assert.equal(await calendar.fetchWatchedMovie(config, 404, io, now), null);
+  // Changer la qualité : le profil 4K de SeenIt (explicite d'abord, sinon déduit) sur le film ou la série.
+  const puts: Array<[string, unknown]> = [];
+  const change = { get: async (url: string) => url.endsWith('/qualityprofile') ? profiles : { id: 9, qualityProfileId: 4, title: 'x' }, put: async (url: string, body: { qualityProfileId: number }) => { puts.push([url, body.qualityProfileId]); } };
+  await calendar.changeProgrammedQuality(config, { kind: 'movie', id: 9 }, '4k', change);
+  await calendar.changeProgrammedQuality({ ...config, sonarr1080pProfileId: 6 }, { kind: 'series', id: 5 }, '1080p', change);
+  await calendar.changeProgrammedQuality(config, { kind: 'movie', id: 9 }, '1080p', change);
+  assert.deepEqual(puts, [['http://radarr/api/v3/movie/9', 5], ['http://sonarr/api/v3/series/5', 6]], 'profil déjà en place : aucune écriture');
+  assert.ok(puts.every(([url]) => isAllowedServiceProxyPath(url, 'PUT')) && isAllowedServiceProxyPath('http://radarr/api/v3/movie?tmdbId=3', 'GET') && isAllowedServiceProxyPath('http://radarr/api/v3/qualityprofile', 'GET'), 'passe le proxy PWA');
+  const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
+  assert.match(section, /const items = \(snapshot\?\.programmed\?\.items \|\| \[\]\)/, 'bug d’affichage du 08/11 : la copie synchronisée reste affichée à la réouverture');
+  assert.match(section, /notifyArrWrite\(media\);/, 'changer la qualité resynchronise l’état et la fiche');
 });

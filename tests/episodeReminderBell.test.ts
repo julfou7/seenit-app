@@ -81,8 +81,8 @@ test('SEENIT-NOTIFICATION-009 cloche câblée sur les épisodes à venir de la f
   const sections = read('src/screens/mediaDetail/seriesSections.tsx');
   assert.match(sections, /\{!aired && !inMode && <EpisodeReminderBell show=\{show\} episode=\{\{ season_number: number, episode_number: episode\.episode_number, name: episode\.name, air_date: episode\.air_date \}\} \/>\}/, 'ligne à venir, hors mode téléchargement');
   const modal = read('src/screens/EpisodeDetailModalCore.tsx');
-  assert.match(modal, /\{isFutureEpisode \? \(activeShow\?\.id \? <EpisodeReminderBell variant="wide" show=\{activeShow\}/, 'fiche épisode à venir d’une série suivie');
-  assert.match(modal, /Bientôt disponible<\/div>\)/, 'série non suivie : mention conservée');
+  assert.match(modal, /\{isFutureEpisode \? <>\{activeShow\?\.id \? <EpisodeReminderBell variant="wide" show=\{activeShow\}/, 'fiche épisode à venir d’une série suivie');
+  assert.match(modal, /Bientôt disponible<\/div>\}/, 'série non suivie : mention conservée');
   const card = read('src/components/cards/UpcomingShowCard.tsx');
   assert.match(card, /if \(await writeEpisodeReminder\(\{ target, ownerUid, nextState, episode: ep, updateShow \}\)\) setIsReminderSet\(nextState\);/, 'une seule écriture partagée');
   assert.doesNotMatch(card, /setDoc|deleteDoc/);
