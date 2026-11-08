@@ -25,6 +25,9 @@ test('SEENIT-DOWNLOAD-017 un épisode précis ne laisse pas sa saison surveillé
   assert.deepEqual(plan.restore.map(entry => entry.episodeNumber), [5, 9], 'demandé + déjà sorti sans fichier ; E10 et E11 (à venir, non demandés) ne sont plus programmés');
   assert.deepEqual(seasonBlanketPlan({ seasons: [{ seasonNumber: 2, monitored: false }] }, 2, episodes, [9], now), { seasons: null, restore: [] }, 'saison déjà suivie épisode par épisode : rien ne change');
   assert.deepEqual(seasonBlanketPlan(null, 2, episodes, [9], now), { seasons: null, restore: [] });
+  // Revue Codex #918 : liste des épisodes illisible (vide) ou sans la saison visée → la saison n'est pas touchée.
+  assert.deepEqual(seasonBlanketPlan(series, 2, [], [9], now), { seasons: null, restore: [] }, 'liste illisible : rien n’est désurveillé');
+  assert.deepEqual(seasonBlanketPlan(series, 2, episodes.map(entry => ({ ...entry, seasonNumber: 3 })), [9], now), { seasons: null, restore: [] });
   const search = read('src/services/sonarrRadarrSearch.ts');
   assert.match(search, /monitored: \(!isEpisodeSearch && !isSeasonSearch\) \|\| \(isSeasonSearch && Number\(s\.seasonNumber\) === Number\(params\.season\)\)\n/, 'série ajoutée pour un épisode : saison non surveillée');
   assert.match(search, /const plan = seasonBlanketPlan\(existingSeries, Number\(params\.season\)[\s\S]{0,900}targetEp\.monitored = false;\n\s+\}\n\s+await ensureEpisodeMonitored\(targetEp\);/, 'série existante : même règle avant de surveiller l’épisode téléchargé');
