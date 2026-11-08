@@ -33,4 +33,9 @@ test('SEENIT-C411-003 titre lisible de la release : reconnaître le bon torrent 
   assert.deepEqual(releaseReadableTitle('The.Bear.S03.MULTI.1080p.WEB.H264-GRP'), { title: 'The Bear', year: undefined, episode: 'S03' });
   assert.equal(releaseReadableTitle('Spider-Man.No.Way.Home.2021.MULTi.1080p.WEB').title, 'Spider-Man No Way Home');
   assert.equal(releaseReadableTitle('Titre Sans Marqueur').title, 'Titre Sans Marqueur');
+  // Revue Codex : un mot du titre qui ressemble à un marqueur (« French », « Web ») ne coupe jamais le titre.
+  assert.deepEqual(releaseReadableTitle('The.French.Dispatch.2021.MULTi.1080p.WEB.H264-GRP'), { title: 'The French Dispatch', year: '2021', episode: undefined });
+  assert.deepEqual(releaseReadableTitle('La.French.2014.FRENCH.1080p.BluRay.x264-GRP'), { title: 'La French', year: '2014', episode: undefined });
+  assert.deepEqual(releaseReadableTitle('French.Kiss.1995.FRENCH.720p.x264'), { title: 'French Kiss', year: '1995', episode: undefined });
+  assert.equal(releaseReadableTitle('Charlottes.Web.FRENCH.1080p.x264').title, 'Charlottes Web');
 });

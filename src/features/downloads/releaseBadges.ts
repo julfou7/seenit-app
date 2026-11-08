@@ -42,21 +42,24 @@ export function releaseBadges(name: string, light = false): string[] {
   return badges;
 }
 
-const MARKER = /^(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|2160p|1080p|1080i|720p|480p|4K|UHD|MULTI|TRUEFRENCH|FRENCH|VFF|VFQ|VFI|VF2|VF|VOSTFR|VO|WEB|WEB-DL|WEBRIP|BLURAY|BDRIP|BRRIP|HDTV|DVDRIP|REMUX|IMAX|REPACK|PROPER|COMPLETE|INTEGRALE|HDR|HDR10|DV|X264|X265|H264|H265|HEVC|AV1|NF|AMZN|DSNP|ATVP)$/i;
+// Marqueurs techniques non ambigus : ils ne se rencontrent pas comme mots d'un titre et bornent le titre.
+const STRONG_MARKER = /^(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|2160p|1080p|1080i|720p|480p|MULTI|TRUEFRENCH|VFF|VFQ|VOSTFR|WEB-DL|WEBRIP|BLURAY|BDRIP|BRRIP|HDTV|DVDRIP|REMUX|HDR10|X264|X265|H264|H265|HEVC|AV1|AMZN|DSNP|ATVP)$/i;
+// Marqueurs ambigus (« The French Dispatch », « La French ») : ils ne coupent jamais le titre et ne sont
+// retirés qu'en fin de titre, faute d'année pour borner celui-ci.
+const WEAK_TRAILING = /^(?:FRENCH|VF|VFI|VF2|VO|IMAX|UHD|4K|HDR|DV|NF|COMPLETE|INTEGRALE|PROPER|REPACK)$/i;
 const YEAR = /^(?:19|20)\d{2}$/;
 
-/**
- * Retour terrain du 08/11 : « comment savoir que c'est le bon torrent si on n'affiche pas le nom ? ».
- * Titre lisible tiré du nom de la release — mots avant les marqueurs techniques, année et épisode à part
- * (« Spider Man Brand New Day · 2026 », « L Arene · S01E03 ») ; le nom technique reste dépliable.
- */
 export function releaseReadableTitle(name: string): { title: string; year?: string; episode?: string } {
   const tokens = name.replace(/\.(?:mkv|mp4|avi)$/i, '').replace(/[._]+/g, ' ').trim().split(/\s+/);
-  const cut = tokens.findIndex((token, index) => index > 0 && MARKER.test(token.replace(/-[^-]*$/, '')));
-  const head = cut > 0 ? tokens.slice(0, cut) : tokens;
-  // Le dernier nombre-année avant les marqueurs est l'année de sortie (« Blade Runner 2049 2017 »).
-  const year = head.length > 1 && YEAR.test(head[head.length - 1]) ? head.pop() : undefined;
-  const episodeToken = tokens.slice(Math.max(cut, 0)).find(token => /^S\d{1,2}(?:E\d{1,3})?$/i.test(token));
-  const title = head.join(' ').replace(/-+$/, '').trim() || name;
-  return { title, year, episode: episodeToken?.toUpperCase() };
+  const core = (token: string) => token.replace(/-[^-]*$/, '');
+  const strong = tokens.findIndex((token, index) => index > 0 && STRONG_MARKER.test(core(token)));
+  const head = strong > 0 ? tokens.slice(0, strong) : [...tokens];
+  // L'année de sortie est la dernière année avant les marqueurs (« Blade Runner 2049 2017 », « La French 2014
+  // FRENCH ») : le titre s'arrête juste avant elle, quels que soient les mots ambigus qui suivent.
+  const yearIndex = head.reduce((found, token, index) => (index > 0 && YEAR.test(token) ? index : found), -1);
+  let titleTokens = yearIndex > 0 ? head.slice(0, yearIndex) : head;
+  if (yearIndex < 0) while (titleTokens.length > 1 && WEAK_TRAILING.test(core(titleTokens[titleTokens.length - 1]))) titleTokens = titleTokens.slice(0, -1);
+  const episodeToken = tokens.find(token => /^S\d{1,2}(?:E\d{1,3})?$/i.test(core(token)));
+  const title = titleTokens.join(' ').replace(/-+$/, '').trim() || name;
+  return { title, year: yearIndex > 0 ? head[yearIndex] : undefined, episode: episodeToken ? core(episodeToken).toUpperCase() : undefined };
 }
