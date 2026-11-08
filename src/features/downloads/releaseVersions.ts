@@ -6,6 +6,8 @@ export interface ReleaseLike {
   name: string;
   size: number;
   seeders: number;
+  /** Pairs en train de télécharger : avec les seeders, la popularité du torrent (recherche avancée). */
+  leechers?: number;
   quality?: string;
   language?: string;
   createdAt?: string;

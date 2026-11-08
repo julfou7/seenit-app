@@ -945,10 +945,11 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   automatique concurrente, vérifie le parseur Radarr et n'envoie que la release choisie.
 - **Recherche avancée** (refonte du 07/11/2026, même langage que « Version précise ») : en-tête ‹ +
   « Recherche avancée », un champ (« Titre, ou titre S02E05 ») avec un bouton loupe de 48 px, puis les
-  filtres de version Toutes, 1080p, 4K, Français, VO. Les résultats sont des cartes de version (qualité,
-  langue, Light, taille et nombre de sources — pas de vitesse dans cette recherche technique), la conseillée
-  en tête et dépliée ; déplier montre le type de release en badges (IMAX, MULTI, VFF, HDR10, Dolby Vision,
-  Atmos, AC3 5.1, WEB, H.265, Netflix…), le type Film/Série quand C411 fournit la sous-catégorie exacte
+  filtres de version Toutes, 1080p, 4K, Français, VO. Les résultats sont des cartes de version (titre lisible
+  de la release, qualité, langue, Light, taille, ↑ seeders en vert et ↓ leechers en rouge — pas de vitesse dans
+  cette recherche technique), la conseillée en tête et dépliée ; déplier montre le type de release en badges
+  (IMAX, VFF, HDR10, Dolby Vision, Atmos, AC3 5.1, WEB, H.265, Netflix…, sans répéter la langue), le type
+  Film/Série quand C411 fournit la sous-catégorie exacte
   (`6` ou `7`), l'âge, « Nom du fichier » (masqué par défaut), « Télécharger » et « Magnet » (copie). Plus
   de filtre Film/Série, de qualité 720p, de liste Light, de tri ni de phrase sous chaque version : le
   caractère manuel est dit par le toast et la carte de suivi. Logo Télécharger : flèche dans un cercle (08/11).

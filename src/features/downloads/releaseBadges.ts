@@ -41,3 +41,32 @@ export function releaseBadges(name: string, light = false): string[] {
   add(light && 'Light');
   return badges;
 }
+
+// Marqueurs techniques non ambigus : ils ne se rencontrent pas comme mots d'un titre et bornent le titre.
+const STRONG_MARKER = /^(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|2160p|1080p|1080i|720p|480p|MULTI|TRUEFRENCH|VFF|VFQ|VOSTFR|WEB-DL|WEBRIP|BLURAY|BDRIP|BRRIP|HDTV|DVDRIP|REMUX|HDR10|X264|X265|H264|H265|HEVC|AV1|AMZN|DSNP|ATVP)$/i;
+// Marqueurs ambigus (« The French Dispatch », « La French ») : ils ne coupent jamais le titre et ne sont
+// retirés qu'en fin de titre, faute d'année pour borner celui-ci.
+const WEAK_TRAILING = /^(?:FRENCH|VF|VFI|VF2|VO|IMAX|UHD|4K|HDR|DV|NF|COMPLETE|INTEGRALE|PROPER|REPACK)$/i;
+const YEAR = /^(?:19|20)\d{2}$/;
+// Épisode avec ou sans saison (« S01E03 », « E01 »), épisodes enchaînés (« S01E01E02 ») ou plage
+// (« S01E01-E10 », « S01E01-10 », « E01-E04 », « S01-S05 ») : tout marqueur qui borne le titre et porte la
+// portée de la release est gardé dans le libellé lisible.
+const EPISODE_RANGE = /^(?:S\d{1,2}(?:E\d{1,3})*|E\d{1,3})(?:-(?:S\d{1,2}(?:E\d{1,3})?|E\d{1,3}|\d{1,3}))?$/i;
+
+export function releaseReadableTitle(name: string): { title: string; year?: string; episode?: string } {
+  const tokens = name.replace(/\.(?:mkv|mp4|avi)$/i, '').replace(/[._]+/g, ' ').trim().split(/\s+/);
+  const core = (token: string) => token.replace(/-[^-]*$/, '');
+  const strong = tokens.findIndex((token, index) => index > 0 && STRONG_MARKER.test(core(token)));
+  const head = strong > 0 ? tokens.slice(0, strong) : [...tokens];
+  // L'année de sortie est la dernière année avant les marqueurs (« Blade Runner 2049 2017 », « La French 2014
+  // FRENCH ») : le titre s'arrête juste avant elle, quels que soient les mots ambigus qui suivent.
+  const yearIndex = head.reduce((found, token, index) => (index > 0 && YEAR.test(token) ? index : found), -1);
+  let titleTokens = yearIndex > 0 ? head.slice(0, yearIndex) : head;
+  if (yearIndex < 0) while (titleTokens.length > 1 && WEAK_TRAILING.test(core(titleTokens[titleTokens.length - 1]))) titleTokens = titleTokens.slice(0, -1);
+  // Une plage (« S01E01-E02 », « S01E01-E10 », « S01-S05 ») est gardée entière : seul un suffixe de groupe
+  // (« S01E03-NoTag ») est retiré.
+  const fullEpisode = (token: string) => EPISODE_RANGE.test(token) ? token : EPISODE_RANGE.test(core(token)) ? core(token) : null;
+  const episodeToken = tokens.map(fullEpisode).find((token): token is string => token !== null);
+  const title = titleTokens.join(' ').replace(/-+$/, '').trim() || name;
+  return { title, year: yearIndex > 0 ? head[yearIndex] : undefined, episode: episodeToken?.toUpperCase() };
+}
