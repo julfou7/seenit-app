@@ -120,6 +120,8 @@ export interface TMDBMedia {
   vote_count?: number;
   genre_ids?: number[];
   overview?: string;
+  /** SEENIT-C411-004 (#900) : rang et seeders d'un titre du Top C411 d'Explorer. */
+  seenitC411?: { rank: number; seeders: number };
 }
 
 interface TMDBPersonImages {
@@ -825,7 +827,7 @@ export class TMDBClient {
         const parts = collectionRes.value.parts
           .filter((part: any) => (part.release_date || part.first_air_date) && !isAdultOrParodyMedia(part))
           .map((part: any) => ({ ...part, media_type: 'movie' as const }))
-          .sort((a: any, b: any) => String(a.release_date || '').localeCompare(String(b.release_date || '')));
+          .sort((a: { release_date?: string }, b: { release_date?: string }) => String(a.release_date || '').localeCompare(String(b.release_date || '')));
         if (parts.length > 1) {
           collection = parts.map((part: any, index: number) => ({ ...part, sagaOrder: index + 1 }));
         }

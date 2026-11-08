@@ -449,7 +449,9 @@ Firestore privé.
 
 Le contrat E-01..33 du [handoff Explorer](../design/explorer-refonte-2026-10-28.md) (#787) remplace les commandes flottantes : loupe et filtres dans la rangée collante, navigation commune inchangée. La recherche est un mode dédié qui masque la nav, y compris clavier fermé avec texte. La sortie restaure la position Explorer. La bibliothèque locale instantanée précède les listes TMDB/personnes ; les filtres ne concernent que TMDB. Le panneau applique chaque choix immédiatement et les pastilles rouvrent le bon onglet. L’aperçu propose trois actions et garde les commandes YouTube natives.
 
-Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Pépites**,
+Explorer propose les catégories **Tout**, **Séries**, **Films**, **Top 100**, **Top C411** (sous le réglage
+Téléchargements avec une clé C411 : les titres les plus partagés sur C411, rang et seeders sur la carte,
+fiches rattachées par l'identifiant TMDB exact fourni par C411, `SEENIT-C411-004`), **Pépites**,
 **Au cinéma**, **Documentaires** et **Personnes**.
 - Dans les résultats de recherche, les titres restent blancs et seule la partie qui correspond au texte saisi est en or (exception à la règle des titres en or).
 - Recherche multi-pages TMDB en listes : bibliothèque locale, films et séries, puis personnes. La page 1 des films et séries s'affiche sans attendre la page 2. Les en-têtes ne montrent ni source (« TMDB »), ni durée, ni « instantané » ; seul « recherche… » signale une attente.

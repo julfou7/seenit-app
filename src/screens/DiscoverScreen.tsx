@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useDownloadConfigStore } from '../store/downloadConfigStore';
+import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 import { tmdb, isMovieAtCinema, EXPLORER_TRENDING_MIN_VOTES, type TMDBMedia } from '../features/shows/tmdb';
 import { type Show } from '../types';
 import { useShows } from '../hooks/useShows';
@@ -56,6 +58,9 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [totalMovieCount, setTotalMovieCount] = useState<number | null>(null);
   const [trending, setTrending] = useState<TMDBMedia[]>([]);
   const [popular, setPopular] = useState<TMDBMedia[]>([]);
+  const [homeNotice, setHomeNotice] = useState<string | null>(null);
+  // SEENIT-C411-004 (#900) : Top C411 seulement sous le réglage Téléchargements, avec une clé C411.
+  const c411Available = useDownloadConfigStore(state => isDownloadFeatureEnabled(state) && Boolean(state.c411ApiKey?.trim()));
   const [popularPersons, setPopularPersons] = useState<TMDBMedia[]>([]);
   const [recommendations, setRecommendations] = useState<TMDBMedia[]>([]);
   const [heroDetails, setHeroDetails] = useState<Record<number, any>>({});
@@ -85,6 +90,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     setActiveCategoryState(category);
     if (category !== 'Films') setMovieReleaseAfterYear('Toutes');
   }, []);
+  useEffect(() => { if (!c411Available && activeCategory === 'Top C411') setActiveCategory('Tout'); }, [c411Available, activeCategory]);
   const [showGenreMenu, setShowGenreMenu] = useState(false);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
 
@@ -461,6 +467,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     setHomeHasMore(true);
     setPopular([]);
     setTrending([]);
+    setHomeNotice(null);
     if (activeCategory === 'Tout') {
       setHomeEnrichmentReady(false);
     }
@@ -501,6 +508,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       });
       if (!isCurrentRequest() || !result) return;
       const { popular: nextPopular, trending: nextTrending, persons: nextPersons, hasMore: nextHasMore } = result;
+      if (page === 1) setHomeNotice(result.notice ?? null);
       if (page === 1 && activeCategory === 'Tout') setHomeEnrichmentReady(true);
       if (nextPopular !== null) {
         setPopular(prev => page === 1 ? nextPopular! : mergeMedia(prev, nextPopular!));
@@ -620,6 +628,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     list = list.filter((item: any) => {
       if (qClean) return true;
       if (activeCategory === 'Personnes' || item.media_type === 'person') return true;
+      // SEENIT-C411-004 : le classement C411 fait foi, sans les seuils de popularité ni de date d'Explorer.
+      if (activeCategory === 'Top C411') return true;
 
       const pop = item.popularity || 0;
       const count = item.vote_count || 0;
@@ -652,8 +662,8 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
 
     if (selectedGenreIds.length > 0 && !qClean && activeCategory !== 'Personnes') {
       const allowedTmdbIds = selectedGenreIds.flatMap(id => GENRE_OPTIONS.find(g => g.id === id)?.tmdbIds || []);
-      list = list.filter((item: any) => {
-        const itemG = item.genre_ids || (item.genres ? item.genres.map((g: any) => g.id) : []);
+      list = list.filter((item: TMDBMedia & { genres?: Array<{ id: number }> }) => {
+        const itemG = item.genre_ids || (item.genres ? item.genres.map(genre => genre.id) : []);
         return allowedTmdbIds.some(gId => itemG.includes(gId));
       });
     }
@@ -852,5 +862,5 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     && sortBy === 'popular'
     && activeCategory === 'Tout';
 
-  return <DiscoverView model={{ shows, isSearchMode, enterSearch, exitSearch, searchElapsedMs, activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleToggleWatched, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchFocused, loading, minRating, movieReleaseAfterYear, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
+  return <DiscoverView model={{ homeNotice, c411Available, shows, isSearchMode, enterSearch, exitSearch, searchElapsedMs, activeCategory, activeFilterCount, activeHeroIndex, addShow, containerRef, debouncedQuery, deleteShow, handleAddMedia, handleHeroScroll, handleLongPress, handleOpenTrailer, handleToggleWatched, hasActiveFilters, hasMore, heroCarouselRef, heroDetails, isLoadingMore, isOffline, isSearchFocused, loading, minRating, movieReleaseAfterYear, movieResults, observerTargetRef, onShowClick, openPersonModal, pegi, personResults, previewMedia, processRawResults, processedResults, query, selectedGenres, selectedPersonId, selectedPlatforms, seriesResults, setActiveCategory, setActiveHeroIndex, setIsSearchFocused, setMinRating, setMovieReleaseAfterYear, setPegi, setPreviewMedia, setQuery, setSelectedGenres, setSelectedPersonId, setSelectedPlatforms, setShowGenreMenu, setSortBy, setSortOrder, setTrailerModalVideos, showGenreMenu, showHeroSurface, showsByTmdbId, sortBy, top10, trailerModalVideos, uniqueProcessedResults, visibleHeroItems, visibleMovieResults, visiblePersonResults, visibleProcessedResults, visibleSeriesResults }} />;
 }

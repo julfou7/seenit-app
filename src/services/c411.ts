@@ -183,12 +183,49 @@ export async function searchC411Torrents(params: C411SearchParams): Promise<C411
       }
 
       lastError = new Error(message);
-    } catch (error: any) {
-      lastError = new Error(error?.message || 'Impossible de joindre C411.');
+    } catch (error: unknown) {
+      lastError = new Error(error instanceof Error && error.message ? error.message : 'Impossible de joindre C411.');
     }
   }
 
   console.warn('[C411] Recherche indisponible:', lastError?.message);
+  throw lastError || new Error('Impossible de joindre C411.');
+}
+
+export interface C411TopItem { mediaType: 'movie' | 'tv'; tmdbId: number; rank: number; seeders: number; releases: number }
+
+/**
+ * SEENIT-C411-004 (#900) — Top C411 par le backend SeenIt authentifié (Web et Capacitor). Une panne ou une
+ * clé refusée lève une erreur au message lisible : jamais un classement vide.
+ */
+export async function getC411Top(scope: 'videos' | 'movie' | 'tv' = 'videos'): Promise<{ items: C411TopItem[]; unresolved: number }> {
+  let lastError: Error | null = null;
+  for (const endpoint of getBackendEndpoints('/api/c411/top')) {
+    try {
+      let status = 0;
+      let data: { items?: unknown; unresolved?: unknown; error?: unknown; code?: unknown } | null = null;
+      if (Capacitor.isNativePlatform()) {
+        const response = await CapacitorHttp.post({ url: endpoint, headers: await getAuthenticatedHeaders({ Accept: 'application/json', 'Content-Type': 'application/json' }), data: { scope }, connectTimeout: 15000, readTimeout: 15000 });
+        status = response.status;
+        data = parseResponseData(response.data);
+      } else {
+        const response = await authenticatedFetch(endpoint, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify({ scope }), signal: AbortSignal.timeout(15000) });
+        status = response.status;
+        data = await response.json().catch(() => null);
+      }
+      if (status >= 200 && status < 300 && Array.isArray(data?.items)) {
+        const items = (data.items as C411TopItem[]).filter(item => (item.mediaType === 'movie' || item.mediaType === 'tv') && Number.isSafeInteger(item.tmdbId) && item.tmdbId > 0);
+        return { items, unresolved: Number(data.unresolved) || 0 };
+      }
+      const message = typeof data?.error === 'string' ? data.error : `Classement C411 indisponible (${status}).`;
+      // Réponse métier du backend (réglage, clé, limite) : définitive, pas de second essai.
+      if (status >= 400 && status < 500) throw Object.assign(new Error(message), { final: true });
+      lastError = new Error(message);
+    } catch (error: unknown) {
+      if (error instanceof Error && (error as Error & { final?: boolean }).final) throw error;
+      lastError = new Error(error instanceof Error && error.message ? error.message : 'Impossible de joindre C411.');
+    }
+  }
   throw lastError || new Error('Impossible de joindre C411.');
 }
 
@@ -250,8 +287,8 @@ export async function testC411Connection(apiKey: string): Promise<{ success: boo
       }
 
       lastMessage = data?.error || data?.message || `Serveur C411 indisponible (${status}).`;
-    } catch (error: any) {
-      lastMessage = error?.message || lastMessage;
+    } catch (error: unknown) {
+      lastMessage = error instanceof Error && error.message ? error.message : lastMessage;
     }
   }
 

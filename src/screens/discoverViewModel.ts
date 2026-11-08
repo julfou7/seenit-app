@@ -10,6 +10,10 @@ export type DiscoverViewModel = {
   exitSearch: () => void;
   searchElapsedMs: number | null;
   activeCategory: string;
+  /** SEENIT-C411-004 (#900) : message d'état du Top C411 (panne, clé, classement vide). */
+  homeNotice?: string | null;
+  /** Top C411 proposé : réglage Téléchargements actif et clé C411 enregistrée. */
+  c411Available?: boolean;
   activeFilterCount: number;
   activeHeroIndex: number;
   addShow: (showData: Omit<Show, "id" | "userId">) => Promise<string>;

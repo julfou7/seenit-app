@@ -40,7 +40,8 @@ import {
   selectUserNotificationDevices
 } from "./src/features/downloads/downloadBackendSecurity.ts";
 import { buildC411SearchParams } from "./src/features/downloads/c411Query.ts";
-import { fetchC411Torrents } from "./src/features/downloads/c411Backend.ts";
+import { C411TopError, fetchC411TopMedia, fetchC411Torrents } from "./src/features/downloads/c411Backend.ts";
+import { isC411TopScope, type C411TmdbIdentity } from "./src/features/downloads/c411Top.ts";
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { downloadServiceTimeoutMs } from "./src/features/downloads/downloadServiceTimeout.ts";
 import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
@@ -1009,9 +1010,9 @@ async function startServer() {
           return 0;
         });
 
-        const hasRemoteOrRelay = sortedConnections.some((c: any) => !c.local || c.relay);
+        const hasRemoteOrRelay = sortedConnections.some((c: { local?: boolean; relay?: boolean }) => !c.local || c.relay);
         const candidateConnections = hasRemoteOrRelay
-          ? sortedConnections.filter((c: any) => !c.local || c.relay)
+          ? sortedConnections.filter((c: { local?: boolean; relay?: boolean }) => !c.local || c.relay)
           : sortedConnections;
 
         // Execute queries for a single connection (STRICT TMDB GUID MATCHING ONLY)
@@ -2357,6 +2358,41 @@ async function startServer() {
           : 'La recherche C411 est momentanément indisponible.',
         torrents: []
       });
+    }
+  });
+
+  // SEENIT-C411-004 (#900) — Top C411 d'Explorer : réglage Téléchargements et clé relus pour l'UID authentifié,
+  // clé jamais renvoyée ; une panne n'est jamais un classement vide.
+  const c411TopIdentityCache = new Map<string, C411TmdbIdentity | null>();
+  app.post('/api/c411/top', requireAuth, rateLimit('c411-top', 6, 60_000), async (req: AuthRequest, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    const scope = req.body?.scope ?? 'videos';
+    if (!isC411TopScope(scope)) return res.status(400).json({ code: 'INVALID_SCOPE', error: 'Périmètre inconnu.' });
+    const userId = req.user?.uid;
+    if (!userId) return res.status(401).json({ code: 'UNAUTHENTICATED', error: 'Utilisateur non authentifié.' });
+    try {
+      const configSnapshot = await adminDb.doc(`users/${userId}/settings/downloadConfig`).get();
+      if (configSnapshot.get('downloadsEnabled') !== true) return res.status(403).json({ code: 'DOWNLOADS_DISABLED', error: 'Téléchargements désactivés.' });
+      const storedApiKey = configSnapshot.get('c411ApiKey');
+      const apiKey = typeof storedApiKey === 'string' ? storedApiKey.trim() : '';
+      if (!apiKey) return res.status(409).json({ code: 'C411_NOT_CONFIGURED', error: 'Clé C411 à configurer.' });
+      const controller = new AbortController();
+      req.once('aborted', () => controller.abort());
+      const deadline = AbortSignal.timeout(12_000);
+      const top = await fetchC411TopMedia({ apiKey, scope, signal: () => AbortSignal.any([controller.signal, deadline]), identityCache: c411TopIdentityCache });
+      return res.json({ scope, items: top.entries, unresolved: top.unresolved, scanned: top.scanned });
+    } catch (error: unknown) {
+      const errorCode = error instanceof C411TopError ? error.code : operationalErrorCode(error, 'C411_TOP_FAILED');
+      emitOperationalEvent({ code: 'DOWNLOAD_C411_FAILED', context: { action: 'top', errorCode }, domain: 'downloads', level: 'warn' });
+      if (error instanceof C411TopError) {
+        if (error.code === 'C411_RATE_LIMITED') {
+          if (error.retryAfter) res.setHeader('Retry-After', error.retryAfter);
+          return res.status(429).json({ code: error.code, error: error.message });
+        }
+        return res.status(502).json({ code: error.code, error: error.message });
+      }
+      const timedOut = errorCode === 'TimeoutError' || errorCode === 'AbortError';
+      return res.status(timedOut ? 504 : 502).json({ code: timedOut ? 'C411_TIMEOUT' : 'C411_UNAVAILABLE', error: timedOut ? 'C411 ne répond pas dans le délai imparti.' : 'Le classement C411 est momentanément indisponible.' });
     }
   });
 
