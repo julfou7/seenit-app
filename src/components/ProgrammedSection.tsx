@@ -2,13 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { Clock3, Film, MoreHorizontal, Tv, X } from 'lucide-react';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
-import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore } from '../store/arrSyncStore';
-import { changeProgrammedQuality, fetchWatchedMovie, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
+import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
+import { changeProgrammedQuality, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
 import type { LiveDownloadItem } from '../services/sonarrRadarrLive';
 
 type EpisodeItem = Extract<ProgrammedItem, { kind: 'episode' }>;
 type MovieItem = Extract<ProgrammedItem, { kind: 'movie' }>;
-type WatchedMovie = Awaited<ReturnType<typeof fetchWatchedMovie>>;
+type WatchedMovie = WatchedMovieDetails;
 
 /**
  * Pastille de date (refonte du 08/11) : « Sortie ven. 13 nov. » pour un épisode ; pour un film, la sortie dont
@@ -60,30 +60,22 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
   // Les identifiants viennent d'un serveur précis : la copie synchronisée est liée au compte et au serveur.
   const scope = programmedScope(useDownloadConfigStore());
   const snapshot = useArrSnapshot();
-  const revision = useArrSyncStore(state => state.revision);
   // Masque tout de suite ce qui vient d'être annulé, en attendant la resynchronisation.
   const [hidden, setHidden] = useState<ReadonlySet<string>>(() => new Set());
   const syncedAt = snapshot?.syncedAt;
   useEffect(() => { setHidden(new Set()); }, [syncedAt]);
   const items = (snapshot?.programmed?.items || []).filter(item => !hidden.has(`${item.kind}:${item.id}`));
   const failures = snapshot?.programmed?.failures || [];
-  const [watchedMovies, setWatchedMovies] = useState<Record<number, WatchedMovie>>({});
   const [busy, setBusy] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   useEffect(() => { void useArrSyncStore.getState().sync(); }, [refreshKey, scope]);
 
-  // Film suivi absent du calendrier : ses dates et sa qualité sont lues dans Radarr par son TMDB exact.
+  // Film suivi absent du calendrier : ses dates, sa qualité et son identifiant Radarr font partie de la copie
+  // synchronisée (même compte, même serveur, relus à chaque synchronisation — revue Codex #918).
   const watchedMovieIds = watching.filter(entry => entry.mediaType === 'movie' && Number(entry.tmdbId) > 0 && !items.some(item => coveredBy(item, entry))).map(entry => Number(entry.tmdbId));
   const watchedKey = watchedMovieIds.join(',');
-  useEffect(() => {
-    if (!watchedKey) return;
-    let current = true;
-    const config = useDownloadConfigStore.getState();
-    void Promise.all(watchedKey.split(',').map(async tmdbId => [Number(tmdbId), await fetchWatchedMovie(config, Number(tmdbId)).catch(() => null)] as const)).then(entries => {
-      if (current && programmedScope(useDownloadConfigStore.getState()) === programmedScope(config)) setWatchedMovies(previous => ({ ...previous, ...Object.fromEntries(entries) }));
-    });
-    return () => { current = false; };
-  }, [watchedKey, revision, scope]);
+  useEffect(() => { useArrSyncStore.getState().watchMovies(watchedKey ? watchedKey.split(',').map(Number) : []); }, [watchedKey]);
+  const watchedMovies: Record<number, WatchedMovie> = snapshot?.watched || {};
 
   const toast = useToastStore.getState().showToast;
   // Jamais un identifiant d'une copie d'un autre compte ou serveur envoyé au serveur actuel : relecture à la place.

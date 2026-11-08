@@ -54,7 +54,7 @@ test('SEENIT-DOWNLOAD-016 un seul état Sonarr/Radarr synchronisé : relu en un 
     'lib/firebase': 'const s=()=>globalThis.__arr;export const auth={get currentUser(){return {uid:s().uid}}};',
     'store/downloadConfigStore': 'const s=()=>globalThis.__arr;export const useDownloadConfigStore=Object.assign(()=>s().config,{getState:()=>s().config});',
     'store/mediaPresenceStore': 'const s=()=>globalThis.__arr;export const useMediaPresenceStore={getState:()=>({checkPresence:async p=>{s().presence.push(p.tmdbId+":"+p.forceRefresh)}})};',
-    'features/downloads/programmedCalendar': 'const s=()=>globalThis.__arr;export const programmedScope=c=>c.sonarrUrl;export const fetchProgrammedCalendar=async c=>{s().reads.push(c.sonarrUrl);const r=s().next.shift();return r?await r:{items:[{id:1,from:c.sonarrUrl}],failures:[]}};',
+    'features/downloads/programmedCalendar': 'const s=()=>globalThis.__arr;export const programmedScope=c=>c.sonarrUrl;export const fetchProgrammedCalendar=async c=>{s().reads.push(c.sonarrUrl);const r=s().next.shift();return r?await r:{items:[{id:1,from:c.sonarrUrl}],failures:[]}};export const fetchWatchedMovie=async(c,id)=>{s().watchedReads.push(c.sonarrUrl+":"+id);return {id:id*10,server:c.sonarrUrl}};',
     'features/downloads/recentImports': 'export const fetchRecentImports=async()=>({items:[],failures:[]});',
   };
   const bundle = await build({ entryPoints: ['src/store/arrSyncStore.ts'], bundle: true, platform: 'node', format: 'esm', write: false, external: ['zustand', 'react'],
@@ -62,10 +62,10 @@ test('SEENIT-DOWNLOAD-016 un seul état Sonarr/Radarr synchronisé : relu en un 
       builder.onResolve({ filter: /lib\/firebase$|downloadConfigStore$|mediaPresenceStore$|programmedCalendar$|recentImports$/ }, args => ({ path: Object.keys(stubs).find(key => args.path.endsWith(key.split('/').at(-1)!))!, namespace: 'ports' }));
       builder.onLoad({ filter: /.*/, namespace: 'ports' }, args => ({ contents: stubs[args.path] }));
     } }] });
-  const state = (globalThis as unknown as { __arr: { uid: string; config: { sonarrUrl: string }; reads: string[]; presence: string[]; next: Array<Promise<unknown>> } }).__arr = { uid: 'u1', config: { sonarrUrl: 'http://a' }, reads: [], presence: [], next: [] };
+  const state = (globalThis as unknown as { __arr: { uid: string; config: { sonarrUrl: string }; reads: string[]; watchedReads: string[]; presence: string[]; next: Array<Promise<unknown>> } }).__arr = { uid: 'u1', config: { sonarrUrl: 'http://a' }, reads: [], watchedReads: [], presence: [], next: [] };
   const file = new URL(`./.arr-sync-${process.pid}.mjs`, import.meta.url);
   writeFileSync(file, bundle.outputFiles[0].text);
-  let store: { useArrSyncStore: { getState: () => { sync: (o?: { maxAgeMs?: number }) => Promise<void>; afterWrite: (t?: unknown) => void; snapshot: { key: string; programmed: { items: Array<{ from: string }> } } | null; revision: number } } };
+  let store: { useArrSyncStore: { getState: () => { sync: (o?: { maxAgeMs?: number }) => Promise<void>; afterWrite: (t?: unknown) => void; watchMovies: (ids: number[]) => void; snapshot: { key: string; programmed: { items: Array<{ from: string }> }; watched: Record<number, { id: number; server: string }> } | null; revision: number } } };
   try { store = await import(file.href); } finally { rmSync(file, { force: true }); }
   const sync = store.useArrSyncStore.getState;
   await Promise.all([sync().sync(), sync().sync()]);
@@ -85,16 +85,25 @@ test('SEENIT-DOWNLOAD-016 un seul état Sonarr/Radarr synchronisé : relu en un 
   assert.equal(sync().snapshot?.programmed.items[0].from, 'http://a', 'la réponse d’avant l’écriture ne remplace pas la nouvelle');
   assert.deepEqual(state.presence, ['77:true'], 'la fiche concernée relit sa présence');
   assert.equal(sync().revision, 1);
-  // Autre serveur : l'ancienne copie n'est jamais montrée.
+  // Revue Codex #918 : un film suivi fait partie de la copie, relu à chaque synchronisation.
+  sync().watchMovies([3]);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.deepEqual(sync().snapshot?.watched[3], { id: 30, server: 'http://a' });
+  await sync().sync();
+  assert.equal(state.watchedReads.filter(entry => entry === 'http://a:3').length, 2, 'relu à la synchronisation ordinaire');
+  // Autre serveur : l'ancienne copie (et ses identifiants Radarr) n'est jamais montrée.
   state.config = { sonarrUrl: 'http://b' };
   const switching = sync().sync();
   assert.equal(sync().snapshot, null);
   await switching;
   assert.equal(sync().snapshot?.programmed.items[0].from, 'http://b');
+  assert.deepEqual(sync().snapshot?.watched[3], { id: 30, server: 'http://b' }, 'détails relus sur le nouveau serveur');
 
   const programmed = read('src/components/ProgrammedSection.tsx');
   assert.doesNotMatch(programmed, /fetchProgrammedCalendar\(/, 'Programmés ne lit plus Sonarr/Radarr lui-même');
   assert.match(programmed, /const snapshot = useArrSnapshot\(\);/);
+  assert.doesNotMatch(programmed, /fetchWatchedMovie\(/, 'films suivis lus dans la copie synchronisée (revue Codex #918)');
+  assert.match(programmed, /const watchedMovies: Record<number, WatchedMovie> = snapshot\?\.watched \|\| \{\};/);
   assert.match(programmed, /notifyArrWrite\(\{ tmdbId: first\.tmdbId, tvdbId: first\.kind === 'episode' \? first\.tvdbId : undefined, mediaType: first\.kind === 'movie' \? 'movie' : 'tv' \}\);/, 'annuler resynchronise la fiche (épisode à nouveau sélectionnable)');
   const rail = read('src/components/RecentImportsRail.tsx');
   assert.doesNotMatch(rail, /fetchRecentImports\(/, 'Téléchargés ne lit plus Sonarr/Radarr lui-même');

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { auth } from '../lib/firebase';
 import { useDownloadConfigStore } from './downloadConfigStore';
 import { useMediaPresenceStore } from './mediaPresenceStore';
-import { fetchProgrammedCalendar, programmedScope, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
+import { fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
 import { fetchRecentImports, type RecentImports } from '../features/downloads/recentImports';
 
 /**
@@ -19,7 +19,9 @@ import { fetchRecentImports, type RecentImports } from '../features/downloads/re
  * Sonarr et Radarr restent la référence : un changement fait dans leur interface apparaît à la synchronisation
  * suivante. Une copie d'un autre compte ou d'un autre serveur n'est jamais affichée.
  */
-export interface ArrSnapshot { key: string; programmed: ProgrammedCalendar | null; imports: RecentImports | null; syncedAt: number }
+export type WatchedMovieDetails = Awaited<ReturnType<typeof fetchWatchedMovie>>;
+/** `watched` : films suivis absents du calendrier (dates, qualité, identifiant Radarr), lus dans la même copie. */
+export interface ArrSnapshot { key: string; programmed: ProgrammedCalendar | null; imports: RecentImports | null; watched: Record<number, WatchedMovieDetails>; syncedAt: number }
 export interface ArrWriteTarget { tmdbId?: number | string; tvdbId?: number | string; mediaType: 'tv' | 'movie' }
 
 interface ArrSyncState {
@@ -27,6 +29,9 @@ interface ArrSyncState {
   /** Incrémenté à chaque écriture de SeenIt : les détails dérivés (dates d'un film suivi…) sont relus. */
   revision: number;
   syncing: boolean;
+  /** Films suivis (TMDB) dont les détails sont relus à chaque synchronisation (revue Codex #918). */
+  watchedIds: number[];
+  watchMovies: (tmdbIds: readonly number[]) => void;
   sync: (options?: { maxAgeMs?: number }) => Promise<void>;
   afterWrite: (target?: ArrWriteTarget) => void;
 }
@@ -40,6 +45,14 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
   snapshot: null,
   revision: 0,
   syncing: false,
+  watchedIds: [],
+  watchMovies: tmdbIds => {
+    const ids = [...new Set(tmdbIds.filter(id => id > 0))].sort((a, b) => a - b);
+    if (ids.join(',') === get().watchedIds.join(',')) return;
+    set({ watchedIds: ids });
+    const snapshot = get().snapshot;
+    if (ids.some(id => !snapshot || !(id in snapshot.watched))) { inFlight = null; void get().sync(); }
+  },
   sync: async ({ maxAgeMs = 0 } = {}) => {
     const key = arrSyncKey();
     const current = get().snapshot;
@@ -51,14 +64,18 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
     const id = ++sequence;
     const promise = (async () => {
       set({ syncing: true });
-      const [programmed, imports] = await Promise.all([
+      const watchedIds = get().watchedIds;
+      const [programmed, imports, watched] = await Promise.all([
         fetchProgrammedCalendar(config).catch(() => ({ items: [], failures: ['Sonarr/Radarr'] })),
         fetchRecentImports(config).catch(() => ({ items: [], failures: ['Sonarr/Radarr'] })),
+        // Revue Codex #918 : les détails d'un film suivi appartiennent à la même copie (même compte, même
+        // serveur) et sont relus à chaque synchronisation ; une lecture échouée est retentée à la suivante.
+        Promise.all(watchedIds.map(async id => [id, await fetchWatchedMovie(config, id).catch(() => null)] as const)).then(entries => Object.fromEntries(entries) as Record<number, WatchedMovieDetails>),
       ]);
       // Une réponse arrivée après un changement de compte ou de serveur, ou dépassée par une relecture plus
       // récente (écriture de SeenIt entre-temps), est ignorée.
       if (arrSyncKey() !== key || id !== sequence) return;
-      set({ snapshot: { key, programmed, imports, syncedAt: Date.now() } });
+      set({ snapshot: { key, programmed, imports, watched, syncedAt: Date.now() } });
     })().finally(() => {
       if (inFlight?.promise === promise) inFlight = null;
       set({ syncing: false });
