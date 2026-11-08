@@ -24,10 +24,13 @@ const aired = (episode: SeasonPlanEpisode, now: number) => {
  */
 export function seasonBlanketPlan(series: SeasonPlanSeries | null | undefined, season: number, episodes: readonly SeasonPlanEpisode[], requested: readonly number[], now = Date.now()): SeasonBlanketPlan {
   const watched = Boolean(series?.seasons?.some(entry => Number(entry.seasonNumber) === Number(season) && entry.monitored === true));
-  if (!watched || !series?.seasons) return { seasons: null, restore: [] };
+  // Revue Codex #918 : jamais de saison désurveillée sans connaître ses épisodes — une liste illisible ou vide
+  // ferait perdre leur surveillance aux épisodes déjà sortis et manquants. La saison reste alors telle quelle.
+  const known = episodes.filter(entry => entry.id && Number(entry.seasonNumber) === Number(season));
+  if (!watched || !series?.seasons || !known.length) return { seasons: null, restore: [] };
   return {
     seasons: series.seasons.map(entry => Number(entry.seasonNumber) === Number(season) ? { ...entry, monitored: false } : entry),
-    restore: episodes.filter(entry => entry.id && Number(entry.seasonNumber) === Number(season) && entry.hasFile !== true
+    restore: known.filter(entry => entry.hasFile !== true
       && (requested.includes(Number(entry.episodeNumber)) || (entry.monitored === true && aired(entry, now)))),
   };
 }
