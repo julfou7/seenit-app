@@ -209,3 +209,8 @@ Complément USR-2026-10-30-001 (retours du 30/10) : journées de plus de 24 h (i
 | USR-2026-11-08-015 | 2026-11-08 | Programmés et Téléchargés v1.4.280 : textes rognés, qualité absente, trop d'espace sous l'image, « toujours les 3 petits points pour changer la qualité », Téléchargés « pas très joli », « je veux pouvoir nettoyer aussi ». | SEENIT-DOWNLOAD-015 | active |
 | USR-2026-11-08-016 | 2026-11-08 | « En cas d'erreur ne pas mélanger anglais et français », un transfert bloqué qui « a fini par se lancer seul » n'est pas une panne. | SEENIT-DOWNLOAD-013 | active |
 | USR-2026-11-08-017 | 2026-11-08 | « Quand je lance 1 seul épisode il me programme toute la saison à venir » ; « si je supprime, impossible de sélectionner à nouveau ». | SEENIT-DOWNLOAD-017, SEENIT-DOWNLOAD-016 | active |
+| USR-2026-11-09-001 | 2026-11-09 | « Passer d'un épisode à l'autre est trop sensible : quand je scrolle de haut en bas ça me change d'épisode si mon scroll n'est pas parfaitement droit. » | SEENIT-UX-008 | active |
+| USR-2026-11-09-002 | 2026-11-09 | « Le badge Ce soir sur Singapura est faux : c'est déjà disponible sur myCanal à 7 h 30. On croit que ce n'est pas encore dispo. » | SEENIT-UX-014 | active |
+| USR-2026-11-09-003 | 2026-11-09 | « C'est le mode téléchargement qui est bleu » : bouton, sélecteur de qualité, cadre des épisodes cochés. | SEENIT-DOWNLOAD-019 | active |
+| USR-2026-11-09-004 | 2026-11-09 | « La cloche reste jaune » ; le rappel d'épisode est rond, à côté de la croix en haut à droite de la fiche épisode. | SEENIT-NOTIFICATION-009 | active |
+| USR-2026-11-09-005 | 2026-11-09 | « Absence de nav bar sur la fiche épisode » ouverte depuis À voir. | SEENIT-UX-019 | active |

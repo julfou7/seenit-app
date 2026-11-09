@@ -23,7 +23,7 @@ export function MovieDownloadButton({ state, progress, upcoming, onPress }: { st
   const label = state === 'active' ? `${BUTTON_LABEL.active}, ${pct} %` : state === 'idle' && upcoming ? 'Programmer le film' : BUTTON_LABEL[state];
   return <button type="button" onClick={onPress} aria-pressed={state === 'mode'} aria-label={label} data-film-download={state}
     className={cn('w-14 h-14 shrink-0 rounded-2xl grid place-items-center active:scale-95',
-      state === 'mode' ? 'bg-[#E5A93D] text-black'
+      state === 'mode' ? 'bg-[#7DD3FC] text-black'
         : state === 'programmed' ? 'bg-[#0E1A20] text-[#7DD3FC] shadow-[inset_0_0_0_1.5px_rgba(125,211,252,0.8)]'
           : state === 'active' ? 'relative text-white'
             : 'bg-zinc-800 text-zinc-200 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]')}

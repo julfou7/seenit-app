@@ -59,6 +59,23 @@ export function resolveEpisodeNavigationDirectionFromKey(
   return null;
 }
 
+export interface EpisodeSwipeGesture { offsetX: number; offsetY: number; velocityX: number; velocityY: number }
+
+/**
+ * Retour terrain du 09/11 (« quand je scrolle de haut en bas ça me change d'épisode si mon scroll n'est pas
+ * parfaitement droit ») : un défilement vertical légèrement en biais dépassait l'ancien seuil (60 px ou
+ * 200 px/s horizontaux). Changer d'épisode exige désormais une intention horizontale nette : le geste est au
+ * moins deux fois plus horizontal que vertical, et soit long (≥ 90 px), soit un lancer rapide (≥ 650 px/s, lui
+ * aussi deux fois plus horizontal que vertical, sur ≥ 40 px). Vers la droite : épisode précédent.
+ */
+export function resolveEpisodeSwipe({ offsetX, offsetY, velocityX, velocityY }: EpisodeSwipeGesture): EpisodeNavigationDirection | null {
+  const horizontal = Math.abs(offsetX), vertical = Math.abs(offsetY);
+  if (!(horizontal >= 24) || horizontal < 2 * vertical) return null;
+  const fling = Math.abs(velocityX) >= 650 && Math.abs(velocityX) >= 2 * Math.abs(velocityY) && horizontal >= 40;
+  if (horizontal < 90 && !fling) return null;
+  return offsetX > 0 ? 'previous' : 'next';
+}
+
 export function canStartEpisodeSwipeFromTarget(target: unknown): boolean {
   const element = asElementLike(target);
   if (!element) return true;

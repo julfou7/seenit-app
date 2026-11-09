@@ -18,9 +18,10 @@
 .download-dialog__quality h4 { font-size:13px; font-weight:600; margin-bottom:12px; color:#d4d4d8; }
 .download-dialog__choices { display:flex; flex-direction:column; gap:8px; margin-top:10px; }
 .download-dialog__choices button { display:flex; align-items:center; gap:12px; min-height:70px; padding:12px; border:1px solid #ffffff12; border-radius:13px; text-align:left; background:#ffffff03; }
-.download-dialog__choices button:hover { border-color:#e5a93d88; background:#e5a93d08; }
+.download-dialog__choices button:hover { border-color:#7dd3fc88; background:#7dd3fc08; }
 .download-dialog__choices button:disabled { opacity:.45; }
-.download-dialog__quality-icon { display:grid; place-items:center; width:36px; height:36px; color:#f2c36b; border-radius:10px; background:#e5a93d0a; }
+/* 09/11 : le choix de qualité appartient au mode téléchargement, en bleu. */
+.download-dialog__quality-icon { display:grid; place-items:center; width:36px; height:36px; color:#7dd3fc; border-radius:10px; background:#7dd3fc12; }
 .download-dialog__choices button > span:nth-child(2) { flex:1; }
 .download-dialog__choices strong { display:block; font-size:15px; font-weight:700; }
 .download-dialog__choices small { display:block; font-size:12px; color:#8b8b94; margin-top:2px; }
@@ -29,4 +30,4 @@
 .download-dialog__manual { border-top:1px solid #ffffff0c; margin-top:20px; }
 .download-dialog__manual-toggle { display:flex; align-items:center; gap:10px; width:100%; min-height:56px; font-size:13px; font-weight:600; color:#a1a1aa; text-align:left; }
 .download-dialog__manual-toggle span { flex:1; }
-.download-dialog button:focus-visible { outline:2px solid #e5a93d; outline-offset:2px; }
+.download-dialog button:focus-visible { outline:2px solid #7dd3fc; outline-offset:2px; }

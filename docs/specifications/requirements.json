@@ -1,8 +1,22 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.281",
+  "applicationVersion": "1.4.282",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
+    {
+      "id": "SEENIT-DOWNLOAD-019",
+      "title": "Le mode téléchargement est bleu ; le rappel et le Vu restent en or",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/terrain282.test.ts",
+          "contains": "SEENIT-DOWNLOAD-019 le mode téléchargement est bleu ; le rappel et le Vu restent en or"
+        }
+      ]
+    },
     {
       "id": "SEENIT-DOWNLOAD-016",
       "title": "État Sonarr/Radarr synchronisé : une copie par compte et serveur, relue après chaque écriture",
@@ -407,6 +421,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/terrain282.test.ts",
+          "contains": "SEENIT-UX-019 la fiche épisode garde la barre de navigation, comme la fiche média"
+        },
         {
           "file": "tests/mediaDetailPrototype.test.ts",
           "contains": "SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée"
@@ -2760,6 +2778,10 @@
       ],
       "tests": [
         {
+          "file": "tests/terrain282.test.ts",
+          "contains": "SEENIT-UX-008 changer d’épisode exige un geste nettement horizontal, jamais un défilement en biais"
+        },
+        {
           "file": "tests/episodeNavigationAccessibility.test.ts",
           "contains": "SEENIT-UX-008 ←/→ naviguent hors saisie sans répétition implicite"
         },
@@ -2815,6 +2837,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/terrain282.test.ts",
+          "contains": "SEENIT-UX-014 le jour de sortie : « Aujourd’hui », jamais « Ce soir » sans heure connue"
+        },
         {
           "file": "tests/episodeReminderBell.test.ts",
           "contains": "SEENIT-UX-014 carte en pause sans ligne sous le titre ; retour en vue horizontale sans marge ajoutée"

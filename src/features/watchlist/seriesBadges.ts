@@ -20,7 +20,9 @@ export function seriesBadge(show: Show, episode: SeriesCardEpisode | null, progr
   if (stale) { const pause = seriesPause(show, now); return pause.days >= 60 ? { label: pause.duration, tone: pause.started ? 'pause' : 'never', icon: pause.started ? 'pause' : 'bookmark' } : null; }
   if (!episode || show.seenEpisodes?.includes(`${episode.season_number}x${episode.episode_number}`)) return null;
   const age = episode.air_date ? Math.round((Date.parse(today + 'T12:00:00') - Date.parse(episode.air_date + 'T12:00:00')) / 86_400_000) : NaN;
-  if (age === 0) return { label: 'Ce soir', tone: 'today' };
+  // Retour terrain du 09/11 (Singapura, disponible sur myCanal dès 7 h 30) : TMDB ne donne que la date, jamais
+  // l'heure ; « Ce soir » laissait croire que l'épisode n'était pas encore disponible. Le jour même : « Aujourd'hui ».
+  if (age === 0) return { label: 'Aujourd’hui', tone: 'today' };
   if (age === 1) return { label: 'Sorti hier', tone: 'yesterday' };
   const finale = episode.episode_type === 'finale' || !progress.totalUnknown && episode.episode_number === progress.knownEpisodes;
   const lastSeason = Math.max(episode.last_season_number || 0, ...Object.values(show.seasonProgress || {}).map(season => season.last_season_number || season.season_number), ...(show.seasonsCache || []).map((season: { season_number: number }) => season.season_number));
