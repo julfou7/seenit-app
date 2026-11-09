@@ -419,6 +419,14 @@ courante ou si l'utilisateur l'a explicitement incluse dans le périmètre. Ne p
 idée purement spéculative sans observation concrète, un doublon exact, un simple manque d'information déjà
 résolu ou une contrainte externe non actionnable par SeenIt.
 
+**Rétrospective de fin de livraison — agir, pas seulement constater (`USR-2026-11-09-014`).** La capture
+ci-dessus reste légère pendant le chantier. Après chaque livraison (release publiée, ou fusion pour un
+changement sans APK), l'agent mesure la boucle (correctif prêt → installable) et chaque temps perdu avec sa
+cause. Toute cause corrigeable, bornée (de l'ordre de 30 minutes) et sans risque produit est traitée **dans la
+même session**, sans attendre de demande, par une petite PR `light` dédiée et validée normalement. Sinon,
+l'issue porte la mesure et une prochaine action datée, reprise dans le checkpoint. Une cause qui n'a coûté
+aucun temps et ne menace pas la prochaine livraison reste au backlog. Détail : `docs/process/delivery.md`.
+
 Une issue active est mise à jour aux jalons utiles : implémentation prête, validation/CI, merge, release ou blocage. Ne mettez pas à jour le corps après chaque micro-commit. Cochez un critère seulement quand il est réellement prouvé.
 
 Une issue de code peut être fermée avec commit + tests + validation applicable. Une release n'est requise pour la fermeture que si le critère de l'issue exige explicitement un binaire publié ; les changements `light/backend` ne doivent plus attendre artificiellement une APK.
@@ -429,7 +437,7 @@ Après chaque modification, conclure exactement avec :
 
 ### 🛠️ Ce qui a été fait
 - Résumé des changements et validations.
-- Ajouter dans cette section un sous-bloc **Difficultés rencontrées / amélioration continue** : y consigner uniquement les blocages, détours, limites d'outillage, échecs de CI/TNR ou hypothèses invalidées réellement rencontrés pendant le chantier, avec l'enseignement concret ou l'amélioration durable associée. Ne jamais inventer de difficulté ; écrire « Aucune difficulté notable » lorsqu'il n'y en a pas. Lorsqu'une difficulté a déclenché la règle proactive de la section 7, citer l'issue réutilisée, rouverte ou créée.
+- Ajouter dans cette section un sous-bloc **Difficultés rencontrées / amélioration continue** : y consigner uniquement les blocages, détours, limites d'outillage, échecs de CI/TNR ou hypothèses invalidées réellement rencontrés pendant le chantier, avec l'enseignement concret ou l'amélioration durable associée. Ne jamais inventer de difficulté ; écrire « Aucune difficulté notable » lorsqu'il n'y en a pas. Lorsqu'une difficulté a déclenché la règle proactive de la section 7, citer l'issue réutilisée, rouverte ou créée, et surtout **l'action d'optimisation faite** (PR, commit) ou planifiée (issue, échéance) après la rétrospective de fin de livraison ; un constat sans action n'est pas un rapport complet.
 
 ### 📌 Impact & Mode de déploiement
 - Classe `light`, `backend` ou `apk`, et préciser si l'APK attend la prochaine release groupée.

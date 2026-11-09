@@ -318,6 +318,30 @@ L'amélioration n'entre dans le périmètre courant que si elle est nécessaire 
 demande en cours ou si l'utilisateur l'a explicitement demandée. Cette règle vise à **réduire le travail
 évitable et accélérer les interventions**, pas à ajouter une étape administrative lourde.
 
+### Rétrospective de fin de livraison : agir, pas seulement constater (`USR-2026-11-09-014`)
+
+Demande du propriétaire du 09/11 : « je veux que tu sois proactif. Si en fin de run tu as perdu du temps tu
+dois prendre des actions pour optimiser si c'est pertinent. Actuellement tu le remontes mais tu ne fais rien
+derrière. On fait le travail à moitié. »
+
+La capture reste légère **pendant** le chantier, pour ne pas retarder le correctif demandé. **Après** chaque
+livraison (release publiée, ou PR fusionnée pour un changement sans APK), l'agent fait une rétrospective
+courte et agit :
+
+1. **Mesurer** la boucle : correctif prêt → APK installable (ou → fusion), et chaque attente ou cycle perdu
+   avec sa cause (CI rouge sans lien, test instable, validation locale évitable, revue, attente inutile,
+   outillage local manquant, etc.).
+2. **Agir tout de suite** quand une cause est corrigeable, bornée (de l'ordre de 30 minutes) et sans risque
+   produit : petite PR `light` dédiée, validée normalement, ouverte dans la même session, sans attendre de
+   demande. Exemples du 09/11 : reprises bornées d'actionlint (#903), appui long du harnais navbar (#925),
+   version d'actionlint compilée depuis les sources (#869), release APK sans attente du backend.
+3. **Sinon**, issue existante mise à jour (ou nouvelle issue) avec la mesure, et **prochaine action datée**
+   inscrite dans le checkpoint du chantier ; jamais une issue laissée sans suite.
+4. **Ne pas rajouter de travail sans gain** : une cause qui n'a pas coûté de temps et ne menace pas la
+   prochaine livraison reste au backlog (exemple : #896, gardé pour plus tard le 09/11).
+
+Le rapport de fin cite l'action faite (PR, commit) ou planifiée (issue, échéance), pas seulement le constat.
+
 ## Acquisition du workspace et reprise d'intervention
 
 La vérification du `main` GitHub canonique et la matérialisation d'un dépôt local sont deux opérations
