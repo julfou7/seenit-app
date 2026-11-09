@@ -937,6 +937,11 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   encore un épisode y reste et sort seulement de la liste. Un toast dit ce qui a été fait.
   Depuis la v1.4.288 (`SEENIT-DOWNLOAD-022`) : titre, affiche, note et année viennent de la fiche TMDB en
   français, comme partout dans l'app (« L'Arène » et non « The Arena (2026) ») ; Sonarr/Radarr restent le repli.
+  Depuis la v1.4.289 (`SEENIT-DOWNLOAD-023`) : plus de limite de 7 jours ni de « Vider » — tout ce que
+  Sonarr/Radarr détiennent avec un fichier, 12 par page puis « Afficher plus ». Section **À décider** : les titres
+  ni téléchargés ni programmés (film non surveillé sans fichier, série sans épisode attendu), avec leur raison ;
+  toucher l'affiche ouvre la fiche, « Retirer » les sort de Radarr/Sonarr. Un film surveillé sans date proche
+  rejoint Programmés (« Date à venir »).
 - Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
   (120 jours) — épisodes et films surveillés, sans fichier, dont la série est surveillée — regroupés par
   série (identifiant Sonarr exact). Depuis la v1.4.280, chaque carte a une méta grise courte (« Film ·
@@ -961,6 +966,11 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   bibliothèque Sonarr/Radarr : un titre déjà sur le disque se voit sur sa fiche (présence), pas dans cet onglet.
   Depuis la v1.4.288 (`SEENIT-DOWNLOAD-022`), titres, affiches et titres d'épisodes viennent de la fiche TMDB en
   français, comme dans le reste de l'app ; Sonarr/Radarr ne servent qu'en repli.
+- Carte **En cours** v2 (v1.4.289, `SEENIT-DOWNLOAD-024`) : flèche au lieu de « … », une ligne « 86 % · 67,9 Mo/s ·
+  ≈ 21 s » sous la barre, centrée entre le bas de l'affiche et le bas de la carte ; déplié : langues, reçu et
+  « Annuler le téléchargement ». Glisser à gauche (geste de l'accueil) montre la tuile « Annuler » et ✕.
+- Les notifications de téléchargement (« Import Plex terminé », envoi au client) affichent le titre français de la
+  fiche (v1.4.289, `SEENIT-DOWNLOAD-022`).
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
 - « Vider » ne touche que la section d'historique visée, jamais un actif.

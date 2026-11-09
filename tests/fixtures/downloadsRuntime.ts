@@ -11,7 +11,7 @@ const FIXTURE_RELEASES = [
   { id: 14, infoHash: 'd', name: 'L.Arene.S01E03.FRENCH.1080p.HDLight.x264.mkv', size: 1.1e9, seeders: 6, leechers: 0, magnetUri: 'magnet:?xt=urn:btih:d' }
 ];
 const sample = (id: string, title: string, status: string, progress = 0): LiveDownloadItem => ({ id, title, movieTitle: title, mediaType: 'movie', tmdbId: Number(id), size: 1200000000, sizeleft: 600000000, status, progress, statusText: status === 'warning' ? 'Manual import required' : 'État confirmé par le client', quality: '1080p', downloadClient: 'Radarr', releaseTitle: `${title}.1080p`, posterPath: '/fixture.jpg', addedAt: Number(id) });
-export const fixtureItems = [sample('1', 'Blade Runner', 'warning', 100), sample('2', 'The Punisher : un très long titre de film à conserver entièrement', 'downloading', 63), { ...sample('3', 'The Boys', 'waiting'), availability: { reason: 'unconfirmed', automatic: false } }, sample('4', 'Dune', 'completed', 100),
+export const fixtureItems = [sample('1', 'Blade Runner', 'warning', 100), { ...sample('2', 'The Punisher : un très long titre de film à conserver entièrement', 'downloading', 63), speedFormatted: '67.9 Mo/s' }, { ...sample('3', 'The Boys', 'waiting'), availability: { reason: 'unconfirmed', automatic: false } }, sample('4', 'Dune', 'completed', 100),
   // Retour terrain du 08/11 : pas encore de version, surveillance Radarr confirmée → « Programmés ».
   { ...sample('5', 'Le Chat Chapeauté', 'waiting'), availability: { reason: 'no_release', automatic: true } }];
 export const useLiveDownloadStore = create(() => ({ downloads: fixtureItems, fetchDownloads: async () => {}, removeDownload: async (item: LiveDownloadItem) => { telemetry.removed.push(item.id); useLiveDownloadStore.setState(state => ({ downloads: state.downloads.filter(value => value.id !== item.id) })); return true; }, clearAllDownloads: async () => {} }));
@@ -75,9 +75,24 @@ export const tmdbArrLabelSource = {
   media: async (tmdbId: number, mediaType: 'tv' | 'movie') => TMDB_LABELS[`${mediaType}:${tmdbId}`] || null,
   episodes: async (tmdbId: number, season: number) => tmdbId === 77 && season === 1 ? new Map([[8, 'La Cage']]) : null,
 };
+// v1.4.289 (« plus de limite à 7 jours ») : la bibliothèque fait la liste de Téléchargés ; l'historique ne fait que dater.
+// SEENIT-DOWNLOAD-023 : « A Dog's Perfect Christmas », non surveillé et sans fichier, va dans « À décider ».
+// Dates fixes, comme dans Sonarr/Radarr : un titre retiré reste masqué tant qu'il ne change pas.
+const DUNE_FILE = ago(3), DOG_ADDED = ago(2);
+const SONARR_LIBRARY = () => [
+  { id: 7, title: 'Severance', tmdbId: 95396, year: 2022, ratings: { value: 8.4 }, monitored: true, added: '2025-01-02T00:00:00Z', statistics: { episodeFileCount: 2 } },
+  { id: 8, title: 'A Knight of the Seven Kingdoms', tmdbId: 224372, monitored: true, added: '2025-06-01T00:00:00Z', statistics: { episodeFileCount: 1 } },
+  ...(telemetry.programmed ? [{ id: 5, title: 'The Arena (2026)', tmdbId: 77, monitored: true, added: '2026-10-01T00:00:00Z', statistics: { episodeFileCount: 0 } }] : [])
+];
+const RADARR_LIBRARY = () => telemetry.programmed ? [] : [
+  { id: 40, title: 'Dune', tmdbId: 4, year: 2021, ratings: { tmdb: { value: 7.8 } }, monitored: true, hasFile: true, movieFile: { dateAdded: DUNE_FILE } },
+  { id: 42, title: "A Dog's Perfect Christmas", tmdbId: 1100, year: 2025, monitored: false, hasFile: false, added: DOG_ADDED }
+];
 export const executeDelete = async (url: string) => { telemetry.arrDeleted.push(url); return {}; };
 export const executeGet = async (url: string) => {
   if (url.includes('/api/v3/history/since')) return telemetry.programmed ? [] : url.includes('includeMovie=true') ? RADARR_IMPORTS : SONARR_IMPORTS;
+  if (url.endsWith('/api/v3/series')) return SONARR_LIBRARY();
+  if (url.endsWith('/api/v3/movie')) return RADARR_LIBRARY();
   if (url.includes('/api/v3/wanted/missing')) return { page: 1, records: !telemetry.programmed ? [] : (url.includes('includeSeries=true') ? SONARR_WANTED : RADARR_WANTED).filter(entry => !telemetry.unmonitored.some(done => done.endsWith(`/${entry.id}`))) };
   if (url.includes('/api/v3/episode?seriesId=')) return SONARR_EPISODES[url.split('=').pop() || ''] || [];
   if (url.includes('/api/v3/qualityprofile')) return [{ id: 4, name: 'HD-1080p' }, { id: 5, name: 'Ultra-HD' }];

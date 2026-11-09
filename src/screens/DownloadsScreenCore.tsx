@@ -2,7 +2,7 @@ import { DialogLayer } from '../components/ui/DialogLayer';
 import { DownloadItemCard } from '../components/DownloadItemCard';
 import { SeasonDownloadCard } from '../components/SeasonDownloadCard';
 import { ProgrammedSection } from '../components/ProgrammedSection';
-import { RecentImportsRail, useRecentImports } from '../components/RecentImportsRail';
+import { RecentImportsRail, useRecentImports, useUndecidedTitles } from '../components/RecentImportsRail';
 import { coveredByRecentImport } from '../features/downloads/recentImports';
 import { groupSeasonDownloads } from '../features/downloads/downloadSeriesGroups';
 import { downloadGroup, isPreTransferRequest, isWatchedWaitingRequest } from '../features/downloads/downloadGroups';
@@ -32,7 +32,7 @@ import {
 import { type C411Torrent, openC411Magnet, searchC411Torrents } from '../services/c411';
 import { useToastStore } from '../store/toastStore';
 import { DownloadConfigSection } from '../components/DownloadConfigSection';
-import { SwipeableCard } from '../components/cards/SwipeableCard';
+import { ActionSwipeCard } from '../components/cards/ActionSwipeCard';
 import { planC411ManualDownload, resolveC411ManualMediaType } from '../features/downloads/c411ManualRouting';
 import {
   acceptDownloadRequest,
@@ -166,6 +166,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   // Maquette DlOngletSuivi : « Téléchargés » montre les imports réels des 7 derniers jours ; un téléchargement
   // terminé déjà présent dans cette rangée (TMDB et épisode exacts) n'est pas répété dans « Terminés ».
   const recentImports = useRecentImports(programmedRefresh);
+  const undecidedTitles = useUndecidedTitles();
   const listedCompleted = useMemo(
     () => recentImports.loaded ? completedDownloads.filter(item => !coveredByRecentImport(recentImports.items, item)) : [],
     [completedDownloads, recentImports]
@@ -387,18 +388,14 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
         const isActive = downloadGroup(item) === 'active' || downloadGroup(item) === 'waiting';
 
         return (
-          <SwipeableCard
+          // Retour terrain du 09/11 : le geste de l'accueil (carte décalée, tuile, ✕) au lieu du fond rouge plein.
+          <ActionSwipeCard
             key={getStableDownloadRenderKey(item)}
-            onSwipeRight={() => handleRemove(item)}
-            rightAction={{
-              title: isActive ? 'Annuler' : 'Retirer',
-              subtitle: isActive ? 'Arrêter le téléchargement' : 'Effacer de la liste',
-              icon: <Trash2 size={20} className="text-white" />,
-              tone: 'rose'
-            }}
+            className="download-swipe"
+            actions={[{ label: isActive ? 'Annuler' : 'Retirer', ariaLabel: `${isActive ? 'Annuler le téléchargement de' : 'Retirer'} ${item.movieTitle || item.seriesTitle || item.title}`, icon: <Trash2 size={18} />, tone: 'rose', onSelect: () => handleRemove(item) }]}
           >
             <DownloadItemCard item={item} onShowClick={onShowClick} onRemove={() => handleRemove(item)} />
-          </SwipeableCard>
+          </ActionSwipeCard>
         );
       })}
     </section>
@@ -448,10 +445,12 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
             {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} onRemoveWatching={handleRemove} />}
             <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
+            {/* SEENIT-DOWNLOAD-023 : ni téléchargés ni programmés — aucun titre de Sonarr/Radarr invisible. */}
+            <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />
             {listedCompleted.length > 0 && renderSection('Terminés', listedCompleted, 'completed')}
             {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'cancelled')}
 
-            {!downloads.length && !recentImports.items.length && (
+            {!downloads.length && !recentImports.items.length && !undecidedTitles.length && (
               <div className="py-16 flex flex-col items-center text-center gap-3 text-zinc-500">
                 <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-white/5 flex items-center justify-center">
                   <DownloadMark size={26} />

@@ -24,7 +24,8 @@ test('SEENIT-DOWNLOAD-022 titres, affiches et épisodes de la fiche TMDB fr-FR p
   };
   const lists = await localizeArrLists({
     programmed: { items: [episode(801, 1), episode(802, 2), { kind: 'movie', id: 902, tmdbId: 77, title: 'Arena Movie', posterUrl: 'radarr.jpg' }, episode(803, 1, { tmdbId: undefined, seriesId: 9, seriesTitle: 'Sans TMDB' }), episode(804, 1, { tmdbId: 404, seriesTitle: 'Panne' })], failures: [] },
-    imports: { items: [arenaImport, { kind: 'movie', key: 'm40', arrId: 40, tmdbId: 1022789, title: 'The Super Mario Galaxy Movie', posterUrl: 'https://image.tmdb.org/t/p/original/mario-en.jpg', year: 2026, rating: 7, date: 2 }], failures: ['Radarr'] },
+    imports: { items: [arenaImport, { kind: 'movie', key: 'm40', arrId: 40, tmdbId: 1022789, title: 'The Super Mario Galaxy Movie', posterUrl: 'https://image.tmdb.org/t/p/original/mario-en.jpg', year: 2026, rating: 7, date: 2 }], failures: ['Radarr'], pending: [] },
+    undecided: [{ ...arenaImport, key: 's9', arrId: 9, monitored: false }],
   }, source);
 
   const [first, second, movie, untracked, failing] = lists.programmed.items;
@@ -37,6 +38,7 @@ test('SEENIT-DOWNLOAD-022 titres, affiches et épisodes de la fiche TMDB fr-FR p
   assert.deepEqual([untracked.kind === 'episode' && untracked.seriesTitle, untracked.posterUrl], ['Sans TMDB', 'https://artworks.thetvdb.com/arena.jpg'], 'sans identifiant TMDB : libellé Sonarr');
   assert.equal(failing.kind === 'episode' && failing.seriesTitle, 'Panne', 'fiche en erreur : repli Sonarr, la synchronisation continue');
 
+  assert.equal(lists.undecided?.[0].title, "L'Arène", 'À décider : même libellé (SEENIT-DOWNLOAD-023)');
   const [arena, mario] = lists.imports.items;
   assert.deepEqual([arena.title, arena.posterUrl, arena.rating, arena.year], ["L'Arène", 'https://image.tmdb.org/t/p/w342/arene-fr.jpg', 7.3, 2026], 'Téléchargés : titre, affiche, note et année de la fiche');
   assert.deepEqual([mario.title, mario.posterUrl], ['Super Mario Galaxy, le film', 'https://image.tmdb.org/t/p/w342/mario-fr.jpg']);
@@ -47,7 +49,7 @@ test('SEENIT-DOWNLOAD-022 titres, affiches et épisodes de la fiche TMDB fr-FR p
   // Fiche trop lente : la synchronisation n'attend pas au-delà du délai, le repli s'affiche.
   const slow: ArrLabelSource = { media: () => new Promise(() => {}), episodes: () => new Promise(() => {}) };
   const started = Date.now();
-  const late = await localizeArrLists({ programmed: { items: [episode(801, 1)], failures: [] }, imports: { items: [arenaImport], failures: [] } }, slow, 20);
+  const late = await localizeArrLists({ programmed: { items: [episode(801, 1)], failures: [] }, imports: { items: [arenaImport], failures: [], pending: [] } }, slow, 20);
   assert.ok(Date.now() - started < 1000);
   assert.equal(late.programmed.items[0].kind === 'episode' && late.programmed.items[0].seriesTitle, 'The Arena (2026)');
   assert.equal(late.imports.items[0].title, 'The Arena (2026)');
@@ -57,6 +59,6 @@ test('SEENIT-DOWNLOAD-022 titres, affiches et épisodes de la fiche TMDB fr-FR p
 
   // La copie synchronisée est la seule à appliquer ces libellés : écrans, menus et toasts en héritent.
   const store = readFileSync('src/store/arrSyncStore.ts', 'utf8');
-  assert.match(store, /const labelled = await localizeArrLists\(\{ programmed, imports \}, tmdbArrLabelSource\);\n\s+if \(arrSyncKey\(\) !== key \|\| id !== sequence\) return;/, 'réponse dépassée pendant la lecture TMDB toujours ignorée');
+  assert.match(store, /const labelled = await localizeArrLists\(\{ programmed: coverage\.programmed, imports, undecided: coverage\.undecided \}, tmdbArrLabelSource\);\n\s+if \(arrSyncKey\(\) !== key \|\| id !== sequence\) return;/, 'réponse dépassée pendant la lecture TMDB toujours ignorée');
   assert.doesNotMatch(readFileSync('src/features/downloads/arrMediaLabels.ts', 'utf8'), /\.title\s*===|toLowerCase\(\)/, 'jamais de rapprochement par le titre');
 });

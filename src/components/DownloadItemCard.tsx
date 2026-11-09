@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useRef, useState } from 'react';
-import { Film, Search, Trash2, Tv, MoreHorizontal, CheckCircle2 } from 'lucide-react';
+import { Film, Search, Trash2, Tv, ChevronDown, CheckCircle2 } from 'lucide-react';
 import { useShowsStore } from '../store/showsStore';
 import { formatBytes, formatCleanMediaInfo, type LiveDownloadItem } from '../services/sonarrRadarr';
 import { findMatchingShowForDownload } from '../features/downloads/downloadIdentity';
@@ -31,7 +31,9 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
   const id = item.tmdbId || library?.tmdbId;
   const audio = getReleaseAudio(item.releaseTitle).label;
   const scope = isTv ? subTitle : ['Film', item.quality].filter(Boolean).join(' · ');
-  const meta = [isTv ? item.quality : '', audio, item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
+  // Carte « En cours » v2 (design validé le 09/11) : langues et reçu passent dans le détail déplié.
+  const meta = [isTv ? item.quality : '', item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
+  const received = item.size > 0 && Number(item.sizeleft) >= 0 ? `${formatBytes(Math.max(0, item.size - Number(item.sizeleft)))} sur ${formatBytes(item.size)}` : '';
   const label = attention ? problem.title : waiting ? (item.availability?.reason === 'no_release' ? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier') : group === 'cancelled' ? 'Annulé' : group === 'completed' ? 'Terminé' : item.importState === 'pending' && progress >= 100 ? 'Transfert terminé · import à confirmer' : item.status === 'searching' ? 'Recherche en cours…' : item.status === 'submitting' ? 'Envoi au client' : item.status === 'stalled' ? 'En attente de sources' : item.status === 'paused' ? 'En pause' : item.status === 'queued' ? 'En file d’attente' : null;
   const showTrack = group === 'active' && !(item.importState === 'pending' && progress >= 100) && (label === null || progress > 0);
   return <article className={`download-card${toFix ? ' download-card--attention' : ''}${terminal ? ' download-card--terminal' : ''}`} data-download-id={item.id}>
@@ -46,13 +48,18 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
         {label && <p className={`download-card__status${attention ? ' is-error' : ''}`}>{group === 'completed' && <CheckCircle2 size={14} aria-hidden="true" />}{label}</p>}
         {toFix && <p className="download-card__hint">{attention ? problem.hint : availabilityHint(item.availability)}</p>}
       </div>
-      <button type="button" className="download-card__more" aria-label={`Actions pour ${cleanTitle}`} aria-expanded={details} onClick={() => setDetails(!details)}><MoreHorizontal size={20} /></button>
+      {/* Retour terrain du 09/11 : une flèche plutôt que « … », car la carte se plie et se déplie. */}
+      <button type="button" className="download-card__more download-card__toggle" aria-label={`${details ? 'Masquer' : 'Voir'} le détail de ${cleanTitle}`} aria-expanded={details} onClick={() => setDetails(!details)}><ChevronDown size={20} aria-hidden="true" /></button>
     </div>
-    {/* Maquette : la barre or court en bas du billet, avec le pourcentage et le temps restant. */}
+    {/* v2 (09/11) : barre centrée entre l'affiche et le bas de la carte ; pourcentage, vitesse et temps restant sur
+        une seule ligne (plus de vitesse isolée dans le détail). */}
     {showTrack && <div className="download-card__track">
       <div role="progressbar" aria-label="Progression du transfert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress} className="download-card__progress"><span style={{ width: `${progress}%` }} /></div>
-      <strong>{progress} %</strong>
-      {item.timeleft && item.timeleft !== '--' && <span>≈ {item.timeleft}</span>}
+      <div className="download-card__rate">
+        <strong>{progress} %</strong>
+        {item.speedFormatted && <span>{item.speedFormatted}</span>}
+        {item.timeleft && item.timeleft !== '--' && <span className="download-card__eta">≈ {item.timeleft}</span>}
+      </div>
     </div>}
     {/* Une carte à régler montre ses deux actions sans passer par « … ». */}
     {toFix && <div className="download-card__quick">
@@ -60,10 +67,11 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
       <button type="button" onClick={onRemove} aria-label={`Retirer ${cleanTitle}`}>Retirer</button>
     </div>}
     {details && <div className="download-card__actions">
+      {audio && <p className="download-card__fact"><span>Langues</span><strong>{audio}</strong></p>}
+      {received && group === 'active' && <p className="download-card__fact"><span>Reçu</span><strong>{received}</strong></p>}
       {item.tmdbId && (terminal || item.status === 'stalled') && <button type="button" onClick={() => setChoosingRelease(true)}><Search size={15} />Autre version</button>}
       {item.tmdbId && toFix && <button type="button" onClick={() => setChoosingQuality(true)}>Changer la qualité</button>}
-      {!toFix && <button type="button" onClick={onRemove} aria-label={`${terminal ? 'Retirer' : 'Annuler'} ${cleanTitle}`}><Trash2 size={15} />{terminal ? 'Retirer' : 'Annuler'}</button>}
-      {item.speedFormatted && group === 'active' && <p className="download-card__meta">{item.speedFormatted}</p>}
+      {!toFix && <button type="button" className="download-card__cancel" onClick={onRemove} aria-label={`${terminal ? 'Retirer' : 'Annuler le téléchargement de'} ${cleanTitle}`}><Trash2 size={16} aria-hidden="true" />{terminal ? 'Retirer' : 'Annuler le téléchargement'}</button>}
     </div>}
     <Suspense fallback={<p role="status" className="download-card__meta">Ouverture du sélecteur…</p>}>
       {choosingRelease && <AlternativeReleaseModal item={item} onClose={() => setChoosingRelease(false)} />}

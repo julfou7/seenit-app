@@ -116,11 +116,15 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
     }, () => { result.failures.push('Radarr'); }));
   }
   await Promise.all(tasks);
-  // À venir d'abord, par date ; puis les recherchés, les plus récents en tête ; enfin les dates inconnues.
+  result.items = sortProgrammedItems(result.items);
+  return result;
+}
+
+/** À venir d'abord, par date ; puis les recherchés, les plus récents en tête ; enfin les dates inconnues. */
+export function sortProgrammedItems(items: readonly ProgrammedItem[]): ProgrammedItem[] {
   const rank = (item: ProgrammedItem) => item.wanted ? 1 : item.date ? 0 : 2;
   const time = (item: ProgrammedItem) => item.date ? Date.parse(item.date) : 0;
-  result.items.sort((a, b) => rank(a) - rank(b) || (rank(a) === 1 ? time(b) - time(a) : time(a) - time(b)));
-  return result;
+  return [...items].sort((a, b) => rank(a) - rank(b) || (rank(a) === 1 ? time(b) - time(a) : time(a) - time(b)));
 }
 
 /** Portée serveur d'une liste « Programmés » : les identifiants Sonarr/Radarr n'ont de sens que sur ce serveur. */
