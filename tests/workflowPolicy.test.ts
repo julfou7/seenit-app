@@ -7,6 +7,7 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const {
+  parseActionlintVersion,
   ACTIONLINT_VERSION,
   ALLOWED_WORKFLOWS,
   containsForbiddenGitMutation,
@@ -14,6 +15,7 @@ const {
   validateAgentRemoteWorkflowContract,
   validateWorkflowPolicy
 } = require('../scripts/validate-workflow-policy.cjs') as {
+  parseActionlintVersion: (output: string) => string | null;
   ACTIONLINT_VERSION: string;
   ALLOWED_WORKFLOWS: Set<string>;
   containsForbiddenGitMutation: (content: string) => boolean;
@@ -128,4 +130,13 @@ test('SEENIT-QUALITY-004 verrouille la quarantaine distante sur le SHA exact et 
   const errors = validateAgentRemoteWorkflowContract(unsafe).join('\n');
   assert.match(errors, /agent-staging/);
   assert.match(errors, /merge-base/);
+});
+
+test('SEENIT-QUALITY-008 #869 accepte actionlint 1.7.12 compilé depuis les sources (« v1.7.12 »), refuse toute autre version', () => {
+  assert.equal(parseActionlintVersion('1.7.12\ninstalled by downloading from release page\nbuilt with go1.24.2 compiler for linux/amd64'), ACTIONLINT_VERSION);
+  assert.equal(parseActionlintVersion('v1.7.12\ninstalled by building from source\nbuilt with go1.22.5 compiler for linux/amd64'), ACTIONLINT_VERSION);
+  assert.equal(parseActionlintVersion('v1.7.11'), '1.7.11', 'une autre version reste lue telle quelle, donc refusée');
+  assert.equal(parseActionlintVersion('v1.7.120'), '1.7.120');
+  assert.equal(parseActionlintVersion('built with go1.24.2'), null, 'la version de Go n’est jamais prise pour celle d’actionlint');
+  assert.equal(parseActionlintVersion(''), null);
 });

@@ -23,6 +23,18 @@ async function tap(client, selector, button='left', hold=0) {
   await client.send('Input.dispatchMouseEvent',{type:'mouseReleased',...p,button,clickCount:1});
   await delay(35);
 }
+// #925 : maintenir l'appui jusqu'au déclenchement du raccourci (3 s au plus) au lieu d'une durée fixe de 530 ms,
+// qui ne laissait que 50 ms de marge sur le seuil de 480 ms quand le runner CI est chargé. Rend la durée réelle.
+async function longPress(client, selector, firedExpression) {
+  const p=await point(client,selector);
+  const started=Date.now();
+  await client.send('Input.dispatchMouseEvent',{type:'mousePressed',...p,button:'left',clickCount:1});
+  while(Date.now()-started<3000 && !(await evaluate(client,`Boolean(${firedExpression})`))) await delay(20);
+  const held=Date.now()-started;
+  await client.send('Input.dispatchMouseEvent',{type:'mouseReleased',...p,button:'left',clickCount:1});
+  await delay(35);
+  return held;
+}
 async function buildNavbarHarness(root) {
   const ports=path.join(root,'tests/fixtures/navbar13jRuntime.ts');
   await esbuild.build({entryPoints:[path.join(root,'tests/fixtures/navbar13j.tsx')],outfile:path.join(root,'dist/__seenit-navbar.js'),bundle:true,platform:'browser',format:'iife',target:['chrome120'],logLevel:'silent',plugins:[{name:'navbar-external-ports',setup(builder){builder.onResolve({filter:/\/(?:downloadConfigStore|liveDownloadStore|useShows|showsStore|logStore|SettingsScreen)$/},()=>({path:ports}));}}]});
@@ -63,11 +75,13 @@ async function testNavbarHarness(client, root) {
     for(let i=0;i<2;i++){await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter'});await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter'});}
     await check(client,`window.__nav13j.telemetry.resets.length===${before}`,'activation clavier/assistée sans double involontaire');
     for(const tab of ['watchlist','discover','downloads']) {
-      await tap(client,selector(tab),'left',530);
+      const held=await longPress(client,selector(tab),`window.__nav13j.telemetry.shortcuts.filter(t=>t===${JSON.stringify(tab)}).length>=1`);
+      // Un appui long, jamais immédiat : le raccourci ne part qu'après le seuil (480 ms, marge de mesure incluse).
+      if(held<450)throw new Error(`#721 appui long ${tab} déclenché trop tôt (${held} ms)`);
       await check(client,`window.__nav13j.telemetry.shortcuts.filter(t=>t===${JSON.stringify(tab)}).length===1`,'appui long unique '+tab);
       if(tab==='discover'||tab==='downloads') {
         const index=await evaluate(client,'navigation.currentEntry.index');
-        await tap(client,selector(tab),'left',530);
+        await longPress(client,selector(tab),`window.__nav13j.telemetry.shortcuts.filter(t=>t===${JSON.stringify(tab)}).length>=2`);
         await check(client,`navigation.currentEntry.index===${index} && window.__nav13j.telemetry.shortcuts.filter(t=>t===${JSON.stringify(tab)}).length===2`,'raccourci actif sans entrée historique doublonnée');
       }
     }

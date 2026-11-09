@@ -318,6 +318,30 @@ L'amélioration n'entre dans le périmètre courant que si elle est nécessaire 
 demande en cours ou si l'utilisateur l'a explicitement demandée. Cette règle vise à **réduire le travail
 évitable et accélérer les interventions**, pas à ajouter une étape administrative lourde.
 
+### Rétrospective de fin de livraison : agir, pas seulement constater (`USR-2026-11-09-014`)
+
+Demande du propriétaire du 09/11 : « je veux que tu sois proactif. Si en fin de run tu as perdu du temps tu
+dois prendre des actions pour optimiser si c'est pertinent. Actuellement tu le remontes mais tu ne fais rien
+derrière. On fait le travail à moitié. »
+
+La capture reste légère **pendant** le chantier, pour ne pas retarder le correctif demandé. **Après** chaque
+livraison (release publiée, ou PR fusionnée pour un changement sans APK), l'agent fait une rétrospective
+courte et agit :
+
+1. **Mesurer** la boucle : correctif prêt → APK installable (ou → fusion), et chaque attente ou cycle perdu
+   avec sa cause (CI rouge sans lien, test instable, validation locale évitable, revue, attente inutile,
+   outillage local manquant, etc.).
+2. **Agir tout de suite** quand une cause est corrigeable, bornée (de l'ordre de 30 minutes) et sans risque
+   produit : petite PR `light` dédiée, validée normalement, ouverte dans la même session, sans attendre de
+   demande. Exemples du 09/11 : reprises bornées d'actionlint (#903), appui long du harnais navbar (#925),
+   version d'actionlint compilée depuis les sources (#869), release APK sans attente du backend.
+3. **Sinon**, issue existante mise à jour (ou nouvelle issue) avec la mesure, et **prochaine action datée**
+   inscrite dans le checkpoint du chantier ; jamais une issue laissée sans suite.
+4. **Ne pas rajouter de travail sans gain** : une cause qui n'a pas coûté de temps et ne menace pas la
+   prochaine livraison reste au backlog (exemple : #896, gardé pour plus tard le 09/11).
+
+Le rapport de fin cite l'action faite (PR, commit) ou planifiée (issue, échéance), pas seulement le constat.
+
 ## Acquisition du workspace et reprise d'intervention
 
 La vérification du `main` GitHub canonique et la matérialisation d'un dépôt local sont deux opérations
@@ -605,6 +629,28 @@ requis ; en mode terrain il expose explicitement que le smoke Android 36 a été
 Cibles release-only : ≤ 2 minutes de travail opérateur avec candidate prête et verte ; ≤ 5 minutes hors
 attente CI si la candidate doit être préparée. Cible terrain : ≤ 10 minutes du correctif prêt/mergé à la
 mise à jour installable dans SeenIt.
+
+#### Ne pas attendre ce qui ne bloque pas (`USR-2026-11-09-013`)
+
+Mesure du 09/11 sur les v1.4.283 à v1.4.286 : 10,5 minutes du code prêt à l'APK installable dans le meilleur
+cas, plus de 30 minutes quand des attentes inutiles s'ajoutaient. Demande du propriétaire : « attendre 10
+minutes ça ne me gêne pas, mais 30 minutes pour un mini correctif ça m'embête ».
+
+- **Release APK sans attendre `Deploy Canonical Backend`.** Dans l'APK, Sonarr, Radarr et qBittorrent sont
+  appelés directement (`CapacitorHttp`), jamais par le proxy du serveur ; le déploiement backend ne sert que
+  la PWA et les routes `/api/...` du serveur. Une fois la validation `push` du SHA exact verte, la release
+  terrain part tout de suite, en parallèle du déploiement. Elle n'attend le déploiement que si le lot ajoute
+  ou modifie une route serveur que l'APK appelle elle-même (exemples : `/api/c411/top`, notification de mise
+  à jour).
+- **Préflight rapide avant la validation complète.** Avant `npm run validate:change`, l'agent lance
+  `npm run test:spec && npm run lint` puis `node --test` sur les TNR qui citent un fichier modifié (y compris
+  les anciens TNR qui lisent le code source). Ces contrôles déterministes de quelques secondes évitent un cycle
+  complet par erreur évitable (identifiant SPEC, règle boy-scout, assertion de source).
+- **Revue de soi avant la PR.** Avant d'ouvrir la PR, vérifier les trois classes de défaut que la revue Codex
+  a trouvées le 09/11 : deux lectures indépendantes ne doivent pas échouer ensemble ; un identifiant mémorisé
+  est lié à son serveur et à son compte ; un retour arrière restaure exactement l'état précédent.
+- **Un test instable n'est pas relancé à l'aveugle deux fois** : la seconde occurrence est corrigée à la
+  racine (exemple : #925, appui long attendu par événement plutôt que par durée fixe).
 
 ## Préparation d'une release APK
 

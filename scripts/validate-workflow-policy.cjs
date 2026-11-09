@@ -114,6 +114,15 @@ function validateWorkflowPolicy(workflowDir = DEFAULT_WORKFLOW_DIR) {
   return files;
 }
 
+/**
+ * #869 : le binaire de release affiche `1.7.12`, celui compilé par `go install …@v1.7.12` affiche `v1.7.12`.
+ * Les deux sont la même version épinglée ; toute autre version reste refusée.
+ */
+function parseActionlintVersion(output) {
+  const match = String(output || '').match(/(?:^|[^\w.])v?(\d+\.\d+\.\d+)(?![\w.])/);
+  return match ? match[1] : null;
+}
+
 function resolveActionlint(command = process.env.SEENIT_ACTIONLINT || 'actionlint') {
   let output;
   try {
@@ -121,8 +130,7 @@ function resolveActionlint(command = process.env.SEENIT_ACTIONLINT || 'actionlin
   } catch (error) {
     throw new Error(`actionlint v${ACTIONLINT_VERSION} est requis avant push. Installer cette version exacte puis relancer npm run validate:change. (${error.message})`);
   }
-  const match = output.match(/\b(\d+\.\d+\.\d+)\b/);
-  if (!match || match[1] !== ACTIONLINT_VERSION) {
+  if (parseActionlintVersion(output) !== ACTIONLINT_VERSION) {
     throw new Error(`Version actionlint invalide : ${output || 'inconnue'} ; v${ACTIONLINT_VERSION} attendue.`);
   }
   return command;
@@ -155,6 +163,7 @@ module.exports = {
   containsForbiddenGitMutation,
   findWritePermissions,
   listWorkflowFiles,
+  parseActionlintVersion,
   resolveActionlint,
   validateAgentRemoteWorkflowContract,
   validateWorkflowPolicy,
