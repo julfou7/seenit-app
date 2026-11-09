@@ -4,7 +4,7 @@ import { auth } from '../lib/firebase';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useShowsStore } from '../store/showsStore';
-import { hideSeenWanted } from '../features/downloads/wantedSeen';
+import { hideSeenWanted, seenWatchedRequest } from '../features/downloads/wantedSeen';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
 import { changeProgrammedQuality, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
@@ -95,7 +95,7 @@ const coveredBy = (item: ProgrammedItem, request: LiveDownloadItem) => Number(re
  * annulation). La liste vient de l'état Sonarr/Radarr synchronisé (SEENIT-DOWNLOAD-016) : la section ne lit
  * rien elle-même, et chaque action resynchronise cet état et la fiche concernée.
  */
-export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], onRemoveWatching }: { refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void }) {
+export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], onRemoveWatching }: { refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void }) {
   // Les identifiants viennent d'un serveur précis : la copie synchronisée est liée au compte et au serveur.
   const scope = programmedScope(useDownloadConfigStore());
   const snapshot = useArrSnapshot();
@@ -105,6 +105,8 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
   useEffect(() => { setHidden(new Set()); }, [syncedAt]);
   // Retour terrain du 09/11 (`USR-2026-11-09-016`) : un recherché déjà vu dans SeenIt depuis 24 h n'est plus listé.
   const shows = useShowsStore(state => state.shows);
+  // Revue Codex #928 : une demande suivie d'un film ou d'un épisode vu depuis 24 h suit la même règle.
+  const watching = watchingRequests.filter(entry => !seenWatchedRequest(entry, shows));
   const items = hideSeenWanted((snapshot?.programmed?.items || []).filter(item => !hidden.has(`${item.kind}:${item.id}`)), shows);
   const failures = snapshot?.programmed?.failures || [];
   const [busy, setBusy] = useState<string | null>(null);

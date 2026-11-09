@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { hideSeenWanted, seenLongEnough, SEEN_GRACE_MS } from '../src/features/downloads/wantedSeen.ts';
+import { hideSeenWanted, seenLongEnough, seenWatchedRequest, SEEN_GRACE_MS } from '../src/features/downloads/wantedSeen.ts';
 
 // Retour terrain du 09/11 sur la v1.4.286 : « oui il faut le retirer mais ajoute un délai de 24 h car des fois je
 // fais des tests vu non vu ou des fausses manip ».
@@ -34,4 +34,27 @@ test('SEENIT-DOWNLOAD-020 un recherché déjà vu dans SeenIt depuis 24 h quitte
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
   assert.match(section, /const items = hideSeenWanted\(\(snapshot\?\.programmed\?\.items \|\| \[\]\)\.filter\(item => !hidden\.has\(`\$\{item\.kind\}:\$\{item\.id\}`\)\), shows\);/, 'appliqué à la liste affichée, sans écriture Sonarr/Radarr');
   assert.doesNotMatch(readFileSync('src/features/downloads/wantedSeen.ts', 'utf8'), /executePut|executeDelete|unprogram/, 'affichage seul');
+});
+
+// Revue Codex #928 : Explorer marque un film vu sans `watchedAt` ; la Bibliothèque et la fiche personne n'écrivaient
+// aucune date. Un vu qui vient d'être fait ne doit jamais être pris pour un import ancien.
+test('SEENIT-DOWNLOAD-020 un vu sans watchedAt se date par lastWatchedAt puis par l’ajout du titre ; les demandes suivies suivent la même règle', () => {
+  const freshMovie = { tmdbId: 1, mediaType: 'movie', seenEpisodes: ['movie'], episodeRecords: {}, lastWatchedAt: now - hour, createdAt: now - 300 * 24 * hour };
+  const justAdded = { tmdbId: 2, mediaType: 'movie', seenEpisodes: ['movie'], episodeRecords: {}, createdAt: now - 2 * hour };
+  const oldImport = { tmdbId: 3, mediaType: 'movie', seenEpisodes: ['movie'], episodeRecords: {}, createdAt: now - 10 * 24 * hour };
+  assert.equal(seenLongEnough(freshMovie as never, 'movie', now), false, 'Explorer : lastWatchedAt récent');
+  assert.equal(seenLongEnough(justAdded as never, 'movie', now), false, 'ajouté vu à l’instant');
+  assert.equal(seenLongEnough(oldImport as never, 'movie', now), true, 'import ancien');
+  const shows = [mobland, freshMovie, oldImport] as never;
+  assert.equal(seenWatchedRequest({ mediaType: 'tv', tmdbId: 247718, seasonNumber: 2, episodeNumber: 1 }, shows, now), true, 'épisode précis vu depuis 30 h');
+  assert.equal(seenWatchedRequest({ mediaType: 'tv', tmdbId: 247718, seasonNumber: 2, episodeNumber: 2 }, shows, now), false, 'vu il y a 2 h');
+  assert.equal(seenWatchedRequest({ mediaType: 'tv', tmdbId: 247718, seasonNumber: 2 }, shows, now), false, 'demande de saison : toujours affichée');
+  assert.equal(seenWatchedRequest({ mediaType: 'movie', tmdbId: 3 }, shows, now), true, 'film vu depuis longtemps');
+  assert.equal(seenWatchedRequest({ mediaType: 'movie', tmdbId: 1 }, shows, now), false);
+  assert.equal(seenWatchedRequest({ mediaType: 'movie', tmdbId: 247718 }, shows, now), false, 'même numéro TMDB, autre type');
+  const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
+  assert.match(section, /const watching = watchingRequests\.filter\(entry => !seenWatchedRequest\(entry, shows\)\);/, 'appliqué avant de construire les cartes');
+  for (const file of ['src/screens/LibraryScreen.tsx', 'src/screens/PersonDetailModal.tsx']) {
+    assert.match(readFileSync(file, 'utf8'), /movie: \{ \.\.\.\(existingShow\.episodeRecords\?\.movie \|\| \{\}\), watchedAt: seenAt \}/, `${file} horodate le vu`);
+  }
 });
