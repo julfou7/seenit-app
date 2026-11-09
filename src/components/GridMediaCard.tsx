@@ -10,6 +10,7 @@ import { cn, checkIsUpToDate, computeAutoArchiveStatus, getTodayStr, getCalendar
 import { useShowsStore } from '../store/showsStore';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
+import { appLogger } from '../store/logStore';
 import type { Show } from '../types';
 
 export interface GridMediaCardProps {
@@ -22,7 +23,16 @@ export interface GridMediaCardProps {
   onLongPress?: (media: TMDBMedia) => void;
   hideBadges?: boolean;
   showProgress?: boolean;
+  /** Affiche fournie hors TMDB (Sonarr/Radarr), à défaut de `media.poster_path`. */
+  posterSrc?: string;
+  /**
+   * Action de la barre sous l'affiche, à la place de « Ajouter » / de l'état de suivi : Téléchargés reprend la
+   * carte d'Explorer avec « Retirer » (retour terrain du 09/11).
+   */
+  action?: GridCardAction;
 }
+
+export interface GridCardAction { label: string; ariaLabel: string; icon?: React.ReactNode; busy?: boolean; disabled?: boolean; onSelect: () => void }
 
 export const GridMediaCard = React.memo(function GridMediaCard({
   media,
@@ -33,7 +43,9 @@ export const GridMediaCard = React.memo(function GridMediaCard({
   onToggleWatched,
   onLongPress,
   hideBadges,
-  showProgress = false
+  showProgress = false,
+  posterSrc,
+  action
 }: GridMediaCardProps) {
   const isUpToDate = checkIsUpToDate(show);
 
@@ -49,8 +61,9 @@ export const GridMediaCard = React.memo(function GridMediaCard({
   const credit = media as TMDBMedia & { character?: string; job?: string; number_of_episodes?: number };
   const characterOrJob = credit.character || credit.job;
 
-  const isAtCinema = !isTv && (isMovieAtCinema(media) || isMovieAtCinema(show));
-  const isUpcoming = !isTv && !isAtCinema && (isMovieUpcoming(media) || isMovieUpcoming(show));
+  // Une carte à action (Téléchargés) montre un titre déjà présent : jamais « Au cinéma » ni « À venir ».
+  const isAtCinema = !action && !isTv && (isMovieAtCinema(media) || isMovieAtCinema(show));
+  const isUpcoming = !action && !isTv && !isAtCinema && (isMovieUpcoming(media) || isMovieUpcoming(show));
 
   const seenCount = isTv ? (show?.seenEpisodes?.length || 0) : 0;
   const totalEpisodes = show?.totalAiredEpisodes || show?.totalEpisodes || credit.number_of_episodes || 0;
@@ -194,11 +207,11 @@ export const GridMediaCard = React.memo(function GridMediaCard({
           className="block w-full text-left rounded-t-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E5A93D]/70 active:scale-[0.99] transition-transform"
         >
         <div className="relative aspect-[2/3] w-full bg-zinc-800">
-          {media.poster_path ? (
+          {media.poster_path || posterSrc ? (
             <img
               loading="lazy"
               decoding="async"
-              src={`https://image.tmdb.org/t/p/w342${media.poster_path}`}
+              src={media.poster_path ? `https://image.tmdb.org/t/p/w342${media.poster_path}` : posterSrc}
               className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               alt={displayTitle}
             />
@@ -243,7 +256,21 @@ export const GridMediaCard = React.memo(function GridMediaCard({
         </div>
         </button>
 
-        {!hideBadges && (
+        {action && (
+          <button
+            type="button"
+            aria-label={action.ariaLabel}
+            aria-busy={action.busy || undefined}
+            disabled={action.disabled || action.busy}
+            data-card-action=""
+            onClick={(e) => { e.stopPropagation(); action.onSelect(); }}
+            className="w-full py-1 text-center flex items-center justify-center gap-1 border-t text-[9px] font-extrabold uppercase tracking-wide cursor-pointer active:scale-95 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#E5A93D]/70 bg-[#1C1C1E] text-zinc-500 border-white/5 hover:text-zinc-300 hover:bg-white/5 disabled:opacity-60"
+          >
+            {action.icon}
+            <span>{action.label}</span>
+          </button>
+        )}
+        {!hideBadges && !action && (
           <button
             type="button"
             aria-label={quickActionLabel}
@@ -432,7 +459,7 @@ export function PreviewModal({
           }
         }
       } catch (err) {
-        console.error("Erreur lors du chargement des détails pour la prévisualisation:", err);
+        appLogger.warn('tmdb', 'Détails de la prévisualisation indisponibles', err);
       } finally {
         if (active) setLoadingTrailer(false);
       }

@@ -43,6 +43,7 @@ test('SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sa
         { id: 9, title: 'Film', tmdbId: 83533, monitored: true, hasFile: false, inCinemas: '2026-10-01', digitalRelease: '2026-12-17' },
         { id: 10, title: 'Déjà là', monitored: true, hasFile: true }
       ];
+      if (url.includes('/api/v3/wanted/missing')) return { page: 1, records: [] };
       throw new Error(url);
     },
     put: async () => undefined
@@ -101,6 +102,7 @@ test('SEENIT-DOWNLOAD-015 Programmés : qualité réelle, sortie numérique dist
         { id: 10, title: 'Cinéma seul', tmdbId: 2, monitored: true, qualityProfileId: 6, inCinemas: '2026-12-09' }];
       if (url.startsWith('http://radarr/api/v3/movie?tmdbId=3')) return [{ id: 30, tmdbId: 3, qualityProfileId: 4, inCinemas: '2026-11-04' }];
       if (url.startsWith('http://radarr/api/v3/movie?tmdbId=')) return [];
+      if (url.includes('/api/v3/wanted/missing')) return { page: 1, records: [] };
       throw new Error(url);
     },
     put: async () => undefined
@@ -126,4 +128,66 @@ test('SEENIT-DOWNLOAD-015 Programmés : qualité réelle, sortie numérique dist
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
   assert.match(section, /const items = \(snapshot\?\.programmed\?\.items \|\| \[\]\)/, 'bug d’affichage du 08/11 : la copie synchronisée reste affichée à la réouverture');
   assert.match(section, /notifyArrWrite\(media\);/, 'changer la qualité resynchronise l’état et la fiche');
+});
+
+// Décision du propriétaire du 09/11 (« pourquoi je ne vois pas tous ces films ») : ce que Sonarr/Radarr cherchent
+// encore — surveillé, déjà sorti, sans fichier — figure dans Programmés, marqué « recherché ».
+test('SEENIT-DOWNLOAD-020 Programmés : les recherchés (wanted/missing) rejoignent la liste, sans doublon, après les sorties à venir', async () => {
+  const urls: string[] = [];
+  const io = {
+    get: async (url: string) => {
+      urls.push(url);
+      if (url.endsWith('/api/v3/qualityprofile')) return [];
+      if (url.startsWith('http://sonarr/api/v3/calendar')) return [{ id: 1, seriesId: 5, seasonNumber: 2, episodeNumber: 3, airDateUtc: '2026-11-14T20:00:00Z', monitored: true, series: { title: 'A', tmdbId: 77, monitored: true } }];
+      if (url.startsWith('http://sonarr/api/v3/wanted/missing')) return { page: 1, totalRecords: 4, records: [
+        { id: 7, seriesId: 5, seasonNumber: 2, episodeNumber: 1, airDateUtc: '2026-10-31T20:00:00Z', monitored: true, hasFile: false, series: { title: 'A', tmdbId: 77, monitored: true } },
+        { id: 8, seriesId: 5, seasonNumber: 2, episodeNumber: 2, airDateUtc: '2026-11-06T20:00:00Z', monitored: true, series: { title: 'A', tmdbId: 77, monitored: true } },
+        { id: 1, seriesId: 5, seasonNumber: 2, episodeNumber: 3, airDateUtc: '2026-11-14T20:00:00Z', monitored: true, series: { title: 'A', tmdbId: 77, monitored: true } },
+        { id: 9, seriesId: 6, seasonNumber: 1, episodeNumber: 1, airDateUtc: '2026-11-01T20:00:00Z', monitored: true, series: { title: 'B', monitored: false } }
+      ] };
+      if (url.startsWith('http://radarr/api/v3/calendar')) return [];
+      if (url.startsWith('http://radarr/api/v3/wanted/missing')) return { page: 1, records: [
+        { id: 40, title: 'Blade Runner 2049', tmdbId: 335984, monitored: true, hasFile: false, isAvailable: true, inCinemas: '2017-10-04', digitalRelease: '2018-01-16' },
+        { id: 41, title: 'Le Chat Chapeauté', tmdbId: 1234, monitored: true, hasFile: false, isAvailable: false, inCinemas: '2026-11-04' },
+        { id: 42, title: 'Annoncé', tmdbId: 55, monitored: true, hasFile: false, isAvailable: false, digitalRelease: '2027-06-01' },
+        { id: 43, title: 'Déjà là', monitored: true, hasFile: true, isAvailable: true }
+      ] };
+      throw new Error(url);
+    },
+    put: async () => undefined
+  };
+  const { items, failures } = await calendar.fetchProgrammedCalendar(config, { now, io });
+  assert.deepEqual(failures, []);
+  const flags = (item: Record<string, unknown>) => `${item.kind}:${item.id}${item.wanted ? ':recherché' : ''}${item.inCinemasPast ? ':salle' : ''}`;
+  assert.deepEqual(items.map(item => flags(item as unknown as Record<string, unknown>)), ['episode:1', 'movie:42', 'episode:8:recherché', 'episode:7:recherché', 'movie:40:recherché', 'movie:41:salle'],
+    'à venir par date, puis recherchés du plus récent au plus ancien ; une série non surveillée et un film présent sont exclus');
+  assert.ok(urls.includes('http://sonarr/api/v3/wanted/missing?page=1&pageSize=100&monitored=true&includeSeries=true&sortKey=episodes.airDateUtc&sortDirection=descending'));
+  assert.ok(urls.includes('http://radarr/api/v3/wanted/missing?page=1&pageSize=100&monitored=true'));
+  assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), 'lecture acceptée par le proxy PWA');
+  // Une page wanted illisible est une panne de la source, jamais « rien de recherché » ; revue Codex #923 : le
+  // calendrier lu correctement reste affiché (les sorties à venir ne disparaissent pas).
+  for (const broken of [async () => '<html>login</html>', async () => { throw new Error('504'); }]) {
+    const partial = await calendar.fetchProgrammedCalendar(config, { now, io: { ...io, get: async (url: string) => url.includes('wanted/missing') ? broken() : io.get(url) } });
+    assert.deepEqual([...partial.failures].sort(), ['Radarr', 'Sonarr']);
+    assert.deepEqual(partial.items.map(item => `${item.kind}:${item.id}`), ['episode:1'], 'calendrier conservé, recherchés absents');
+  }
+  // Et l'inverse : calendrier en panne, recherchés lus.
+  const noCalendar = await calendar.fetchProgrammedCalendar(config, { now, io: { ...io, get: async (url: string) => url.includes('/calendar') ? Promise.reject(new Error('503')) : io.get(url) } });
+  assert.deepEqual([[...noCalendar.failures].sort(), noCalendar.items.length], [['Radarr', 'Sonarr'], 6]);
+});
+
+test('SEENIT-DOWNLOAD-020 Programmés : vue compacte par défaut, détaillée au choix, mémorisée par compte', () => {
+  const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
+  assert.match(section, /useState<ProgrammedLayout>\(\(\) => readUserScopedJson<ProgrammedLayout>\(auth\.currentUser\?\.uid, LAYOUT_FIELD, 'compact'\) === 'detailed' \? 'detailed' : 'compact'\)/, 'compact par défaut, relu par compte');
+  assert.match(section, /const switchLayout = \(next: ProgrammedLayout\) => \{ setLayout\(next\); writeUserScopedJson\(auth\.currentUser\?\.uid, LAYOUT_FIELD, next\); \};/, 'choix mémorisé par compte');
+  assert.match(section, /aria-label="Programmés en compact" aria-pressed=\{compact\}/);
+  assert.match(section, /aria-label="Programmés en détaillé" aria-pressed=\{!compact\}/);
+  assert.match(section, /\{card\.episodes && expanded\.has\(card\.key\) && card\.episodes\.rows\}/, 'compact : épisodes repliés jusqu’au chevron');
+  assert.match(section, /item\.wanted \? `Sorti \$\{pastDayLabel\(item\.date\)\} · recherché` : programmedDateLabel\(item\.date\)/, 'un recherché dit sa vraie date de sortie');
+  assert.match(readFileSync('src/screens/downloads.css', 'utf8'), /\.programmed-compact__title \{[^}]*overflow-wrap:anywhere/, 'titre entier en compact');
+  // Retour terrain du 09/11 : « supprime Sonarr et Radarr sous le titre, y a pas besoin ».
+  assert.match(section, /meta: meta\('Série', first\.quality, /);
+  assert.match(section, /meta: meta\('Film', movie\.quality\)/);
+  assert.match(section, /meta: meta\(requestScope\(entry\), quality\)/);
+  assert.doesNotMatch(section, /'(?:Série|Film) · (?:Sonarr|Radarr)'|isTv \? 'Sonarr' : 'Radarr', quality/);
 });

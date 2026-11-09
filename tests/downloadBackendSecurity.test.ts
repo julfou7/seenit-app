@@ -65,3 +65,19 @@ test('le proxy n’accepte que les chemins Sonarr Radarr et qBittorrent nécessa
   assert.equal(isAllowedServiceProxyPath('https://example.org/admin/export', 'GET'), false);
   assert.equal(isAllowedServiceProxyPath('https://example.org/api/v3/queue', 'PATCH'), false);
 });
+
+test('SEENIT-DOWNLOAD-021 proxy PWA : Retirer sort un média de Radarr/Sonarr sans jamais effacer de fichier ; wanted/missing en lecture', () => {
+  // v1.4.284 — « Retirer » de Téléchargés : sortie de Radarr/Sonarr seulement avec `deleteFiles=false` explicite,
+  // jamais d'effacement de fichier par le proxy (ni `true`, ni absent, ni paramètre doublé).
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/movie/9?deleteFiles=false&addImportExclusion=false', 'DELETE'), true);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/series/12?deleteFiles=false&addImportListExclusion=false', 'DELETE'), true);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/movie/9?deleteFiles=true', 'DELETE'), false);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/series/12?deleteFiles=false&deleteFiles=true', 'DELETE'), false);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/series/12?deleteFiles=False', 'DELETE'), false);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/episode/801?deleteFiles=false', 'DELETE'), false);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/movie?deleteFiles=false', 'DELETE'), false);
+  // Recherchés de Programmés : lecture seule de wanted/missing.
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/wanted/missing?page=1&pageSize=100&monitored=true', 'GET'), true);
+  assert.equal(isAllowedServiceProxyPath('https://sonarr.example/api/v3/wanted/missing', 'POST'), false);
+  assert.equal(isAllowedServiceProxyPath('https://radarr.example/api/v3/wanted/cutoff', 'GET'), false);
+});

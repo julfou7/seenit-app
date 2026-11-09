@@ -38,13 +38,19 @@ export function selectUserNotificationDevices(
 
 export function isAllowedServiceProxyPath(rawUrl: string, method: string): boolean {
   let pathname = '';
+  let search: URLSearchParams;
   try {
-    pathname = new URL(rawUrl).pathname.replace(/\/+$/, '') || '/';
+    const url = new URL(rawUrl);
+    pathname = url.pathname.replace(/\/+$/, '') || '/';
+    search = url.searchParams;
   } catch {
     return false;
   }
+  // « Retirer » de Téléchargés (v1.4.284) : un film ou une série sort de Radarr/Sonarr, fichiers toujours gardés.
+  // Le proxy n'accepte cette suppression qu'avec `deleteFiles=false` explicite : jamais d'effacement de fichier.
+  if (method === 'DELETE' && /^\/api\/v3\/(?:series|movie)\/\d+$/.test(pathname)) return search.get('deleteFiles') === 'false' && search.getAll('deleteFiles').length === 1;
   const allowed: Array<{ method: string; path: RegExp }> = [
-    { method: 'GET', path: /^\/api\/v3\/(?:system\/status|qualityprofile|rootfolder|health|indexer|config\/indexer|series(?:\/lookup)?|episode|movie(?:\/lookup)?|queue|history(?:\/since)?|calendar|release|parse|notification(?:\/schema)?)$/ },
+    { method: 'GET', path: /^\/api\/v3\/(?:system\/status|qualityprofile|rootfolder|health|indexer|config\/indexer|series(?:\/lookup)?|episode|movie(?:\/lookup)?|queue|history(?:\/since)?|calendar|wanted\/missing|release|parse|notification(?:\/schema)?)$/ },
     // Lecture d'une ressource par identifiant (programmation, déprogrammation, nettoyage de pack) : GET seul.
     { method: 'GET', path: /^\/api\/v3\/(?:series|episode|movie)\/\d+$/ },
     { method: 'POST', path: /^\/api\/v3\/(?:series|movie|command|release(?:\/push)?|notification)$/ },

@@ -1,8 +1,44 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.283",
+  "applicationVersion": "1.4.284",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
+    {
+      "id": "SEENIT-DOWNLOAD-020",
+      "title": "Programmés montre les recherchés (wanted/missing) et se lit en compact ou en détaillé",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/programmedCalendar.test.ts",
+          "contains": "SEENIT-DOWNLOAD-020 Programmés : les recherchés (wanted/missing) rejoignent la liste, sans doublon, après les sorties à venir"
+        },
+        {
+          "file": "tests/programmedCalendar.test.ts",
+          "contains": "SEENIT-DOWNLOAD-020 Programmés : vue compacte par défaut, détaillée au choix, mémorisée par compte"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-021",
+      "title": "Téléchargés reprend la carte d'Explorer ; Retirer sort de Radarr/Sonarr en gardant les fichiers",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/recentImports.test.ts",
+          "contains": "SEENIT-DOWNLOAD-021 Téléchargés : identifiant, année et note de la carte ; Retirer garde les fichiers et les séries encore programmées"
+        },
+        {
+          "file": "tests/downloadBackendSecurity.test.ts",
+          "contains": "SEENIT-DOWNLOAD-021"
+        }
+      ]
+    },
     {
       "id": "SEENIT-DOWNLOAD-019",
       "title": "Le mode téléchargement est bleu ; le rappel et le Vu restent en or",

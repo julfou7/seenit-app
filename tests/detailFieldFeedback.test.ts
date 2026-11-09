@@ -43,9 +43,10 @@ test('SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente
   assert.match(screen, /const transitions = `\$\{activeDownloads\.length\}:\$\{completedDownloads\.length\}:\$\{errorDownloads\.length\}:\$\{watchedRequests\.map\(item => item\.id\)\.join\(','\)\}`;/);
   assert.match(screen, /if \(lastTransitions\.current === transitions\) return;[\s\S]{0,80}setProgrammedRefresh\(key => key \+ 1\);/);
   const programmed = read('src/components/ProgrammedSection.tsx');
-  assert.match(programmed, /data-programmed-request=\{entry\.id\}/);
+  assert.match(programmed, /data: \{ 'data-programmed-request': entry\.id \}/);
   // Refonte du 08/11 puis v1.4.281 : une pastille de date (sortie numérique, cinéma…) au lieu de la phrase bleue.
-  assert.match(programmed, /const pill = item \? releasePill\(item\.date, item\.kind === 'movie' \? item\.dateKind : 'air'\) : isTv \? 'Pas encore de version' : watchedMoviePill\(/);
+  // v1.4.284 : un film couvert garde sa raison exacte (sortie, recherché ou salle) ; un épisode, sa date ou « recherché ».
+  assert.match(programmed, /const pill = item \? item\.kind === 'movie' \? programmedMoviePill\(item\) : itemPill\(item\) : isTv \? 'Pas encore de version' : watchedMoviePill\(/);
   assert.match(programmed, /Number\(item\.tmdbId\) === Number\(request\.tmdbId\)/, 'doublon calendrier reconnu par TMDB exact, jamais le titre');
   const card = read('src/components/DownloadItemCard.tsx');
   assert.match(card, /waiting \? \(item\.availability\?\.reason === 'no_release' \? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier'\)/);

@@ -7,7 +7,7 @@ import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
 type DownloadConfig = ReturnType<typeof useDownloadConfigStore.getState>;
 type ArrImage = { coverType?: string; remoteUrl?: string; url?: string };
 type CalendarEpisode = { id?: number; seriesId?: number; seasonNumber?: number; episodeNumber?: number; title?: string; airDateUtc?: string; airDate?: string; monitored?: boolean; hasFile?: boolean; series?: { title?: string; tmdbId?: number; tvdbId?: number; monitored?: boolean; qualityProfileId?: number; images?: ArrImage[] } };
-type CalendarMovie = { id?: number; title?: string; tmdbId?: number; monitored?: boolean; hasFile?: boolean; qualityProfileId?: number; digitalRelease?: string; physicalRelease?: string; inCinemas?: string; images?: ArrImage[] };
+type CalendarMovie = { id?: number; title?: string; tmdbId?: number; monitored?: boolean; hasFile?: boolean; isAvailable?: boolean; qualityProfileId?: number; digitalRelease?: string; physicalRelease?: string; inCinemas?: string; images?: ArrImage[] };
 
 /** Retour terrain du 08/11 : la date d'un film dit de quelle sortie il s'agit (seule une version numérique ou
  * physique se télécharge ; une sortie au cinéma seule ne donne pas encore de version). */
@@ -15,9 +15,13 @@ export type ReleaseKind = 'air' | 'digital' | 'physical' | 'cinema';
 /** Qualité réellement demandée à Sonarr/Radarr (profil de la série ou du film). */
 export type ProgrammedQuality = string;
 
+/**
+ * `wanted` : déjà sorti, surveillé et sans fichier — Sonarr/Radarr le cherchent encore (« Recherché », décision du
+ * propriétaire du 09/11, `USR-2026-11-09-009`). `inCinemasPast` : film sorti en salle sans date numérique connue.
+ */
 export type ProgrammedItem =
-  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number }
-  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number };
+  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean }
+  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; inCinemasPast?: boolean };
 
 export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[] }
 
@@ -53,6 +57,12 @@ const readProfiles = async (io: CalendarIo, url: string, apiKey: string): Promis
 };
 const headersFor = (apiKey: string) => ({ 'X-Api-Key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' });
 const iso = (time: number) => new Date(time).toISOString();
+/** Page `wanted/missing` (Sonarr v4, Radarr v5) : `{ records: [...] }` ; toute autre réponse est une panne. */
+const wantedRecords = <T,>(page: unknown): T[] | null => {
+  const records = (page as { records?: unknown } | null)?.records;
+  return Array.isArray(records) ? records as T[] : null;
+};
+const WANTED_PAGE = 'page=1&pageSize=100&monitored=true';
 
 /**
  * #879 — Section « Programmés » de l'onglet Télécharger (maquette DlOngletSuivi) : ce que Sonarr et
@@ -67,30 +77,49 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
   const tasks: Promise<void>[] = [];
   if (config.sonarrUrl && config.sonarrApiKey) {
     const { sonarrUrl, sonarrApiKey } = config;
-    tasks.push(Promise.all([io.get(`${cleanUrl(sonarrUrl)}/api/v3/calendar?${range}&includeSeries=true`, headersFor(sonarrApiKey)), readProfiles(io, sonarrUrl, sonarrApiKey)]).then(([list, profiles]) => {
-      // Une page de connexion HTML ou toute réponse non tableau est une panne, pas un calendrier vide.
-      if (!Array.isArray(list)) { result.failures.push('Sonarr'); return; }
-      for (const entry of list as CalendarEpisode[]) {
-        if (!entry.id || entry.monitored !== true || entry.hasFile === true || entry.series?.monitored === false) continue;
+    const base = cleanUrl(sonarrUrl);
+    tasks.push(Promise.all([io.get(`${base}/api/v3/calendar?${range}&includeSeries=true`, headersFor(sonarrApiKey)).catch(() => null), readProfiles(io, sonarrUrl, sonarrApiKey),
+      io.get(`${base}/api/v3/wanted/missing?${WANTED_PAGE}&includeSeries=true&sortKey=episodes.airDateUtc&sortDirection=descending`, headersFor(sonarrApiKey)).catch(() => null)]).then(([list, profiles, wantedPage]) => {
+      // Une page de connexion HTML ou toute réponse non tableau est une panne, pas un calendrier vide. Revue Codex
+      // #923 : calendrier et recherchés sont lus indépendamment — une panne de l'un garde l'autre et signale la source.
+      const calendar = Array.isArray(list) ? list as CalendarEpisode[] : null;
+      const wanted = wantedRecords<CalendarEpisode>(wantedPage);
+      if (!calendar || !wanted) result.failures.push('Sonarr');
+      const seen = new Set<number>();
+      for (const entry of [...calendar || [], ...wanted || []]) {
+        if (!entry.id || seen.has(entry.id) || entry.monitored !== true || entry.hasFile === true || entry.series?.monitored === false) continue;
+        seen.add(entry.id);
         const profileId = Number(entry.series?.qualityProfileId) || undefined;
-        result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date: entry.airDateUtc || entry.airDate, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }) });
+        const date = entry.airDateUtc || entry.airDate;
+        result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }), ...(date && Date.parse(date) < now ? { wanted: true } : {}) });
       }
     }, () => { result.failures.push('Sonarr'); }));
   }
   if (config.radarrUrl && config.radarrApiKey) {
     const { radarrUrl, radarrApiKey } = config;
-    tasks.push(Promise.all([io.get(`${cleanUrl(radarrUrl)}/api/v3/calendar?${range}`, headersFor(radarrApiKey)), readProfiles(io, radarrUrl, radarrApiKey)]).then(([list, profiles]) => {
-      if (!Array.isArray(list)) { result.failures.push('Radarr'); return; }
-      for (const movie of list as CalendarMovie[]) {
-        if (!movie.id || movie.monitored !== true || movie.hasFile === true) continue;
+    const base = cleanUrl(radarrUrl);
+    tasks.push(Promise.all([io.get(`${base}/api/v3/calendar?${range}`, headersFor(radarrApiKey)).catch(() => null), readProfiles(io, radarrUrl, radarrApiKey),
+      io.get(`${base}/api/v3/wanted/missing?${WANTED_PAGE}`, headersFor(radarrApiKey)).catch(() => null)]).then(([list, profiles, wantedPage]) => {
+      const calendar = Array.isArray(list) ? list as CalendarMovie[] : null;
+      const wanted = wantedRecords<CalendarMovie>(wantedPage);
+      if (!calendar || !wanted) result.failures.push('Radarr');
+      const seen = new Set<number>();
+      for (const movie of [...calendar || [], ...wanted || []]) {
+        if (!movie.id || seen.has(movie.id) || movie.monitored !== true || movie.hasFile === true) continue;
+        seen.add(movie.id);
         const release = movieRelease(movie, now);
         const profileId = Number(movie.qualityProfileId) || undefined;
-        result.items.push({ kind: 'movie', id: movie.id, tmdbId: movie.tmdbId || undefined, title: movie.title || 'Film', date: release.date, dateKind: release.kind, posterUrl: poster(movie.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.radarr1080pProfileId, uhd: config.radarr4kProfileId }) });
+        // Sans sortie à venir : disponible selon Radarr → recherché ; sinon sorti en salle, version pas encore annoncée.
+        const extra = release.date ? {} : movie.isAvailable === true ? { wanted: true } : release.inCinemasPast ? { inCinemasPast: true } : {};
+        result.items.push({ kind: 'movie', id: movie.id, tmdbId: movie.tmdbId || undefined, title: movie.title || 'Film', date: release.date, dateKind: release.kind, posterUrl: poster(movie.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.radarr1080pProfileId, uhd: config.radarr4kProfileId }), ...extra });
       }
     }, () => { result.failures.push('Radarr'); }));
   }
   await Promise.all(tasks);
-  result.items.sort((a, b) => (a.date ? Date.parse(a.date) : Infinity) - (b.date ? Date.parse(b.date) : Infinity));
+  // À venir d'abord, par date ; puis les recherchés, les plus récents en tête ; enfin les dates inconnues.
+  const rank = (item: ProgrammedItem) => item.wanted ? 1 : item.date ? 0 : 2;
+  const time = (item: ProgrammedItem) => item.date ? Date.parse(item.date) : 0;
+  result.items.sort((a, b) => rank(a) - rank(b) || (rank(a) === 1 ? time(b) - time(a) : time(a) - time(b)));
   return result;
 }
 
