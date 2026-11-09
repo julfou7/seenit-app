@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Clock3, Film, MoreHorizontal, Tv, X } from 'lucide-react';
+import { ChevronDown, Clock3, Film, MoreHorizontal, Tv, X } from 'lucide-react';
+import { auth } from '../lib/firebase';
+import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
@@ -30,6 +32,29 @@ export function watchedMoviePill(details: WatchedMovie | undefined): string {
   if (details?.inCinemasPast) return 'Déjà au cinéma · sortie numérique pas encore annoncée';
   return details ? 'Date de sortie pas encore annoncée' : 'Pas encore de version';
 }
+/** Décision du 09/11 (`USR-2026-11-09-009`) : sorti, surveillé, sans fichier — Sonarr/Radarr le cherchent encore. */
+export const WANTED_PILL = 'Recherché · pas encore de version';
+/** Pastille d'un film du calendrier ou recherché : sa sortie, sinon la raison exacte. */
+export function programmedMoviePill(movie: Pick<MovieItem, 'date' | 'dateKind' | 'wanted' | 'inCinemasPast'>): string {
+  if (movie.date) return releasePill(movie.date, movie.dateKind);
+  if (movie.wanted) return WANTED_PILL;
+  return movie.inCinemasPast ? 'Déjà au cinéma · sortie numérique pas encore annoncée' : 'Date à venir';
+}
+const itemPill = (item: EpisodeItem) => item.wanted ? WANTED_PILL : releasePill(item.date);
+/** Jour de sortie passé d'un épisode recherché (« sam. 31 oct. »). */
+const pastDayLabel = (date?: string) => date ? new Date(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+
+/** v1.4.284 (retour terrain du 09/11 : « une vue compacte ? la hauteur varie d'une série à l'autre ») : une ligne
+ * de hauteur régulière par titre, épisodes repliés ; la vue détaillée reste au choix, mémorisée par compte. */
+export type ProgrammedLayout = 'compact' | 'detailed';
+const LAYOUT_FIELD = 'downloads.programmed.layout';
+interface ProgrammedCard {
+  key: string; data: Record<string, number | string>; name: string; isTv: boolean; poster?: string | null; meta: string; pill: string;
+  open: () => unknown; canOpen: boolean;
+  actions: { open: boolean; button: React.ReactNode; panel: React.ReactNode } | null;
+  episodes?: { summary: string; rows: React.ReactNode };
+}
+
 const When = ({ children }: { children: React.ReactNode }) => <span className="programmed__when"><Clock3 size={13} aria-hidden="true" />{children}</span>;
 const code = (item: EpisodeItem) => `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`;
 const pad = (value: number) => String(value).padStart(2, '0');
@@ -68,6 +93,9 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
   const failures = snapshot?.programmed?.failures || [];
   const [busy, setBusy] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
+  const [layout, setLayout] = useState<ProgrammedLayout>(() => readUserScopedJson<ProgrammedLayout>(auth.currentUser?.uid, LAYOUT_FIELD, 'compact') === 'detailed' ? 'detailed' : 'compact');
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleExpanded = (key: string) => setExpanded(previous => { const next = new Set(previous); if (!next.delete(key)) next.add(key); return next; });
   useEffect(() => { void useArrSyncStore.getState().sync(); }, [refreshKey, scope]);
 
   // Film suivi absent du calendrier : ses dates, sa qualité et son identifiant Radarr font partie de la copie
@@ -142,77 +170,88 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
         <button type="button" disabled={busy !== null} onClick={onCancel}><X size={15} aria-hidden="true" />{cancelLabel}</button>
       </div> };
   };
-  const poster = (url: string | null | undefined, isTv: boolean, name: string, onOpen: () => void, disabled: boolean) => <button type="button" className="download-card__poster download-season__poster" disabled={disabled} aria-label={`Ouvrir ${name}`} onClick={onOpen}>{url ? <img src={url} alt="" loading="lazy" decoding="async" /> : isTv ? <Tv size={22} /> : <Film size={22} />}</button>;
+  // Retour terrain du 09/11 : « supprime Sonarr et Radarr sous le titre, y a pas besoin » — type, qualité, nombre.
   const meta = (...parts: Array<string | undefined | false>) => parts.filter(Boolean).join(' · ');
+  const compact = layout === 'compact';
 
-  return <section className="downloads-section" data-programmed>
-    <h2>Programmés</h2>
+  // Chaque carte est décrite une fois puis rendue en vue détaillée ou compacte (v1.4.284).
+  const cards: ProgrammedCard[] = [];
+  for (const entry of watching) {
+    const isTv = entry.mediaType === 'tv';
+    const name = entry.movieTitle || entry.seriesTitle || entry.title;
+    const item = covering.get(entry.id);
+    const details = !isTv && !item && Number(entry.tmdbId) > 0 ? watchedMovies[Number(entry.tmdbId)] : undefined;
+    const quality = item?.quality || details?.quality || entry.quality;
+    const pill = item ? item.kind === 'movie' ? programmedMoviePill(item) : itemPill(item) : isTv ? 'Pas encore de version' : watchedMoviePill(Number(entry.tmdbId) in watchedMovies ? details : undefined);
+    const radarrId = item?.kind === 'movie' ? item.id : details?.id;
+    cards.push({ key: `w${entry.id}`, data: { 'data-programmed-request': entry.id }, name, isTv, poster: posterUrl(entry.posterPath), meta: meta(requestScope(entry), quality), pill,
+      open: () => entry.tmdbId && onShowClick?.(entry.tmdbId, entry.mediaType), canOpen: Boolean(entry.tmdbId && onShowClick),
+      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }) : null, () => { setMenu(null); onRemoveWatching(entry); }) : null });
+  }
+  for (const group of series.values()) {
+    const first = group[0];
+    const upcoming = group.filter(item => !item.wanted).map(item => item.date).filter((value): value is string => Boolean(value)).sort()[0];
+    const wantedCount = group.filter(item => item.wanted).length;
+    cards.push({ key: `s${first.seriesId}`, data: { 'data-programmed-series': first.seriesId }, name: first.seriesTitle, isTv: true, poster: first.posterUrl,
+      meta: meta('Série', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`),
+      pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : WANTED_PILL,
+      open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
+      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }), () => void cancel(group, first.seriesTitle), group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation'),
+      episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, rows: <ul className="download-season__rows">
+        {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
+          <span className="download-season__code">{code(item)}</span>
+          <span className="programmed__row-text">
+            <span className="programmed__row-title" data-untitled={isUntitledEpisode(item) || undefined}>{isUntitledEpisode(item) ? 'Titre à venir' : item.title}</span>
+            <span className="programmed__row-date" data-wanted={item.wanted || undefined}>{item.wanted ? `Sorti ${pastDayLabel(item.date)} · recherché` : programmedDateLabel(item.date)}</span>
+          </span>
+          {rowCancel(item, `${first.seriesTitle} ${code(item)}`)}
+        </li>)}
+      </ul> } });
+  }
+  for (const movie of movies) {
+    cards.push({ key: `m${movie.id}`, data: { 'data-programmed-movie': movie.id }, name: movie.title, isTv: false, poster: movie.posterUrl, meta: meta('Film', movie.quality), pill: programmedMoviePill(movie),
+      open: () => movie.tmdbId && onShowClick?.(movie.tmdbId, 'movie'), canOpen: Boolean(movie.tmdbId && onShowClick),
+      actions: cardMenu(`m${movie.id}`, movie.title, movie.quality, choice => void changeQuality({ kind: 'movie', id: movie.id }, choice, movie.title, { tmdbId: movie.tmdbId, mediaType: 'movie' }), () => void cancel([movie], movie.title)) });
+  }
+  const posterButton = (card: ProgrammedCard, className: string) => <button type="button" className={className} disabled={!card.canOpen} aria-label={`Ouvrir ${card.name}`} onClick={card.open}>{card.poster ? <img src={card.poster} alt="" loading="lazy" decoding="async" /> : card.isTv ? <Tv size={20} /> : <Film size={20} />}</button>;
+  const switchLayout = (next: ProgrammedLayout) => { setLayout(next); writeUserScopedJson(auth.currentUser?.uid, LAYOUT_FIELD, next); };
+
+  return <section className="downloads-section" data-programmed data-layout={layout}>
+    <div className="programmed-head">
+      <h2>Programmés</h2>
+      <div className="programmed-layout" role="group" aria-label="Présentation de Programmés">
+        <button type="button" aria-label="Programmés en compact" aria-pressed={compact} onClick={() => switchLayout('compact')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="3.5" rx="1.5" /><rect x="3" y="10.25" width="18" height="3.5" rx="1.5" /><rect x="3" y="16.5" width="18" height="3.5" rx="1.5" /></svg></button>
+        <button type="button" aria-label="Programmés en détaillé" aria-pressed={!compact} onClick={() => switchLayout('detailed')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="8" rx="2.5" /><rect x="3" y="13" width="18" height="8" rx="2.5" /></svg></button>
+      </div>
+    </div>
     {failures.length > 0 && <p className="download-card__meta" role="status">{failures.join(' et ')} injoignable pour l’instant : la liste peut être incomplète.</p>}
-    {watching.map(entry => {
-      const isTv = entry.mediaType === 'tv';
-      const name = entry.movieTitle || entry.seriesTitle || entry.title;
-      const open = () => entry.tmdbId && onShowClick?.(entry.tmdbId, entry.mediaType);
-      const item = covering.get(entry.id);
-      const details = !isTv && !item && Number(entry.tmdbId) > 0 ? watchedMovies[Number(entry.tmdbId)] : undefined;
-      const quality = item?.quality || details?.quality || entry.quality;
-      const pill = item ? releasePill(item.date, item.kind === 'movie' ? item.dateKind : 'air') : isTv ? 'Pas encore de version' : watchedMoviePill(Number(entry.tmdbId) in watchedMovies ? details : undefined);
-      const radarrId = item?.kind === 'movie' ? item.id : details?.id;
-      const actions = cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }) : null, () => { setMenu(null); onRemoveWatching?.(entry); });
-      return <article key={`w${entry.id}`} className="download-card programmed" data-programmed-request={entry.id}>
-        <div className="download-card__head">
-          {poster(posterUrl(entry.posterPath), isTv, name, open, !entry.tmdbId || !onShowClick)}
-          <div className="download-card__body">
-            <button type="button" className="download-card__title" disabled={!entry.tmdbId || !onShowClick} onClick={open}>{name}</button>
-            <p className="programmed__meta">{meta(requestScope(entry), isTv ? 'Sonarr' : 'Radarr', quality)}</p>
-            <div className="programmed__foot"><When>{pill}</When></div>
+    {cards.map(card => compact
+      ? <article key={card.key} className="programmed-compact" {...card.data}>
+        <div className="programmed-compact__row">
+          {posterButton(card, 'programmed-compact__poster')}
+          <div className="programmed-compact__body">
+            <button type="button" className="programmed-compact__title" disabled={!card.canOpen} onClick={card.open}>{card.name}</button>
+            <p className="programmed__meta">{card.meta}</p>
+            <span className="programmed-compact__when">{card.pill}</span>
           </div>
-          {onRemoveWatching && actions.button}
+          {card.episodes && <button type="button" className="programmed-compact__expand" aria-expanded={expanded.has(card.key)} aria-label={`${expanded.has(card.key) ? 'Replier' : 'Voir'} les épisodes de ${card.name} (${card.episodes.summary})`} onClick={() => toggleExpanded(card.key)}><ChevronDown size={20} aria-hidden="true" /></button>}
+          {card.actions?.button}
         </div>
-        {actions.panel}
-      </article>;
-    })}
-    {[...series.values()].map(group => {
-      const first = group[0];
-      const open = () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv');
-      const actions = cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }), () => void cancel(group, first.seriesTitle), group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation');
-      return <article key={`s${first.seriesId}`} className="download-card programmed" data-programmed-series={first.seriesId}>
+        {card.actions?.panel}
+        {card.episodes && expanded.has(card.key) && card.episodes.rows}
+      </article>
+      : <article key={card.key} className="download-card programmed" {...card.data}>
         <div className="download-card__head">
-          {poster(first.posterUrl, true, first.seriesTitle, open, !first.tmdbId || !onShowClick)}
+          {posterButton(card, 'download-card__poster download-season__poster')}
           <div className="download-card__body">
-            <button type="button" className="download-card__title" disabled={!first.tmdbId || !onShowClick} onClick={open}>{first.seriesTitle}</button>
-            <p className="programmed__meta">{meta('Série · Sonarr', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`)}</p>
-            <div className="programmed__foot"><When>{releasePill(group.map(item => item.date).filter((value): value is string => Boolean(value)).sort()[0])}</When></div>
+            <button type="button" className="download-card__title" disabled={!card.canOpen} onClick={card.open}>{card.name}</button>
+            <p className="programmed__meta">{card.meta}</p>
+            <div className="programmed__foot"><When>{card.pill}</When></div>
           </div>
-          {actions.button}
+          {card.actions?.button}
         </div>
-        {actions.panel}
-        <ul className="download-season__rows">
-          {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
-            <span className="download-season__code">{code(item)}</span>
-            <span className="programmed__row-text">
-              <span className="programmed__row-title" data-untitled={isUntitledEpisode(item) || undefined}>{isUntitledEpisode(item) ? 'Titre à venir' : item.title}</span>
-              <span className="programmed__row-date">{programmedDateLabel(item.date)}</span>
-            </span>
-            {rowCancel(item, `${first.seriesTitle} ${code(item)}`)}
-          </li>)}
-        </ul>
-      </article>;
-    })}
-    {movies.map(movie => {
-      const open = () => movie.tmdbId && onShowClick?.(movie.tmdbId, 'movie');
-      const actions = cardMenu(`m${movie.id}`, movie.title, movie.quality, choice => void changeQuality({ kind: 'movie', id: movie.id }, choice, movie.title, { tmdbId: movie.tmdbId, mediaType: 'movie' }), () => void cancel([movie], movie.title));
-      return <article key={`m${movie.id}`} className="download-card programmed" data-programmed-movie={movie.id}>
-        <div className="download-card__head">
-          {poster(movie.posterUrl, false, movie.title, open, !movie.tmdbId || !onShowClick)}
-          <div className="download-card__body">
-            <button type="button" className="download-card__title" disabled={!movie.tmdbId || !onShowClick} onClick={open}>{movie.title}</button>
-            <p className="programmed__meta">{meta('Film · Radarr', movie.quality)}</p>
-            <div className="programmed__foot"><When>{releasePill(movie.date, movie.dateKind)}</When></div>
-          </div>
-          {actions.button}
-        </div>
-        {actions.panel}
-      </article>;
-    })}
+        {card.actions?.panel}
+        {card.episodes?.rows}
+      </article>)}
   </section>;
 }

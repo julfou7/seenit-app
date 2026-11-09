@@ -1,4 +1,4 @@
-import { cleanUrl, executeGet } from '../../services/sonarrRadarr';
+import { cleanUrl, executeDelete, executeGet } from '../../services/sonarrRadarr';
 import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
 
@@ -6,14 +6,18 @@ type DownloadConfig = ReturnType<typeof useDownloadConfigStore.getState>;
 type ArrImage = { coverType?: string; remoteUrl?: string };
 type HistoryRecord = {
   eventType?: unknown; date?: string; seriesId?: number; movieId?: number;
-  series?: { title?: string; tmdbId?: number; tvdbId?: number; images?: ArrImage[] };
+  series?: { title?: string; tmdbId?: number; tvdbId?: number; year?: number; images?: ArrImage[]; ratings?: { value?: number } };
   episode?: { seasonNumber?: number; episodeNumber?: number };
-  movie?: { title?: string; tmdbId?: number; images?: ArrImage[] };
+  movie?: { title?: string; tmdbId?: number; year?: number; images?: ArrImage[]; ratings?: { tmdb?: { value?: number }; imdb?: { value?: number } } };
 };
 
+/**
+ * Import de la rangée « Téléchargés ». `arrId` est l'identifiant Sonarr (série) ou Radarr (film) du serveur lu ;
+ * `year` et `rating` alimentent la carte d'Explorer reprise depuis la v1.4.284.
+ */
 export type RecentImport =
-  | { kind: 'series'; key: string; tmdbId?: number; title: string; posterUrl?: string; date: number; episodes: Array<{ season: number; episode: number }> }
-  | { kind: 'movie'; key: string; tmdbId?: number; title: string; posterUrl?: string; date: number };
+  | { kind: 'series'; key: string; arrId: number; tmdbId?: number; title: string; posterUrl?: string; year?: number; rating?: number; date: number; episodes: Array<{ season: number; episode: number }> }
+  | { kind: 'movie'; key: string; arrId: number; tmdbId?: number; title: string; posterUrl?: string; year?: number; rating?: number; date: number };
 
 export interface RecentImports { items: RecentImport[]; failures: string[] }
 export type RecentImportsGet = (url: string, headers: Record<string, string>) => Promise<unknown>;
@@ -24,6 +28,7 @@ const headersFor = (apiKey: string) => ({ 'X-Api-Key': apiKey, Accept: 'applicat
 // 3 = downloadFolderImported : le fichier est réellement dans la bibliothèque (Sonarr comme Radarr).
 const imported = (record: HistoryRecord) => Number(record.eventType) === 3 || /downloadfolderimported/i.test(String(record.eventType || ''));
 const when = (record: HistoryRecord) => { const time = Date.parse(record.date || ''); return Number.isFinite(time) ? time : 0; };
+const positive = (value: unknown) => { const number = Number(value); return Number.isFinite(number) && number > 0 ? number : undefined; };
 
 /**
  * Rangée « Téléchargés · 7 derniers jours » de l'onglet Télécharger (maquette DlOngletSuivi) : les imports
@@ -45,7 +50,7 @@ export async function fetchRecentImports(config: DownloadConfig, { now = Date.no
       for (const record of list as HistoryRecord[]) {
         const season = Number(record.episode?.seasonNumber), episode = Number(record.episode?.episodeNumber), seriesId = Number(record.seriesId);
         if (!imported(record) || !seriesId || !Number.isInteger(season) || !Number.isInteger(episode)) continue;
-        const entry = series.get(seriesId) || { kind: 'series' as const, key: `s${seriesId}`, tmdbId: record.series?.tmdbId || undefined, title: record.series?.title || 'Série', posterUrl: poster(record.series?.images), date: 0, episodes: [] };
+        const entry = series.get(seriesId) || { kind: 'series' as const, key: `s${seriesId}`, arrId: seriesId, tmdbId: record.series?.tmdbId || undefined, title: record.series?.title || 'Série', posterUrl: poster(record.series?.images), year: positive(record.series?.year), rating: positive(record.series?.ratings?.value), date: 0, episodes: [] };
         if (!entry.episodes.some(value => value.season === season && value.episode === episode)) entry.episodes.push({ season, episode });
         entry.date = Math.max(entry.date, when(record));
         series.set(seriesId, entry);
@@ -58,7 +63,7 @@ export async function fetchRecentImports(config: DownloadConfig, { now = Date.no
       for (const record of list as HistoryRecord[]) {
         const movieId = Number(record.movieId);
         if (!imported(record) || !movieId) continue;
-        const entry = movies.get(movieId) || { kind: 'movie' as const, key: `m${movieId}`, tmdbId: record.movie?.tmdbId || undefined, title: record.movie?.title || 'Film', posterUrl: poster(record.movie?.images), date: 0 };
+        const entry = movies.get(movieId) || { kind: 'movie' as const, key: `m${movieId}`, arrId: movieId, tmdbId: record.movie?.tmdbId || undefined, title: record.movie?.title || 'Film', posterUrl: poster(record.movie?.images), year: positive(record.movie?.year), rating: positive(record.movie?.ratings?.tmdb?.value ?? record.movie?.ratings?.imdb?.value), date: 0 };
         entry.date = Math.max(entry.date, when(record));
         movies.set(movieId, entry);
       }
@@ -101,3 +106,31 @@ export function coveredByRecentImport(imports: RecentImport[], media: { mediaTyp
 
 /** Portée serveur : une liste lue sur un serveur n'est jamais affichée pour un autre. */
 export const recentImportsScope = (config: DownloadConfig) => [isDownloadFeatureEnabled(config), cleanUrl(config.sonarrUrl || ''), config.sonarrApiKey || '', cleanUrl(config.radarrUrl || ''), config.radarrApiKey || ''].join('\n');
+
+type ArrEpisode = { monitored?: boolean; hasFile?: boolean };
+export type RecentImportsDelete = (url: string, headers: Record<string, string>) => Promise<unknown>;
+/** `removed` : sorti de Sonarr/Radarr ; `kept` : série gardée dans Sonarr car des épisodes y sont encore programmés. */
+export type RemoveOutcome = 'removed' | 'kept';
+
+/**
+ * « Retirer » d'une carte Téléchargés (retour terrain et décision du propriétaire du 09/11, `USR-2026-11-09-008`) :
+ * - film : retiré de Radarr ;
+ * - série : retirée de Sonarr seulement si aucun épisode n'y est encore attendu (surveillé sans fichier, donc
+ *   programmé) ; sinon elle y reste et la suite continue d'arriver ;
+ * - les fichiers sont toujours gardés (`deleteFiles=false`) : Plex garde le titre.
+ * L'identifiant vient de la copie synchronisée du même compte et du même serveur (vérifié par l'appelant).
+ */
+export async function removeRecentImport(config: DownloadConfig, item: RecentImport, { get = executeGet as RecentImportsGet, del = executeDelete as RecentImportsDelete }: { get?: RecentImportsGet; del?: RecentImportsDelete } = {}): Promise<RemoveOutcome> {
+  if (item.kind === 'movie') {
+    if (!config.radarrUrl || !config.radarrApiKey) throw new Error('Radarr n’est pas configuré.');
+    await del(`${cleanUrl(config.radarrUrl)}/api/v3/movie/${item.arrId}?deleteFiles=false&addImportExclusion=false`, headersFor(config.radarrApiKey));
+    return 'removed';
+  }
+  if (!config.sonarrUrl || !config.sonarrApiKey) throw new Error('Sonarr n’est pas configuré.');
+  const base = cleanUrl(config.sonarrUrl), headers = headersFor(config.sonarrApiKey);
+  const episodes = await get(`${base}/api/v3/episode?seriesId=${item.arrId}`, headers);
+  if (!Array.isArray(episodes)) throw new Error('Sonarr injoignable pour l’instant.');
+  if ((episodes as ArrEpisode[]).some(episode => episode.monitored === true && episode.hasFile !== true)) return 'kept';
+  await del(`${base}/api/v3/series/${item.arrId}?deleteFiles=false&addImportListExclusion=false`, headers);
+  return 'removed';
+}

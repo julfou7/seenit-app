@@ -931,6 +931,10 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   une source injoignable est signalée.
   Depuis la v1.4.281 : mini-cartes au style d'Explorer (cadre arrondi, « 8 ép. » et coche dans les coins,
   titre or et repère sous l'affiche) et bouton « Vider », qui masque la liste sur l'appareil sans rien supprimer.
+  Depuis la v1.4.284 (`SEENIT-DOWNLOAD-021`) : la grille et la carte d'Explorer (note, logo du diffuseur, titre
+  or, Série/Film, année), avec « Retirer » sous l'affiche au lieu de « Ajouter ». Retirer sort un film de Radarr
+  ou une série de Sonarr en gardant toujours les fichiers (Plex garde le titre) ; une série dont Sonarr attend
+  encore un épisode y reste et sort seulement de la liste. Un toast dit ce qui a été fait.
 - Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
   (120 jours) — épisodes et films surveillés, sans fichier, dont la série est surveillée — regroupés par
   série (identifiant Sonarr exact). Depuis la v1.4.280, chaque carte a une méta grise courte (« Film ·
@@ -944,6 +948,12 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   plus de saut à l'ouverture, et une annulation rend l'épisode aussitôt programmable dans sa fiche. Un
   transfert sans source connectée reste dans « En cours » (« En attente de sources ») ; les messages du client
   sont en français. Programmer un épisode précis ne programme plus le reste de sa saison (`SEENIT-DOWNLOAD-017`).
+  Depuis la v1.4.284 (`SEENIT-DOWNLOAD-020`) : les **recherchés** y figurent aussi — surveillés, déjà sortis,
+  sans fichier (« Sorti sam. 31 oct. · recherché », « Recherché · pas encore de version »), après les sorties à
+  venir ; et la section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
+  chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni
+  « Radarr » : « Film · 4K », « Série · 4K · 3 épisodes ». La synchronisation ne recopie pas toute la
+  bibliothèque Sonarr/Radarr : un titre déjà sur le disque se voit sur sa fiche (présence), pas dans cet onglet.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
 - « Vider » ne touche que la section d'historique visée, jamais un actif.

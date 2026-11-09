@@ -1,6 +1,8 @@
 .downloads-page { --dl-surface:#141417; --dl-muted:#8b8b94; background:#09090b; }
 .downloads-content { padding-bottom:calc(var(--seenit-bottom-nav-height, 80px) + env(safe-area-inset-bottom, 0px) + 24px); }
-.downloads-page h1 { min-width:0; font-size:clamp(24px, 7.6vw, 30px); line-height:1.15; font-weight:800; letter-spacing:-.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+/* Retour terrain du 09/11 (« le g de Téléchargements est incomplet ») : `overflow:hidden` (points de suspension sur
+   petit écran) coupait le jambage du « g » ; un padding vertical compensé laisse le tracé entier sans rien décaler. */
+.downloads-page h1 { min-width:0; font-size:clamp(24px, 7.6vw, 30px); line-height:1.15; font-weight:800; letter-spacing:-.04em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-block:.14em; margin-block:-.14em; }
 .downloads-page > header { flex:none; padding:18px 16px 8px; }
 .downloads-page .downloads-segments { display:flex; padding:4px; border-radius:16px; background:#18181b; gap:4px; }
 .downloads-segments button { flex:1; min-height:44px; border-radius:12px; color:#8b8b94; font-size:13px; font-weight:700; }
@@ -117,17 +119,6 @@
 .downloads-recent__head h2 { flex:1; min-width:0; }
 .downloads-recent__head span { font-size:13px; font-weight:700; color:#a1a1aa; }
 .downloads-recent__clear { flex:none; min-height:44px; min-width:44px; margin-right:-8px; padding:0 8px; border-radius:12px; color:#d4d4d8; font-size:13.5px; font-weight:700; }
-.downloads-recent__rail { display:flex; gap:10px; margin:0 -16px; padding:0 16px 4px; overflow-x:auto; scrollbar-width:none; overscroll-behavior-x:contain; }
-.downloads-recent__rail::-webkit-scrollbar { display:none; }
-.downloads-recent__rail li { flex:0 0 112px; width:112px; min-width:0; }
-.downloads-recent__rail button { display:flex; flex-direction:column; width:100%; height:100%; text-align:left; color:inherit; border-radius:12px; overflow:hidden; background:#1c1c1e; box-shadow:inset 0 0 0 1px #ffffff0d; }
-.downloads-recent__poster { position:relative; display:grid; place-items:center; aspect-ratio:2/3; width:100%; background:#202024; color:#8b8b94; }
-.downloads-recent__poster img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-.downloads-recent__count { position:absolute; left:0; top:0; padding:3px 7px; border-bottom-right-radius:8px; background:#000000b3; font-size:11px; font-weight:800; color:#fff; }
-.downloads-recent__done { position:absolute; right:0; top:0; width:26px; height:24px; border-bottom-left-radius:8px; background:#000000b3; display:grid; place-items:center; color:#86efac; }
-.downloads-recent__info { display:flex; flex-direction:column; gap:2px; padding:7px 8px 9px; }
-.downloads-recent__info strong { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; font-size:13px; line-height:1.25; font-weight:800; color:var(--seenit-media-title,#f2c36b); overflow-wrap:anywhere; }
-.downloads-recent__info span { font-size:11.5px; line-height:1.3; color:#a1a1aa; overflow-wrap:anywhere; }
 /* Recherche avancée (refonte du 07/11) : en-tête retour + titre, un champ, filtres de « Version précise ». */
 .downloads-header--search { display:flex; align-items:center; gap:4px; padding-left:6px; }
 .downloads-header--search h1 { font-size:22px; }
@@ -150,3 +141,29 @@
 /* v1.4.281 : dans « Programmés », le ⋯ se pose dans le coin sans réduire la largeur de la méta et de la date. */
 .download-card.programmed .download-card__more { position:absolute; top:-4px; right:-4px; margin:0; }
 .download-card.programmed .download-card__title { padding-right:36px; }
+
+/* v1.4.284 — « Téléchargés » reprend la grille et la carte d'Explorer (GridMediaCard) avec « Retirer ». */
+.downloads-recent > ul { margin-top:12px; }
+/* v1.4.284 — Programmés : bascule Compact / Détaillé (même gabarit que celle d'À voir, en bleu). */
+.programmed-head { display:flex; align-items:center; gap:10px; }
+.programmed-head h2 { flex:1; min-width:0; }
+.programmed-layout { flex:none; display:flex; padding:2px; border-radius:24px; box-shadow:inset 0 0 0 1px #ffffff14; background:#ffffff0a; }
+.programmed-layout button { width:44px; height:44px; display:grid; place-items:center; border-radius:50%; color:#71717a; }
+.programmed-layout button[aria-pressed="true"] { background:#7dd3fc26; color:#7dd3fc; }
+.programmed-layout svg { width:18px; height:18px; fill:currentColor; }
+/* Vue compacte : une ligne par titre (affiche 42 px, titre entier, méta, date), épisodes repliés. */
+.programmed-compact { margin-top:8px; padding:8px; border-radius:16px; background:linear-gradient(100deg,oklch(.3 .07 210 / .55),transparent 70%),#141418; box-shadow:inset 0 0 0 1px #7dd3fc33; }
+.programmed-compact__row { display:flex; align-items:center; gap:10px; min-height:63px; }
+.programmed-compact__poster { flex:none; position:relative; width:42px; height:63px; border-radius:8px; overflow:hidden; background:#202024; color:#8b8b94; display:grid; place-items:center; box-shadow:0 0 0 1px #ffffff1f; }
+.programmed-compact__poster img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.programmed-compact__body { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.programmed-compact__title { text-align:left; font-size:14.5px; font-weight:800; line-height:1.25; color:#f2c36b; overflow-wrap:anywhere; }
+.programmed-compact .programmed__meta { margin-top:0; font-size:12px; }
+.programmed-compact__when { font-size:12px; font-weight:800; line-height:1.3; color:#7dd3fc; overflow-wrap:anywhere; }
+.programmed-compact__expand { flex:none; width:44px; height:44px; display:grid; place-items:center; border-radius:50%; color:#a1a1aa; }
+.programmed-compact__expand svg { transition:transform 160ms ease; }
+.programmed-compact__expand[aria-expanded="true"] svg { transform:rotate(180deg); }
+.programmed-compact .download-card__more { flex:none; margin:0; align-self:center; }
+.programmed-compact .download-season__rows { margin-top:6px; }
+.programmed__row-date[data-wanted] { color:#a1a1aa; }
+@media(prefers-reduced-motion:reduce) { .programmed-compact__expand svg { transition:none; } }

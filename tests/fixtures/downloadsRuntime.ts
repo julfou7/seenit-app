@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
 
-export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], qualities: [] as string[], presence: [] as string[], pushed: [] as string[], programmed: false, unmonitored: [] as string[], added: [] as string[] };
+export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], qualities: [] as string[], presence: [] as string[], pushed: [] as string[], programmed: false, unmonitored: [] as string[], added: [] as string[], arrDeleted: [] as string[] };
 // #879 — versions de la page « Version précise » (C411 simulé) : la conseillée n'est pas la première reçue.
 const day = 86_400_000;
 const FIXTURE_RELEASES = [
@@ -48,16 +48,24 @@ export const cleanUrl = (url: string) => String(url || '').replace(/\/+$/, '');
 // Rangée « Téléchargés » : imports Sonarr/Radarr des 7 derniers jours (un grab et un doublon d'import en piège).
 const ago = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 const SONARR_IMPORTS = [
-  { eventType: 'downloadFolderImported', date: ago(0.1), seriesId: 7, episode: { seasonNumber: 2, episodeNumber: 10 }, series: { title: 'Severance', tmdbId: 95396 } },
+  { eventType: 'downloadFolderImported', date: ago(0.1), seriesId: 7, episode: { seasonNumber: 2, episodeNumber: 10 }, series: { title: 'Severance', tmdbId: 95396, year: 2022, ratings: { value: 8.4 } } },
   { eventType: 'downloadFolderImported', date: ago(0.2), seriesId: 7, episode: { seasonNumber: 2, episodeNumber: 9 }, series: { title: 'Severance', tmdbId: 95396 } },
   { eventType: 'downloadFolderImported', date: ago(0.3), seriesId: 7, episode: { seasonNumber: 2, episodeNumber: 10 }, series: { title: 'Severance', tmdbId: 95396 } },
   { eventType: 'grabbed', date: ago(0.4), seriesId: 8, episode: { seasonNumber: 1, episodeNumber: 4 }, series: { title: 'A Knight of the Seven Kingdoms', tmdbId: 224372 } },
   { eventType: 'downloadFolderImported', date: ago(1), seriesId: 8, episode: { seasonNumber: 1, episodeNumber: 3 }, series: { title: 'A Knight of the Seven Kingdoms', tmdbId: 224372 } }
 ];
 // Dune (TMDB 4) est aussi un téléchargement terminé suivi : il n'est pas répété dans « Terminés ».
-const RADARR_IMPORTS = [{ eventType: 3, date: ago(3), movieId: 40, movie: { title: 'Dune', tmdbId: 4 } }];
+const RADARR_IMPORTS = [{ eventType: 3, date: ago(3), movieId: 40, movie: { title: 'Dune', tmdbId: 4, year: 2021, ratings: { tmdb: { value: 7.8 } } } }];
+// v1.4.284 — « Retirer » : Severance (Sonarr 7) n'attend plus rien ; A Knight… (Sonarr 8) a encore un épisode programmé.
+const SONARR_EPISODES: Record<string, Array<{ monitored: boolean; hasFile: boolean }>> = { 7: [{ monitored: true, hasFile: true }], 8: [{ monitored: true, hasFile: true }, { monitored: true, hasFile: false }] };
+// Recherchés (wanted/missing) de la page « Programmés » : un épisode de L'Arène sorti sans fichier et un film disponible.
+const SONARR_WANTED = [{ id: 799, seriesId: 5, seasonNumber: 1, episodeNumber: 7, title: 'Épisode 7', airDateUtc: ago(6), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4 } }];
+const RADARR_WANTED = [{ id: 902, title: 'Blade Runner 2049', tmdbId: 335984, monitored: true, hasFile: false, isAvailable: true, qualityProfileId: 4, inCinemas: '2017-10-04', digitalRelease: '2018-01-16' }];
+export const executeDelete = async (url: string) => { telemetry.arrDeleted.push(url); return {}; };
 export const executeGet = async (url: string) => {
   if (url.includes('/api/v3/history/since')) return telemetry.programmed ? [] : url.includes('includeMovie=true') ? RADARR_IMPORTS : SONARR_IMPORTS;
+  if (url.includes('/api/v3/wanted/missing')) return { page: 1, records: !telemetry.programmed ? [] : (url.includes('includeSeries=true') ? SONARR_WANTED : RADARR_WANTED).filter(entry => !telemetry.unmonitored.some(done => done.endsWith(`/${entry.id}`))) };
+  if (url.includes('/api/v3/episode?seriesId=')) return SONARR_EPISODES[url.split('=').pop() || ''] || [];
   if (url.includes('/api/v3/qualityprofile')) return [{ id: 4, name: 'HD-1080p' }, { id: 5, name: 'Ultra-HD' }];
   if (!telemetry.programmed) return [];
   // Un épisode déprogrammé n'apparaît plus au calendrier, comme dans Sonarr (l'état est relu après l'écriture).
