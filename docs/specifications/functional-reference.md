@@ -530,8 +530,8 @@ dans la pile Retour.
 Depuis le 03/11/2026 (`SEENIT-UX-019`), les fiches série, film et épisode reprennent le prototype : un seul
 défilement sans onglets, hero titré en or, carte de progression avec **Marquer SxxEyy vu** et une seule
 tuile diffuseur (ta plateforme choisie, sinon Plex), **Moyenne par saison**, pastilles de saison (anneau
-Vu pour une saison finie, saison choisie cerclée d'or), barres de notes et lignes d'épisode (numéro
-« E02 » coloré, durée ou date, sans note ni repère sur l'image), **Où regarder** en lignes,
+Vu pour une saison finie, saison choisie cerclée d'or), barres de notes et lignes d'épisode (code
+« Sxx | Eyy » coloré, durée ou date, sans note ni repère sur l'image), **Où regarder** en lignes,
 **Personnages** (six, puis dix par dix). Le film affiche « Si tu lances maintenant · Fin à HH:MM »,
 sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L'épisode ajoute la soirée de
 trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
