@@ -164,9 +164,16 @@ test('SEENIT-DOWNLOAD-020 Programmés : les recherchés (wanted/missing) rejoign
   assert.ok(urls.includes('http://sonarr/api/v3/wanted/missing?page=1&pageSize=100&monitored=true&includeSeries=true&sortKey=episodes.airDateUtc&sortDirection=descending'));
   assert.ok(urls.includes('http://radarr/api/v3/wanted/missing?page=1&pageSize=100&monitored=true'));
   assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), 'lecture acceptée par le proxy PWA');
-  // Une page wanted illisible est une panne de la source, jamais « rien de recherché ».
-  const broken = await calendar.fetchProgrammedCalendar(config, { now, io: { ...io, get: async (url: string) => url.includes('wanted/missing') ? '<html>login</html>' : io.get(url) } });
-  assert.deepEqual([...broken.failures].sort(), ['Radarr', 'Sonarr']);
+  // Une page wanted illisible est une panne de la source, jamais « rien de recherché » ; revue Codex #923 : le
+  // calendrier lu correctement reste affiché (les sorties à venir ne disparaissent pas).
+  for (const broken of [async () => '<html>login</html>', async () => { throw new Error('504'); }]) {
+    const partial = await calendar.fetchProgrammedCalendar(config, { now, io: { ...io, get: async (url: string) => url.includes('wanted/missing') ? broken() : io.get(url) } });
+    assert.deepEqual([...partial.failures].sort(), ['Radarr', 'Sonarr']);
+    assert.deepEqual(partial.items.map(item => `${item.kind}:${item.id}`), ['episode:1'], 'calendrier conservé, recherchés absents');
+  }
+  // Et l'inverse : calendrier en panne, recherchés lus.
+  const noCalendar = await calendar.fetchProgrammedCalendar(config, { now, io: { ...io, get: async (url: string) => url.includes('/calendar') ? Promise.reject(new Error('503')) : io.get(url) } });
+  assert.deepEqual([[...noCalendar.failures].sort(), noCalendar.items.length], [['Radarr', 'Sonarr'], 6]);
 });
 
 test('SEENIT-DOWNLOAD-020 Programmés : vue compacte par défaut, détaillée au choix, mémorisée par compte', () => {

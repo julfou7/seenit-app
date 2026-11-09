@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import { readFileSync } from 'node:fs';
 import { isAllowedServiceProxyPath } from '../src/features/downloads/downloadBackendSecurity.ts';
 
 // Vrai module de la rangée « Téléchargés » : seuls le transport et le gate sont remplacés.
@@ -18,6 +19,8 @@ const recent = await import(`data:text/javascript;base64,${Buffer.from(bundle.ou
   recentImportLabel: (item: Item, now: number) => string;
   importDayLabel: (time: number, now: number) => string;
   removeRecentImport: (config: Record<string, unknown>, item: Item & { arrId: number }, io: Record<string, unknown>) => Promise<'removed' | 'kept'>;
+  recentImportServerKey: (config: Record<string, unknown>, item: Item) => string;
+  visibleRecentImports: (items: Item[], clearedAt: number, removed?: Record<string, number>, keyOf?: (item: Item) => string) => Item[];
   coveredByRecentImport: (imports: Item[], media: Record<string, unknown>) => boolean;
   recentImportsScope: (config: Record<string, unknown>) => string;
 };
@@ -111,4 +114,22 @@ test('SEENIT-DOWNLOAD-021 Téléchargés : identifiant, année et note de la car
   await assert.rejects(recent.removeRecentImport(config, done, { ...io, get: async () => '<html>login</html>' }));
   assert.equal(deleted.length, 2);
   await assert.rejects(recent.removeRecentImport({ ...config, radarrUrl: '' }, movie, io), /Radarr n’est pas configuré/);
+});
+
+// Revue Codex #923 : `s7` et `m40` ne valent que sur leur serveur ; un retrait mémorisé ne masque jamais
+// l'élément de même identifiant d'un autre Sonarr/Radarr du même compte.
+test('SEENIT-DOWNLOAD-021 Téléchargés : un retrait mémorisé est lié au serveur d’origine', () => {
+  const series: Item = { kind: 'series', key: 's7', title: 'Severance', date: now - 1000 };
+  const movie: Item = { kind: 'movie', key: 'm40', title: 'Dune', date: now - 1000 };
+  const serverA = config, serverB = { ...config, sonarrUrl: 'http://autre-sonarr/', radarrUrl: 'http://autre-radarr' };
+  assert.equal(recent.recentImportServerKey(serverA, series), 'http://sonarr|s7');
+  assert.equal(recent.recentImportServerKey(serverA, movie), 'http://radarr|m40', 'film : adresse du Radarr');
+  assert.ok(!recent.recentImportServerKey(serverA, series).includes('s|') && !recent.recentImportServerKey(serverA, series).includes(String(config.sonarrApiKey) + '|'), 'jamais la clé d’API');
+  const removed = { [recent.recentImportServerKey(serverA, series)]: now - 1000 };
+  assert.deepEqual(recent.visibleRecentImports([series, movie], 0, removed, item => recent.recentImportServerKey(serverA, item)).map(item => item.key), ['m40'], 'masqué sur son serveur');
+  assert.deepEqual(recent.visibleRecentImports([series, movie], 0, removed, item => recent.recentImportServerKey(serverB, item)).map(item => item.key), ['s7', 'm40'], 'visible sur un autre serveur');
+  const newer = { ...series, date: now };
+  assert.deepEqual(recent.visibleRecentImports([newer], 0, removed, item => recent.recentImportServerKey(serverA, item)).map(item => item.key), ['s7'], 'un nouvel import du titre revient');
+  assert.match(readFileSync('src/components/RecentImportsRail.tsx', 'utf8'), /const keyOf = \(item: RecentImport\) => recentImportServerKey\(config, item\);\n\s+const visible = visibleRecentImports\(items, clearedAt, removed, keyOf\);/);
+  assert.match(readFileSync('src/components/RecentImportsRail.tsx', 'utf8'), /\[keyOf\(item\), item\.date\]/, 'retrait mémorisé sous la clé du serveur');
 });

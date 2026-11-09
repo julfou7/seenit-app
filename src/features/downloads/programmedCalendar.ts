@@ -78,13 +78,15 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
   if (config.sonarrUrl && config.sonarrApiKey) {
     const { sonarrUrl, sonarrApiKey } = config;
     const base = cleanUrl(sonarrUrl);
-    tasks.push(Promise.all([io.get(`${base}/api/v3/calendar?${range}&includeSeries=true`, headersFor(sonarrApiKey)), readProfiles(io, sonarrUrl, sonarrApiKey),
-      io.get(`${base}/api/v3/wanted/missing?${WANTED_PAGE}&includeSeries=true&sortKey=episodes.airDateUtc&sortDirection=descending`, headersFor(sonarrApiKey))]).then(([list, profiles, wantedPage]) => {
-      // Une page de connexion HTML ou toute réponse non tableau est une panne, pas un calendrier vide.
+    tasks.push(Promise.all([io.get(`${base}/api/v3/calendar?${range}&includeSeries=true`, headersFor(sonarrApiKey)).catch(() => null), readProfiles(io, sonarrUrl, sonarrApiKey),
+      io.get(`${base}/api/v3/wanted/missing?${WANTED_PAGE}&includeSeries=true&sortKey=episodes.airDateUtc&sortDirection=descending`, headersFor(sonarrApiKey)).catch(() => null)]).then(([list, profiles, wantedPage]) => {
+      // Une page de connexion HTML ou toute réponse non tableau est une panne, pas un calendrier vide. Revue Codex
+      // #923 : calendrier et recherchés sont lus indépendamment — une panne de l'un garde l'autre et signale la source.
+      const calendar = Array.isArray(list) ? list as CalendarEpisode[] : null;
       const wanted = wantedRecords<CalendarEpisode>(wantedPage);
-      if (!Array.isArray(list) || !wanted) { result.failures.push('Sonarr'); return; }
+      if (!calendar || !wanted) result.failures.push('Sonarr');
       const seen = new Set<number>();
-      for (const entry of [...list as CalendarEpisode[], ...wanted]) {
+      for (const entry of [...calendar || [], ...wanted || []]) {
         if (!entry.id || seen.has(entry.id) || entry.monitored !== true || entry.hasFile === true || entry.series?.monitored === false) continue;
         seen.add(entry.id);
         const profileId = Number(entry.series?.qualityProfileId) || undefined;
@@ -96,12 +98,13 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
   if (config.radarrUrl && config.radarrApiKey) {
     const { radarrUrl, radarrApiKey } = config;
     const base = cleanUrl(radarrUrl);
-    tasks.push(Promise.all([io.get(`${base}/api/v3/calendar?${range}`, headersFor(radarrApiKey)), readProfiles(io, radarrUrl, radarrApiKey),
-      io.get(`${base}/api/v3/wanted/missing?${WANTED_PAGE}`, headersFor(radarrApiKey))]).then(([list, profiles, wantedPage]) => {
+    tasks.push(Promise.all([io.get(`${base}/api/v3/calendar?${range}`, headersFor(radarrApiKey)).catch(() => null), readProfiles(io, radarrUrl, radarrApiKey),
+      io.get(`${base}/api/v3/wanted/missing?${WANTED_PAGE}`, headersFor(radarrApiKey)).catch(() => null)]).then(([list, profiles, wantedPage]) => {
+      const calendar = Array.isArray(list) ? list as CalendarMovie[] : null;
       const wanted = wantedRecords<CalendarMovie>(wantedPage);
-      if (!Array.isArray(list) || !wanted) { result.failures.push('Radarr'); return; }
+      if (!calendar || !wanted) result.failures.push('Radarr');
       const seen = new Set<number>();
-      for (const movie of [...list as CalendarMovie[], ...wanted]) {
+      for (const movie of [...calendar || [], ...wanted || []]) {
         if (!movie.id || seen.has(movie.id) || movie.monitored !== true || movie.hasFile === true) continue;
         seen.add(movie.id);
         const release = movieRelease(movie, now);

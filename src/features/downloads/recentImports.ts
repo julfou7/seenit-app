@@ -104,6 +104,16 @@ export function coveredByRecentImport(imports: RecentImport[], media: { mediaTyp
     : media.mediaType === 'tv' && item.episodes.some(value => value.season === media.seasonNumber && value.episode === media.episodeNumber)));
 }
 
+/**
+ * Clé d'un retrait mémorisé (revue Codex #923) : `s7` ou `m40` n'ont de sens que sur leur serveur ; la clé
+ * porte donc l'adresse du Sonarr (série) ou du Radarr (film) d'origine, sans clé d'API.
+ */
+export const recentImportServerKey = (config: Pick<DownloadConfig, 'sonarrUrl' | 'radarrUrl'>, item: Pick<RecentImport, 'kind' | 'key'>) =>
+  `${cleanUrl((item.kind === 'movie' ? config.radarrUrl : config.sonarrUrl) || '')}|${item.key}`;
+/** Imports visibles : après « Vider » et hors retraits mémorisés pour ce serveur (clé → date de l'import retiré). */
+export const visibleRecentImports = (items: readonly RecentImport[], clearedAt: number, removed: Readonly<Record<string, number>> = {}, keyOf: (item: RecentImport) => string = item => item.key) =>
+  items.filter(item => item.date > clearedAt && item.date > (removed[keyOf(item)] || 0));
+
 /** Portée serveur : une liste lue sur un serveur n'est jamais affichée pour un autre. */
 export const recentImportsScope = (config: DownloadConfig) => [isDownloadFeatureEnabled(config), cleanUrl(config.sonarrUrl || ''), config.sonarrApiKey || '', cleanUrl(config.radarrUrl || ''), config.radarrApiKey || ''].join('\n');
 

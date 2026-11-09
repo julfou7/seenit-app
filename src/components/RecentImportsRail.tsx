@@ -5,7 +5,7 @@ import { useToastStore } from '../store/toastStore';
 import { auth } from '../lib/firebase';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore } from '../store/arrSyncStore';
-import { recentImportLabel, recentImportsScope, removeRecentImport, type RecentImport } from '../features/downloads/recentImports';
+import { recentImportLabel, recentImportServerKey, recentImportsScope, removeRecentImport, visibleRecentImports, type RecentImport } from '../features/downloads/recentImports';
 import { frenchArrMessage } from '../features/downloads/arrStatusMessages';
 import type { TMDBMedia } from '../features/shows/tmdb';
 import { GridMediaCard } from './GridMediaCard';
@@ -25,11 +25,9 @@ export function useRecentImports(refreshKey = 0): { items: RecentImport[]; failu
 
 /** Retour terrain du 08/11 (« je veux pouvoir nettoyer aussi ») : « Vider » masque les imports déjà vus. */
 const CLEARED_FIELD = 'downloads.recentImports.clearedAt';
-/** v1.4.284 : imports retirés un à un (clé → date de l'import retiré) ; un nouvel import du même titre revient. */
+/** v1.4.284 : imports retirés un à un (serveur + clé → date de l'import retiré) ; un nouvel import du titre revient. */
 const REMOVED_FIELD = 'downloads.recentImports.removed';
 const WEEK = 8 * 86_400_000;
-export const visibleRecentImports = (items: readonly RecentImport[], clearedAt: number, removed: Readonly<Record<string, number>> = {}) =>
-  items.filter(item => item.date > clearedAt && item.date > (removed[item.key] || 0));
 
 const tmdbPosterPath = (url?: string) => url?.match(/image\.tmdb\.org\/t\/p\/[^/]+(\/[^/?#]+)$/)?.[1];
 /** Carte d'Explorer d'un import : identité TMDB exacte, affiche TMDB (sinon celle de Sonarr/Radarr), note et année. */
@@ -53,7 +51,9 @@ export function RecentImportsRail({ items, failures, onShowClick }: { items: Rec
   const [clearedAt, setClearedAt] = useState(() => Number(readUserScopedJson(uid, CLEARED_FIELD, 0)) || 0);
   const [removed, setRemoved] = useState<Record<string, number>>(() => readUserScopedJson<Record<string, number>>(uid, REMOVED_FIELD, {}) || {});
   const [busy, setBusy] = useState<string | null>(null);
-  const visible = visibleRecentImports(items, clearedAt, removed);
+  const config = useDownloadConfigStore();
+  const keyOf = (item: RecentImport) => recentImportServerKey(config, item);
+  const visible = visibleRecentImports(items, clearedAt, removed, keyOf);
   if (!visible.length && !failures.length) return null;
   const toast = useToastStore.getState().showToast;
   const clear = () => {
@@ -73,7 +73,7 @@ export function RecentImportsRail({ items, failures, onShowClick }: { items: Rec
     try {
       const outcome = await removeRecentImport(useDownloadConfigStore.getState(), item);
       const now = Date.now();
-      const next = Object.fromEntries([...Object.entries(removed).filter(([, date]) => date > now - WEEK), [item.key, item.date]]);
+      const next = Object.fromEntries([...Object.entries(removed).filter(([, date]) => date > now - WEEK), [keyOf(item), item.date]]);
       writeUserScopedJson(uid, REMOVED_FIELD, next);
       setRemoved(next);
       notifyArrWrite({ tmdbId: item.tmdbId, mediaType: item.kind === 'movie' ? 'movie' : 'tv' });
