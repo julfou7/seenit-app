@@ -25,7 +25,9 @@ export function coverArrLibrary(programmed: ProgrammedCalendar, pending: readonl
     if (title.kind === 'movie' && title.monitored) {
       const release = movieRelease(title.release || {}, now);
       const state = release.date ? {} : title.release?.isAvailable ? { wanted: true } : release.inCinemasPast ? { inCinemasPast: true } : {};
-      extra.push({ kind: 'movie', id: title.arrId, tmdbId: title.tmdbId, title: title.title, date: release.date, dateKind: release.kind, posterUrl: title.posterUrl, profileId: title.profileId, ...state });
+      // Revue Codex #933 : même libellé de qualité qu'au calendrier (affichage et choix 1080p/4K du menu ⋯).
+      const quality = programmed.movieQuality?.(title.profileId);
+      extra.push({ kind: 'movie', id: title.arrId, tmdbId: title.tmdbId, title: title.title, date: release.date, dateKind: release.kind, posterUrl: title.posterUrl, profileId: title.profileId, ...(quality ? { quality } : {}), ...state });
       continue;
     }
     if (title.kind === 'series' && title.monitored && sonarrUnknown) continue;
