@@ -18,6 +18,10 @@
         {
           "file": "tests/programmedCalendar.test.ts",
           "contains": "SEENIT-DOWNLOAD-020 Programmés : vue compacte par défaut, détaillée au choix, mémorisée par compte"
+        },
+        {
+          "file": "tests/programmedCalendar.test.ts",
+          "contains": "SEENIT-DOWNLOAD-020 détaillé : les épisodes se replient, repliés par défaut au-delà de 3, choix gardé"
         }
       ]
     },

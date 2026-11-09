@@ -182,7 +182,7 @@ test('SEENIT-DOWNLOAD-020 Programmés : vue compacte par défaut, détaillée au
   assert.match(section, /const switchLayout = \(next: ProgrammedLayout\) => \{ setLayout\(next\); writeUserScopedJson\(auth\.currentUser\?\.uid, LAYOUT_FIELD, next\); \};/, 'choix mémorisé par compte');
   assert.match(section, /aria-label="Programmés en compact" aria-pressed=\{compact\}/);
   assert.match(section, /aria-label="Programmés en détaillé" aria-pressed=\{!compact\}/);
-  assert.match(section, /\{card\.episodes && expanded\.has\(card\.key\) && card\.episodes\.rows\}/, 'compact : épisodes repliés jusqu’au chevron');
+  assert.match(section, /\{card\.episodes && episodesOpen\(card\) && card\.episodes\.rows\}/, 'compact : épisodes repliés jusqu’au chevron');
   assert.match(section, /item\.wanted \? `Sorti \$\{pastDayLabel\(item\.date\)\} · recherché` : programmedDateLabel\(item\.date\)/, 'un recherché dit sa vraie date de sortie');
   assert.match(readFileSync('src/screens/downloads.css', 'utf8'), /\.programmed-compact__title \{[^}]*overflow-wrap:anywhere/, 'titre entier en compact');
   // Retour terrain du 09/11 : « supprime Sonarr et Radarr sous le titre, y a pas besoin ».
@@ -190,4 +190,15 @@ test('SEENIT-DOWNLOAD-020 Programmés : vue compacte par défaut, détaillée au
   assert.match(section, /meta: meta\('Film', movie\.quality\)/);
   assert.match(section, /meta: meta\(requestScope\(entry\), quality\)/);
   assert.doesNotMatch(section, /'(?:Série|Film) · (?:Sonarr|Radarr)'|isTv \? 'Sonarr' : 'Radarr', quality/);
+});
+
+// Retour terrain du 09/11 sur la v1.4.284 (MobLand, 9 épisodes) : « il faut que je puisse masquer le détail de tous
+// les épisodes, ça prend toute la place ».
+test('SEENIT-DOWNLOAD-020 détaillé : les épisodes se replient, repliés par défaut au-delà de 3, choix gardé', () => {
+  const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
+  assert.match(section, /export const EPISODES_OPEN_MAX = 3;\nexport const episodesOpenByDefault = \(layout: ProgrammedLayout, count: number\) => layout === 'detailed' && count <= EPISODES_OPEN_MAX;/, 'compact toujours replié ; détaillé déplié jusqu’à 3');
+  assert.match(section, /episodesChoice\.get\(`\$\{layout\}:\$\{card\.key\}`\) \?\? episodesOpenByDefault\(layout, card\.episodes!\.count\)/, 'un choix explicite l’emporte, même si le nombre d’épisodes change');
+  assert.match(section, /className="programmed__episodes-toggle" aria-expanded=\{episodesOpen\(card\)\}/);
+  assert.match(section, /if \(open\) return `Masquer \$\{target\}`;\n\s+return `Voir \$\{target\}\$\{wanted \? ` · \$\{wanted\} recherché\$\{wanted > 1 \? 's' : ''\}` : ''\}`;/, '« Voir les 9 épisodes · 8 recherchés » / « Masquer les 9 épisodes »');
+  assert.match(readFileSync('src/screens/downloads.css', 'utf8'), /\.programmed__episodes-toggle \{[^}]*min-height:44px/, 'cible de 44 px');
 });
