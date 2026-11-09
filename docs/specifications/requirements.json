@@ -30,6 +30,20 @@
       ]
     },
     {
+      "id": "SEENIT-DOWNLOAD-022",
+      "title": "Programmés et Téléchargés affichent le titre, l'affiche et les épisodes de la fiche TMDB en français",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/arrMediaLabels.test.ts",
+          "contains": "SEENIT-DOWNLOAD-022 titres, affiches et épisodes de la fiche TMDB fr-FR par identité exacte ; repli Sonarr/Radarr"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DOWNLOAD-021",
       "title": "Téléchargés reprend la carte d'Explorer ; Retirer sort de Radarr/Sonarr en gardant les fichiers",
       "targets": [

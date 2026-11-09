@@ -4,6 +4,8 @@ import { useDownloadConfigStore } from './downloadConfigStore';
 import { useMediaPresenceStore } from './mediaPresenceStore';
 import { fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
 import { fetchRecentImports, type RecentImports } from '../features/downloads/recentImports';
+import { localizeArrLists } from '../features/downloads/arrMediaLabels';
+import { tmdbArrLabelSource } from '../features/downloads/arrMediaSource';
 
 /**
  * SEENIT-DOWNLOAD-016 — État Sonarr/Radarr synchronisé (retour terrain du 08/11 : « ça serait pas mieux de
@@ -75,7 +77,10 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       // Une réponse arrivée après un changement de compte ou de serveur, ou dépassée par une relecture plus
       // récente (écriture de SeenIt entre-temps), est ignorée.
       if (arrSyncKey() !== key || id !== sequence) return;
-      set({ snapshot: { key, programmed, imports, watched, syncedAt: Date.now() } });
+      // SEENIT-DOWNLOAD-022 : titres, affiches et notes de la fiche TMDB en français, comme le reste de l'app.
+      const labelled = await localizeArrLists({ programmed, imports }, tmdbArrLabelSource);
+      if (arrSyncKey() !== key || id !== sequence) return;
+      set({ snapshot: { key, programmed: labelled.programmed, imports: labelled.imports, watched, syncedAt: Date.now() } });
     })().finally(() => {
       if (inFlight?.promise === promise) inFlight = null;
       set({ syncing: false });

@@ -59,10 +59,11 @@ test('SEENIT-DOWNLOAD-016 un seul état Sonarr/Radarr synchronisé : relu en un 
     'store/mediaPresenceStore': 'const s=()=>globalThis.__arr;export const useMediaPresenceStore={getState:()=>({checkPresence:async p=>{s().presence.push(p.tmdbId+":"+p.forceRefresh)}})};',
     'features/downloads/programmedCalendar': 'const s=()=>globalThis.__arr;export const programmedScope=c=>c.sonarrUrl;export const fetchProgrammedCalendar=async c=>{s().reads.push(c.sonarrUrl);const r=s().next.shift();return r?await r:{items:[{id:1,from:c.sonarrUrl}],failures:[]}};export const fetchWatchedMovie=async(c,id)=>{s().watchedReads.push(c.sonarrUrl+":"+id);return {id:id*10,server:c.sonarrUrl}};',
     'features/downloads/recentImports': 'export const fetchRecentImports=async()=>({items:[],failures:[]});',
+    'features/downloads/arrMediaSource': 'export const tmdbArrLabelSource={media:async()=>null,episodes:async()=>null};',
   };
   const bundle = await build({ entryPoints: ['src/store/arrSyncStore.ts'], bundle: true, platform: 'node', format: 'esm', write: false, external: ['zustand', 'react'],
     plugins: [{ name: 'arr-ports', setup(builder) {
-      builder.onResolve({ filter: /lib\/firebase$|downloadConfigStore$|mediaPresenceStore$|programmedCalendar$|recentImports$/ }, args => ({ path: Object.keys(stubs).find(key => args.path.endsWith(key.split('/').at(-1)!))!, namespace: 'ports' }));
+      builder.onResolve({ filter: /lib\/firebase$|downloadConfigStore$|mediaPresenceStore$|programmedCalendar$|recentImports$|arrMediaSource$/ }, args => ({ path: Object.keys(stubs).find(key => args.path.endsWith(key.split('/').at(-1)!))!, namespace: 'ports' }));
       builder.onLoad({ filter: /.*/, namespace: 'ports' }, args => ({ contents: stubs[args.path] }));
     } }] });
   const state = (globalThis as unknown as { __arr: { uid: string; config: { sonarrUrl: string }; reads: string[]; watchedReads: string[]; presence: string[]; next: Array<Promise<unknown>> } }).__arr = { uid: 'u1', config: { sonarrUrl: 'http://a' }, reads: [], watchedReads: [], presence: [], next: [] };
