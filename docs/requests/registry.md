@@ -214,3 +214,4 @@ Complément USR-2026-10-30-001 (retours du 30/10) : journées de plus de 24 h (i
 | USR-2026-11-09-003 | 2026-11-09 | « C'est le mode téléchargement qui est bleu » : bouton, sélecteur de qualité, cadre des épisodes cochés. | SEENIT-DOWNLOAD-019 | active |
 | USR-2026-11-09-004 | 2026-11-09 | « La cloche reste jaune » ; le rappel d'épisode est rond, à côté de la croix en haut à droite de la fiche épisode. | SEENIT-NOTIFICATION-009 | active |
 | USR-2026-11-09-005 | 2026-11-09 | « Absence de nav bar sur la fiche épisode » ouverte depuis À voir. | SEENIT-UX-019 | active |
+| USR-2026-11-09-006 | 2026-11-09 | Rappels : « c'est ok si ça active toute la série, c'est mieux même » — la cloche règle les rappels de la série et montre l'état réel ; pas de popup « épisodes suivants ». | SEENIT-NOTIFICATION-009, [#910](https://github.com/julfou7/seenit-app/issues/910) | active |

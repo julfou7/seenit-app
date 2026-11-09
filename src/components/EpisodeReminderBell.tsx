@@ -15,7 +15,8 @@ export function EpisodeReminderBell({ show, episode, variant = 'icon' }: { show:
   const { reminder, pending, toggle, available } = useEpisodeReminder(show, episode);
   if (!available) return null;
   const code = reminderEpisodeString(episode);
-  const label = `${reminder ? 'Désactiver' : 'Activer'} le rappel pour ${code}`;
+  // Décision du 09/11 (#910) : la cloche agit sur toute la série, son nom accessible le dit.
+  const label = `${reminder ? 'Couper' : 'Activer'} les rappels de ${show?.title || 'la série'} (${code})`;
   const press = (event: React.MouseEvent) => { event.stopPropagation(); void toggle(); };
   const idle = variant === 'overlay'
     ? 'bg-[rgba(9,9,11,0.88)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]'

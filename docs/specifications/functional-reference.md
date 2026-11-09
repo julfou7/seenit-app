@@ -580,7 +580,9 @@ Depuis les retours de la v1.4.251 (#857) :
   à la sortie » à la place de « Bientôt disponible » (v1.4.280, `SEENIT-NOTIFICATION-009`) ; depuis la v1.4.281,
   la fiche d'un épisode à venir propose « Télécharger à la sortie » en 1080p ou 4K
   puis « Annuler la programmation » (`SEENIT-DOWNLOAD-018`), et l'épisode suivant n'est plus entouré ; depuis
-  la v1.4.282, la cloche reste en or et, dans la fiche épisode, elle est ronde à côté de la croix ;
+  la v1.4.282, la cloche reste en or et, dans la fiche épisode, elle est ronde à côté de la croix ; depuis la
+  v1.4.283, toute cloche règle les rappels de la série et montre l'état réel (allumée par défaut pour une série
+  suivie quand « Sortie du jour » est activée), sans toast de confirmation (seul un échec est signalé) ;
 - la fiche épisode charge avec un squelette à son gabarit actuel, garde la barre de navigation (v1.4.282,
   ouverte depuis À voir comme depuis la fiche série) et ne change d'épisode que sur un geste nettement
   horizontal : un défilement vertical en biais n'y change plus d'épisode (`SEENIT-UX-008`).

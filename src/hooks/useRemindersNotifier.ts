@@ -288,7 +288,8 @@ export function useRemindersNotifier() {
         rememberFutureTvId(
           airDate9Am,
           'today',
-          Boolean(userPrefs.release_today_tv || isSpecificReminder),
+          // Décision du 09/11 (#910) : une série activée à la cloche est prévenue même sans « Sortie du jour ».
+          Boolean(userPrefs.release_today_tv || isSpecificReminder || s.notificationsEnabled === true),
         );
         await prunePendingMediaReminderNotifications(s.id, 'tv', allowedPendingTvIds);
 
@@ -369,7 +370,7 @@ export function useRemindersNotifier() {
           );
         }
 
-        if (userPrefs.release_today_tv || isSpecificReminder) {
+        if (userPrefs.release_today_tv || isSpecificReminder || s.notificationsEnabled === true) {
           const episodeCopy = buildTvEpisodeReminderCopy(s, upcoming, todayStr, provider?.name);
           await scheduleTvAlert(
             airDate9Am,
