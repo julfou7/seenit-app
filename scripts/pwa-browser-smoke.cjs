@@ -307,6 +307,14 @@ async function createPageWebSocket(port) {
   return target.webSocketDebuggerUrl;
 }
 
+/**
+ * #934 — Le 09/11, le smoke est resté 8 minutes bloqué sans rien dire : un appel DevTools sans réponse attendait
+ * indéfiniment. Chaque appel est désormais borné, et chaque harnais d'un couloir aussi : un blocage devient un échec
+ * qui nomme le harnais, le couloir et la méthode DevTools.
+ */
+const CDP_SEND_TIMEOUT_MS = 60_000;
+const LANE_TASK_TIMEOUT_MS = 240_000;
+
 class CdpClient {
   constructor(url) {
     this.url = url;
@@ -350,10 +358,14 @@ class CdpClient {
     this.listeners.set(method, listeners);
   }
 
-  send(method, params = {}) {
+  send(method, params = {}, timeoutMs = CDP_SEND_TIMEOUT_MS) {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject, method });
+      const timer = setTimeout(() => {
+        if (this.pending.delete(id)) reject(new Error(`${method} : pas de réponse DevTools après ${timeoutMs} ms`));
+      }, timeoutMs);
+      const settle = done => value => { clearTimeout(timer); done(value); };
+      this.pending.set(id, { resolve: settle(resolve), reject: settle(reject), method });
       this.socket.send(JSON.stringify({ id, method, params }));
     });
   }
@@ -551,16 +563,19 @@ function resolveLaneCount(value, max) {
   return Math.min(max, Math.max(1, parsed));
 }
 
-async function runLane(client, tasks, timings, label) {
+async function runLane(client, tasks, timings, label, taskTimeoutMs = LANE_TASK_TIMEOUT_MS) {
   const results = {};
   for (const [key, task] of tasks) {
     const started = Date.now();
+    let timer;
     try {
-      results[key] = await task(client);
+      const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`harnais bloqué depuis ${taskTimeoutMs} ms`)), taskTimeoutMs); });
+      results[key] = await Promise.race([task(client), deadline]);
     } catch (error) {
       error.message = `${key} (${label}) : ${error.message}`;
       throw error;
     } finally {
+      clearTimeout(timer);
       timings[key] = Math.round((Date.now() - started) / 100) / 10;
     }
   }
@@ -725,6 +740,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  runLane,
   buildLaneGroups,
   resolveLaneCount,
   CdpClient,
