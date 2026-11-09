@@ -126,7 +126,7 @@ test('SEENIT-DOWNLOAD-015 Programmés : qualité réelle, sortie numérique dist
   assert.deepEqual(puts, [['http://radarr/api/v3/movie/9', 5], ['http://sonarr/api/v3/series/5', 6]], 'profil déjà en place : aucune écriture');
   assert.ok(puts.every(([url]) => isAllowedServiceProxyPath(url, 'PUT')) && isAllowedServiceProxyPath('http://radarr/api/v3/movie?tmdbId=3', 'GET') && isAllowedServiceProxyPath('http://radarr/api/v3/qualityprofile', 'GET'), 'passe le proxy PWA');
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
-  assert.match(section, /const items = \(snapshot\?\.programmed\?\.items \|\| \[\]\)/, 'bug d’affichage du 08/11 : la copie synchronisée reste affichée à la réouverture');
+  assert.match(section, /const items = hideSeenWanted\(\(snapshot\?\.programmed\?\.items \|\| \[\]\)/, 'bug d’affichage du 08/11 : la copie synchronisée reste affichée à la réouverture');
   assert.match(section, /notifyArrWrite\(media\);/, 'changer la qualité resynchronise l’état et la fiche');
 });
 

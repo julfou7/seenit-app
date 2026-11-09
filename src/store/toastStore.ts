@@ -21,6 +21,11 @@ export interface ToastMessageObj {
   action: string;
   posterPath?: string | null;
   iconSymbol?: NavigationTabSymbol;
+  /**
+   * Retour terrain du 09/11 (`USR-2026-11-09-015`) : toucher le titre ou l'image du toast ouvre cette fiche
+   * (identité TMDB exacte), quel que soit le type du toast.
+   */
+  media?: { tmdbId: number; mediaType: 'tv' | 'movie' } | null;
 }
 
 export interface ToastItem {
@@ -45,7 +50,7 @@ interface ToastState {
   showToast: (
     message: string | ToastMessageObj,
     type?: ToastType,
-    show?: any,
+    show?: Show | null,
     onUndo?: (() => void | Promise<void>) | null,
     duration?: number,
     scope?: ToastScope

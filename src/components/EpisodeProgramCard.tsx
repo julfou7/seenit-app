@@ -31,8 +31,8 @@ export function EpisodeProgramCard({ title, tmdbId, tvdbId, imdbId, season, epis
       const outcome = await programArrEpisodes({ title, tmdbId, tvdbId, imdbId, season, episodes: [episode], qualityPreference: quality, readConfig });
       if (outcome.interrupted) return;
       // Un seul toast par lancement (SEENIT-DOWNLOAD-015).
-      if (outcome.programmed.length) toast({ title, subtitle: `S${season} | E${episode}`, posterPath, action: `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` }, 'success');
-      else toast({ title, subtitle: `S${season} | E${episode}`, posterPath, action: outcome.failure || 'Épisode pas encore annoncé dans Sonarr : réessaie plus tard.' }, outcome.failure ? 'error' : 'info');
+      if (outcome.programmed.length) toast({ title, subtitle: `S${season} | E${episode}`, posterPath, media: Number(tmdbId) > 0 ? { tmdbId: Number(tmdbId), mediaType: 'tv' } : null, action: `Programmé pour sa sortie · ${quality === '4k' ? '4K' : '1080p'}` }, 'success');
+      else toast({ title, subtitle: `S${season} | E${episode}`, posterPath, media: Number(tmdbId) > 0 ? { tmdbId: Number(tmdbId), mediaType: 'tv' } : null, action: outcome.failure || 'Épisode pas encore annoncé dans Sonarr : réessaie plus tard.' }, outcome.failure ? 'error' : 'info');
       notifyArrWrite({ tmdbId, tvdbId, mediaType: 'tv' });
     } finally {
       setPending(null);
@@ -44,7 +44,7 @@ export function EpisodeProgramCard({ title, tmdbId, tvdbId, imdbId, season, epis
     try {
       const { unprogramArrEpisode } = await import('../features/downloads/episodeProgramming');
       const failure = await unprogramArrEpisode({ title, tmdbId, tvdbId, imdbId, season, episode, readConfig });
-      toast({ title, subtitle: `S${season} | E${episode}`, posterPath, action: failure || 'N’est plus programmé.' }, failure ? 'error' : 'info');
+      toast({ title, subtitle: `S${season} | E${episode}`, posterPath, media: Number(tmdbId) > 0 ? { tmdbId: Number(tmdbId), mediaType: 'tv' } : null, action: failure || 'N’est plus programmé.' }, failure ? 'error' : 'info');
       notifyArrWrite({ tmdbId, tvdbId, mediaType: 'tv' });
     } finally {
       setPending(null);
