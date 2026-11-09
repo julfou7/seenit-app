@@ -2,14 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, Bell } from 'lucide-react';
 import { type Show } from '../../types';
 import { auth } from '../../lib/firebase';
-import { writeEpisodeReminder } from '../../features/notifications/episodeReminder';
+import { readEpisodeReminder, writeEpisodeReminder } from '../../features/notifications/episodeReminder';
 import { useToastStore } from '../../store/toastStore';
 import { useShowActions } from '../../hooks/useShows';
 import { useShowsStore } from '../../store/showsStore';
 import { cn, getTodayStr, getCalendarDaysDiff, getEpisodeRelativeAirDate } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
-import { readUserScopedJson } from '../../lib/userIsolation';
 import { SeriesEpisodeCard, type SeriesCardAction } from './SeriesEpisodeCard';
 import { buildMovieCollectionProgress, type CollectionPart } from '../../features/watchlist/movieCollectionProgress';
 import { loadMovieCollection } from '../../features/watchlist/movieCollectionLoader';
@@ -108,11 +107,8 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
 });
 
 function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, actions, compact, ensureTracked }: Props & { ep: UpcomingEpisodeInfo }) {
-  const storageField = `reminder_${show.id}_S${ep.season_number}E${ep.episode_number}`;
-  const [isReminderSet, setIsReminderSet] = useState<boolean>(() => {
-    if (show.notificationsEnabled) return true;
-    return readUserScopedJson(auth.currentUser?.uid, storageField, false);
-  });
+  // Même état que les autres cloches : les rappels réels de la série (décision du 09/11, #910).
+  const [isReminderSet, setIsReminderSet] = useState<boolean>(() => readEpisodeReminder(show, ep));
   const [loadingReminder, setLoadingReminder] = useState(false);
   const reminderFlight = useRef(false);
   const [optimisticReminder, setOptimisticReminder] = useState<boolean | null>(null);
@@ -132,6 +128,7 @@ function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, action
 
   const performReminder = async (target: Show, ownerUid: string, nextState: boolean) => {
     // Écriture partagée avec la fiche série et la fiche épisode (episodeReminder).
+    // La cloche réagit tout de suite et ne confirme rien par un toast tardif (SPEC « rappel » V4).
     if (await writeEpisodeReminder({ target, ownerUid, nextState, episode: ep, updateShow })) setIsReminderSet(nextState);
   };
   const toggleReminder = async (event: React.MouseEvent) => {

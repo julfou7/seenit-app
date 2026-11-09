@@ -544,7 +544,8 @@ l'or reste au Vu et à la cloche. Le badge du jour de sortie dit « Aujourd’hu
 pas connue). Une série
 n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
-ligne à la place de la navigation). La sélection est gardée quand on change de saison (« 5 épisodes · 2 saisons ») et
+ligne à la place de la navigation ; depuis la v1.4.283, son texte se lit en entier — « 2 maintenant · 1 à la
+sortie », un titre long passe à la ligne, jamais de points de suspension). La sélection est gardée quand on change de saison (« 5 épisodes · 2 saisons ») et
 les saisons partent dans l'ordre. En mode, un épisode à venir se coche en bleu pour être **programmé** :
 Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sans recherche immédiate ; un
 épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Avec un seul épisode sorti
@@ -580,7 +581,9 @@ Depuis les retours de la v1.4.251 (#857) :
   à la sortie » à la place de « Bientôt disponible » (v1.4.280, `SEENIT-NOTIFICATION-009`) ; depuis la v1.4.281,
   la fiche d'un épisode à venir propose « Télécharger à la sortie » en 1080p ou 4K
   puis « Annuler la programmation » (`SEENIT-DOWNLOAD-018`), et l'épisode suivant n'est plus entouré ; depuis
-  la v1.4.282, la cloche reste en or et, dans la fiche épisode, elle est ronde à côté de la croix ;
+  la v1.4.282, la cloche reste en or et, dans la fiche épisode, elle est ronde à côté de la croix ; depuis la
+  v1.4.283, toute cloche règle les rappels de la série et montre l'état réel (allumée par défaut pour une série
+  suivie quand « Sortie du jour » est activée), sans toast de confirmation (seul un échec est signalé) ;
 - la fiche épisode charge avec un squelette à son gabarit actuel, garde la barre de navigation (v1.4.282,
   ouverte depuis À voir comme depuis la fiche série) et ne change d'épisode que sur un geste nettement
   horizontal : un défilement vertical en biais n'y change plus d'épisode (`SEENIT-UX-008`).

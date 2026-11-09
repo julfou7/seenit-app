@@ -8,14 +8,14 @@ import { build } from 'esbuild';
 // « vue liste, je descends, je remets la vue horizontale : j'ai un grand espace dessous ».
 const read = (path: string) => readFileSync(path, 'utf8');
 
-type Calls = { writes: Array<[string, unknown]>; deletes: string[]; updates: Array<[string, unknown]>; local: Array<[string, string, unknown]>; failSet: boolean; uid: string | null; switchOnPermission: boolean };
+type Calls = { writes: Array<[string, unknown]>; deletes: string[]; updates: Array<[string, unknown]>; local: Array<[string, string, unknown]>; failSet: boolean; failDelete?: boolean; uid: string | null; switchOnPermission: boolean; prefs?: Record<string, boolean> };
 const calls: Calls = (globalThis as unknown as { __reminder: Calls }).__reminder = { writes: [], deletes: [], updates: [], local: [], failSet: false, uid: 'u1', switchOnPermission: false };
 
 async function loadModule() {
   const stubs: Record<string, string> = {
-    'firebase/firestore': `const c=()=>globalThis.__reminder;export const doc=(_db,...path)=>path.join('/');export const setDoc=async(ref,data)=>{if(c().failSet)throw new Error('refusé');c().writes.push([ref,data]);};export const deleteDoc=async ref=>{c().deletes.push(ref);};`,
+    'firebase/firestore': `const c=()=>globalThis.__reminder;export const doc=(_db,...path)=>path.join('/');export const setDoc=async(ref,data)=>{if(c().failSet)throw new Error('refusé');c().writes.push([ref,data]);};export const deleteDoc=async ref=>{if(c().failDelete)throw new Error('refusé');c().deletes.push(ref);};`,
     'lib/firebase': `const c=()=>globalThis.__reminder;export const db={};export const auth={get currentUser(){return c().uid?{uid:c().uid}:null}};export const requestNotificationPermission=async()=>{if(c().switchOnPermission)c().uid='u2';return 'fcm';};`,
-    'lib/userIsolation': `const c=()=>globalThis.__reminder;export const readUserScopedJson=(_uid,_field,fallback)=>fallback;export const writeUserScopedJson=(uid,field,value)=>c().local.push(['set',uid+':'+field,value]);export const removeUserScopedValue=(uid,field)=>c().local.push(['remove',uid+':'+field,null]);`,
+    'lib/userIsolation': `const c=()=>globalThis.__reminder;export const readUserScopedJson=(_uid,field,fallback)=>field==='notifications'&&c().prefs?c().prefs:fallback;export const writeUserScopedJson=(uid,field,value)=>c().local.push(['set',uid+':'+field,value]);export const removeUserScopedValue=(uid,field)=>c().local.push(['remove',uid+':'+field,null]);`,
     'hooks/useShows': 'export const useShowActions=()=>({updateShow:async()=>{}});',
     'store/toastStore': 'export const useToastStore={getState:()=>({showToast(){}})};',
     'store/logStore': 'export const appLogger={warn(){}};',
@@ -48,7 +48,7 @@ test('SEENIT-NOTIFICATION-009 cloche d’épisode à venir : même écriture que
   calls.updates.length = 0; calls.local.length = 0;
   assert.equal(await writeEpisodeReminder({ target: { ...show as object, notificationsEnabled: true } as never, ownerUid: 'u1', nextState: false, episode, updateShow }), true);
   assert.deepEqual(calls.deletes, ['users/u1/reminders/s1_S01E03']);
-  assert.deepEqual(calls.local, [['remove', 'u1:reminder_s1_S1E3', null]]);
+  assert.deepEqual(calls.local, [['remove', 'u1:reminder_s1_S1E3', null], ['remove', 'u1:reminder_s1', null]], 'couper la série retire aussi l’ancien repère de série');
 
   calls.updates.length = 0; calls.failSet = true;
   await assert.rejects(writeEpisodeReminder({ target: show, ownerUid: 'u1', nextState: true, episode, updateShow }), /refusé/);
@@ -86,7 +86,8 @@ test('SEENIT-NOTIFICATION-009 cloche câblée sur les épisodes à venir de la f
   assert.ok(modal.indexOf('<EpisodeReminderBell variant="overlay"') < modal.indexOf('aria-label="Fermer"', modal.indexOf('<EpisodeReminderBell variant="overlay"')), 'juste avant la croix');
   assert.match(modal, /\{!activeShow\?\.id && <div className="min-h-11[^"]*"><Clock size=\{16\} className="text-zinc-500" \/>Bientôt disponible<\/div>\}/, 'série non suivie : mention conservée');
   const card = read('src/components/cards/UpcomingShowCard.tsx');
-  assert.match(card, /if \(await writeEpisodeReminder\(\{ target, ownerUid, nextState, episode: ep, updateShow \}\)\) setIsReminderSet\(nextState\);/, 'une seule écriture partagée');
+  assert.match(card, /if \(await writeEpisodeReminder\(\{ target, ownerUid, nextState, episode: ep, updateShow \}\)\) setIsReminderSet\(nextState\);/, 'une seule écriture partagée, sans toast tardif');
+  assert.match(card, /useState<boolean>\(\(\) => readEpisodeReminder\(show, ep\)\)/, 'même état réel que les autres cloches');
   assert.doesNotMatch(card, /setDoc|deleteDoc/);
   const bell = read('src/components/EpisodeReminderBell.tsx');
   assert.match(bell, /if \(!available\) return null;/);
@@ -98,4 +99,37 @@ test('SEENIT-NOTIFICATION-009 cloche câblée sur les épisodes à venir de la f
 test('SEENIT-UX-014 carte en pause sans ligne sous le titre ; retour en vue horizontale sans marge ajoutée', () => {
   assert.match(read('src/components/cards/SeriesEpisodeCard.tsx'), /const staleDetail = pause \? null : visibleDetail && \/pas vu\|délaissé\/i\.test\(visibleDetail\) \? visibleDetail : null;/, 'le badge de l’affiche suffit, dans toutes les vues');
   assert.match(read('src/hooks/useCardLayoutAnchor.ts'), /const deficit = anchor\.list \? Math\.max\(0, desired \+ viewport - scroller\.scrollHeight\) : 0;/, 'marge seulement au passage en liste');
+});
+
+// Décision du propriétaire du 09/11 (#910) : « c'est ok si ça active toute la série, c'est mieux même ».
+test('SEENIT-NOTIFICATION-009 la cloche agit sur toute la série et montre les rappels réellement planifiés', async () => {
+  const { seriesRemindersActive, readEpisodeReminder, writeEpisodeReminder } = await loadModule();
+  const episode = { season_number: 2, episode_number: 9 };
+  Object.assign(calls, { uid: 'u1', switchOnPermission: false, failSet: false, prefs: undefined });
+  // Série suivie sans choix explicite : prévenue par défaut (« Sortie du jour » activée), cloche allumée.
+  assert.equal(seriesRemindersActive({ id: 's1', mediaType: 'tv' } as never), true);
+  assert.equal(readEpisodeReminder({ id: 's1', mediaType: 'tv' } as never, episode), true);
+  assert.equal(seriesRemindersActive({ id: 's1', mediaType: 'tv', notificationsEnabled: false } as never), false, 'série coupée');
+  assert.equal(seriesRemindersActive({ id: 's1', mediaType: 'tv', isArchived: true } as never), false, 'série archivée');
+  assert.equal(seriesRemindersActive({ id: 's1', mediaType: 'tv', status: 'dropped' } as never), false, 'série abandonnée');
+  assert.equal(seriesRemindersActive({ id: '', mediaType: 'tv' } as never), false, 'série non suivie (fiche acteur)');
+  calls.prefs = { release_today_tv: false };
+  assert.equal(seriesRemindersActive({ id: 's1', mediaType: 'tv' } as never), false, '« Sortie du jour » coupée : pas de rappel par défaut');
+  assert.equal(seriesRemindersActive({ id: 's1', mediaType: 'tv', notificationsEnabled: true } as never), true, 'série activée à la cloche : prévenue malgré tout');
+  calls.prefs = undefined;
+  // Couper une série prévenue par défaut écrit bien `false` (le choix devient explicite).
+  calls.updates.length = 0;
+  const updateShow = async (id: string, updates: unknown) => { calls.updates.push([id, updates]); };
+  await writeEpisodeReminder({ target: { id: 's1', title: 'MobLand', mediaType: 'tv' } as never, ownerUid: 'u1', nextState: false, episode, updateShow });
+  assert.deepEqual(calls.updates, [['s1', { notificationsEnabled: false }]]);
+  // Revue Codex #922 : si la coupure échoue, la série retrouve l'absence de choix, jamais un `true` explicite
+  // qui la laisserait prévenue après avoir coupé « Sortie du jour ».
+  calls.updates.length = 0; calls.failDelete = true;
+  await assert.rejects(writeEpisodeReminder({ target: { id: 's1', title: 'MobLand', mediaType: 'tv' } as never, ownerUid: 'u1', nextState: false, episode, updateShow }));
+  calls.failDelete = false;
+  assert.deepEqual(calls.updates, [['s1', { notificationsEnabled: false }], ['s1', { notificationsEnabled: undefined }]], 'absence de choix restaurée');
+  assert.notEqual((calls.updates[1][1] as { notificationsEnabled?: boolean }).notificationsEnabled, true);
+  const notifier = read('src/hooks/useRemindersNotifier.ts');
+  assert.match(notifier, /if \(userPrefs\.release_today_tv \|\| isSpecificReminder \|\| s\.notificationsEnabled === true\) \{/, 'une série activée à la cloche est prévenue même sans « Sortie du jour »');
+  assert.match(read('src/components/EpisodeReminderBell.tsx'), /const label = `\$\{reminder \? 'Couper' : 'Activer'\} les rappels de \$\{show\?\.title \|\| 'la série'\} \(\$\{code\}\)`;/, 'le nom accessible dit que la cloche agit sur la série');
 });

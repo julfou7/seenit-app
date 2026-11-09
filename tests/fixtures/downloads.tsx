@@ -55,7 +55,7 @@ function EpisodesFixture({ mode }: { mode: boolean }) {
     <SeasonPanel season={{ season_number: 2, episode_count: 4 }} episodes={[1, 2, 3, 4].map(episode_number => ({ episode_number, name: episode_number === 1 ? 'Un titre particulièrement long qui doit disposer de deux lignes' : `Épisode ${episode_number}`, air_date: '2020-01-01', still_path: '/fixture.jpg', runtime: 52 }))} show={null} nextKey="2x1" runtimeFallback={52} onToggleSeason={() => {}} onToggleEpisode={() => {}} onOpenEpisode={episode => telemetry.opened.push(`episode:${episode.episode_number}`)}
     downloadMode={{ active: mode, picked, onToggle: toggle }}
     episodesHasFile={{ '2x3': true }} getEpisodeDownload={episode => episode === 2 ? { id: 'active', mediaType: 'tv', title: 'Série', status: 'downloading', statusText: 'En cours', progress: 30, size: 0, sizeleft: 0 } : null} />
-    {mode && <DownloadModeBar title={`${picked.size} épisodes`} detail="Touche une barre ou un épisode." enabled={picked.size > 0} onLaunch={() => {}} onPrecise={() => {}} onExit={() => telemetry.opened.push('exit')} />}
+    {mode && <DownloadModeBar title={`${picked.size} épisodes`} detail={picked.size ? `${picked.size} maintenant` : 'Coche un épisode.'} enabled={picked.size > 0} onLaunch={() => {}} onPrecise={() => {}} onExit={() => telemetry.opened.push('exit')} />}
   </div>;
 }
 // Maquette DlFilm : même composition que la fiche film — bouton ⬇ à côté du bouton principal, barre du mode.

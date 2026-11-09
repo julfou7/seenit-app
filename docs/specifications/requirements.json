@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.282",
+  "applicationVersion": "1.4.283",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -82,6 +82,10 @@
         {
           "file": "tests/episodeReminderBell.test.ts",
           "contains": "SEENIT-NOTIFICATION-009 la cloche suit la préférence de la série après le clic d’une autre cloche (revue Codex #917)"
+        },
+        {
+          "file": "tests/episodeReminderBell.test.ts",
+          "contains": "SEENIT-NOTIFICATION-009 la cloche agit sur toute la série et montre les rappels réellement planifiés"
         },
         {
           "file": "tests/episodeReminderBell.test.ts",

@@ -89,11 +89,13 @@ export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise, o
   // La fiche vit dans un contexte d'empilement (z-150) sous la navigation (z-160) : la barre passe par un
   // portail sur document.body pour recouvrir réellement la navigation et recevoir les appuis. Une seule
   // ligne de 60 px (retour terrain du 07/11) : la liste n'est plus cachée par un grand panneau.
+  // Retour terrain du 09/11 : « le texte doit être visible en entier » — jamais de points de suspension, le texte
+  // passe à la ligne s'il ne tient pas.
   const bar = <div role="region" aria-label="Lancer le téléchargement" data-mode-bar className="fixed inset-x-2.5 bottom-[calc(10px+env(safe-area-inset-bottom,0px))] z-[170] max-w-md mx-auto rounded-[22px] bg-[rgba(22,22,26,0.96)] backdrop-blur-xl p-2 flex items-center gap-2 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.13),0_14px_34px_rgba(0,0,0,0.6)] animate-in fade-in slide-in-from-bottom-2 duration-200 motion-reduce:animate-none">
     <button type="button" onClick={onExit} aria-label="Quitter le mode téléchargement" className="w-11 h-11 shrink-0 grid place-items-center rounded-full bg-white/10 text-zinc-100 active:scale-95"><X size={20} /></button>
     {onPrecise && enabled
-      ? <button type="button" onClick={onPrecise} className="flex-1 min-w-0 min-h-11 flex flex-col justify-center text-left leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className="text-[12.5px] font-bold text-zinc-400">Version précise ›</span></button>
-      : <span className="flex-1 min-w-0 min-h-11 flex flex-col justify-center leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className={cn('truncate text-[12.5px]', tone === 'sky' ? 'font-bold text-[#7DD3FC]' : 'text-zinc-400')}>{detail}</span></span>}
+      ? <button type="button" onClick={onPrecise} className="flex-1 min-w-0 min-h-11 flex flex-col justify-center text-left leading-tight"><strong className="text-[14.5px] font-extrabold text-white [overflow-wrap:anywhere]">{title}</strong><span className="text-[12.5px] font-bold text-zinc-400">Version précise ›</span></button>
+      : <span className="flex-1 min-w-0 min-h-11 flex flex-col justify-center leading-tight"><strong className="text-[14.5px] font-extrabold text-white [overflow-wrap:anywhere]">{title}</strong><span className={cn('text-[12.5px] [overflow-wrap:anywhere]', tone === 'sky' ? 'font-bold text-[#7DD3FC]' : 'text-zinc-400')}>{detail}</span></span>}
     {/* Bleu : le film à venir est programmé pour sa sortie (maquette DlFilm). */}
     <button type="button" disabled={!enabled} onClick={() => onLaunch('1080p')} className={cn('h-11 shrink-0 px-3.5 rounded-[13px] text-black text-[15px] font-extrabold active:scale-[0.97] disabled:bg-zinc-800 disabled:text-zinc-500', 'bg-[#7DD3FC]')}>1080p</button>
     <button type="button" disabled={!enabled} onClick={() => onLaunch('4k')} className="h-11 shrink-0 px-3.5 rounded-[13px] bg-zinc-800 text-zinc-100 text-[15px] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] active:scale-[0.97] disabled:text-zinc-500">4K</button>
