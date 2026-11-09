@@ -57,8 +57,8 @@ test('SEENIT-DOWNLOAD-016 un seul état Sonarr/Radarr synchronisé : relu en un 
     'lib/firebase': 'const s=()=>globalThis.__arr;export const auth={get currentUser(){return {uid:s().uid}}};',
     'store/downloadConfigStore': 'const s=()=>globalThis.__arr;export const useDownloadConfigStore=Object.assign(()=>s().config,{getState:()=>s().config});',
     'store/mediaPresenceStore': 'const s=()=>globalThis.__arr;export const useMediaPresenceStore={getState:()=>({checkPresence:async p=>{s().presence.push(p.tmdbId+":"+p.forceRefresh)}})};',
-    'features/downloads/programmedCalendar': 'const s=()=>globalThis.__arr;export const programmedScope=c=>c.sonarrUrl;export const fetchProgrammedCalendar=async c=>{s().reads.push(c.sonarrUrl);const r=s().next.shift();return r?await r:{items:[{id:1,from:c.sonarrUrl}],failures:[]}};export const fetchWatchedMovie=async(c,id)=>{s().watchedReads.push(c.sonarrUrl+":"+id);return {id:id*10,server:c.sonarrUrl}};',
-    'features/downloads/recentImports': 'export const fetchRecentImports=async()=>({items:[],failures:[]});',
+    'features/downloads/programmedCalendar': 'const s=()=>globalThis.__arr;export const programmedScope=c=>c.sonarrUrl;export const fetchProgrammedCalendar=async c=>{s().reads.push(c.sonarrUrl);const r=s().next.shift();return r?await r:{items:[{id:1,from:c.sonarrUrl}],failures:[]}};export const fetchWatchedMovie=async(c,id)=>{s().watchedReads.push(c.sonarrUrl+":"+id);return {id:id*10,server:c.sonarrUrl}};export const movieRelease=()=>({inCinemasPast:false});export const sortProgrammedItems=i=>i;',
+    'features/downloads/recentImports': 'export const fetchRecentImports=async()=>({items:[],failures:[],pending:[]});',
     'features/downloads/arrMediaSource': 'export const tmdbArrLabelSource={media:async()=>null,episodes:async()=>null};',
   };
   const bundle = await build({ entryPoints: ['src/store/arrSyncStore.ts'], bundle: true, platform: 'node', format: 'esm', write: false, external: ['zustand', 'react'],

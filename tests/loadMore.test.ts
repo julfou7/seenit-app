@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import vm from 'node:vm';
 
@@ -55,7 +55,9 @@ test('SEENIT-UX-020 #873 toutes les paginations réutilisent le contrôle partag
     ['src/components/MovieActorProfile.tsx', /<LoadMore previews=\{grid\.slice\(limit, limit \+ 3\)/],
     ['src/screens/mediaDetail/detailSections.tsx', /<LoadMore round previews=\{cast\.slice\(limit, limit \+ 3\)/],
     ['src/components/ProAnalyticsDashboard.tsx', /<LoadMore round previews=\{people\.slice\(PEOPLE_PREVIEW, PEOPLE_PREVIEW \+ 3\)/],
-    ['src/screens/PersonDetailModal.tsx', /<LoadMore previews=\{filteredCredits\.slice\(visibleCredits\.length, visibleCredits\.length \+ 3\)/]
+    ['src/screens/PersonDetailModal.tsx', /<LoadMore previews=\{filteredCredits\.slice\(visibleCredits\.length, visibleCredits\.length \+ 3\)/],
+    // Retour terrain du 09/11 : Moi · Films à voir avait gardé « Charger plus ».
+    ['src/screens/LibraryScreen.tsx', /<LoadMore\n\s+previews=\{data\.slice\(visibleCount, visibleCount \+ 3\)/]
   ];
   for (const [file, pattern] of surfaces) {
     const source = read(file);
@@ -67,6 +69,13 @@ test('SEENIT-UX-020 #873 toutes les paginations réutilisent le contrôle partag
   assert.match(read('src/components/cards/HomeLoadMore.tsx'), /import '\.\/loadMore\.css';/);
   assert.match(read('src/components/cards/loadMore.css'), /\.home-load-more \{ height:52px; min-height:52px;/);
   assert.doesNotMatch(read('src/screens/watchListHome.css'), /\.home-load-more \{/, 'une seule source de styles');
+  // Invariant global (retour terrain du 09/11) : aucun autre bouton texte de pagination dans toute l'app, même sur
+  // une surface oubliée de la liste ci-dessus.
+  const walk = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(`${dir}/${entry.name}`) : /\.tsx$/.test(entry.name) ? [`${dir}/${entry.name}`] : []);
+  for (const file of walk('src')) {
+    const code = read(file).replace(/\{\/\*[\s\S]*?\*\/\}|\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    assert.doesNotMatch(code, />\s*(?:Charger|Voir|Afficher) (?:plus|la suite)\s*</, `${file} : pagination hors du contrôle partagé`);
+  }
 });
 
 test('SEENIT-UX-020 #873 le focus clavier suit le dépliage et le repli sans se perdre', () => {

@@ -18,9 +18,9 @@ test('SEENIT-DOWNLOAD-021 Téléchargés : la carte d’Explorer elle-même, ave
   assert.match(card, /\{!hideBadges && !action && \(/, 'jamais « Ajouter » en plus de l’action');
   assert.match(card, /const isAtCinema = !action && !isTv/, 'un titre déjà téléchargé n’est jamais « Au cinéma »');
   const rail = read('src/components/RecentImportsRail.tsx');
-  assert.match(rail, /<ul className="grid grid-cols-3 sm:grid-cols-4 gap-x-1\.5 gap-y-4" aria-label="Téléchargés">/, 'même grille qu’Explorer');
+  assert.match(rail, /<ul className="grid grid-cols-3 sm:grid-cols-4 gap-x-1\.5 gap-y-4" aria-label=\{undecided \? 'À décider' : 'Téléchargés'\}>/, 'même grille qu’Explorer');
   assert.match(rail, /<GridMediaCard media=\{importMedia\(item\)\} posterSrc=\{item\.posterUrl\}/);
-  assert.match(rail, /action=\{\{ label: 'Retirer', ariaLabel: `Retirer \$\{item\.title\} de Téléchargés et de \$\{item\.kind === 'movie' \? 'Radarr' : 'Sonarr'\}`/);
+  assert.match(rail, /action=\{\{ label: 'Retirer', ariaLabel: `Retirer \$\{item\.title\} de \$\{undecided \? 'À décider' : 'Téléchargés'\} et de \$\{item\.kind === 'movie' \? 'Radarr' : 'Sonarr'\}`/);
   assert.match(rail, /if \(useArrSyncStore\.getState\(\)\.snapshot\?\.key !== arrSyncKey\(\)\) \{/, 'jamais un identifiant d’un autre compte ou serveur');
   // Retour terrain du 09/11 sur la v1.4.286 : plus de « fichiers gardés » (Sonarr/Radarr déplacent les fichiers).
   assert.match(rail, /outcome === 'kept' \? 'Retiré de la liste · la suite reste programmée dans Sonarr' : `Retiré de \$\{item\.kind === 'movie' \? 'Radarr' : 'Sonarr'\}`, posterPath: item\.posterUrl \|\| null/, 'un seul toast qui dit ce qui a été fait, avec l’affiche');

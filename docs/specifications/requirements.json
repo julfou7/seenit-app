@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.288",
+  "applicationVersion": "1.4.289",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -40,6 +40,42 @@
         {
           "file": "tests/arrMediaLabels.test.ts",
           "contains": "SEENIT-DOWNLOAD-022 titres, affiches et épisodes de la fiche TMDB fr-FR par identité exacte ; repli Sonarr/Radarr"
+        },
+        {
+          "file": "tests/downloadNotificationPoster.test.ts",
+          "contains": "SEENIT-DOWNLOAD-022 notifications de téléchargement : titre de la fiche TMDB fr-FR par identité exacte, repli Sonarr/Radarr"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-023",
+      "title": "Aucun titre de Sonarr/Radarr invisible : Téléchargés sans limite de date, Programmés ou À décider",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/arrCoverage.test.ts",
+          "contains": "SEENIT-DOWNLOAD-023 aucun titre de Sonarr/Radarr invisible : Programmés ou « À décider », jamais deux fois"
+        },
+        {
+          "file": "tests/recentImports.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : tout ce que Sonarr/Radarr détiennent avec un fichier, sans limite de date ; imports récents datés et détaillés"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-024",
+      "title": "Carte En cours v2 : flèche, vitesse sur la ligne de progression centrée, geste de l'accueil",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/downloadCardV2.test.ts",
+          "contains": "SEENIT-DOWNLOAD-024 carte En cours v2 : flèche, ligne de progression unique, geste de l’accueil"
         }
       ]
     },
@@ -315,7 +351,7 @@
         },
         {
           "file": "tests/recentImports.test.ts",
-          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : imports réels des 7 derniers jours, groupés par série, doublons et grabs ignorés"
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : tout ce que Sonarr/Radarr détiennent avec un fichier, sans limite de date ; imports récents datés et détaillés"
         },
         {
           "file": "tests/recentImports.test.ts",
@@ -1696,7 +1732,7 @@
         },
         {
           "file": "tests/recentImports.test.ts",
-          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : imports réels des 7 derniers jours, groupés par série, doublons et grabs ignorés"
+          "contains": "SEENIT-DOWNLOAD-013 Téléchargés : tout ce que Sonarr/Radarr détiennent avec un fichier, sans limite de date ; imports récents datés et détaillés"
         }
       ]
     },

@@ -2,6 +2,7 @@ import { removeTrackedMedia } from '../features/shows/removeTrackedMedia';
 import React, { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { useShows } from '../hooks/useShows';
 import { GridMediaCard, PreviewModal } from '../components/GridMediaCard';
+import { LoadMore } from '../components/cards/HomeLoadMore';
 import { type TMDBMedia, isMovieAtCinema } from '../features/shows/tmdb';
 import { Inbox } from 'lucide-react';
 import { checkIsUpToDate, getTodayStr } from '../lib/utils';
@@ -77,7 +78,10 @@ const LibrarySectionGrid = React.memo(function LibrarySectionGrid(props: Library
     setVisibleCount(current => Math.min(Math.max(current, LIBRARY_GRID_BATCH_SIZE), data.length));
   }, [data.length]);
 
+  // Retour terrain du 09/11 (Moi · Films à voir) : le seul « Afficher plus » de l'app (SEENIT-UX-020), plus le
+  // bouton texte « Charger plus » d'origine.
   return (
+    <>
     <div className="moi-grid">
       {data.slice(0, visibleCount).map(({ media, show }) => (
         <GridMediaCard
@@ -91,18 +95,17 @@ const LibrarySectionGrid = React.memo(function LibrarySectionGrid(props: Library
           onAddClick={onAddClick}
         />
       ))}
-      {visibleCount < data.length && (
-        <button
-          type="button"
-          onClick={() => startTransition(() => {
-            setVisibleCount(current => Math.min(data.length, current + LIBRARY_GRID_BATCH_SIZE));
-          })}
-          className="moi-more"
-        >
-          Charger plus
-        </button>
-      )}
     </div>
+    <LoadMore
+      previews={data.slice(visibleCount, visibleCount + 3).map(({ media, show }) => ({ key: getMediaKey(media.media_type, media.id), initial: (show.title || '?').charAt(0), imagePath: show.posterPath }))}
+      remainingCount={data.length - visibleCount}
+      step={LIBRARY_GRID_BATCH_SIZE}
+      lastLabel={data[visibleCount]?.show.mediaType === 'tv' ? 'Afficher la dernière' : 'Afficher le dernier'}
+      onLoad={() => startTransition(() => {
+        setVisibleCount(current => Math.min(data.length, current + LIBRARY_GRID_BATCH_SIZE));
+      })}
+    />
+    </>
   );
 }, (previous, next) =>
   areLibraryItemsEqual(previous.data, next.data) &&

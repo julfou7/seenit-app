@@ -23,7 +23,8 @@ export type ProgrammedItem =
   | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean }
   | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; inCinemasPast?: boolean };
 
-export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[] }
+/** `movieQuality` : libellé de qualité d'un profil Radarr de ce serveur (revue Codex #933 : films ajoutés hors calendrier). */
+export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[]; movieQuality?: (profileId?: number) => ProgrammedQuality | undefined }
 
 export interface CalendarIo {
   get: (url: string, headers: Record<string, string>) => Promise<unknown>;
@@ -100,6 +101,7 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
     const base = cleanUrl(radarrUrl);
     tasks.push(Promise.all([io.get(`${base}/api/v3/calendar?${range}`, headersFor(radarrApiKey)).catch(() => null), readProfiles(io, radarrUrl, radarrApiKey),
       io.get(`${base}/api/v3/wanted/missing?${WANTED_PAGE}`, headersFor(radarrApiKey)).catch(() => null)]).then(([list, profiles, wantedPage]) => {
+      result.movieQuality = profileId => profileQualityLabel(profileId, profiles, { hd: config.radarr1080pProfileId, uhd: config.radarr4kProfileId });
       const calendar = Array.isArray(list) ? list as CalendarMovie[] : null;
       const wanted = wantedRecords<CalendarMovie>(wantedPage);
       if (!calendar || !wanted) result.failures.push('Radarr');
@@ -116,11 +118,15 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
     }, () => { result.failures.push('Radarr'); }));
   }
   await Promise.all(tasks);
-  // À venir d'abord, par date ; puis les recherchés, les plus récents en tête ; enfin les dates inconnues.
+  result.items = sortProgrammedItems(result.items);
+  return result;
+}
+
+/** À venir d'abord, par date ; puis les recherchés, les plus récents en tête ; enfin les dates inconnues. */
+export function sortProgrammedItems(items: readonly ProgrammedItem[]): ProgrammedItem[] {
   const rank = (item: ProgrammedItem) => item.wanted ? 1 : item.date ? 0 : 2;
   const time = (item: ProgrammedItem) => item.date ? Date.parse(item.date) : 0;
-  result.items.sort((a, b) => rank(a) - rank(b) || (rank(a) === 1 ? time(b) - time(a) : time(a) - time(b)));
-  return result;
+  return [...items].sort((a, b) => rank(a) - rank(b) || (rank(a) === 1 ? time(b) - time(a) : time(a) - time(b)));
 }
 
 /** Portée serveur d'une liste « Programmés » : les identifiants Sonarr/Radarr n'ont de sens que sur ce serveur. */

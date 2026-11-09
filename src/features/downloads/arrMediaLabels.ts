@@ -1,6 +1,6 @@
 import { getTmdbLocalizedTitle } from '../shows/mediaTitle.ts';
 import type { ProgrammedCalendar, ProgrammedItem } from './programmedCalendar';
-import type { RecentImport, RecentImports } from './recentImports';
+import type { ArrPendingTitle, RecentImport, RecentImports } from './recentImports';
 
 /**
  * SEENIT-DOWNLOAD-022 — Retour terrain du 09/11 sur la v1.4.287 (« titre pas traduit dans Téléchargements, écart
@@ -16,7 +16,7 @@ export interface ArrLabelSource {
   /** Titres français des épisodes d'une saison TMDB, par numéro d'épisode. */
   episodes: (tmdbId: number, season: number) => Promise<ReadonlyMap<number, string> | null>;
 }
-export interface ArrLists { programmed: ProgrammedCalendar; imports: RecentImports }
+export interface ArrLists { programmed: ProgrammedCalendar; imports: RecentImports; undecided?: ArrPendingTitle[] }
 
 /** Au-delà, la synchronisation n'attend plus TMDB : le repli Sonarr/Radarr s'affiche, la fiche est en cache ensuite. */
 export const ARR_LABEL_TIMEOUT_MS = 2500;
@@ -70,7 +70,7 @@ export function localizeProgrammedItem(item: ProgrammedItem, label: ArrMediaLabe
 }
 
 /** Applique un libellé SeenIt à un import ; la note et l'année de la fiche remplacent celles de Sonarr/Radarr. */
-export function localizeRecentImport(item: RecentImport, label: ArrMediaLabel | null | undefined): RecentImport {
+export function localizeRecentImport<T extends RecentImport>(item: T, label: ArrMediaLabel | null | undefined): T {
   if (!label) return item;
   return { ...item, title: label.title || item.title, posterUrl: label.posterPath ? tmdbImage(label.posterPath, 'w342') : item.posterUrl, rating: label.rating ?? item.rating, year: label.year ?? item.year };
 }
@@ -93,12 +93,13 @@ export async function localizeArrLists(lists: ArrLists, source: ArrLabelSource, 
       seasons.set(seasonKey(Number(item.tmdbId), item.season), settle(source.episodes(Number(item.tmdbId), item.season), timeoutMs));
     }
   }
-  for (const item of lists.imports.items) askMedia(importKey(item));
+  for (const item of [...lists.imports.items, ...lists.undecided || []]) askMedia(importKey(item));
   const labels = new Map(await Promise.all([...media].map(async ([key, promise]) => [key, await promise] as const)));
   const titles = new Map(await Promise.all([...seasons].map(async ([key, promise]) => [key, await promise] as const)));
   const label = (key: string | null) => key ? labels.get(key) : null;
   return {
     programmed: { ...lists.programmed, items: lists.programmed.items.map(item => localizeProgrammedItem(item, label(programmedKey(item)), item.kind === 'episode' && Number(item.tmdbId) > 0 ? titles.get(seasonKey(Number(item.tmdbId), item.season)) : null)) },
     imports: { ...lists.imports, items: lists.imports.items.map(item => localizeRecentImport(item, label(importKey(item)))) },
+    ...(lists.undecided ? { undecided: lists.undecided.map(item => localizeRecentImport(item, label(importKey(item)))) } : {}),
   };
 }

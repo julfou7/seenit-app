@@ -3,7 +3,8 @@ import { auth } from '../lib/firebase';
 import { useDownloadConfigStore } from './downloadConfigStore';
 import { useMediaPresenceStore } from './mediaPresenceStore';
 import { fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
-import { fetchRecentImports, type RecentImports } from '../features/downloads/recentImports';
+import { fetchRecentImports, type ArrPendingTitle, type RecentImports } from '../features/downloads/recentImports';
+import { coverArrLibrary } from '../features/downloads/arrCoverage';
 import { localizeArrLists } from '../features/downloads/arrMediaLabels';
 import { tmdbArrLabelSource } from '../features/downloads/arrMediaSource';
 
@@ -23,7 +24,8 @@ import { tmdbArrLabelSource } from '../features/downloads/arrMediaSource';
  */
 export type WatchedMovieDetails = Awaited<ReturnType<typeof fetchWatchedMovie>>;
 /** `watched` : films suivis absents du calendrier (dates, qualité, identifiant Radarr), lus dans la même copie. */
-export interface ArrSnapshot { key: string; programmed: ProgrammedCalendar | null; imports: RecentImports | null; watched: Record<number, WatchedMovieDetails>; syncedAt: number }
+/** `undecided` : titres de Sonarr/Radarr ni téléchargés ni programmés (SEENIT-DOWNLOAD-023). */
+export interface ArrSnapshot { key: string; programmed: ProgrammedCalendar | null; imports: RecentImports | null; undecided: ArrPendingTitle[]; watched: Record<number, WatchedMovieDetails>; syncedAt: number }
 export interface ArrWriteTarget { tmdbId?: number | string; tvdbId?: number | string; mediaType: 'tv' | 'movie' }
 
 interface ArrSyncState {
@@ -69,7 +71,7 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       const watchedIds = get().watchedIds;
       const [programmed, imports, watched] = await Promise.all([
         fetchProgrammedCalendar(config).catch(() => ({ items: [], failures: ['Sonarr/Radarr'] })),
-        fetchRecentImports(config).catch(() => ({ items: [], failures: ['Sonarr/Radarr'] })),
+        fetchRecentImports(config).catch((): RecentImports => ({ items: [], failures: ['Sonarr/Radarr'], pending: [] })),
         // Revue Codex #918 : les détails d'un film suivi appartiennent à la même copie (même compte, même
         // serveur) et sont relus à chaque synchronisation ; une lecture échouée est retentée à la suivante.
         Promise.all(watchedIds.map(async id => [id, await fetchWatchedMovie(config, id).catch(() => null)] as const)).then(entries => Object.fromEntries(entries) as Record<number, WatchedMovieDetails>),
@@ -78,9 +80,11 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       // récente (écriture de SeenIt entre-temps), est ignorée.
       if (arrSyncKey() !== key || id !== sequence) return;
       // SEENIT-DOWNLOAD-022 : titres, affiches et notes de la fiche TMDB en français, comme le reste de l'app.
-      const labelled = await localizeArrLists({ programmed, imports }, tmdbArrLabelSource);
+      // SEENIT-DOWNLOAD-023 : chaque titre de Sonarr/Radarr à un endroit (Téléchargés, Programmés ou À décider).
+      const coverage = coverArrLibrary(programmed, imports.pending);
+      const labelled = await localizeArrLists({ programmed: coverage.programmed, imports, undecided: coverage.undecided }, tmdbArrLabelSource);
       if (arrSyncKey() !== key || id !== sequence) return;
-      set({ snapshot: { key, programmed: labelled.programmed, imports: labelled.imports, watched, syncedAt: Date.now() } });
+      set({ snapshot: { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() } });
     })().finally(() => {
       if (inFlight?.promise === promise) inFlight = null;
       set({ syncing: false });

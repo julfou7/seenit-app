@@ -45,8 +45,9 @@ import { isC411TopScope, type C411TmdbIdentity } from "./src/features/downloads/
 import { buildDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookNotification.ts";
 import { downloadServiceTimeoutMs } from "./src/features/downloads/downloadServiceTimeout.ts";
 import { deliverDownloadWebhookPresentation } from "./src/features/downloads/downloadWebhookDelivery.ts";
-import { createDownloadNotificationPosterResolver } from './src/features/downloads/downloadNotificationPoster.ts';
-const resolveDownloadNotificationPoster = createDownloadNotificationPosterResolver();
+import { createDownloadNotificationMediaResolver } from './src/features/downloads/downloadNotificationPoster.ts';
+// Affiche et titre français de la fiche TMDB (SEENIT-NOTIFICATION-003, SEENIT-DOWNLOAD-022).
+const resolveDownloadNotificationMedia = createDownloadNotificationMediaResolver();
 import { processDownloadFailureNotification } from "./src/features/downloads/downloadFailureNotificationBackend.ts";
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
 import { normalizePlexAvailabilityTraceBatch } from "./src/features/notifications/plexAvailabilityDiagnostics.ts";
@@ -698,7 +699,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.288',
+        'X-Plex-Version': '1.4.289',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -714,7 +715,7 @@ async function startServer() {
         const results =
           data?.MediaContainer?.SearchResult ||
           data?.MediaContainer?.Metadata ||
-          data?.MediaContainer?.Hub?.flatMap((h: any) => h.Metadata || []) ||
+          data?.MediaContainer?.Hub?.flatMap((h: { Metadata?: unknown[] }) => h.Metadata || []) ||
           data?.SearchResult ||
           data?.Metadata;
 
@@ -2802,7 +2803,7 @@ async function startServer() {
         ownerUidHash,
         presentation,
         sendPush: sendPushToUserDevices,
-        resolvePoster: resolveDownloadNotificationPoster,
+        resolveMedia: resolveDownloadNotificationMedia,
         traceId,
       });
 

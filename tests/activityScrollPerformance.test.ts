@@ -27,7 +27,7 @@ test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
   assert.match(librarySource, /useState\(\(\) => Math\.min\(LIBRARY_GRID_BATCH_SIZE, data\.length\)\)/);
   assert.match(librarySource, /data\.slice\(0, visibleCount\)\.map/);
   assert.match(librarySource, /setVisibleCount\(current => Math\.min\(data\.length, current \+ LIBRARY_GRID_BATCH_SIZE\)\)/);
-  assert.match(librarySource, />\s*Charger plus\s*<\/button>/);
+  assert.match(librarySource, /<LoadMore\n\s+previews=\{data\.slice\(visibleCount, visibleCount \+ 3\)/, 'le seul « Afficher plus » de l’app (SEENIT-UX-020)');
   assert.match(librarySource, /<LibrarySectionGrid\s+key=\{activeSection\.id\}/,
     'une seule section est montée à la fois et repart d’un lot borné à chaque changement de pastille');
   assert.match(librarySource, /key=\{getMediaKey\(media\.media_type, media\.id\)\}/);

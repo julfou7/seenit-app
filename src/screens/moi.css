@@ -19,7 +19,6 @@
 .moi-chip[aria-pressed=true]{background:#E5A93D;border-color:#E5A93D;color:#000;font-weight:800}
 .moi-chip-count{font-size:12px;font-weight:800;opacity:.65}
 .moi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px 6px;padding:9px 10px 0}
-.moi-more{grid-column:1/-1;min-height:44px;border-radius:14px;border:1px solid rgba(255,255,255,.10);background:#141417;color:#d4d4d8;font-size:13px;font-weight:700}
 .moi-empty{padding:40px 24px;display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;color:#8b8b94;font-size:14px;line-height:1.5}
 .moi-empty strong{font-size:17px;font-weight:800;color:#e4e4e7}
 .moi-stats{display:flex;flex-direction:column;gap:10px;padding:0 16px}

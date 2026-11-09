@@ -23,7 +23,7 @@ test('SEENIT-NOTIFICATION-003 #801 branche le cache privé et le contrôle natif
   const cache = readFileSync('android/app/src/main/java/com/seenit/app/NotificationPosterCache.java', 'utf8');
   const nativeContract = readFileSync('android/app/src/androidTest/java/com/seenit/app/ImportNotificationImageContract.java', 'utf8');
   const upgrade = readFileSync('android/app/src/androidTest/java/com/seenit/app/UpgradeContractInstrumentedTest.java', 'utf8');
-  assert.match(server, /resolvePoster: resolveDownloadNotificationPoster/);
+  assert.match(server, /resolveMedia: resolveDownloadNotificationMedia/);
   assert.match(worker, /applyPoster\(builder, NotificationPosterCache\.read\(context, message\.get\("posterUrl"\)\), compactText\)/);
   assert.match(worker, /attempt <= 3 && NotificationPosterCache\.warm/);
   assert.match(worker, /postImportNotification\(getApplicationContext\(\), receipt, true\)/);
