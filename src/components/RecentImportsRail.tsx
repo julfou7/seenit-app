@@ -76,7 +76,8 @@ export function RecentImportsRail({ items, failures, onShowClick, variant = 'imp
     }
     setBusy(item.key);
     try {
-      const outcome = await removeRecentImport(useDownloadConfigStore.getState(), item);
+      // Revue Codex #933 : depuis « À décider », rien n'est programmé — le titre est toujours retiré de Sonarr/Radarr.
+      const outcome = await removeRecentImport(useDownloadConfigStore.getState(), item, { keepAwaited: !undecided });
       // Les retraits mémorisés ne sont plus purgés par date : un titre ancien reste masqué tant qu'il n'a pas changé.
       const next = { ...readUserScopedJson<Record<string, number>>(uid, REMOVED_FIELD, {}), ...removed, [keyOf(item)]: item.date };
       writeUserScopedJson(uid, REMOVED_FIELD, next);

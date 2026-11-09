@@ -123,7 +123,11 @@ test('SEENIT-DOWNLOAD-021 Téléchargés : identifiant, année et note de la car
 
   const deleted: string[] = [];
   const episodes: Record<string, unknown> = { 7: [{ monitored: true, hasFile: true }, { monitored: false, hasFile: false }], 8: [{ monitored: true, hasFile: true }, { monitored: true, hasFile: false }] };
-  const io = { get: async (url: string) => episodes[url.split('=').pop() || ''], del: async (url: string) => { deleted.push(url); } };
+  // Revue Codex #933 : la surveillance de la série compte — 9 est non surveillée mais garde un épisode coché.
+  const seriesMonitored: Record<string, boolean> = { 7: true, 8: true, 9: false };
+  episodes[9] = [{ monitored: true, hasFile: false }];
+  const reads: string[] = [];
+  const io = { get: async (url: string) => { reads.push(url); const series = url.match(/\/series\/(\d+)$/); return series ? { id: Number(series[1]), monitored: seriesMonitored[series[1]] } : episodes[url.split('=').pop() || '']; }, del: async (url: string) => { deleted.push(url); } };
   const movie = { kind: 'movie' as const, key: 'm40', arrId: 40, title: 'Dune', date: now };
   const done = { kind: 'series' as const, key: 's7', arrId: 7, title: 'Severance', date: now, episodes: [] };
   const awaited = { kind: 'series' as const, key: 's8', arrId: 8, title: 'A Knight', date: now, episodes: [] };
@@ -131,10 +135,20 @@ test('SEENIT-DOWNLOAD-021 Téléchargés : identifiant, année et note de la car
   assert.equal(await recent.removeRecentImport(config, done, io), 'removed', 'plus rien d’attendu : sortie de Sonarr');
   assert.equal(await recent.removeRecentImport(config, awaited, io), 'kept', 'un épisode surveillé sans fichier : la série reste dans Sonarr');
   assert.deepEqual(deleted, ['http://radarr/api/v3/movie/40?deleteFiles=false&addImportExclusion=false', 'http://sonarr/api/v3/series/7?deleteFiles=false&addImportListExclusion=false']);
+  const unmonitored = { kind: 'series' as const, key: 's9', arrId: 9, title: 'Non surveillée', date: now, episodes: [] };
+  assert.equal(await recent.removeRecentImport(config, unmonitored, io), 'removed', 'série non surveillée : rien n’arrivera, elle est retirée au lieu d’être masquée');
+  assert.equal(deleted.at(-1), 'http://sonarr/api/v3/series/9?deleteFiles=false&addImportListExclusion=false');
+  reads.length = 0;
+  assert.equal(await recent.removeRecentImport(config, awaited, { ...io, keepAwaited: false }), 'removed', '« À décider » : toujours retiré, sans lecture');
+  assert.deepEqual(reads, []);
+  assert.equal(deleted.at(-1), 'http://sonarr/api/v3/series/8?deleteFiles=false&addImportListExclusion=false');
+  deleted.splice(2);
+  assert.ok(isAllowedServiceProxyPath('http://sonarr/api/v3/series/8', 'GET'), 'fiche de série lue par le proxy PWA');
   assert.ok(deleted.every(url => isAllowedServiceProxyPath(url, 'DELETE')), 'suppression acceptée par le proxy PWA, fichiers gardés');
   assert.ok(isAllowedServiceProxyPath('http://sonarr/api/v3/episode?seriesId=8', 'GET'));
-  // Épisodes illisibles : rien n'est retiré, l'erreur est remontée.
+  // Série ou épisodes illisibles : rien n'est retiré, l'erreur est remontée.
   await assert.rejects(recent.removeRecentImport(config, done, { ...io, get: async () => '<html>login</html>' }));
+  await assert.rejects(recent.removeRecentImport(config, done, { ...io, get: async (url: string) => url.endsWith('/series/7') ? { monitored: true } : '<html>login</html>' }));
   assert.equal(deleted.length, 2);
   await assert.rejects(recent.removeRecentImport({ ...config, radarrUrl: '' }, movie, io), /Radarr n’est pas configuré/);
 });

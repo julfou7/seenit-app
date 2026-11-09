@@ -96,6 +96,8 @@ export const executeGet = async (url: string) => {
   if (url.includes('/api/v3/wanted/missing')) return { page: 1, records: !telemetry.programmed ? [] : (url.includes('includeSeries=true') ? SONARR_WANTED : RADARR_WANTED).filter(entry => !telemetry.unmonitored.some(done => done.endsWith(`/${entry.id}`))) };
   if (url.includes('/api/v3/episode?seriesId=')) return SONARR_EPISODES[url.split('=').pop() || ''] || [];
   if (url.includes('/api/v3/qualityprofile')) return [{ id: 4, name: 'HD-1080p' }, { id: 5, name: 'Ultra-HD' }];
+  // Fiche Sonarr d'une série (Retirer, revue Codex #933) : Severance et A Knight… sont surveillées.
+  if (/\/api\/v3\/series\/\d+$/.test(url)) return { id: Number(url.split('/').pop()), monitored: true };
   if (!telemetry.programmed) return [];
   // Un épisode déprogrammé n'apparaît plus au calendrier, comme dans Sonarr (l'état est relu après l'écriture).
   if (url.includes('/api/v3/calendar') && url.includes('includeSeries=true')) return ([

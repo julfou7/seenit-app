@@ -152,14 +152,17 @@ export type RecentImportsDelete = (url: string, headers: Record<string, string>)
 export type RemoveOutcome = 'removed' | 'kept';
 
 /**
- * « Retirer » d'une carte Téléchargés (retour terrain et décision du propriétaire du 09/11, `USR-2026-11-09-008`) :
+ * « Retirer » d'une carte Téléchargés ou « À décider » (retour terrain et décision du propriétaire du 09/11,
+ * `USR-2026-11-09-008`) :
  * - film : retiré de Radarr ;
- * - série : retirée de Sonarr seulement si aucun épisode n'y est encore attendu (surveillé sans fichier, donc
- *   programmé) ; sinon elle y reste et la suite continue d'arriver ;
+ * - série : retirée de Sonarr, sauf si la série est surveillée et qu'un épisode y est encore attendu (surveillé sans
+ *   fichier, donc programmé) : elle y reste et la suite continue d'arriver. Revue Codex #933 : une série non
+ *   surveillée n'attend rien, même si des épisodes restent cochés — elle est retirée, jamais masquée sans retrait.
+ *   Depuis « À décider » (`keepAwaited: false`), le titre n'est par construction pas programmé : toujours retiré ;
  * - les fichiers sont toujours gardés (`deleteFiles=false`) : Plex garde le titre.
  * L'identifiant vient de la copie synchronisée du même compte et du même serveur (vérifié par l'appelant).
  */
-export async function removeRecentImport(config: DownloadConfig, item: RecentImport, { get = executeGet as RecentImportsGet, del = executeDelete as RecentImportsDelete }: { get?: RecentImportsGet; del?: RecentImportsDelete } = {}): Promise<RemoveOutcome> {
+export async function removeRecentImport(config: DownloadConfig, item: RecentImport, { get = executeGet as RecentImportsGet, del = executeDelete as RecentImportsDelete, keepAwaited = true }: { get?: RecentImportsGet; del?: RecentImportsDelete; keepAwaited?: boolean } = {}): Promise<RemoveOutcome> {
   if (item.kind === 'movie') {
     if (!config.radarrUrl || !config.radarrApiKey) throw new Error('Radarr n’est pas configuré.');
     await del(`${cleanUrl(config.radarrUrl)}/api/v3/movie/${item.arrId}?deleteFiles=false&addImportExclusion=false`, headersFor(config.radarrApiKey));
@@ -167,9 +170,15 @@ export async function removeRecentImport(config: DownloadConfig, item: RecentImp
   }
   if (!config.sonarrUrl || !config.sonarrApiKey) throw new Error('Sonarr n’est pas configuré.');
   const base = cleanUrl(config.sonarrUrl), headers = headersFor(config.sonarrApiKey);
-  const episodes = await get(`${base}/api/v3/episode?seriesId=${item.arrId}`, headers);
-  if (!Array.isArray(episodes)) throw new Error('Sonarr injoignable pour l’instant.');
-  if ((episodes as ArrEpisode[]).some(episode => episode.monitored === true && episode.hasFile !== true)) return 'kept';
+  if (keepAwaited) {
+    const series = await get(`${base}/api/v3/series/${item.arrId}`, headers);
+    if (!series || typeof series !== 'object' || Array.isArray(series)) throw new Error('Sonarr injoignable pour l’instant.');
+    if ((series as { monitored?: boolean }).monitored === true) {
+      const episodes = await get(`${base}/api/v3/episode?seriesId=${item.arrId}`, headers);
+      if (!Array.isArray(episodes)) throw new Error('Sonarr injoignable pour l’instant.');
+      if ((episodes as ArrEpisode[]).some(episode => episode.monitored === true && episode.hasFile !== true)) return 'kept';
+    }
+  }
   await del(`${base}/api/v3/series/${item.arrId}?deleteFiles=false&addImportListExclusion=false`, headers);
   return 'removed';
 }
