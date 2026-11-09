@@ -158,7 +158,8 @@ export type RemoveOutcome = 'removed' | 'kept';
  * - série : retirée de Sonarr, sauf si la série est surveillée et qu'un épisode y est encore attendu (surveillé sans
  *   fichier, donc programmé) : elle y reste et la suite continue d'arriver. Revue Codex #933 : une série non
  *   surveillée n'attend rien, même si des épisodes restent cochés — elle est retirée, jamais masquée sans retrait.
- *   Depuis « À décider » (`keepAwaited: false`), le titre n'est par construction pas programmé : toujours retiré ;
+ *   Les épisodes réels sont toujours relus, y compris depuis « À décider » (Programmés ne lit que 100 recherchés et
+ *   120 jours de calendrier) ; `keepAwaited: false` reste réservé à un retrait explicite sans cette protection ;
  * - les fichiers sont toujours gardés (`deleteFiles=false`) : Plex garde le titre.
  * L'identifiant vient de la copie synchronisée du même compte et du même serveur (vérifié par l'appelant).
  */

@@ -9,7 +9,7 @@ import type { ArrPendingTitle } from './recentImports';
  * - avec au moins un fichier → « Téléchargés » (lu par `fetchRecentImports`) ;
  * - sans fichier, déjà dans Programmés (calendrier, recherchés) → Programmés ;
  * - film surveillé sans fichier hors calendrier (sortie lointaine ou non annoncée) → ajouté à Programmés ;
- * - sinon (non surveillé, ou série sans aucun épisode attendu) → « À décider ».
+ * - sinon (non surveillé, ou série surveillée sans épisode au calendrier ni parmi les recherchés lus) → « À décider ».
  * Le rattachement se fait par l'identifiant Sonarr/Radarr du même serveur, jamais par le titre.
  */
 export interface ArrCoverage { programmed: ProgrammedCalendar; undecided: ArrPendingTitle[] }
@@ -37,4 +37,5 @@ export function coverArrLibrary(programmed: ProgrammedCalendar, pending: readonl
 /** Raison affichée d'un titre « À décider ». */
 export const undecidedReason = (title: Pick<ArrPendingTitle, 'kind' | 'monitored'>) => title.kind === 'movie'
   ? 'Film non surveillé, sans fichier'
-  : title.monitored ? 'Série surveillée, aucun épisode attendu' : 'Série non surveillée, sans fichier';
+  // Revue Codex #933 : hors calendrier et hors première page des recherchés ne prouve pas « aucun épisode attendu ».
+  : title.monitored ? 'Série surveillée, sans fichier' : 'Série non surveillée, sans fichier';

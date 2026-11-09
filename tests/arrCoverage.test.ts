@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
+import { readFileSync } from 'node:fs';
 
 // Vrais modules (répartition, calendrier) : seuls les transports et le gate sont remplacés.
 const bundle = await build({ entryPoints: ['src/features/downloads/arrCoverage.ts'], bundle: true, platform: 'node', format: 'esm', write: false,
@@ -43,10 +44,16 @@ test('SEENIT-DOWNLOAD-023 aucun titre de Sonarr/Radarr invisible : Programmés o
     const inUndecided = result.undecided.some(entry => entry.key === title.key);
     assert.ok(inProgrammed !== inUndecided, `${title.title} : visible une seule fois`);
   }
-  assert.deepEqual(result.undecided.map(coverage.undecidedReason), ['Film non surveillé, sans fichier', 'Série non surveillée, sans fichier', 'Série surveillée, aucun épisode attendu']);
+  assert.deepEqual(result.undecided.map(coverage.undecidedReason), ['Film non surveillé, sans fichier', 'Série non surveillée, sans fichier', 'Série surveillée, sans fichier']);
   // Calendrier Sonarr illisible : une série surveillée n'est jamais classée « À décider » à tort.
   const sonarrDown = coverage.coverArrLibrary({ items: [], failures: ['Sonarr'] }, pending, now);
   assert.deepEqual(sonarrDown.undecided.map(title => title.key), ['m42', 's10']);
   // Rien à ajouter : la liste Programmés est rendue telle quelle.
   assert.equal(coverage.coverArrLibrary(programmed, [], now).programmed, programmed);
+  // Revue Codex #933 : « À décider » ne retire jamais sans relire les épisodes ; une série gardée reste visible.
+  const rail = readFileSync('src/components/RecentImportsRail.tsx', 'utf8');
+  assert.match(rail, /const outcome = await removeRecentImport\(useDownloadConfigStore\.getState\(\), item\);/);
+  assert.doesNotMatch(rail, /keepAwaited/);
+  assert.match(rail, /const keptVisible = undecided && outcome === 'kept';\n\s+if \(!keptVisible\) \{/);
+  assert.match(rail, /keptVisible \? 'Gardée dans Sonarr · des épisodes y sont encore attendus'/);
 });

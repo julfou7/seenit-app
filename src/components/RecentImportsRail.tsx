@@ -76,16 +76,21 @@ export function RecentImportsRail({ items, failures, onShowClick, variant = 'imp
     }
     setBusy(item.key);
     try {
-      // Revue Codex #933 : depuis « À décider », rien n'est programmé — le titre est toujours retiré de Sonarr/Radarr.
-      const outcome = await removeRecentImport(useDownloadConfigStore.getState(), item, { keepAwaited: !undecided });
-      // Les retraits mémorisés ne sont plus purgés par date : un titre ancien reste masqué tant qu'il n'a pas changé.
-      const next = { ...readUserScopedJson<Record<string, number>>(uid, REMOVED_FIELD, {}), ...removed, [keyOf(item)]: item.date };
-      writeUserScopedJson(uid, REMOVED_FIELD, next);
-      setRemoved(next);
+      // Revue Codex #933 : la série n'est gardée que si elle est surveillée et attend encore un épisode (lecture des
+      // épisodes réels : Programmés ne lit que 100 recherchés et 120 jours de calendrier).
+      const outcome = await removeRecentImport(useDownloadConfigStore.getState(), item);
+      // Depuis « À décider », une série gardée reste visible : jamais masquée sans avoir été retirée.
+      const keptVisible = undecided && outcome === 'kept';
+      if (!keptVisible) {
+        // Les retraits mémorisés ne sont plus purgés par date : un titre ancien reste masqué tant qu'il n'a pas changé.
+        const next = { ...readUserScopedJson<Record<string, number>>(uid, REMOVED_FIELD, {}), ...removed, [keyOf(item)]: item.date };
+        writeUserScopedJson(uid, REMOVED_FIELD, next);
+        setRemoved(next);
+      }
       notifyArrWrite({ tmdbId: item.tmdbId, mediaType: item.kind === 'movie' ? 'movie' : 'tv' });
       // Retour terrain du 09/11 sur la v1.4.286 : l'affiche reste dans le toast, qui ouvre la fiche ; « fichiers
       // gardés » n'apporte rien (Sonarr/Radarr déplacent les fichiers après l'import).
-      toast({ title: item.title, action: outcome === 'kept' ? 'Retiré de la liste · la suite reste programmée dans Sonarr' : `Retiré de ${item.kind === 'movie' ? 'Radarr' : 'Sonarr'}`, posterPath: item.posterUrl || null, media: toastMedia(item) }, 'info');
+      toast({ title: item.title, action: keptVisible ? 'Gardée dans Sonarr · des épisodes y sont encore attendus' : outcome === 'kept' ? 'Retiré de la liste · la suite reste programmée dans Sonarr' : `Retiré de ${item.kind === 'movie' ? 'Radarr' : 'Sonarr'}`, posterPath: item.posterUrl || null, media: toastMedia(item) }, 'info');
     } catch (error: unknown) {
       toast({ title: item.title, action: frenchArrMessage(error instanceof Error ? error.message : '') || 'Retrait impossible. Réessaie.', posterPath: item.posterUrl || null, media: toastMedia(item) }, 'error');
     } finally {

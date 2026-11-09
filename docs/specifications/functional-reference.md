@@ -939,7 +939,7 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   français, comme partout dans l'app (« L'Arène » et non « The Arena (2026) ») ; Sonarr/Radarr restent le repli.
   Depuis la v1.4.289 (`SEENIT-DOWNLOAD-023`) : plus de limite de 7 jours ni de « Vider » — tout ce que
   Sonarr/Radarr détiennent avec un fichier, 12 par page puis « Afficher plus ». Section **À décider** : les titres
-  ni téléchargés ni programmés (film non surveillé sans fichier, série sans épisode attendu), avec leur raison ;
+  ni téléchargés ni programmés (film non surveillé sans fichier, série sans épisode au calendrier), avec leur raison ;
   toucher l'affiche ouvre la fiche, « Retirer » les sort de Radarr/Sonarr. Un film surveillé sans date proche
   rejoint Programmés (« Date à venir »).
 - Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
