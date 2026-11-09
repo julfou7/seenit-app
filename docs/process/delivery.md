@@ -606,6 +606,28 @@ Cibles release-only : ≤ 2 minutes de travail opérateur avec candidate prête 
 attente CI si la candidate doit être préparée. Cible terrain : ≤ 10 minutes du correctif prêt/mergé à la
 mise à jour installable dans SeenIt.
 
+#### Ne pas attendre ce qui ne bloque pas (`USR-2026-11-09-013`)
+
+Mesure du 09/11 sur les v1.4.283 à v1.4.286 : 10,5 minutes du code prêt à l'APK installable dans le meilleur
+cas, plus de 30 minutes quand des attentes inutiles s'ajoutaient. Demande du propriétaire : « attendre 10
+minutes ça ne me gêne pas, mais 30 minutes pour un mini correctif ça m'embête ».
+
+- **Release APK sans attendre `Deploy Canonical Backend`.** Dans l'APK, Sonarr, Radarr et qBittorrent sont
+  appelés directement (`CapacitorHttp`), jamais par le proxy du serveur ; le déploiement backend ne sert que
+  la PWA et les routes `/api/...` du serveur. Une fois la validation `push` du SHA exact verte, la release
+  terrain part tout de suite, en parallèle du déploiement. Elle n'attend le déploiement que si le lot ajoute
+  ou modifie une route serveur que l'APK appelle elle-même (exemples : `/api/c411/top`, notification de mise
+  à jour).
+- **Préflight rapide avant la validation complète.** Avant `npm run validate:change`, l'agent lance
+  `npm run test:spec && npm run lint` puis `node --test` sur les TNR qui citent un fichier modifié (y compris
+  les anciens TNR qui lisent le code source). Ces contrôles déterministes de quelques secondes évitent un cycle
+  complet par erreur évitable (identifiant SPEC, règle boy-scout, assertion de source).
+- **Revue de soi avant la PR.** Avant d'ouvrir la PR, vérifier les trois classes de défaut que la revue Codex
+  a trouvées le 09/11 : deux lectures indépendantes ne doivent pas échouer ensemble ; un identifiant mémorisé
+  est lié à son serveur et à son compte ; un retour arrière restaure exactement l'état précédent.
+- **Un test instable n'est pas relancé à l'aveugle deux fois** : la seconde occurrence est corrigée à la
+  racine (exemple : #925, appui long attendu par événement plutôt que par durée fixe).
+
 ## Préparation d'une release APK
 
 Les changements `apk` peuvent s'accumuler sur `main` avec plusieurs commits. La version Android n'est
