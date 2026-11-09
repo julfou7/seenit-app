@@ -17,7 +17,8 @@ export const fixtureItems = [sample('1', 'Blade Runner', 'warning', 100), sample
 export const useLiveDownloadStore = create(() => ({ downloads: fixtureItems, fetchDownloads: async () => {}, removeDownload: async (item: LiveDownloadItem) => { telemetry.removed.push(item.id); useLiveDownloadStore.setState(state => ({ downloads: state.downloads.filter(value => value.id !== item.id) })); return true; }, clearAllDownloads: async () => {} }));
 const config = { downloadsEnabled: true, isHydrated: true, sonarrUrl: 'https://fixture.example', sonarrApiKey: 'fixture', radarrUrl: 'https://fixture.example', radarrApiKey: 'fixture' };
 export const useDownloadConfigStore = Object.assign(() => config, { getState: () => config });
-export const useToastStore = Object.assign(() => () => {}, { getState: () => ({ showToast: () => {} }) });
+export const toasts: Array<{ title?: string; action?: string; posterPath?: string | null; type?: string }> = [];
+export const useToastStore = Object.assign(() => () => {}, { getState: () => ({ showToast: (toast: unknown, type?: string) => { if (toast && typeof toast === 'object') toasts.push({ ...(toast as Record<string, string>), type }); } }) });
 export const useShowsStore = <T,>(selector: (state: { shows: [] }) => T) => selector({ shows: [] });
 export const formatBytes = (size: number) => `${(size / 1000000000).toFixed(1)} Go`;
 export const formatCleanMediaInfo = (item: LiveDownloadItem) => ({ cleanTitle: item.title, subTitle: item.mediaType === 'tv' ? 'S02 | E05' : 'Film', isTv: item.mediaType === 'tv' });
@@ -59,8 +60,10 @@ const RADARR_IMPORTS = [{ eventType: 3, date: ago(3), movieId: 40, movie: { titl
 // v1.4.284 — « Retirer » : Severance (Sonarr 7) n'attend plus rien ; A Knight… (Sonarr 8) a encore un épisode programmé.
 const SONARR_EPISODES: Record<string, Array<{ monitored: boolean; hasFile: boolean }>> = { 7: [{ monitored: true, hasFile: true }], 8: [{ monitored: true, hasFile: true }, { monitored: true, hasFile: false }] };
 // Recherchés (wanted/missing) de la page « Programmés » : un épisode de L'Arène sorti sans fichier et un film disponible.
+// Affiche Sonarr de L'Arène : la carte et le toast d'annulation la gardent (retour terrain du 09/11 sur la v1.4.285).
+const ARENE_IMAGES = [{ coverType: 'poster', remoteUrl: 'https://image.tmdb.org/t/p/original/arene.jpg' }];
 // Quatre épisodes pour L'Arène au total : repliés par défaut en vue détaillée (retour terrain du 09/11, MobLand).
-const SONARR_WANTED = [6, 7].map(episodeNumber => ({ id: 792 + episodeNumber, seriesId: 5, seasonNumber: 1, episodeNumber, title: `Épisode ${episodeNumber}`, airDateUtc: ago(20 - 2 * episodeNumber), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4 } }));
+const SONARR_WANTED = [6, 7].map(episodeNumber => ({ id: 792 + episodeNumber, seriesId: 5, seasonNumber: 1, episodeNumber, title: `Épisode ${episodeNumber}`, airDateUtc: ago(20 - 2 * episodeNumber), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4, images: ARENE_IMAGES } }));
 const RADARR_WANTED = [{ id: 902, title: 'Blade Runner 2049', tmdbId: 335984, monitored: true, hasFile: false, isAvailable: true, qualityProfileId: 4, inCinemas: '2017-10-04', digitalRelease: '2018-01-16' }];
 export const executeDelete = async (url: string) => { telemetry.arrDeleted.push(url); return {}; };
 export const executeGet = async (url: string) => {
@@ -71,8 +74,8 @@ export const executeGet = async (url: string) => {
   if (!telemetry.programmed) return [];
   // Un épisode déprogrammé n'apparaît plus au calendrier, comme dans Sonarr (l'état est relu après l'écriture).
   if (url.includes('/api/v3/calendar') && url.includes('includeSeries=true')) return ([
-    { id: 801, seriesId: 5, seasonNumber: 1, episodeNumber: 8, title: 'Épisode 8', airDateUtc: inDays(7), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4 } },
-    { id: 802, seriesId: 5, seasonNumber: 1, episodeNumber: 9, title: 'Épisode 9', airDateUtc: inDays(14), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4 } },
+    { id: 801, seriesId: 5, seasonNumber: 1, episodeNumber: 8, title: 'Épisode 8', airDateUtc: inDays(7), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4, images: ARENE_IMAGES } },
+    { id: 802, seriesId: 5, seasonNumber: 1, episodeNumber: 9, title: 'Épisode 9', airDateUtc: inDays(14), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4, images: ARENE_IMAGES } },
     // Non surveillé, présent ou série désactivée : jamais « programmé ».
     { id: 803, seriesId: 5, seasonNumber: 1, episodeNumber: 10, title: 'Épisode 10', airDateUtc: inDays(21), monitored: false, series: { title: "L'Arène", tmdbId: 77, monitored: true } },
     { id: 804, seriesId: 6, seasonNumber: 2, episodeNumber: 1, title: 'Pilote', airDateUtc: inDays(3), monitored: true, hasFile: false, series: { title: 'Série en pause', tmdbId: 78, monitored: false } },

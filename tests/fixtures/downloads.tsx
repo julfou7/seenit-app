@@ -6,7 +6,7 @@ import { DownloadModeBanner, DownloadModeBar } from '../../src/screens/mediaDeta
 import { MovieDownloadButton, MovieDownloadTrack } from '../../src/screens/mediaDetail/movieDownloadMode';
 import { DownloadModal } from '../../src/components/DownloadModal';
 import PreciseVersionPage from '../../src/screens/mediaDetail/PreciseVersionPage';
-import { fixtureItems, telemetry, useLiveDownloadStore } from './downloadsRuntime';
+import { fixtureItems, telemetry, toasts, useLiveDownloadStore } from './downloadsRuntime';
 import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
 
 // #879 — deux épisodes de la même saison (TMDB 77) et un homonyme d'une autre série (TMDB 99).
@@ -74,5 +74,5 @@ function FilmStatesFixture() {
     <MovieDownloadTrack state="programmed" progress={0} onCancel={async () => { telemetry.unmonitored.push('film'); }} />
   </div>;
 }
-Object.assign(window, { __downloads: { mount, telemetry } });
+Object.assign(window, { __downloads: { mount, telemetry, toasts } });
 mount();

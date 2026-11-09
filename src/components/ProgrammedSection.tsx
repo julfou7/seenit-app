@@ -131,30 +131,33 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
     setBusy(label);
     setMenu(null);
     const config = useDownloadConfigStore.getState();
+    // Retour terrain du 09/11 sur la v1.4.285 (« la photo disparaît quand je retire un épisode ») : le toast garde
+    // l'affiche du titre, comme ceux du lancement et de la programmation.
+    const first = targets[0];
+    const posterPath = first.posterUrl || null;
     try {
       for (const item of targets) await unprogramItem(config, item);
       setHidden(previous => new Set([...previous, ...targets.map(item => `${item.kind}:${item.id}`)]));
-      const first = targets[0];
       // État synchronisé et fiche relus ensemble : l'épisode ou le film redevient programmable dans sa fiche.
       notifyArrWrite({ tmdbId: first.tmdbId, tvdbId: first.kind === 'episode' ? first.tvdbId : undefined, mediaType: first.kind === 'movie' ? 'movie' : 'tv' });
-      toast({ title: first.kind === 'episode' ? first.seriesTitle : first.title, subtitle: first.kind === 'episode' && targets.length === 1 ? `S${first.season} | E${first.episode}` : undefined, action: targets.length > 1 ? `${targets.length} épisodes ne sont plus programmés.` : 'N’est plus programmé.' }, 'info');
+      toast({ title: first.kind === 'episode' ? first.seriesTitle : first.title, subtitle: first.kind === 'episode' && targets.length === 1 ? `S${first.season} | E${first.episode}` : undefined, action: targets.length > 1 ? `${targets.length} épisodes ne sont plus programmés.` : 'N’est plus programmé.', posterPath }, 'info');
     } catch (error: unknown) {
-      toast({ title: label, action: error instanceof Error ? error.message : 'Impossible de déprogrammer.' }, 'error');
+      toast({ title: label, action: error instanceof Error ? error.message : 'Impossible de déprogrammer.', posterPath }, 'error');
       notifyArrWrite();
     } finally {
       setBusy(null);
     }
   };
-  const changeQuality = async (target: { kind: 'movie'; id: number } | { kind: 'series'; id: number }, preference: '1080p' | '4k', label: string, media: { tmdbId?: number; mediaType: 'tv' | 'movie' }) => {
+  const changeQuality = async (target: { kind: 'movie'; id: number } | { kind: 'series'; id: number }, preference: '1080p' | '4k', label: string, media: { tmdbId?: number; mediaType: 'tv' | 'movie' }, posterPath?: string | null) => {
     if (busy || !sameScope()) return;
     setBusy(label);
     setMenu(null);
     try {
       await changeProgrammedQuality(useDownloadConfigStore.getState(), target, preference);
-      toast({ title: label, action: `Qualité : ${preference === '4k' ? '4K' : '1080p'}` }, 'success');
+      toast({ title: label, action: `Qualité : ${preference === '4k' ? '4K' : '1080p'}`, posterPath }, 'success');
       notifyArrWrite(media);
     } catch (error: unknown) {
-      toast({ title: label, action: error instanceof Error ? error.message : 'Qualité inchangée.' }, 'error');
+      toast({ title: label, action: error instanceof Error ? error.message : 'Qualité inchangée.', posterPath }, 'error');
     } finally {
       setBusy(null);
     }
@@ -201,7 +204,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
     const radarrId = item?.kind === 'movie' ? item.id : details?.id;
     cards.push({ key: `w${entry.id}`, data: { 'data-programmed-request': entry.id }, name, isTv, poster: posterUrl(entry.posterPath), meta: meta(requestScope(entry), quality), pill,
       open: () => entry.tmdbId && onShowClick?.(entry.tmdbId, entry.mediaType), canOpen: Boolean(entry.tmdbId && onShowClick),
-      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }) : null, () => { setMenu(null); onRemoveWatching(entry); }) : null });
+      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }) : null });
   }
   for (const group of series.values()) {
     const first = group[0];
@@ -211,7 +214,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
       meta: meta('Série', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`),
       pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : WANTED_PILL,
       open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
-      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }), () => void cancel(group, first.seriesTitle), group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation'),
+      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => void cancel(group, first.seriesTitle), group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation'),
       episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, count: group.length, wanted: wantedCount, rows: <ul className="download-season__rows">
         {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
           <span className="download-season__code">{code(item)}</span>
@@ -226,7 +229,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
   for (const movie of movies) {
     cards.push({ key: `m${movie.id}`, data: { 'data-programmed-movie': movie.id }, name: movie.title, isTv: false, poster: movie.posterUrl, meta: meta('Film', movie.quality), pill: programmedMoviePill(movie),
       open: () => movie.tmdbId && onShowClick?.(movie.tmdbId, 'movie'), canOpen: Boolean(movie.tmdbId && onShowClick),
-      actions: cardMenu(`m${movie.id}`, movie.title, movie.quality, choice => void changeQuality({ kind: 'movie', id: movie.id }, choice, movie.title, { tmdbId: movie.tmdbId, mediaType: 'movie' }), () => void cancel([movie], movie.title)) });
+      actions: cardMenu(`m${movie.id}`, movie.title, movie.quality, choice => void changeQuality({ kind: 'movie', id: movie.id }, choice, movie.title, { tmdbId: movie.tmdbId, mediaType: 'movie' }, movie.posterUrl), () => void cancel([movie], movie.title)) });
   }
   const posterButton = (card: ProgrammedCard, className: string) => <button type="button" className={className} disabled={!card.canOpen} aria-label={`Ouvrir ${card.name}`} onClick={card.open}>{card.poster ? <img src={card.poster} alt="" loading="lazy" decoding="async" /> : card.isTv ? <Tv size={20} /> : <Film size={20} />}</button>;
   const switchLayout = (next: ProgrammedLayout) => { setLayout(next); writeUserScopedJson(auth.currentUser?.uid, LAYOUT_FIELD, next); };
