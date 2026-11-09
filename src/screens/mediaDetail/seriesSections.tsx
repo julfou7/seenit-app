@@ -119,8 +119,8 @@ export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, 
         const watchedOn = watched && Number.isFinite(watchedAt) && watchedAt > 0 ? `Vu le ${new Date(watchedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : null;
         const runtime = episode.runtime || runtimeFallback;
         // Retour terrain du 08/11 : la note est déjà dans les barres de la saison ; la ligne reprend le numéro
-        // (« E02 », or à voir, bleu à venir, gris vu) et l'image reste libre de tout repère.
-        const episodeCode = `E${String(episode.episode_number).padStart(2, '0')}`;
+        // (« Sxx | Eyy », or à voir, bleu à venir, gris vu) et l'image reste libre de tout repère.
+        const episodeCode = `S${String(number).padStart(2, '0')} | E${String(episode.episode_number).padStart(2, '0')}`;
         const download = episodeDownloadPresentation(episode.episode_number, aired, Boolean(episodesHasFile?.[key]), getEpisodeDownload?.(episode.episode_number), Boolean(episodesMonitored?.[key]));
         // #879 : état unique de l'épisode pour le mode téléchargement et les pastilles passives.
         const live = getEpisodeDownload?.(episode.episode_number);
