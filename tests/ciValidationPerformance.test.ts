@@ -31,6 +31,11 @@ test('SEENIT-QUALITY-008 impose un préflight sans dépendances et un cache exac
   assert.match(validateJob, /version='1\.7\.12'/);
   assert.match(validateJob, /8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8/);
   assert.match(validateJob, /actionlint_\$\{version\}_linux_amd64\.tar\.gz/);
+  // #903 : une panne passagère de l'hôte des releases GitHub (503/504) ne fait plus échouer la validation,
+  // ni la validation distante ; reprises bornées, version et empreinte inchangées.
+  for (const workflow of [validateJob, readFileSync('.github/workflows/agent-remote-validate.yml', 'utf8')]) {
+    assert.match(workflow, /curl -fsSL --retry 6 --retry-delay 5 --retry-all-errors --retry-max-time 180 --max-time 60 "https:\/\/github\.com\/rhysd\/actionlint\/releases\/download\/v\$\{version\}\/actionlint_\$\{version\}_linux_amd64\.tar\.gz" -o "\$archive"\n\s+echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  \$archive" \| sha256sum --check --status/);
+  }
   assert.match(validateJob, /npm run validate:change -- --preflight/);
   assert.match(validateJob, /npm run validate:change -- --postinstall/);
   assert.match(validateJob, /SEENIT_VALIDATE_BASE_SHA/);
