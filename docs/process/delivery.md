@@ -652,7 +652,13 @@ minutes ça ne me gêne pas, mais 30 minutes pour un mini correctif ça m'embêt
   de la PR : « Ferme #N » ne ferme rien et oblige à une fermeture manuelle.
 - **Revue de soi avant la PR.** Avant d'ouvrir la PR, vérifier les trois classes de défaut que la revue Codex
   a trouvées le 09/11 : deux lectures indépendantes ne doivent pas échouer ensemble ; un identifiant mémorisé
-  est lié à son serveur et à son compte ; un retour arrière restaure exactement l'état précédent.
+  est lié à son serveur et à son compte ; un retour arrière restaure exactement l'état précédent. Ajoutées après
+  la v1.4.289 (trois remarques Codex successives sur #933, ≈ 25 min de cycles) : une lecture bornée (une page,
+  une fenêtre de dates) ne prouve jamais une absence — ne jamais lever une protection sur cette base ; un élément
+  ajouté par un second chemin porte les mêmes champs dérivés que le chemin principal (qualité, libellés) ; un
+  masquage local suit toujours une action réellement faite, jamais un « gardé » sans retrait.
+- **Smoke borné (#934).** Chaque appel DevTools du smoke expire après 60 s et chaque harnais après 240 s, avec le
+  nom du harnais, du couloir et de la méthode : un blocage muet devient un échec lisible en moins de 5 minutes.
 - **Un test instable n'est pas relancé à l'aveugle deux fois** : la seconde occurrence est corrigée à la
   racine (exemple : #925, appui long attendu par événement plutôt que par durée fixe).
 
