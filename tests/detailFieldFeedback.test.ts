@@ -133,7 +133,7 @@ test('Fiche série (08/11) : pastilles de saison avec l’anneau Vu, lignes d’
   assert.match(rows, /on \? 'bg-\[#1E1A12\] shadow-\[inset_0_0_0_1\.5px_#E5A93D\]'/, 'saison choisie cerclée d’or, sans aplat');
   assert.doesNotMatch(rows, /SeenItWatchedStamp|rounded-tr-md bg-black\/80/, 'image d’épisode libre : ni tampon, ni « E2 »');
   assert.doesNotMatch(rows, /★ \{formatRating\(Number\(episode\.vote_average\)\)\}/, 'la note est déjà dans les barres de la saison');
-  assert.match(rows, /const episodeCode = `E\$\{String\(episode\.episode_number\)\.padStart\(2, '0'\)\}`;/);
+  assert.ok(rows.includes("const episodeCode = `S${String(number).padStart(2, '0')} | E${String(episode.episode_number).padStart(2, '0')}`;"), 'la saison est visible dans le code de chaque épisode (#935)');
   assert.match(rows, /<b data-episode-code className=\{cn\('font-extrabold', watched \? 'text-zinc-500' : aired \? 'text-\[#F2C36B\]' : 'text-sky-300'\)\}>\{episodeCode\}<\/b>/);
   assert.match(read('src/screens/mediaDetail/downloadMode.tsx'), /<DownloadMark size=\{34\} strokeWidth=\{1\.9\} \/>/);
   assert.match(read('src/screens/mediaDetail/movieDownloadMode.tsx'), /: <DownloadMark size=\{34\} strokeWidth=\{1\.9\} \/>\}/);
