@@ -643,9 +643,13 @@ minutes ça ne me gêne pas, mais 30 minutes pour un mini correctif ça m'embêt
   ou modifie une route serveur que l'APK appelle elle-même (exemples : `/api/c411/top`, notification de mise
   à jour).
 - **Préflight rapide avant la validation complète.** Avant `npm run validate:change`, l'agent lance
-  `npm run test:spec && npm run lint` puis `node --test` sur les TNR qui citent un fichier modifié (y compris
-  les anciens TNR qui lisent le code source). Ces contrôles déterministes de quelques secondes évitent un cycle
+  `npm run test:spec && npm run lint && node scripts/test-touched.cjs`. Le dernier lance tous les TNR qui citent
+  un fichier modifié depuis `origin/main`, y compris les anciens TNR qui lisent le code source (quelques
+  secondes ; ajouté le 09/11 après un cycle perdu sur un TNR de Programmés oublié). Juger chaque étape à son
+  **code de sortie**, jamais en filtrant la sortie sur un symbole. Ces contrôles déterministes évitent un cycle
   complet par erreur évitable (identifiant SPEC, règle boy-scout, assertion de source).
+- **Fermer les issues par la PR.** Écrire `Closes #N` (mot-clé anglais reconnu par GitHub) dans la description
+  de la PR : « Ferme #N » ne ferme rien et oblige à une fermeture manuelle.
 - **Revue de soi avant la PR.** Avant d'ouvrir la PR, vérifier les trois classes de défaut que la revue Codex
   a trouvées le 09/11 : deux lectures indépendantes ne doivent pas échouer ensemble ; un identifiant mémorisé
   est lié à son serveur et à son compte ; un retour arrière restaure exactement l'état précédent.
