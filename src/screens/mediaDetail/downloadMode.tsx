@@ -19,12 +19,14 @@ export const isEpisodeSelectable = (state: EpisodeModeState) => state === 'avail
 /** #879 — Un épisode à venir, pas encore surveillé dans Sonarr, peut être programmé (coché en bleu). */
 export const isEpisodeProgrammable = (state: EpisodeModeState) => state === 'future';
 export const isEpisodePickable = (state: EpisodeModeState) => isEpisodeSelectable(state) || isEpisodeProgrammable(state);
+// Retour terrain du 09/11 : « c'est le mode téléchargement qui est bleu » — bouton, sélection, barre et choix de
+// qualité en bleu ; l'or reste au Vu et à la cloche de rappel.
 const SKY = '#7DD3FC';
 const HATCH = 'repeating-linear-gradient(135deg,#2a2a2f 0 2px,#141417 2px 4px)';
 
 export function DownloadModeToggle({ active, badge, onToggle }: { active: boolean; badge: number; onToggle: () => void }) {
   return <button type="button" onClick={onToggle} aria-pressed={active} aria-label={active ? 'Quitter le mode téléchargement' : `Mode téléchargement${badge ? `, ${badge} en cours` : ''}`}
-    className={cn('relative w-[52px] h-[52px] shrink-0 rounded-[15px] grid place-items-center active:scale-95', active ? 'bg-[#E5A93D] text-black' : 'bg-zinc-800 text-zinc-200 shadow-[0_0_0_1px_rgba(255,255,255,0.12)]')}>
+    className={cn('relative w-[52px] h-[52px] shrink-0 rounded-[15px] grid place-items-center active:scale-95', active ? 'bg-[#7DD3FC] text-black' : 'bg-zinc-800 text-zinc-200 shadow-[0_0_0_1px_rgba(255,255,255,0.12)]')}>
     <DownloadMark size={34} strokeWidth={1.9} />
     {badge > 0 && <span aria-hidden="true" className="absolute -top-1.5 -right-1.5 min-w-5 h-5 px-1 rounded-full bg-zinc-100 text-black text-[11px] font-extrabold grid place-items-center shadow-[0_0_0_2px_#141417]">{badge}</span>}
   </button>;
@@ -32,7 +34,7 @@ export function DownloadModeToggle({ active, badge, onToggle }: { active: boolea
 
 const segmentStyle = (state: EpisodeModeState, picked: boolean, progress?: number): React.CSSProperties => {
   if (picked && state === 'future') return { background: HATCH, boxShadow: `inset 0 0 0 1.5px ${SKY}` };
-  if (picked) return { background: '#27272a', boxShadow: 'inset 0 0 0 1.5px #E5A93D' };
+  if (picked) return { background: '#27272a', boxShadow: `inset 0 0 0 1.5px ${SKY}` };
   if (state === 'programmed') return { background: HATCH, boxShadow: `inset 0 0 0 1.5px ${SKY}` };
   if (state === 'seen') return { background: '#E5A93D' };
   if (state === 'present') return { background: '#F4F4F5' };
@@ -60,8 +62,8 @@ export function DownloadModeBanner({ season, states, progress, picked, allPicked
 }) {
   const counts = states.reduce<Record<string, number>>((acc, entry) => { acc[entry.state] = (acc[entry.state] || 0) + 1; return acc; }, {});
   const legend = LEGEND.filter(entry => counts[entry.state]).map(entry => ({ ...entry, label: `${counts[entry.state]} ${counts[entry.state] > 1 ? entry.many : entry.one}` }));
-  return <section aria-label="Mode téléchargement" className="rounded-[18px] bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)] px-3.5 pt-3 pb-2 flex flex-col animate-in fade-in slide-in-from-top-1 duration-150 motion-reduce:animate-none">
-    <strong className="text-[15px] font-extrabold text-[#F2C36B]">Mode téléchargement · saison {season}</strong>
+  return <section aria-label="Mode téléchargement" className="rounded-[18px] bg-[#0B1A21] shadow-[inset_0_0_0_1.5px_rgba(125,211,252,0.6)] px-3.5 pt-3 pb-2 flex flex-col animate-in fade-in slide-in-from-top-1 duration-150 motion-reduce:animate-none">
+    <strong className="text-[15px] font-extrabold text-[#7DD3FC]">Mode téléchargement · saison {season}</strong>
     <span className="text-[12.5px] text-zinc-300">{states.some(entry => entry.state === 'future' || entry.state === 'programmed') ? 'Coche les épisodes. En bleu : programmés pour leur sortie.' : 'Touche une barre ou un épisode pour le cocher.'}</span>
     {/* Segments de 44 × 44 px au minimum : chaque épisode se touche directement ; une longue saison défile
         horizontalement au lieu de réduire les cibles à quelques pixels. Le numéro situe l'épisode. */}
@@ -71,14 +73,14 @@ export function DownloadModeBanner({ season, states, progress, picked, allPicked
         const isPicked = picked.has(entry.episode);
         return <button key={entry.episode} type="button" data-mode-segment={entry.episode} onClick={() => onSegment(entry.episode)} aria-pressed={selectable ? isPicked : undefined}
           aria-label={`Épisode ${entry.episode} : ${isPicked ? 'coché' : STATE_LABEL[entry.state]}`} className="flex-1 min-w-11 h-11 shrink-0 snap-start flex flex-col justify-center gap-1 active:scale-95 transition-transform">
-          <span aria-hidden="true" className={cn('text-[10.5px] font-extrabold leading-none text-center', isPicked ? 'text-[#F2C36B]' : 'text-zinc-500')}>{entry.episode}</span>
+          <span aria-hidden="true" className={cn('text-[10.5px] font-extrabold leading-none text-center', isPicked ? 'text-[#7DD3FC]' : 'text-zinc-500')}>{entry.episode}</span>
           <span className="block w-full h-[9px] rounded-[3px]" style={segmentStyle(entry.state, isPicked, progress(entry.episode))} />
         </button>;
       })}
     </div>
     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
       {legend.map(entry => <span key={entry.state} className="inline-flex items-center gap-1.5 text-[12px] font-bold text-zinc-300"><i aria-hidden="true" className="w-[9px] h-[9px] rounded-[3px]" style={entry.dot} />{entry.label}</span>)}
-      {canPick && <button type="button" onClick={onToggleAll} className="ml-auto min-h-11 px-3 rounded-xl bg-[rgba(229,169,61,0.14)] text-[13.5px] font-extrabold text-[#F2C36B] active:scale-95">{allPicked ? 'Tout décocher' : 'Tout cocher'}</button>}
+      {canPick && <button type="button" onClick={onToggleAll} className="ml-auto min-h-11 px-3 rounded-xl bg-[rgba(125,211,252,0.14)] text-[13.5px] font-extrabold text-[#7DD3FC] active:scale-95">{allPicked ? 'Tout décocher' : 'Tout cocher'}</button>}
     </div>
   </section>;
 }
@@ -93,19 +95,19 @@ export function DownloadModeBar({ title, detail, enabled, onLaunch, onPrecise, o
       ? <button type="button" onClick={onPrecise} className="flex-1 min-w-0 min-h-11 flex flex-col justify-center text-left leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className="text-[12.5px] font-bold text-zinc-400">Version précise ›</span></button>
       : <span className="flex-1 min-w-0 min-h-11 flex flex-col justify-center leading-tight"><strong className="truncate text-[14.5px] font-extrabold text-white">{title}</strong><span className={cn('truncate text-[12.5px]', tone === 'sky' ? 'font-bold text-[#7DD3FC]' : 'text-zinc-400')}>{detail}</span></span>}
     {/* Bleu : le film à venir est programmé pour sa sortie (maquette DlFilm). */}
-    <button type="button" disabled={!enabled} onClick={() => onLaunch('1080p')} className={cn('h-11 shrink-0 px-3.5 rounded-[13px] text-black text-[15px] font-extrabold active:scale-[0.97] disabled:bg-zinc-800 disabled:text-zinc-500', tone === 'sky' ? 'bg-[#7DD3FC]' : 'bg-[#E5A93D]')}>1080p</button>
+    <button type="button" disabled={!enabled} onClick={() => onLaunch('1080p')} className={cn('h-11 shrink-0 px-3.5 rounded-[13px] text-black text-[15px] font-extrabold active:scale-[0.97] disabled:bg-zinc-800 disabled:text-zinc-500', 'bg-[#7DD3FC]')}>1080p</button>
     <button type="button" disabled={!enabled} onClick={() => onLaunch('4k')} className="h-11 shrink-0 px-3.5 rounded-[13px] bg-zinc-800 text-zinc-100 text-[15px] font-extrabold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] active:scale-[0.97] disabled:text-zinc-500">4K</button>
   </div>;
   return typeof document === 'undefined' ? bar : createPortal(bar, document.body);
 }
 
-/** Contrôle de droite en mode : sélection (or) ou état du téléchargement, à la place du Vu. */
+/** Contrôle de droite en mode : sélection (bleue depuis le 09/11) ou état du téléchargement, à la place du Vu. */
 export function EpisodeModeControl({ episode, state, picked, progress, onToggle }: { episode: number; state: EpisodeModeState; picked: boolean; progress?: number; onToggle: () => void }) {
   if (isEpisodeSelectable(state)) {
     const ring = state === 'attention' && !picked ? '#FB7185' : '#A1A1AA';
     return <button type="button" role="checkbox" aria-checked={picked} aria-label={`${state === 'attention' ? 'Relancer' : 'Télécharger'} l’épisode ${episode}`} onClick={event => { event.stopPropagation(); onToggle(); }} className="w-11 h-11 shrink-0 grid place-items-center">
       <svg viewBox="0 0 100 100" width="34" height="34" aria-hidden="true">
-        {picked ? <circle cx="50" cy="50" r="42" fill="#E5A93D" /> : <circle cx="50" cy="50" r="38" fill="none" stroke={ring} strokeWidth="8" />}
+        {picked ? <circle cx="50" cy="50" r="42" fill={SKY} /> : <circle cx="50" cy="50" r="38" fill="none" stroke={ring} strokeWidth="8" />}
         <path d="M50 30v34M36 51l14 14 14-14" fill="none" stroke={picked ? '#0B0B0D' : ring} strokeWidth={picked ? 10 : 8} strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </button>;

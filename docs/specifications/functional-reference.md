@@ -538,7 +538,10 @@ trois épisodes, la courbe de la saison, un résumé masqué tant que le précé
 et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮,
 ancré sous le bouton (290 px, une ligne de détail par action, séparateur avant les actions de cycle de vie,
 jamais de feuille du bas) ;
-hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Une série
+hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Depuis la v1.4.282,
+le mode téléchargement est bleu (bouton, panneau, épisodes cochés, choix de qualité ; `SEENIT-DOWNLOAD-019`) ;
+l'or reste au Vu et à la cloche. Le badge du jour de sortie dit « Aujourd’hui » (plus « Ce soir » : l'heure n'est
+pas connue). Une série
 n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
 ligne à la place de la navigation). La sélection est gardée quand on change de saison (« 5 épisodes · 2 saisons ») et
@@ -575,9 +578,12 @@ Depuis les retours de la v1.4.251 (#857) :
 - un épisode à venir reste net et dit quand il sort (« Demain », « Dans 5 jours », « Dans 12 jours ·
   16 nov. ») ; pour une série suivie, sa ligne porte une cloche de rappel (44 px) et sa fiche « Me prévenir
   à la sortie » à la place de « Bientôt disponible » (v1.4.280, `SEENIT-NOTIFICATION-009`) ; depuis la v1.4.281,
-  la cloche active est bleue, la fiche d'un épisode à venir propose « Télécharger à la sortie » en 1080p ou 4K
-  puis « Annuler la programmation » (`SEENIT-DOWNLOAD-018`), et l'épisode suivant n'est plus entouré ;
-- la fiche épisode charge avec un squelette à son gabarit actuel.
+  la fiche d'un épisode à venir propose « Télécharger à la sortie » en 1080p ou 4K
+  puis « Annuler la programmation » (`SEENIT-DOWNLOAD-018`), et l'épisode suivant n'est plus entouré ; depuis
+  la v1.4.282, la cloche reste en or et, dans la fiche épisode, elle est ronde à côté de la croix ;
+- la fiche épisode charge avec un squelette à son gabarit actuel, garde la barre de navigation (v1.4.282,
+  ouverte depuis À voir comme depuis la fiche série) et ne change d'épisode que sur un geste nettement
+  horizontal : un défilement vertical en biais n'y change plus d'épisode (`SEENIT-UX-008`).
 Depuis les retours de la v1.4.252 (#859), le film n'a qu'un bouton à états (Suivre le film → Marquer vu → ✓ Vu ·
 annuler) suivi des tuiles diffuseur et Plex comme la série, et le bouton Vu des fiches anime dès le toucher, de
 façon fluide (compositeur), sans s'atténuer pendant l'enregistrement.

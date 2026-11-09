@@ -500,7 +500,7 @@ export function DownloadModal({
                             type="button"
                             disabled={sendingTorrentId === torrent.id}
                             onClick={() => void handleSendToClient(torrent)}
-                            className="flex-1 min-h-11 rounded-lg bg-[#E5A93D] hover:bg-[#f0b84c] text-black text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
+                            className="flex-1 min-h-11 rounded-lg bg-[#7DD3FC] hover:bg-[#a5e2fd] text-black text-xs font-black flex items-center justify-center gap-1.5 disabled:opacity-50"
                           >
                             {sendingTorrentId === torrent.id ? <Loader2 size={13} className="animate-spin" /> : <DownloadMark size={15} />}
                             Envoyer
@@ -568,7 +568,7 @@ export function DownloadModal({
                 }}
                 className={`w-full min-h-11 px-3 py-2.5 rounded-xl text-left flex items-center justify-between ${
                   selectedSeason === season.season_number
-                    ? 'bg-[#E5A93D] text-black'
+                    ? 'bg-[#7DD3FC] text-black'
                     : 'bg-zinc-800/70 text-zinc-200'
                 }`}
               >
@@ -612,7 +612,7 @@ export function DownloadModal({
                   }}
                   className={`min-h-11 px-3 py-2.5 rounded-xl text-xs font-bold flex items-center justify-between ${
                     selectedEpisode === episode
-                      ? 'bg-[#E5A93D] text-black'
+                      ? 'bg-[#7DD3FC] text-black'
                       : 'bg-zinc-800/70 text-zinc-200'
                   }`}
                 >

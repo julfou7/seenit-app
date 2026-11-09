@@ -81,8 +81,10 @@ test('SEENIT-NOTIFICATION-009 cloche câblée sur les épisodes à venir de la f
   const sections = read('src/screens/mediaDetail/seriesSections.tsx');
   assert.match(sections, /\{!aired && !inMode && <EpisodeReminderBell show=\{show\} episode=\{\{ season_number: number, episode_number: episode\.episode_number, name: episode\.name, air_date: episode\.air_date \}\} \/>\}/, 'ligne à venir, hors mode téléchargement');
   const modal = read('src/screens/EpisodeDetailModalCore.tsx');
-  assert.match(modal, /\{isFutureEpisode \? <>\{activeShow\?\.id \? <EpisodeReminderBell variant="wide" show=\{activeShow\}/, 'fiche épisode à venir d’une série suivie');
-  assert.match(modal, /Bientôt disponible<\/div>\}/, 'série non suivie : mention conservée');
+  // Retour terrain du 09/11 : dans l'en-tête de la fiche épisode, ronde, à côté de la croix.
+  assert.match(modal, /\{isFutureEpisode && activeShow\?\.id && <EpisodeReminderBell variant="overlay" show=\{activeShow\}/, 'fiche épisode à venir d’une série suivie');
+  assert.ok(modal.indexOf('<EpisodeReminderBell variant="overlay"') < modal.indexOf('aria-label="Fermer"', modal.indexOf('<EpisodeReminderBell variant="overlay"')), 'juste avant la croix');
+  assert.match(modal, /\{!activeShow\?\.id && <div className="min-h-11[^"]*"><Clock size=\{16\} className="text-zinc-500" \/>Bientôt disponible<\/div>\}/, 'série non suivie : mention conservée');
   const card = read('src/components/cards/UpcomingShowCard.tsx');
   assert.match(card, /if \(await writeEpisodeReminder\(\{ target, ownerUid, nextState, episode: ep, updateShow \}\)\) setIsReminderSet\(nextState\);/, 'une seule écriture partagée');
   assert.doesNotMatch(card, /setDoc|deleteDoc/);

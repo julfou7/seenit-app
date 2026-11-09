@@ -8,7 +8,8 @@ const show = { id:'series',tmdbId:42,mediaType:'tv',seenEpisodes:[],episodeRecor
 const episode = { season_number:1,episode_number:1,episode_count:6,air_date:'2026-10-24' };
 const progress = buildSeriesSeasonProgress(show,episode,'watch','2026-10-24');
 test('SEENIT-UX-014 B07 ruban unique utile, priorité et aucune disponibilité', () => {
- assert.deepEqual(seriesBadge(show,episode,progress,false,'2026-10-24',now),{label:'Ce soir',tone:'today'});
+ // Retour terrain du 09/11 : TMDB ne donne pas l'heure de sortie ; « Ce soir » devient « Aujourd’hui ».
+ assert.deepEqual(seriesBadge(show,episode,progress,false,'2026-10-24',now),{label:'Aujourd’hui',tone:'today'});
  assert.equal(seriesBadge(show,{...episode,air_date:'2026-10-23'},progress,false,'2026-10-24',now)?.label,'Sorti hier');
  assert.equal(seriesBadge(show,{...episode,air_date:'2026-10-22'},progress,false,'2026-10-24',now)?.label,'Nouveau');
  assert.equal(seriesBadge(show,{...episode,air_date:'2026-10-01'},progress,false,'2026-10-24',now),null);

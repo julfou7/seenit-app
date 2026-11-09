@@ -24,6 +24,7 @@ import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { type EpisodeDetailData } from './episodeDetailTypes';
 import {
   canStartEpisodeSwipeFromTarget,
+  resolveEpisodeSwipe,
   resolveEpisodeNavigationDirectionFromKey,
   resolveLoadedAdjacentEpisode,
 } from '../features/navigation/episodeNavigation';
@@ -879,8 +880,10 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const openPlex = () => { void openPlexWatchUrl(activeShow || { tmdbId: showTmdbId, imdbId: activeShow?.imdbId, title: activeShow?.title || tmdbShowTitle, mediaType: 'tv' }); };
   const seenThenNext = async () => { if (!isSeen) await toggleSeen(); void handleNextEpisode(); };
 
+  // Retour terrain du 09/11 (« absence de nav bar sur la fiche épisode ») : comme la fiche média, la fiche épisode
+  // garde la barre de navigation (couche non bloquante, `data-media-layer`) ; son contenu réserve déjà sa hauteur.
   return (
-    <DialogLayer ref={dialogRootRef} onDismiss={onClose} label="Détail de l’épisode" historyMode="external" role="dialog" className="fixed inset-0 z-40 flex flex-col items-center">
+    <DialogLayer ref={dialogRootRef} onDismiss={onClose} label="Détail de l’épisode" historyMode="external" role="dialog" blocking={false} data-media-layer="" data-episode-detail="" className="fixed inset-0 z-40 flex flex-col items-center">
       {/* Backdrop */}
       <motion.div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
@@ -954,6 +957,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         <motion.div
           className="flex-1 flex flex-col w-full h-full overflow-hidden relative bg-[#09090B]"
           drag="x"
+          // Retour terrain du 09/11 : un geste d'abord vertical reste un défilement, jamais un changement d'épisode.
+          dragDirectionLock
           dragControls={dragControls}
           dragListener={false}
           dragConstraints={{ left: 0, right: 0 }}
@@ -973,16 +978,15 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
               animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
               return;
             }
-            const offset = info.offset.x;
-            const velocity = info.velocity.x;
+            const swipe = resolveEpisodeSwipe({ offsetX: info.offset.x, offsetY: info.offset.y, velocityX: info.velocity.x, velocityY: info.velocity.y });
 
-            if (offset > 60 || velocity > 200) {
+            if (swipe === 'previous') {
               if (hasPrevious) {
                 animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
                 void handlePreviousEpisode();
                 return;
               }
-            } else if (offset < -60 || velocity < -200) {
+            } else if (swipe === 'next') {
               if (hasNext) {
                 animate(dragX, 0, { type: 'spring', damping: 25, stiffness: 300 });
                 void handleNextEpisode();
@@ -1035,7 +1039,11 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 <ArrowLeft size={18} className="text-[#E5A93D] shrink-0" />
                 <span className="min-w-0 flex flex-col text-left leading-[1.15]"><span className="text-[9px] font-extrabold tracking-[0.08em] text-zinc-400">SÉRIE</span><span className="seenit-media-title text-[13px] font-bold truncate">{show?.title || tmdbShowTitle || 'Retour'}</span></span>
               </button>
-              <button type="button" onClick={onClose} aria-label="Fermer" className="w-11 h-11 rounded-full bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center justify-center text-white active:scale-95"><X size={18} /></button>
+              {/* Retour terrain du 09/11 : la cloche d'un épisode à venir est ronde, à côté de la croix. */}
+              <span className="flex items-center gap-2">
+                {isFutureEpisode && activeShow?.id && <EpisodeReminderBell variant="overlay" show={activeShow} episode={{ season_number: currentSeason, episode_number: currentNumber, name: currentEpisode.name, air_date: currentEpisode.air_date }} />}
+                <button type="button" onClick={onClose} aria-label="Fermer" className="w-11 h-11 rounded-full bg-[rgba(9,9,11,0.88)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] flex items-center justify-center text-white active:scale-95"><X size={18} /></button>
+              </span>
             </div>
 
             <div className="w-full">
@@ -1073,10 +1081,9 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                   <span className="text-[18px] text-[#E5A93D]" aria-hidden="true">›</span>
                 </button>}
 
-                {/* Retour terrain du 08/11 : un épisode à venir d'une série suivie a sa cloche de rappel. */}
+                {/* Retour terrain du 08/11 : un épisode à venir d'une série suivie a sa cloche de rappel (en-tête depuis le 09/11). */}
                 {/* Retour terrain du 08/11 : depuis la fiche épisode, on programme aussi son téléchargement. */}
-                {isFutureEpisode ? <>{activeShow?.id ? <EpisodeReminderBell variant="wide" show={activeShow} episode={{ season_number: currentSeason, episode_number: currentNumber, name: currentEpisode.name, air_date: currentEpisode.air_date }} />
-                  : <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>}
+                {isFutureEpisode ? <>{!activeShow?.id && <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>}
                   <EpisodeProgramCard title={tmdbShowTitle || activeShow?.title || ''} tmdbId={tmdbShowId || activeShow?.tmdbId} tvdbId={activeShow?.tvdbId} imdbId={activeShow?.imdbId} season={currentSeason} episode={currentNumber} presence={presence} /></>
                   : watchProviders.length > 0 && <WhereToWatchCard providers={watchProviders} loading={false} userPlatforms={userPlatforms} title={activeShow?.title || tmdbShowTitle || ''} onOpenPlex={openPlex} emptyLabel="" />}
 

@@ -126,22 +126,22 @@ async function testMediaDetailHarness(client) {
     if (movieGeometry.overflow) throw new Error(`SEENIT-UX-019 film ${width}px déborde ${JSON.stringify(movieGeometry)}`);
 
     await mount(client, width, 'episode');
-    await check(client, 'document.querySelector("[role=dialog] h1")?.textContent==="Ozymandias" && document.body.innerText.includes("S05 | E14")', 'fiche épisode titrée');
-    await check(client, 'document.querySelector(\'[role=dialog] button.seenit-check[aria-label="Marquer vu"] .seenit-ring-glyph\') && !/il est \\d/.test(document.body.innerText)', 'Vu de la fiche épisode = anneau de l’Accueil, sans « il est » (#857)');
+    await check(client, 'document.querySelector("[data-episode-detail] h1")?.textContent==="Ozymandias" && document.body.innerText.includes("S05 | E14")', 'fiche épisode titrée');
+    await check(client, 'document.querySelector(\'[data-episode-detail] button.seenit-check[aria-label="Marquer vu"] .seenit-ring-glyph\') && !/il est \\d/.test(document.body.innerText)', 'Vu de la fiche épisode = anneau de l’Accueil, sans « il est » (#857)');
     await check(client, 'document.body.innerText.includes("Si tu lances maintenant") && document.querySelectorAll(\'[aria-label^="Ouvrir E"]\').length===3', 'soirée de trois épisodes');
     await check(client, 'document.body.innerText.includes("Meilleure note de la saison") && document.querySelectorAll("[aria-current=true]").length>=1', 'courbe et rang dans la saison');
-    await check(client, '(document.querySelector("[role=dialog]").innerText.match(/^Netflix$/gm) || []).length===1 && !document.body.innerText.includes("with Ads")', 'un seul Netflix, sans « Standard with Ads »');
+    await check(client, '(document.querySelector("[data-episode-detail]").innerText.match(/^Netflix$/gm) || []).length===1 && !document.body.innerText.includes("with Ads")', 'un seul Netflix, sans « Standard with Ads »');
     for (const label of ['Épisode précédent', 'Épisode suivant']) await check(client, `${byLabel(label)}?.getBoundingClientRect().height>=44`, `${label} garde 44 px (SEENIT-UX-008)`);
     await click(client, byLabel('Épisode 16'));
-    await check(client, 'document.querySelector("[role=dialog] h1")?.textContent==="Felina" && document.body.innerText.includes("Résumé masqué")', 'une case ouvre l’épisode et masque son résumé si le précédent n’est pas vu');
+    await check(client, 'document.querySelector("[data-episode-detail] h1")?.textContent==="Felina" && document.body.innerText.includes("Résumé masqué")', 'une case ouvre l’épisode et masque son résumé si le précédent n’est pas vu');
     await click(client, byText('button', 'Résumé masqué'));
     await check(client, 'document.body.innerText.includes("Fin de Walt") && !document.body.innerText.includes("Résumé masqué")', 'le résumé se révèle au toucher');
     await delay(400);
     await click(client, byLabel('Épisode 14'));
-    await check(client, 'document.querySelector("[role=dialog] h1")?.textContent==="Ozymandias"', 'retour sur E14 par la case');
+    await check(client, 'document.querySelector("[data-episode-detail] h1")?.textContent==="Ozymandias"', 'retour sur E14 par la case');
     await delay(400);
     await click(client, byText('button', 'Vu, puis E15'));
-    await check(client, 'document.querySelector("[role=dialog] h1")?.textContent==="Granite State"', '« Vu, puis E15 » marque et enchaîne');
+    await check(client, 'document.querySelector("[data-episode-detail] h1")?.textContent==="Granite State"', '« Vu, puis E15 » marque et enchaîne');
     await delay(400); // une navigation d’épisode ignore les touches pendant sa transition (300 ms)
     await click(client, byLabel('Épisode 14, vu'));
     await check(client, 'document.body.innerText.includes("✓ Vu") && ' + byLabel('Ta réaction') + '', 'l’épisode marqué est vu et propose une réaction');
