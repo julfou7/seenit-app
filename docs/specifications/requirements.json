@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.287",
+  "applicationVersion": "1.4.288",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -26,6 +26,20 @@
         {
           "file": "tests/wantedSeen.test.ts",
           "contains": "SEENIT-DOWNLOAD-020 un recherché déjà vu dans SeenIt depuis 24 h quitte Programmés ; avant 24 h il reste"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DOWNLOAD-022",
+      "title": "Programmés et Téléchargés affichent le titre, l'affiche et les épisodes de la fiche TMDB en français",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/arrMediaLabels.test.ts",
+          "contains": "SEENIT-DOWNLOAD-022 titres, affiches et épisodes de la fiche TMDB fr-FR par identité exacte ; repli Sonarr/Radarr"
         }
       ]
     },

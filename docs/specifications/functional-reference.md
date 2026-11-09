@@ -935,6 +935,8 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   or, Série/Film, année), avec « Retirer » sous l'affiche au lieu de « Ajouter ». Retirer sort un film de Radarr
   ou une série de Sonarr en gardant toujours les fichiers (Plex garde le titre) ; une série dont Sonarr attend
   encore un épisode y reste et sort seulement de la liste. Un toast dit ce qui a été fait.
+  Depuis la v1.4.288 (`SEENIT-DOWNLOAD-022`) : titre, affiche, note et année viennent de la fiche TMDB en
+  français, comme partout dans l'app (« L'Arène » et non « The Arena (2026) ») ; Sonarr/Radarr restent le repli.
 - Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
   (120 jours) — épisodes et films surveillés, sans fichier, dont la série est surveillée — regroupés par
   série (identifiant Sonarr exact). Depuis la v1.4.280, chaque carte a une méta grise courte (« Film ·
@@ -957,6 +959,8 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   défaut au-delà de 3. Depuis la v1.4.287, un recherché déjà vu dans SeenIt depuis plus de 24 h n'y figure plus, et
   les toasts de Programmés et de Téléchargés gardent l'affiche et ouvrent la fiche au toucher. La synchronisation ne recopie pas toute la
   bibliothèque Sonarr/Radarr : un titre déjà sur le disque se voit sur sa fiche (présence), pas dans cet onglet.
+  Depuis la v1.4.288 (`SEENIT-DOWNLOAD-022`), titres, affiches et titres d'épisodes viennent de la fiche TMDB en
+  français, comme dans le reste de l'app ; Sonarr/Radarr ne servent qu'en repli.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.
 - « Vider » ne touche que la section d'historique visée, jamais un actif.
