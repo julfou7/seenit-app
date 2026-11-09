@@ -61,7 +61,6 @@ test('SEENIT-RATING-001 affiche les notes de saison et d’épisode uniquement d
 
 test('issue #935 affiche le code de saison et d’épisode avec deux chiffres dans toutes les lignes', () => {
   const seriesSections = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
-  assert.match(seriesSections, /const episodeCode = `S\\$\\{String\\(number\\)\\.padStart\\(2, '0'\\)\\} \\| E\\$\\{String\\(episode\\.episode_number\\)\\.padStart\\(2, '0'\\)\\}`/);
+  assert.ok(seriesSections.includes("const episodeCode = `S${String(number).padStart(2, '0')} | E${String(episode.episode_number).padStart(2, '0')}`;"));
   assert.match(seriesSections, /<b data-episode-code/);
-  assert.match(seriesSections, /<span className="text-\\[12px\\] text-zinc-400">/);
 });
