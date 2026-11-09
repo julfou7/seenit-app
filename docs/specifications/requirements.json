@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.286",
+  "applicationVersion": "1.4.287",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -22,6 +22,10 @@
         {
           "file": "tests/programmedCalendar.test.ts",
           "contains": "SEENIT-DOWNLOAD-020 détaillé : les épisodes se replient, repliés par défaut au-delà de 3, choix gardé"
+        },
+        {
+          "file": "tests/wantedSeen.test.ts",
+          "contains": "SEENIT-DOWNLOAD-020 un recherché déjà vu dans SeenIt depuis 24 h quitte Programmés ; avant 24 h il reste"
         }
       ]
     },
@@ -2788,6 +2792,10 @@
         {
           "file": "tests/toastNavigation.test.ts",
           "contains": "SEENIT-UX-006 le conteneur protège navigation clavier, actions secondaires et drag"
+        },
+        {
+          "file": "tests/toastNavigation.test.ts",
+          "contains": "SEENIT-UX-006 un toast qui déclare sa fiche (identité TMDB exacte) l’ouvre, quel que soit son type"
         }
       ]
     },

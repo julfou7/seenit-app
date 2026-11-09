@@ -368,9 +368,13 @@ export function PersonDetailModal({ personId, onClose, onShowClick }: Props) {
             }
           );
         } else {
+          // Revue Codex #928 : un vu porte sa date (Programmés masque un recherché vu depuis 24 h, pas avant).
+          const seenAt = Date.now();
           await updateShow(existingShow.id, {
             status: 'completed',
-            seenEpisodes: ['movie']
+            seenEpisodes: ['movie'],
+            lastWatchedAt: seenAt,
+            episodeRecords: { ...(existingShow.episodeRecords || {}), movie: { ...(existingShow.episodeRecords?.movie || {}), watchedAt: seenAt } }
           });
           showToast(
             `« ${existingShow.title} » marqué comme vu !`,

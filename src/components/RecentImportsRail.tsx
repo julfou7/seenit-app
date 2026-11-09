@@ -29,6 +29,7 @@ const CLEARED_FIELD = 'downloads.recentImports.clearedAt';
 const REMOVED_FIELD = 'downloads.recentImports.removed';
 const WEEK = 8 * 86_400_000;
 
+const toastMedia = (item: RecentImport) => item.tmdbId ? { tmdbId: item.tmdbId, mediaType: item.kind === 'movie' ? 'movie' as const : 'tv' as const } : null;
 const tmdbPosterPath = (url?: string) => url?.match(/image\.tmdb\.org\/t\/p\/[^/]+(\/[^/?#]+)$/)?.[1];
 /** Carte d'Explorer d'un import : identité TMDB exacte, affiche TMDB (sinon celle de Sonarr/Radarr), note et année. */
 export function importMedia(item: RecentImport): TMDBMedia {
@@ -77,9 +78,11 @@ export function RecentImportsRail({ items, failures, onShowClick }: { items: Rec
       writeUserScopedJson(uid, REMOVED_FIELD, next);
       setRemoved(next);
       notifyArrWrite({ tmdbId: item.tmdbId, mediaType: item.kind === 'movie' ? 'movie' : 'tv' });
-      toast({ title: item.title, action: outcome === 'kept' ? 'Retiré de la liste · la suite reste programmée dans Sonarr' : `Retiré de ${item.kind === 'movie' ? 'Radarr' : 'Sonarr'} · fichiers gardés` }, 'info');
+      // Retour terrain du 09/11 sur la v1.4.286 : l'affiche reste dans le toast, qui ouvre la fiche ; « fichiers
+      // gardés » n'apporte rien (Sonarr/Radarr déplacent les fichiers après l'import).
+      toast({ title: item.title, action: outcome === 'kept' ? 'Retiré de la liste · la suite reste programmée dans Sonarr' : `Retiré de ${item.kind === 'movie' ? 'Radarr' : 'Sonarr'}`, posterPath: item.posterUrl || null, media: toastMedia(item) }, 'info');
     } catch (error: unknown) {
-      toast({ title: item.title, action: frenchArrMessage(error instanceof Error ? error.message : '') || 'Retrait impossible. Réessaie.' }, 'error');
+      toast({ title: item.title, action: frenchArrMessage(error instanceof Error ? error.message : '') || 'Retrait impossible. Réessaie.', posterPath: item.posterUrl || null, media: toastMedia(item) }, 'error');
     } finally {
       setBusy(null);
     }

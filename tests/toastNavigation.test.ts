@@ -67,3 +67,18 @@ test('SEENIT-UX-006 le conteneur protège navigation clavier, actions secondaire
   assert.match(toastSource, /if \(diff > 25\)/);
   assert.match(toastSource, /flex items-center gap-1\.5 shrink-0 ml-auto/);
 });
+
+// Retour terrain du 09/11 sur la v1.4.286 : « au clic sur le titre ou l'image du toast, je veux pouvoir rouvrir le film
+// ou la série » — les toasts de Téléchargés, Programmés et de la fiche épisode déclarent leur fiche.
+test('SEENIT-UX-006 un toast qui déclare sa fiche (identité TMDB exacte) l’ouvre, quel que soit son type', () => {
+  for (const type of ['info', 'error', 'success'] as const) {
+    assert.deepEqual(resolveToastMediaNavigationTarget({ type, message: { title: 'MobLand', action: 'N’est plus programmé.', media: { tmdbId: 247718, mediaType: 'tv' } } }), { showId: '', tmdbId: 247718, mediaType: 'tv' });
+  }
+  assert.deepEqual(resolveToastMediaNavigationTarget({ type: 'info', message: { action: 'Retiré de Radarr', media: { tmdbId: 4, mediaType: 'movie' } } }), { showId: '', tmdbId: 4, mediaType: 'movie' });
+  assert.equal(resolveToastMediaNavigationTarget({ type: 'info', message: { action: 'x', media: { tmdbId: 0, mediaType: 'tv' } } }), null, 'identité invalide');
+  assert.equal(resolveToastMediaNavigationTarget({ type: 'info', message: { action: 'x', media: null } }), null, 'sans fiche : pas cliquable');
+  assert.equal(resolveToastMediaNavigationTarget({ type: 'unfollow', message: { action: 'Retiré d’À voir', media: { tmdbId: 4, mediaType: 'movie' } } }), null, 'un retrait d’À voir reste non navigable');
+  assert.equal(resolveToastMediaNavigationTarget({ type: 'info', message: 'Texte seul' }), null);
+  assert.match(readFileSync('src/components/RecentImportsRail.tsx', 'utf8'), /posterPath: item\.posterUrl \|\| null, media: toastMedia\(item\) \}, 'info'\);/, 'Téléchargés : affiche et fiche');
+  assert.match(readFileSync('src/components/ProgrammedSection.tsx', 'utf8'), /'N’est plus programmé\.', posterPath, media \}, 'info'\);/, 'Programmés : affiche et fiche');
+});

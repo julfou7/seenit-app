@@ -233,10 +233,13 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
       const oldStatus = existingShow.status;
       const oldSeenEpisodes = existingShow.seenEpisodes || [];
 
+      // Revue Codex #928 : un vu porte sa date (Programmés masque un recherché vu depuis 24 h, pas avant).
+      const seenAt = Date.now();
       await updateShow(existingShow.id, {
         status: newStatus,
         seenEpisodes: newSeenEpisodes,
-        updatedAt: Date.now()
+        ...(isCurrentlySeen ? {} : { lastWatchedAt: seenAt, episodeRecords: { ...(existingShow.episodeRecords || {}), movie: { ...(existingShow.episodeRecords?.movie || {}), watchedAt: seenAt } } }),
+        updatedAt: seenAt
       });
       showToast(
         isCurrentlySeen ? `« ${titleToUse} » marqué comme non vu` : `« ${titleToUse} » marqué comme vu`,
