@@ -220,3 +220,4 @@ Complément USR-2026-10-30-001 (retours du 30/10) : journées de plus de 24 h (i
 | USR-2026-11-09-009 | 2026-11-09 | « Pourquoi si je suis synchro je ne vois pas tous ces films ? » — décision : ajouter à Programmés les recherchés (surveillés, sortis, sans fichier), pas une bibliothèque complète. | SEENIT-DOWNLOAD-020 | active |
 | USR-2026-11-09-010 | 2026-11-09 | Programmés : « une vue compacte ? la hauteur varie d'une série à l'autre » — compact par défaut, détaillé au choix. | SEENIT-DOWNLOAD-020 | active |
 | USR-2026-11-09-011 | 2026-11-09 | Programmés : « supprime Sonarr et Radarr sous le titre, y a pas besoin » — méta « Film · 4K », « Série · 4K · 3 épisodes ». | SEENIT-DOWNLOAD-020 | active |
+| USR-2026-11-09-012 | 2026-11-09 | Programmés détaillé (MobLand, 9 épisodes) : « il faut que je puisse masquer le détail de tous les épisodes, ça prend toute la place » — épisodes repliables, repliés au-delà de 3. | SEENIT-DOWNLOAD-020 | active |

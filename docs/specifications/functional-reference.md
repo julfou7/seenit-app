@@ -952,7 +952,9 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   sans fichier (« Sorti sam. 31 oct. · recherché », « Recherché · pas encore de version »), après les sorties à
   venir ; et la section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni
-  « Radarr » : « Film · 4K », « Série · 4K · 3 épisodes ». La synchronisation ne recopie pas toute la
+  « Radarr » : « Film · 4K », « Série · 4K · 3 épisodes ». Depuis la v1.4.285, en détaillé, les épisodes d'une
+  série se replient (« Voir les 9 épisodes · 8 recherchés » / « Masquer les 9 épisodes ») et sont repliés par
+  défaut au-delà de 3. La synchronisation ne recopie pas toute la
   bibliothèque Sonarr/Radarr : un titre déjà sur le disque se voit sur sa fiche (présence), pas dans cet onglet.
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.
 - L'annulation active retire la demande du client ; les fichiers qBittorrent sont conservés.

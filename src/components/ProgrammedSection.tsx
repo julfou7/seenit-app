@@ -48,11 +48,23 @@ const pastDayLabel = (date?: string) => date ? new Date(date).toLocaleDateString
  * de hauteur régulière par titre, épisodes repliés ; la vue détaillée reste au choix, mémorisée par compte. */
 export type ProgrammedLayout = 'compact' | 'detailed';
 const LAYOUT_FIELD = 'downloads.programmed.layout';
+/**
+ * Retour terrain du 09/11 sur la v1.4.284 (MobLand, 9 épisodes : « il faut que je puisse masquer le détail de
+ * tous les épisodes, ça prend toute la place ») : en détaillé, les épisodes se replient ; dépliés jusqu'à 3 par
+ * défaut, repliés au-delà. En compact, toujours repliés.
+ */
+export const EPISODES_OPEN_MAX = 3;
+export const episodesOpenByDefault = (layout: ProgrammedLayout, count: number) => layout === 'detailed' && count <= EPISODES_OPEN_MAX;
+export function episodesToggleLabel(open: boolean, count: number, wanted: number): string {
+  const target = count > 1 ? `les ${count} épisodes` : 'l’épisode';
+  if (open) return `Masquer ${target}`;
+  return `Voir ${target}${wanted ? ` · ${wanted} recherché${wanted > 1 ? 's' : ''}` : ''}`;
+}
 interface ProgrammedCard {
   key: string; data: Record<string, number | string>; name: string; isTv: boolean; poster?: string | null; meta: string; pill: string;
   open: () => unknown; canOpen: boolean;
   actions: { open: boolean; button: React.ReactNode; panel: React.ReactNode } | null;
-  episodes?: { summary: string; rows: React.ReactNode };
+  episodes?: { summary: string; count: number; wanted: number; rows: React.ReactNode };
 }
 
 const When = ({ children }: { children: React.ReactNode }) => <span className="programmed__when"><Clock3 size={13} aria-hidden="true" />{children}</span>;
@@ -94,8 +106,9 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
   const [busy, setBusy] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [layout, setLayout] = useState<ProgrammedLayout>(() => readUserScopedJson<ProgrammedLayout>(auth.currentUser?.uid, LAYOUT_FIELD, 'compact') === 'detailed' ? 'detailed' : 'compact');
-  const [expanded, setExpanded] = useState<ReadonlySet<string>>(() => new Set());
-  const toggleExpanded = (key: string) => setExpanded(previous => { const next = new Set(previous); if (!next.delete(key)) next.add(key); return next; });
+  // Choix explicite d'ouvrir ou de replier les épisodes, par vue (`compact:s5`, `detailed:s5`). Un choix fait reste
+  // tel quel même si le nombre d'épisodes change ensuite (annulation) ; sans choix, l'état par défaut s'applique.
+  const [episodesChoice, setEpisodesChoice] = useState<ReadonlyMap<string, boolean>>(() => new Map());
   useEffect(() => { void useArrSyncStore.getState().sync(); }, [refreshKey, scope]);
 
   // Film suivi absent du calendrier : ses dates, sa qualité et son identifiant Radarr font partie de la copie
@@ -173,6 +186,8 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
   // Retour terrain du 09/11 : « supprime Sonarr et Radarr sous le titre, y a pas besoin » — type, qualité, nombre.
   const meta = (...parts: Array<string | undefined | false>) => parts.filter(Boolean).join(' · ');
   const compact = layout === 'compact';
+  const episodesOpen = (card: ProgrammedCard) => Boolean(card.episodes) && (episodesChoice.get(`${layout}:${card.key}`) ?? episodesOpenByDefault(layout, card.episodes!.count));
+  const toggleEpisodes = (card: ProgrammedCard) => { const open = episodesOpen(card); setEpisodesChoice(previous => new Map(previous).set(`${layout}:${card.key}`, !open)); };
 
   // Chaque carte est décrite une fois puis rendue en vue détaillée ou compacte (v1.4.284).
   const cards: ProgrammedCard[] = [];
@@ -197,7 +212,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
       pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : WANTED_PILL,
       open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
       actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }), () => void cancel(group, first.seriesTitle), group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation'),
-      episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, rows: <ul className="download-season__rows">
+      episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, count: group.length, wanted: wantedCount, rows: <ul className="download-season__rows">
         {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
           <span className="download-season__code">{code(item)}</span>
           <span className="programmed__row-text">
@@ -234,11 +249,11 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
             <p className="programmed__meta">{card.meta}</p>
             <span className="programmed-compact__when">{card.pill}</span>
           </div>
-          {card.episodes && <button type="button" className="programmed-compact__expand" aria-expanded={expanded.has(card.key)} aria-label={`${expanded.has(card.key) ? 'Replier' : 'Voir'} les épisodes de ${card.name} (${card.episodes.summary})`} onClick={() => toggleExpanded(card.key)}><ChevronDown size={20} aria-hidden="true" /></button>}
+          {card.episodes && <button type="button" className="programmed-compact__expand" aria-expanded={episodesOpen(card)} aria-label={`${episodesOpen(card) ? 'Replier' : 'Voir'} les épisodes de ${card.name} (${card.episodes.summary})`} onClick={() => toggleEpisodes(card)}><ChevronDown size={20} aria-hidden="true" /></button>}
           {card.actions?.button}
         </div>
         {card.actions?.panel}
-        {card.episodes && expanded.has(card.key) && card.episodes.rows}
+        {card.episodes && episodesOpen(card) && card.episodes.rows}
       </article>
       : <article key={card.key} className="download-card programmed" {...card.data}>
         <div className="download-card__head">
@@ -251,7 +266,11 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching = [], 
           {card.actions?.button}
         </div>
         {card.actions?.panel}
-        {card.episodes?.rows}
+        {card.episodes && <button type="button" className="programmed__episodes-toggle" aria-expanded={episodesOpen(card)} onClick={() => toggleEpisodes(card)}>
+          <span>{episodesToggleLabel(episodesOpen(card), card.episodes.count, card.episodes.wanted)}</span>
+          <ChevronDown size={18} aria-hidden="true" />
+        </button>}
+        {card.episodes && episodesOpen(card) && card.episodes.rows}
       </article>)}
   </section>;
 }

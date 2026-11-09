@@ -59,7 +59,8 @@ const RADARR_IMPORTS = [{ eventType: 3, date: ago(3), movieId: 40, movie: { titl
 // v1.4.284 — « Retirer » : Severance (Sonarr 7) n'attend plus rien ; A Knight… (Sonarr 8) a encore un épisode programmé.
 const SONARR_EPISODES: Record<string, Array<{ monitored: boolean; hasFile: boolean }>> = { 7: [{ monitored: true, hasFile: true }], 8: [{ monitored: true, hasFile: true }, { monitored: true, hasFile: false }] };
 // Recherchés (wanted/missing) de la page « Programmés » : un épisode de L'Arène sorti sans fichier et un film disponible.
-const SONARR_WANTED = [{ id: 799, seriesId: 5, seasonNumber: 1, episodeNumber: 7, title: 'Épisode 7', airDateUtc: ago(6), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4 } }];
+// Quatre épisodes pour L'Arène au total : repliés par défaut en vue détaillée (retour terrain du 09/11, MobLand).
+const SONARR_WANTED = [6, 7].map(episodeNumber => ({ id: 792 + episodeNumber, seriesId: 5, seasonNumber: 1, episodeNumber, title: `Épisode ${episodeNumber}`, airDateUtc: ago(20 - 2 * episodeNumber), monitored: true, hasFile: false, series: { title: "L'Arène", tmdbId: 77, monitored: true, qualityProfileId: 4 } }));
 const RADARR_WANTED = [{ id: 902, title: 'Blade Runner 2049', tmdbId: 335984, monitored: true, hasFile: false, isAvailable: true, qualityProfileId: 4, inCinemas: '2017-10-04', digitalRelease: '2018-01-16' }];
 export const executeDelete = async (url: string) => { telemetry.arrDeleted.push(url); return {}; };
 export const executeGet = async (url: string) => {
