@@ -24,3 +24,16 @@ test('SEENIT-DOWNLOAD-021 Téléchargés : la carte d’Explorer elle-même, ave
   assert.match(rail, /if \(useArrSyncStore\.getState\(\)\.snapshot\?\.key !== arrSyncKey\(\)\) \{/, 'jamais un identifiant d’un autre compte ou serveur');
   assert.match(rail, /outcome === 'kept' \? 'Retiré de la liste · la suite reste programmée dans Sonarr' : `Retiré de \$\{item\.kind === 'movie' \? 'Radarr' : 'Sonarr'\} · fichiers gardés`/, 'un seul toast qui dit ce qui a été fait');
 });
+
+// Retour terrain du 09/11 sur la v1.4.285 : « la photo disparaît quand je retire un épisode ».
+test('SEENIT-DOWNLOAD-020 retirer ou changer la qualité dans Programmés : le toast garde l’affiche du titre', () => {
+  const section = read('src/components/ProgrammedSection.tsx');
+  assert.match(section, /const first = targets\[0\];\n\s+const posterPath = first\.posterUrl \|\| null;/);
+  assert.match(section, /'N’est plus programmé\.', posterPath \}, 'info'\);/, 'annulation : affiche');
+  assert.match(section, /'Impossible de déprogrammer\.', posterPath \}, 'error'\);/, 'échec : affiche');
+  assert.match(section, /action: `Qualité : \$\{preference === '4k' \? '4K' : '1080p'\}`, posterPath \}, 'success'\);/, 'qualité : affiche');
+  assert.equal((section.match(/mediaType: '(?:tv|movie)' \}, (?:posterUrl\(entry\.posterPath\)|first\.posterUrl|movie\.posterUrl)\)/g) || []).length, 3, 'chaque carte passe son affiche');
+  const card = read('src/components/EpisodeProgramCard.tsx');
+  assert.equal((card.match(/subtitle: `S\$\{season\} \| E\$\{episode\}`, posterPath, action:/g) || []).length, 3, 'fiche épisode : programmer et annuler avec l’affiche');
+  assert.match(read('src/screens/EpisodeDetailModalCore.tsx'), /presence=\{presence\} posterPath=\{activeShow\?\.posterPath \|\| null\} \/>/);
+});

@@ -1086,7 +1086,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 {/* Retour terrain du 08/11 : un épisode à venir d'une série suivie a sa cloche de rappel (en-tête depuis le 09/11). */}
                 {/* Retour terrain du 08/11 : depuis la fiche épisode, on programme aussi son téléchargement. */}
                 {isFutureEpisode ? <>{!activeShow?.id && <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>}
-                  <EpisodeProgramCard title={tmdbShowTitle || activeShow?.title || ''} tmdbId={tmdbShowId || activeShow?.tmdbId} tvdbId={activeShow?.tvdbId} imdbId={activeShow?.imdbId} season={currentSeason} episode={currentNumber} presence={presence} /></>
+                  <EpisodeProgramCard title={tmdbShowTitle || activeShow?.title || ''} tmdbId={tmdbShowId || activeShow?.tmdbId} tvdbId={activeShow?.tvdbId} imdbId={activeShow?.imdbId} season={currentSeason} episode={currentNumber} presence={presence} posterPath={activeShow?.posterPath || null} /></>
                   : watchProviders.length > 0 && <WhereToWatchCard providers={watchProviders} loading={false} userPlatforms={userPlatforms} title={activeShow?.title || tmdbShowTitle || ''} onOpenPlex={openPlex} emptyLabel="" />}
 
                 <RedditSection
