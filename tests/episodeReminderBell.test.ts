@@ -8,12 +8,12 @@ import { build } from 'esbuild';
 // « vue liste, je descends, je remets la vue horizontale : j'ai un grand espace dessous ».
 const read = (path: string) => readFileSync(path, 'utf8');
 
-type Calls = { writes: Array<[string, unknown]>; deletes: string[]; updates: Array<[string, unknown]>; local: Array<[string, string, unknown]>; failSet: boolean; uid: string | null; switchOnPermission: boolean; prefs?: Record<string, boolean> };
+type Calls = { writes: Array<[string, unknown]>; deletes: string[]; updates: Array<[string, unknown]>; local: Array<[string, string, unknown]>; failSet: boolean; failDelete?: boolean; uid: string | null; switchOnPermission: boolean; prefs?: Record<string, boolean> };
 const calls: Calls = (globalThis as unknown as { __reminder: Calls }).__reminder = { writes: [], deletes: [], updates: [], local: [], failSet: false, uid: 'u1', switchOnPermission: false };
 
 async function loadModule() {
   const stubs: Record<string, string> = {
-    'firebase/firestore': `const c=()=>globalThis.__reminder;export const doc=(_db,...path)=>path.join('/');export const setDoc=async(ref,data)=>{if(c().failSet)throw new Error('refusé');c().writes.push([ref,data]);};export const deleteDoc=async ref=>{c().deletes.push(ref);};`,
+    'firebase/firestore': `const c=()=>globalThis.__reminder;export const doc=(_db,...path)=>path.join('/');export const setDoc=async(ref,data)=>{if(c().failSet)throw new Error('refusé');c().writes.push([ref,data]);};export const deleteDoc=async ref=>{if(c().failDelete)throw new Error('refusé');c().deletes.push(ref);};`,
     'lib/firebase': `const c=()=>globalThis.__reminder;export const db={};export const auth={get currentUser(){return c().uid?{uid:c().uid}:null}};export const requestNotificationPermission=async()=>{if(c().switchOnPermission)c().uid='u2';return 'fcm';};`,
     'lib/userIsolation': `const c=()=>globalThis.__reminder;export const readUserScopedJson=(_uid,field,fallback)=>field==='notifications'&&c().prefs?c().prefs:fallback;export const writeUserScopedJson=(uid,field,value)=>c().local.push(['set',uid+':'+field,value]);export const removeUserScopedValue=(uid,field)=>c().local.push(['remove',uid+':'+field,null]);`,
     'hooks/useShows': 'export const useShowActions=()=>({updateShow:async()=>{}});',
@@ -122,6 +122,13 @@ test('SEENIT-NOTIFICATION-009 la cloche agit sur toute la série et montre les r
   const updateShow = async (id: string, updates: unknown) => { calls.updates.push([id, updates]); };
   await writeEpisodeReminder({ target: { id: 's1', title: 'MobLand', mediaType: 'tv' } as never, ownerUid: 'u1', nextState: false, episode, updateShow });
   assert.deepEqual(calls.updates, [['s1', { notificationsEnabled: false }]]);
+  // Revue Codex #922 : si la coupure échoue, la série retrouve l'absence de choix, jamais un `true` explicite
+  // qui la laisserait prévenue après avoir coupé « Sortie du jour ».
+  calls.updates.length = 0; calls.failDelete = true;
+  await assert.rejects(writeEpisodeReminder({ target: { id: 's1', title: 'MobLand', mediaType: 'tv' } as never, ownerUid: 'u1', nextState: false, episode, updateShow }));
+  calls.failDelete = false;
+  assert.deepEqual(calls.updates, [['s1', { notificationsEnabled: false }], ['s1', { notificationsEnabled: undefined }]], 'absence de choix restaurée');
+  assert.notEqual((calls.updates[1][1] as { notificationsEnabled?: boolean }).notificationsEnabled, true);
   const notifier = read('src/hooks/useRemindersNotifier.ts');
   assert.match(notifier, /if \(userPrefs\.release_today_tv \|\| isSpecificReminder \|\| s\.notificationsEnabled === true\) \{/, 'une série activée à la cloche est prévenue même sans « Sortie du jour »');
   assert.match(read('src/components/EpisodeReminderBell.tsx'), /const label = `\$\{reminder \? 'Couper' : 'Activer'\} les rappels de \$\{show\?\.title \|\| 'la série'\} \(\$\{code\}\)`;/, 'le nom accessible dit que la cloche agit sur la série');

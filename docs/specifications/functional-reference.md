@@ -544,7 +544,8 @@ l'or reste au Vu et à la cloche. Le badge du jour de sortie dit « Aujourd’hu
 pas connue). Une série
 n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
-ligne à la place de la navigation). La sélection est gardée quand on change de saison (« 5 épisodes · 2 saisons ») et
+ligne à la place de la navigation ; depuis la v1.4.283, son texte se lit en entier — « 2 maintenant · 1 à la
+sortie », un titre long passe à la ligne, jamais de points de suspension). La sélection est gardée quand on change de saison (« 5 épisodes · 2 saisons ») et
 les saisons partent dans l'ordre. En mode, un épisode à venir se coche en bleu pour être **programmé** :
 Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sans recherche immédiate ; un
 épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Avec un seul épisode sorti

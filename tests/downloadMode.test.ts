@@ -162,6 +162,10 @@ test('SEENIT-DOWNLOAD-014 #879 chaque segment du bandeau se touche, la barre com
   assert.equal(exited, 1);
   assert.match(String(bar.props!.className), /rounded-\[22px\][^"]*p-2 flex items-center gap-2/, 'une seule ligne compacte');
   assert.equal(findNodes(bar, node => node.props?.['aria-label'] === 'Quitter le mode téléchargement').length, 1);
+  // Retour terrain du 09/11 : « 6 maintenant · en quelle … » coupé — le texte de la barre se lit en entier.
+  const modeBar = mode.slice(mode.indexOf('export function DownloadModeBar'));
+  assert.doesNotMatch(modeBar.slice(0, modeBar.indexOf('\nexport function', 1)), /truncate|line-clamp/, 'jamais de points de suspension dans la barre');
+  assert.match(view, /const pickedDetail = !pickedList\.length \? 'Coche un épisode\.'\n\s+: \[pickedNow\.length \? `\$\{pickedNow\.length\} maintenant` : '', pickedFuture\.length \? `\$\{pickedFuture\.length\} à la sortie` : ''\]\.filter\(Boolean\)\.join\(' · '\);/, 'texte court : « 2 maintenant · 1 à la sortie »');
   // La fiche : entrer dans le mode défile jusqu'à l'épisode où on en est ; un segment défile jusqu'à sa ligne.
   assert.match(view, /const target = nextInSeason \?\? selectableEpisodes\[0\] \?\? modeStates\.find\(entry => entry\.state !== 'seen'\)\?\.episode;\n\s+if \(target !== undefined\) requestEpisodeScroll\(target\);/);
   assert.match(view, /const row = mainScrollRef\.current\?\.querySelector<HTMLElement>\(`\[data-episode-row="\$\{episodeScroll\.episode\}"\]`\);\n\s+if \(!row\) return;/, 'ligne absente (saison en chargement) : la demande reste en attente');

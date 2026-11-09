@@ -67,7 +67,9 @@ export async function writeEpisodeReminder(options: { target: Show; ownerUid: st
     else await deleteDoc(reminderRef);
   } catch (error) {
     if (preferenceChanged && auth.currentUser?.uid === ownerUid) {
-      try { await updateShow(target.id, { notificationsEnabled: target.notificationsEnabled ?? !nextState }); }
+      // Revue Codex #922 : restaurer la valeur exacte. Une série sans choix explicite (prévenue par défaut) le reste ;
+      // `undefined` est écrit `null`, que tous les lecteurs traitent comme « pas de choix ».
+      try { await updateShow(target.id, { notificationsEnabled: target.notificationsEnabled }); }
       catch (rollbackError) { appLogger.warn('system', 'Restauration du rappel impossible', rollbackError); }
     }
     throw error;

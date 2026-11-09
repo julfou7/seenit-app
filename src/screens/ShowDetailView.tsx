@@ -267,9 +267,10 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const pickedNow = pickedList.filter(entry => !entry.future);
   const pickedFuture = pickedList.filter(entry => entry.future);
   const bySeason = (entries: PickedEpisode[]) => entries.reduce((groups, entry) => groups.set(entry.season, [...(groups.get(entry.season) || []), entry.episode]), new Map<number, number[]>());
-  // Maquette : « 2 maintenant · 1 programmé pour sa sortie · en quelle qualité ? ».
-  const pickedDetail = !pickedList.length ? 'Touche une barre ou un épisode.'
-    : `${[pickedNow.length ? `${pickedNow.length} maintenant` : '', pickedFuture.length ? `${pickedFuture.length} programmé${pickedFuture.length > 1 ? 's' : ''} pour sa sortie` : ''].filter(Boolean).join(' · ')} · en quelle qualité ?`;
+  // Retour terrain du 09/11 : « 6 maintenant · en quelle … » était coupé. Texte court et lisible en entier
+  // (« 2 maintenant · 1 à la sortie ») : les boutons 1080p et 4K posent déjà la question de la qualité.
+  const pickedDetail = !pickedList.length ? 'Coche un épisode.'
+    : [pickedNow.length ? `${pickedNow.length} maintenant` : '', pickedFuture.length ? `${pickedFuture.length} à la sortie` : ''].filter(Boolean).join(' · ');
   /** Lance les épisodes cochés avec les mêmes gardes que la popup : rien n'est remplacé ni relancé en double. */
   const launchPickedEpisodes = async (quality: DownloadQualityChoice) => {
     if (!pickedList.length || !effectiveTmdbId) return;
