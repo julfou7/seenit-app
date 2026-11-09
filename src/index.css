@@ -41,6 +41,12 @@ html, body {
   padding-bottom: 0;
 }
 .seenit-dialog-layer .pb-nav { padding-bottom: 1rem; }
+/* Revue Codex #921 : la fiche épisode garde la barre de navigation (SEENIT-UX-019) ; ses dernières actions
+   (Précédent / Suivant) ne passent plus sous l'îlot de navigation. */
+.seenit-dialog-layer[data-episode-detail] .pb-nav {
+  padding-bottom: calc(5.25rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(5.25rem + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px)));
+}
 /* La fiche média peut recevoir le focus avant le chargement de ses contrôles.
    Elle ne doit jamais afficher l'outline UA autour de toute la WebView. */
 .seenit-dialog-layer[data-dialog-blocking="false"]:focus,

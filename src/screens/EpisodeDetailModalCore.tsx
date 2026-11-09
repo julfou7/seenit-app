@@ -881,9 +881,11 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const seenThenNext = async () => { if (!isSeen) await toggleSeen(); void handleNextEpisode(); };
 
   // Retour terrain du 09/11 (« absence de nav bar sur la fiche épisode ») : comme la fiche média, la fiche épisode
-  // garde la barre de navigation (couche non bloquante, `data-media-layer`) ; son contenu réserve déjà sa hauteur.
+  // garde la barre de navigation (couche non bloquante, `data-media-layer`). Revue Codex #921 : non bloquante, elle
+  // garde son z-index déclaré ; z-[155] la place au-dessus de la fiche série (z-150) et sous la barre (z-160), et la
+  // réserve de hauteur de la barre est rétablie pour son contenu (index.css).
   return (
-    <DialogLayer ref={dialogRootRef} onDismiss={onClose} label="Détail de l’épisode" historyMode="external" role="dialog" blocking={false} data-media-layer="" data-episode-detail="" className="fixed inset-0 z-40 flex flex-col items-center">
+    <DialogLayer ref={dialogRootRef} onDismiss={onClose} label="Détail de l’épisode" historyMode="external" role="dialog" blocking={false} data-media-layer="" data-episode-detail="" className="fixed inset-0 z-[155] flex flex-col items-center">
       {/* Backdrop */}
       <motion.div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"

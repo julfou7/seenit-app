@@ -23,7 +23,10 @@ test('SEENIT-UX-008 changer d’épisode exige un geste nettement horizontal, ja
 
 test('SEENIT-UX-019 la fiche épisode garde la barre de navigation, comme la fiche média', () => {
   const modal = read('src/screens/EpisodeDetailModalCore.tsx');
-  assert.match(modal, /<DialogLayer ref=\{dialogRootRef\} onDismiss=\{onClose\} label="Détail de l’épisode" historyMode="external" role="dialog" blocking=\{false\} data-media-layer="" data-episode-detail="" className="fixed inset-0 z-40/);
+  assert.match(modal, /<DialogLayer ref=\{dialogRootRef\} onDismiss=\{onClose\} label="Détail de l’épisode" historyMode="external" role="dialog" blocking=\{false\} data-media-layer="" data-episode-detail="" className="fixed inset-0 z-\[155\] flex/, 'revue Codex #921 : au-dessus de la fiche série (z-150), sous la barre (z-160)');
+  assert.match(read('src/App.tsx'), /className="fixed inset-0 z-\[150\] bg-black/, 'la fiche série reste à z-150');
+  assert.match(read('src/components/bottomNav.css'), /\.bottom-nav-shell\{position:fixed;[^}]*z-index:160;/, 'la barre reste à z-160');
+  assert.match(read('src/index.css'), /\.seenit-dialog-layer\[data-episode-detail\] \.pb-nav \{\n\s+padding-bottom: calc\(5\.25rem/, 'revue Codex #921 : la hauteur de la barre est réservée');
   assert.match(read('src/components/bottomNav.css'), /body:has\(\[data-dialog-layer\]:not\(\[data-settings-layer\]\):not\(\[data-media-layer\]\)\) \.bottom-nav-shell\{display:none\}/, 'les vrais dialogues plein écran la masquent toujours');
   assert.match(modal, /relative z-10 flex flex-col gap-3\.5 pb-nav"/, 'le contenu réserve la hauteur de la barre');
   // Un changement d'onglet ferme la fiche épisode ouverte depuis À voir.
