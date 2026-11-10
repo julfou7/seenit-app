@@ -36,7 +36,7 @@
 .home-swipe__card { position:relative; transition:transform .25s; }.home-swipe--open .home-swipe__card { transform:translateX(-164px); }
 .home-swipe__actions { visibility:hidden; position:absolute; right:0; top:24px; height:150px; display:flex; align-items:stretch; gap:4px; }
 .home-swipe__actions button { width:78px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#e5a93d26; color:#f2c36b; font-size:11px; font-weight:800; cursor:pointer; }.home-swipe__actions button:last-child { background:#fb718526; color:#fda4af; }
-.home-swipe__close { position:absolute; top:0; right:0; z-index:3; width:44px; height:44px; display:grid; place-items:center; color:#d4d4d8; border-radius:50%; background:#18181be6; cursor:pointer; }
+
 .home-notifications { width:100%; max-width:500px; max-height:82dvh; display:flex; flex-direction:column; padding:16px; border-radius:28px; border:1px solid #ffffff1a; background:#111114; color:#f4f4f5; box-shadow:0 24px 70px #000a; }
 .home-notifications > header { display:flex; align-items:center; justify-content:space-between; gap:12px; }.home-notifications h2 { font-size:20px; font-weight:800; }.home-notifications > header button { width:44px; height:44px; border-radius:50%; display:grid; place-items:center; background:#ffffff08; cursor:pointer; }
 .home-notifications__read { min-height:44px; display:flex; align-items:center; gap:8px; color:#e5a93d; font-size:12px; font-weight:700; cursor:pointer; }.home-notifications > p { padding:24px 8px; color:#a1a1aa; font-size:14px; }

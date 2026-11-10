@@ -4,6 +4,7 @@ import { SeasonDownloadCard } from '../components/SeasonDownloadCard';
 import { ProgrammedSection } from '../components/ProgrammedSection';
 import { RecentImportsRail, useRecentImports, useUndecidedTitles } from '../components/RecentImportsRail';
 import { coveredByRecentImport } from '../features/downloads/recentImports';
+import { undecidedOutsideQueue } from '../features/downloads/arrCoverage';
 import { groupSeasonDownloads } from '../features/downloads/downloadSeriesGroups';
 import { downloadGroup, isPreTransferRequest, isWatchedWaitingRequest } from '../features/downloads/downloadGroups';
 import { describeReleases, matchesVersionFilter, releaseAgeLabel, type VersionFilter } from '../features/downloads/releaseVersions';
@@ -166,7 +167,11 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   // Maquette DlOngletSuivi : « Téléchargés » montre les imports réels des 7 derniers jours ; un téléchargement
   // terminé déjà présent dans cette rangée (TMDB et épisode exacts) n'est pas répété dans « Terminés ».
   const recentImports = useRecentImports(programmedRefresh);
-  const undecidedTitles = useUndecidedTitles();
+  const undecidedInSync = useUndecidedTitles();
+  // Un titre dans la file du client (sauf annulé) est déjà visible ici : il quitte « À décider » (10/11).
+  const undecidedTitles = useMemo(() => undecidedOutsideQueue(undecidedInSync, new Set(downloads
+    .filter(item => downloadGroup(item) !== 'cancelled' && Number(item.tmdbId) > 0)
+    .map(item => `${item.mediaType === 'movie' ? 'movie' : 'tv'}:${Number(item.tmdbId)}`))), [undecidedInSync, downloads]);
   const listedCompleted = useMemo(
     () => recentImports.loaded ? completedDownloads.filter(item => !coveredByRecentImport(recentImports.items, item)) : [],
     [completedDownloads, recentImports]

@@ -1,4 +1,4 @@
-import { notifyArrWrite } from '../store/arrSyncStore';
+import { arrSyncKey, notifyArrWrite } from '../store/arrSyncStore';
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
@@ -31,7 +31,8 @@ import { SeenItRing } from '../components/SeenItLogo';
 import { episodeDownloadPresentation } from '../features/downloads/episodeDownloadPresentation';
 import type { DownloadQualityChoice } from '../features/downloads/downloadLaunch';
 import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
-import { MovieDownloadButton, MovieDownloadTrack, type FilmDownloadState } from './mediaDetail/movieDownloadMode';
+import { MovieDownloadButton, MovieDownloadTrack, MovieUndecidedTrack, type FilmDownloadState } from './mediaDetail/movieDownloadMode';
+import { removeRecentImport } from '../features/downloads/recentImports';
 import { downloadGroup } from '../features/downloads/downloadGroups';
 import { availabilityHint } from '../features/downloads/downloadAvailability';
 
@@ -190,6 +191,27 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const filmGroup = filmItem ? downloadGroup(filmItem) : null;
   const filmState: FilmDownloadState = filmMode ? 'mode' : filmGroup === 'active' ? 'active' : filmGroup === 'waiting' ? 'waiting' : !movieAvailable && model.presence.radarrMonitored && filmUpcoming ? 'programmed' : 'idle';
   const filmTrackRef = React.useRef<HTMLDivElement>(null);
+  // Retour terrain du 10/11 : un film « À décider » (dans Radarr, non surveillé, sans fichier) est dit sur la fiche.
+  const filmUndecided = canUseFilmMode && filmState === 'idle' && !movieAvailable && model.presence.radarrUndecided === true;
+  const removeUndecidedFilm = async () => {
+    const toast = useToastStore.getState().showToast;
+    const media = { tmdbId: Number(effectiveTmdbId), mediaType: 'movie' as const };
+    // Revue Codex #938 : portée (compte + serveur Radarr) capturée avant la lecture et revérifiée avant le retrait.
+    const scope = arrSyncKey();
+    try {
+      // Identifiant relu sur le serveur actuel juste avant le retrait (jamais une copie d'un autre serveur).
+      const { useMediaPresenceStore } = await import('../store/mediaPresenceStore');
+      const fresh = await useMediaPresenceStore.getState().checkPresence({ tmdbId: effectiveTmdbId, mediaType: 'movie', forceRefresh: true });
+      const arrId = Number(fresh?.radarrMovieId);
+      if (!fresh?.radarrUndecided || !(arrId > 0)) { notifyArrWrite(media); return; }
+      if (arrSyncKey() !== scope) { toast({ title, action: 'La configuration a changé : rien n’a été retiré.', posterPath: show?.posterPath, media }, 'info'); notifyArrWrite(media); return; }
+      await removeRecentImport(useDownloadConfigStore.getState(), { kind: 'movie', key: `m${arrId}`, arrId, tmdbId: media.tmdbId, title, date: 0 });
+      notifyArrWrite(media);
+      toast({ title, action: 'Retiré de Radarr', posterPath: show?.posterPath, media }, 'info');
+    } catch (error: unknown) {
+      toast({ title, action: error instanceof Error && error.message ? error.message : 'Retrait impossible. Réessaie.', posterPath: show?.posterPath, media }, 'error');
+    }
+  };
   useEffect(() => {
     const close = () => setFilmMode(false);
     window.addEventListener('app-close-modals', close);
@@ -395,6 +417,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         {isSeries ? <SeriesProgressCard seenCount={seenCount} totalEpisodes={totalEpisodes} remainingMinutes={remainingTimeMinutes} seasons={seasons} show={show}>{seriesCta}{heroProvider && providerTile(heroProvider)}{canUseDownloadMode && show && <DownloadModeToggle active={downloadMode} badge={activeDownloads} onToggle={toggleDownloadMode} />}</SeriesProgressCard>
           : <div className="flex gap-2">{movieCta}{heroProvider && providerTile(heroProvider)}{canUseFilmMode && !movieAvailable && <MovieDownloadButton state={filmState} progress={Number(filmItem?.progress) || 0} upcoming={filmUpcoming} onPress={pressFilmButton} />}</div>}
         {!isSeries && !hasSeenMedia && !isUnreleased && !isAtCinema && <MovieEndCard runtime={tmdbDetails?.runtime} />}
+        {filmUndecided && <MovieUndecidedTrack onRemove={removeUndecidedFilm} />}
         {canUseFilmMode && (filmState === 'active' || filmState === 'waiting' || filmState === 'programmed') && <div ref={filmTrackRef}><MovieDownloadTrack state={filmState} quality={filmItem?.quality} progress={Number(filmItem?.progress) || 0} timeleft={filmItem?.timeleft} waitingHint={filmItem ? availabilityHint(filmItem.availability) : undefined} onCancel={cancelFilm} /></div>}
 
         {tmdbDetails ? <DetailSynopsis text={tmdbDetails.overview || 'Aucun synopsis disponible.'} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} /> : <div className="space-y-2 animate-pulse" aria-hidden="true"><div className="h-3.5 w-full rounded bg-zinc-800/80" /><div className="h-3.5 w-4/5 rounded bg-zinc-800/80" /></div>}

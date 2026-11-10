@@ -64,3 +64,28 @@ export function MovieDownloadTrack({ state, quality, progress, timeleft, waiting
     </div>
   </section>;
 }
+
+/**
+ * Retour terrain du 10/11 sur la v1.4.289 (« pas de message clair que le film est dans mes téléchargements, comme
+ * pour les programmés ») : film présent dans Radarr, non surveillé et sans fichier (« À décider »,
+ * SEENIT-DOWNLOAD-023). La fiche le dit ; ⬇ le télécharge, « Retirer » le sort de Radarr (fichiers gardés).
+ */
+export function MovieUndecidedTrack({ onRemove }: { onRemove: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const remove = async () => {
+    setBusy(true);
+    try { await onRemove(); } finally { setBusy(false); }
+  };
+  return <section aria-label="Film dans tes téléchargements" data-film-track="undecided" className="rounded-[20px] bg-[#141417] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.07)]">
+    <div className="flex items-center gap-3 px-3.5 py-3">
+      <span aria-hidden="true" className="w-[42px] h-[42px] shrink-0 rounded-[10px] grid place-items-center bg-zinc-800 text-zinc-100"><DownloadMark size={22} /></span>
+      <div className="flex-1 min-w-0">
+        <strong className="block text-[15px] font-extrabold text-white">Dans Radarr · à décider</strong>
+        <small className="block text-[13px] font-bold text-zinc-300">Ni téléchargé ni programmé : télécharge-le ou retire-le.</small>
+      </div>
+      <button type="button" disabled={busy} onClick={() => void remove()} className="min-h-11 px-2.5 rounded-xl text-[13.5px] font-bold flex items-center gap-1.5 text-zinc-300 disabled:opacity-60">
+        {busy && <Loader2 size={15} className="animate-spin" />}Retirer
+      </button>
+    </div>
+  </section>;
+}

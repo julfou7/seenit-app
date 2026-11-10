@@ -41,3 +41,13 @@ export const undecidedReason = (title: Pick<ArrPendingTitle, 'kind' | 'monitored
   ? 'Film non surveillé, sans fichier'
   // Revue Codex #933 : hors calendrier et hors première page des recherchés ne prouve pas « aucun épisode attendu ».
   : title.monitored ? 'Série surveillée, sans fichier' : 'Série non surveillée, sans fichier';
+
+/**
+ * Retour terrain du 10/11 sur la v1.4.289 (« un film à décider ne disparaît pas après arbitrage ») : télécharger
+ * une version d'un film déjà dans Radarr ne le rend pas « surveillé » ; il restait « À décider » pendant le
+ * téléchargement. Un titre présent dans la file du client (en cours, en attente, à régler ou terminé, jamais un
+ * annulé) est déjà visible dans Télécharger : il quitte « À décider ». Identité TMDB exacte, jamais le titre.
+ */
+export function undecidedOutsideQueue(undecided: readonly ArrPendingTitle[], queued: ReadonlySet<string>): ArrPendingTitle[] {
+  return undecided.filter(title => !(Number(title.tmdbId) > 0 && queued.has(`${title.kind === 'movie' ? 'movie' : 'tv'}:${Number(title.tmdbId)}`)));
+}

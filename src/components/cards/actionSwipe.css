@@ -1,10 +1,9 @@
-/* Geste de l'accueil réutilisable (ActionSwipeCard) : mêmes tuiles, même décalage, même ✕ que `.home-swipe`
-   (watchListHome.css). La carte se décale de la largeur de ses tuiles (78 px chacune, 4 px d'écart). */
+/* Geste de l'accueil réutilisable (ActionSwipeCard) : mêmes tuiles et même décalage que `.home-swipe`
+   (watchListHome.css) ; pas de ✕ (retour terrain du 10/11) : toucher la carte, glisser à droite ou Échap referment. La carte se décale de la largeur de ses tuiles (78 px chacune, 4 px d'écart). */
 .action-swipe { position:relative; overflow:hidden; border-radius:22px; touch-action:pan-y; }
 .action-swipe__card { position:relative; transition:transform .25s; }
 .action-swipe--open .action-swipe__card { transform:translateX(calc(-1 * var(--action-swipe-shift, 86px))); }
 .action-swipe__actions { position:absolute; right:0; top:var(--action-swipe-top, 0px); bottom:0; display:flex; align-items:stretch; gap:4px; }
 .action-swipe__actions button { width:78px; border-radius:14px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; background:#e5a93d26; color:#f2c36b; font-size:11px; font-weight:800; cursor:pointer; }
 .action-swipe__actions button[data-tone=rose] { background:#fb718526; color:#fda4af; }
-.action-swipe__close { position:absolute; top:0; right:0; z-index:3; width:44px; height:44px; display:grid; place-items:center; color:#d4d4d8; border-radius:50%; background:#18181be6; cursor:pointer; }
 @media (prefers-reduced-motion:reduce) { .action-swipe__card { transition:none; } }

@@ -7,7 +7,7 @@ import { episodePresenceKey } from '../features/downloads/episodePresenceKey';
 
 /** Champs d'un épisode Sonarr lus par la présence (#879, typés au lieu de `any`). */
 type SonarrEpisodeLike = { seasonNumber: number; episodeNumber: number; hasFile?: boolean; monitored?: boolean };
-type RadarrMovieLike = { tmdbId?: number | string; imdbId?: string; hasFile?: boolean; monitored?: boolean };
+type RadarrMovieLike = { id?: number; tmdbId?: number | string; imdbId?: string; hasFile?: boolean; monitored?: boolean };
 type SonarrSeriesLike = { id?: number; tvdbId?: number | string; tmdbId?: number | string; imdbId?: string; monitored?: boolean };
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../lib/firebase';
@@ -23,6 +23,12 @@ export interface MediaPresenceData {
   episodesMonitored?: Record<string, boolean>;
   /** Maquette DlFilm — film surveillé par Radarr sans fichier : programmé pour sa sortie. */
   radarrMonitored?: boolean;
+  /**
+   * Retour terrain du 10/11 (SEENIT-DOWNLOAD-023) : film présent dans Radarr, non surveillé et sans fichier —
+   * « À décider ». La fiche le dit, comme un film programmé ; `radarrMovieId` sert au retrait (même serveur).
+   */
+  radarrUndecided?: boolean;
+  radarrMovieId?: number;
   plexInfo?: PlexMediaInfo;
   lastChecked: number;
 }
@@ -139,6 +145,8 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
 
     let radarrHasFile = false;
     let radarrMonitored = false;
+    let radarrUndecided = false;
+    let radarrMovieId: number | undefined;
     let sonarrHasFile = false;
     const seasonsHasFile: Record<number, boolean> = {};
     const episodesHasFile: Record<string, boolean> = {};
@@ -171,6 +179,8 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
           if (match) {
             radarrHasFile = !!match.hasFile;
             radarrMonitored = match.monitored === true && !match.hasFile;
+            radarrUndecided = match.monitored !== true && !match.hasFile;
+            radarrMovieId = Number(match.id) > 0 ? Number(match.id) : undefined;
           }
         }
       } catch {
@@ -251,6 +261,8 @@ export const useMediaPresenceStore = create<MediaPresenceStore>((set, get) => ({
       episodesHasFile: downloadsEnabled ? episodesHasFile : {},
       episodesMonitored: downloadsEnabled ? episodesMonitored : {},
       radarrMonitored: downloadsEnabled ? radarrMonitored : false,
+      radarrUndecided: downloadsEnabled ? radarrUndecided : false,
+      ...(downloadsEnabled && radarrMovieId ? { radarrMovieId } : {}),
       plexInfo,
       lastChecked: now
     };

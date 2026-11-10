@@ -15,6 +15,7 @@ const bundle = await build({ entryPoints: ['src/features/downloads/arrCoverage.t
 type Pending = { kind: 'series' | 'movie'; key: string; arrId: number; tmdbId?: number; title: string; date: number; monitored: boolean; episodes?: []; release?: Record<string, unknown>; profileId?: number };
 type Programmed = { kind: string; id: number; seriesId?: number; title?: string; date?: string; wanted?: boolean; quality?: string };
 const coverage = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`) as {
+  undecidedOutsideQueue: (undecided: Pending[], queued: ReadonlySet<string>) => Pending[];
   coverArrLibrary: (programmed: { items: Programmed[]; failures: string[]; movieQuality?: (id?: number) => string | undefined }, pending: Pending[], now: number) => { programmed: { items: Programmed[]; failures: string[] }; undecided: Pending[] };
   undecidedReason: (title: Pending) => string;
 };
@@ -57,4 +58,24 @@ test('SEENIT-DOWNLOAD-023 aucun titre de Sonarr/Radarr invisible : Programmés o
   assert.doesNotMatch(rail, /keepAwaited/);
   assert.match(rail, /const keptVisible = undecided && outcome === 'kept';\n\s+if \(!keptVisible\) \{/);
   assert.match(rail, /keptVisible \? 'Gardée dans Sonarr · des épisodes y sont encore attendus'/);
+});
+
+// Retour terrain du 10/11 sur la v1.4.289 : « un film à décider ne disparaît pas après arbitrage ».
+test('SEENIT-DOWNLOAD-023 un titre dans la file du client quitte « À décider », par identité TMDB exacte', () => {
+  const dog: Pending = { kind: 'movie', key: 'm42', arrId: 42, tmdbId: 1100, title: "A Dog's Perfect Christmas", date: 1, monitored: false };
+  const series: Pending = { kind: 'series', key: 's10', arrId: 10, tmdbId: 555, title: 'Sans fichier', date: 2, monitored: false };
+  assert.deepEqual(coverage.undecidedOutsideQueue([dog, series], new Set(['movie:1100'])).map(title => title.key), ['s10'], 'film en téléchargement : visible dans En cours, plus dans À décider');
+  assert.deepEqual(coverage.undecidedOutsideQueue([dog, series], new Set(['tv:1100', 'movie:555'])).map(title => title.key), ['m42', 's10'], 'jamais un autre type au même identifiant');
+  assert.deepEqual(coverage.undecidedOutsideQueue([{ ...dog, tmdbId: undefined }], new Set(['movie:0'])).map(title => title.key), ['m42'], 'sans TMDB : jamais retiré par erreur');
+  const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
+  assert.match(screen, /undecidedOutsideQueue\(undecidedInSync, new Set\(downloads\s+\.filter\(item => downloadGroup\(item\) !== 'cancelled' && Number\(item\.tmdbId\) > 0\)/, 'un annulé ne couvre rien : le titre revient « À décider »');
+  // La fiche film dit « Dans Radarr · à décider » et relit l'identifiant sur le serveur actuel avant de retirer.
+  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  assert.match(view, /const filmUndecided = canUseFilmMode && filmState === 'idle' && !movieAvailable && model\.presence\.radarrUndecided === true;/);
+  assert.match(view, /checkPresence\(\{ tmdbId: effectiveTmdbId, mediaType: 'movie', forceRefresh: true \}\);\n\s+const arrId = Number\(fresh\?\.radarrMovieId\);/);
+  // Revue Codex #938 : la portée capturée avant la lecture doit être identique au moment du retrait.
+  assert.match(view, /const scope = arrSyncKey\(\);\n\s+try \{/);
+  assert.match(view, /if \(arrSyncKey\(\) !== scope\) \{ toast\(\{ title, action: 'La configuration a changé : rien n’a été retiré\.'[^\n]*\n\s+await removeRecentImport\(/, 'aucun DELETE si le compte ou le serveur a changé pendant la lecture');
+  assert.match(readFileSync('src/screens/mediaDetail/movieDownloadMode.tsx', 'utf8'), /Dans Radarr · à décider/);
+  assert.match(readFileSync('src/store/mediaPresenceStore.ts', 'utf8'), /radarrUndecided = match\.monitored !== true && !match\.hasFile;/);
 });
