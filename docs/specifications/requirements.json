@@ -3901,6 +3901,20 @@
           "contains": "SEENIT-DISCOVER-007 #853 le filtre d’âge résout en avance les âges de la page suivante"
         }
       ]
+    },
+    {
+      "id": "SEENIT-NOTIFICATION-010",
+      "title": "Dates et heures traçables de la boîte Notifications par UID",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/notificationNoticeTime.test.ts",
+          "contains": "SEENIT-NOTIFICATION-010 les notifications gardent leur heure réelle et les cartes calculées leur première apparition"
+        }
+      ]
     }
   ]
 }

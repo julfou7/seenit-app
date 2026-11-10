@@ -3,6 +3,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { readUserScopedJson, writeUserScopedJson } from '../../lib/userIsolation';
 import type { Show } from '../../types';
+import { isValidNoticeTime } from './notificationNoticeTime';
 export const NOTIFICATION_INBOX_FIELD = 'notification_inbox_v1';
 export interface InboxNotification { id: string; title: string; body: string; data: Record<string, unknown>; receivedAt: number }
 export async function rememberNotification(uid: string | null | undefined, raw: { id?: unknown; title?: unknown; body?: unknown; data?: unknown; extra?: unknown }) {
@@ -19,8 +20,11 @@ export async function rememberNotification(uid: string | null | undefined, raw: 
       if (owner.ownerUidHash !== hash) return;
     } catch { return; }
   }
-  const item = { id: String(raw.id || `${raw.title}:${raw.body || ''}`), title: String(raw.title), body: String(raw.body || ''), data: Object.fromEntries(Object.entries(owner).filter(([key]) => ['showId','tmdbId','mediaType','season','episode','releasedSeason','releasedEpisode','type','notificationScope'].includes(key))), receivedAt: Date.now() };
+  const id = String(raw.id || `${raw.title}:${raw.body || ''}`);
   const previous = readUserScopedJson<InboxNotification[]>(uid, NOTIFICATION_INBOX_FIELD, []);
+  const original = previous.find(entry => entry.id === id);
+  const receivedAt = isValidNoticeTime(original?.receivedAt) ? original.receivedAt : Date.now();
+  const item = { id, title: String(raw.title), body: String(raw.body || ''), data: Object.fromEntries(Object.entries(owner).filter(([key]) => ['showId','tmdbId','mediaType','season','episode','releasedSeason','releasedEpisode','type','notificationScope'].includes(key))), receivedAt };
   writeUserScopedJson(uid, NOTIFICATION_INBOX_FIELD, [item, ...previous.filter(entry => entry.id !== item.id && !(item.data.notificationScope === 'media' && entry.data.notificationScope === 'media' && item.data.showId && String(entry.data.showId) === String(item.data.showId) && entry.data.mediaType === item.data.mediaType))].slice(0, 100));
 }
 export async function collectDeliveredNotifications(uid: string, currentUid: () => string | undefined, shows: readonly Show[]) {
