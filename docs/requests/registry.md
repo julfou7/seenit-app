@@ -232,3 +232,6 @@ Complément USR-2026-10-30-001 (retours du 30/10) : journées de plus de 24 h (i
 | USR-2026-11-09-021 | 2026-11-09 | Téléchargement en cours : « une flèche plutôt que les 3 petits points ; la vitesse est toute seule en dessous, trop de place perdue » ; design validé avec la barre centrée entre le bas de l'image et le bas de la carte. | SEENIT-DOWNLOAD-024 | active |
 | USR-2026-11-09-022 | 2026-11-09 | « Titre de la notif Plex en anglais également. » | SEENIT-DOWNLOAD-022 | active |
 | USR-2026-11-09-023 | 2026-11-09 | « Un film unmonitored restera orphelin également, il doit être visible. Et je déciderai dans SeenIt quoi en faire. » | SEENIT-DOWNLOAD-023 | active |
+| USR-2026-11-10-001 | 2026-11-10 | « Un film à décider ne disparaît pas après arbitrage. » — un titre dans la file du client quitte « À décider ». | SEENIT-DOWNLOAD-023 | active |
+| USR-2026-11-10-002 | 2026-11-10 | « Pas de message clair que le film est dans mes téléchargements, comme pour les programmés. » — la fiche film dit « Dans Radarr · à décider ». | SEENIT-DOWNLOAD-023 | active |
+| USR-2026-11-10-003 | 2026-11-10 | « Pour le swipe à droite, virer la petite croix en haut, c'est moche. » | SEENIT-DOWNLOAD-024 | active |

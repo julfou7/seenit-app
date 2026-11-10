@@ -942,6 +942,8 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   ni téléchargés ni programmés (film non surveillé sans fichier, série sans épisode au calendrier), avec leur raison ;
   toucher l'affiche ouvre la fiche, « Retirer » les sort de Radarr/Sonarr. Un film surveillé sans date proche
   rejoint Programmés (« Date à venir »).
+  Depuis la v1.4.290 : un titre en cours de téléchargement quitte « À décider » ; la fiche d'un film « À décider »
+  affiche « Dans Radarr · à décider » avec « Retirer ».
 - Section **Programmés** : ce que Sonarr et Radarr récupéreront à la sortie, lu dans leur calendrier
   (120 jours) — épisodes et films surveillés, sans fichier, dont la série est surveillée — regroupés par
   série (identifiant Sonarr exact). Depuis la v1.4.280, chaque carte a une méta grise courte (« Film ·
@@ -968,7 +970,8 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   français, comme dans le reste de l'app ; Sonarr/Radarr ne servent qu'en repli.
 - Carte **En cours** v2 (v1.4.289, `SEENIT-DOWNLOAD-024`) : flèche au lieu de « … », une ligne « 86 % · 67,9 Mo/s ·
   ≈ 21 s » sous la barre, centrée entre le bas de l'affiche et le bas de la carte ; déplié : langues, reçu et
-  « Annuler le téléchargement ». Glisser à gauche (geste de l'accueil) montre la tuile « Annuler » et ✕.
+  « Annuler le téléchargement ». Glisser à gauche (geste de l'accueil) montre la tuile « Annuler » ; depuis la
+  v1.4.290, plus de ✕ (accueil compris) : toucher la carte, glisser à droite ou Échap referment.
 - Les notifications de téléchargement (« Import Plex terminé », envoi au client) affichent le titre français de la
   fiche (v1.4.289, `SEENIT-DOWNLOAD-022`).
 - Un swipe droit supprime une entrée d'historique ou demande confirmation pour annuler un actif.

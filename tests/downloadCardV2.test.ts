@@ -30,6 +30,9 @@ test('SEENIT-DOWNLOAD-024 carte En cours v2 : flèche, ligne de progression uniq
   assert.match(read('src/components/cards/HomeSwipeCard.tsx'), /<ActionSwipeCard base="home-swipe" ignore="button:not\(\.series-8f__open\),a,input"/);
   const swipe = read('src/components/cards/ActionSwipeCard.tsx');
   assert.match(swipe, /if \(Math\.abs\(dx\) > 52 && Math\.abs\(dx\) > Math\.abs\(dy\) \* 1\.5\) \{ moved\.current = true; setOpen\(dx < 0\); \}/, 'mêmes seuils que l’accueil');
-  assert.match(swipe, /aria-label="Fermer les actions"/);
+  // Retour terrain du 10/11 : plus de ✕ (« c'est moche ») ; toucher la carte, glisser à droite ou Échap referment.
+  assert.doesNotMatch(swipe, /Fermer les actions|__close/);
+  assert.doesNotMatch(read('src/components/cards/actionSwipe.css') + read('src/screens/watchListHome.css'), /swipe__close/);
+  assert.match(swipe, /if \(performance\.now\(\) >= ignoreClickUntil\.current\) setOpen\(false\);/, 'toucher la carte referme');
   assert.match(swipe, /event\.key === 'Escape' && open/);
 });
