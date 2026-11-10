@@ -20,8 +20,8 @@ test('SEENIT-NOTIFICATION-010 les notifications gardent leur heure réelle et le
 
 test('SEENIT-NOTIFICATION-010 purge les timestamps invalides, borne les anciennes cartes et ne partage aucun UID', () => {
   const now = Date.parse('2026-11-10T18:13:00Z');
-  const dates = { a: now - 60_000, b: now + 900_000, c: Number.NaN };
-  const result = reconcileFirstSeen(dates, ['a', 'b', 'new'], now, 2);
+  const dates = { old: now - 120_000, a: now - 60_000, b: now + 900_000, c: Number.NaN };
+  const result = reconcileFirstSeen(dates, ['b', 'new'], now, 2);
   assert.deepEqual(result.times, { b: now, new: now }, 'un timestamp invalide ne devient jamais une heure réelle');
   assert.equal(result.changed, true);
   const source = readFileSync('src/components/HomeNotifications.tsx', 'utf8');
