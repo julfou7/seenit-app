@@ -284,7 +284,11 @@ de synchronisation et ouvre les Notifications avec une cloche et un point or si 
 c’est une page plein écran au contrat des Réglages (navigation conservée, Retour) qui réunit les
 preuves Plex en cache, rappels du jour, téléchargements terminés, dates films confirmées, actualités
 et mise à jour. Titres de films/séries en or ; une notification non lue a un fond plein et un point or
-sur son image. Aucun bouton par notification : toucher ouvre la fiche et marque lu, glisser vers la
+sur son image. Chaque carte porte sous son message une date et une heure locales : « Reçue le »
+pour la notification système conservée dans l'inbox, « Repérée le » pour la première apparition
+locale d'une carte calculée (Plex, rappel, téléchargement, news ou version). La première apparition
+est enregistrée par UID et identifiant de carte, bornée et stable après une réouverture ; elle
+n'est ni présentée comme la date de diffusion, ni déduite du dernier rafraîchissement Plex. Aucun bouton par notification : toucher ouvre la fiche et marque lu, glisser vers la
 droite retire (action Retirer focalisable pour le clavier/TalkBack). Retirer la dernière notification,
 Tout marquer lu ou changer d'onglet ferme la page. Tout marquer lu conserve l’état par compte ; les actualités réutilisent
 les préférences cloud existantes. Marquer Vu se fait depuis la fiche du média.

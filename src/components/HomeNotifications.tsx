@@ -15,6 +15,7 @@ import { getTodayStr } from '../lib/utils';
 import { receivedEpisode, releaseReminderAlreadyReceived } from '../features/notifications/notificationDedup';
 import { useToastStore } from '../store/toastStore';
 import type { Notice } from './HomeNotificationsPage';
+import { NOTICE_FIRST_SEEN_FIELD, isValidNoticeTime, reconcileFirstSeen } from '../features/notifications/notificationNoticeTime';
 
 interface News { id: string; showId: string; message: string; description?: string }
 // Chargée à la première ouverture : la page (cadre Réglages, cartes, glissement) reste hors du chargement d'À voir.
@@ -33,6 +34,7 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
   const [downloads, setDownloads] = useState<LiveDownloadItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [clock, setClock] = useState(() => Date.now());
+  const [firstSeen, setFirstSeen] = useState<{ uid: string | null; times: Record<string, number> }>({ uid: null, times: {} });
   const plex = usePlexAvailabilityStore(state => state.cache);
   const downloadsEnabled = useDownloadConfigStore(state => state.downloadsEnabled);
   const release = useUpdateStore(state => state.latestRelease);
@@ -113,11 +115,23 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
   }
   for (const item of received) {
     const show = userShows.find(show => String(show.id) === String(item.data.showId) || Number(show.tmdbId) === Number(item.data.tmdbId) && show.mediaType === (item.data.mediaType || 'tv'));
-    if (show) notices.push({ id: `received:${item.id}`, title: show.title, detail: formatNotificationEpisodeCodes(item.body), show, episode: show.mediaType === 'tv' ? receivedEpisode(item) : undefined });
+    if (show) notices.push({ id: `received:${item.id}`, title: show.title, detail: formatNotificationEpisodeCodes(item.body), show, receivedAt: item.receivedAt, episode: show.mediaType === 'tv' ? receivedEpisode(item) : undefined });
   }
   if (hasUpdate && release) notices.unshift({ id: `update:${release.version}`, title: `SeenIt ${release.version}`, detail: 'Une mise à jour est disponible', update: true });
+  // Le temps d'une carte calculée est sa première apparition dans la boîte pour cet UID,
+  // jamais la date TMDB, le dernier polling Plex ou une réception native inventée.
+  const firstSeenIds = notices.filter(notice => !isValidNoticeTime(notice.receivedAt)).map(notice => notice.id).join('\u001f');
+  useEffect(() => {
+    if (!uid) { setFirstSeen({ uid: null, times: {} }); return; }
+    const stored = readUserScopedJson<Record<string, number>>(uid, NOTICE_FIRST_SEEN_FIELD, {});
+    const { times, changed } = reconcileFirstSeen(stored, firstSeenIds ? firstSeenIds.split('\u001f') : [], Date.now());
+    if (auth.currentUser?.uid !== uid) return;
+    if (changed) writeUserScopedJson(uid, NOTICE_FIRST_SEEN_FIELD, times);
+    setFirstSeen({ uid, times });
+  }, [uid, firstSeenIds]);
   const isRead = (notice: Notice) => read.includes(notice.id) || Boolean(notice.newsId && readNews.includes(notice.newsId));
-  const visibleNotices = notices.filter(notice => !dismissed.includes(notice.id));
+  const visibleNotices = notices.filter(notice => !dismissed.includes(notice.id))
+    .map(notice => ({ ...notice, firstSeenAt: firstSeen.uid === uid ? firstSeen.times[notice.id] : undefined }));
   const unread = visibleNotices.filter(notice => !isRead(notice));
   const hadVisibleNotices = useRef(false);
   useEffect(() => {
