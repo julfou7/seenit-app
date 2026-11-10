@@ -1,4 +1,4 @@
-import { notifyArrWrite } from '../store/arrSyncStore';
+import { arrSyncKey, notifyArrWrite } from '../store/arrSyncStore';
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
@@ -196,12 +196,15 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const removeUndecidedFilm = async () => {
     const toast = useToastStore.getState().showToast;
     const media = { tmdbId: Number(effectiveTmdbId), mediaType: 'movie' as const };
+    // Revue Codex #938 : portée (compte + serveur Radarr) capturée avant la lecture et revérifiée avant le retrait.
+    const scope = arrSyncKey();
     try {
       // Identifiant relu sur le serveur actuel juste avant le retrait (jamais une copie d'un autre serveur).
       const { useMediaPresenceStore } = await import('../store/mediaPresenceStore');
       const fresh = await useMediaPresenceStore.getState().checkPresence({ tmdbId: effectiveTmdbId, mediaType: 'movie', forceRefresh: true });
       const arrId = Number(fresh?.radarrMovieId);
       if (!fresh?.radarrUndecided || !(arrId > 0)) { notifyArrWrite(media); return; }
+      if (arrSyncKey() !== scope) { toast({ title, action: 'La configuration a changé : rien n’a été retiré.', posterPath: show?.posterPath, media }, 'info'); notifyArrWrite(media); return; }
       await removeRecentImport(useDownloadConfigStore.getState(), { kind: 'movie', key: `m${arrId}`, arrId, tmdbId: media.tmdbId, title, date: 0 });
       notifyArrWrite(media);
       toast({ title, action: 'Retiré de Radarr', posterPath: show?.posterPath, media }, 'info');

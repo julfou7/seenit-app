@@ -73,6 +73,9 @@ test('SEENIT-DOWNLOAD-023 un titre dans la file du client quitte « À décider 
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.match(view, /const filmUndecided = canUseFilmMode && filmState === 'idle' && !movieAvailable && model\.presence\.radarrUndecided === true;/);
   assert.match(view, /checkPresence\(\{ tmdbId: effectiveTmdbId, mediaType: 'movie', forceRefresh: true \}\);\n\s+const arrId = Number\(fresh\?\.radarrMovieId\);/);
+  // Revue Codex #938 : la portée capturée avant la lecture doit être identique au moment du retrait.
+  assert.match(view, /const scope = arrSyncKey\(\);\n\s+try \{/);
+  assert.match(view, /if \(arrSyncKey\(\) !== scope\) \{ toast\(\{ title, action: 'La configuration a changé : rien n’a été retiré\.'[^\n]*\n\s+await removeRecentImport\(/, 'aucun DELETE si le compte ou le serveur a changé pendant la lecture');
   assert.match(readFileSync('src/screens/mediaDetail/movieDownloadMode.tsx', 'utf8'), /Dans Radarr · à décider/);
   assert.match(readFileSync('src/store/mediaPresenceStore.ts', 'utf8'), /radarrUndecided = match\.monitored !== true && !match\.hasFile;/);
 });
