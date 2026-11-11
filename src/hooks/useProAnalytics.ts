@@ -85,17 +85,18 @@ const isDirectingJob = (jobValue: string) => {
     || job === 'showrunner';
 };
 
-const toPersonContribution = (person: any): AnalyticsPersonContribution => ({
+interface PersonSource { id?: unknown; name?: unknown; profile_path?: unknown; popularity?: unknown }
+const toPersonContribution = (person: PersonSource): AnalyticsPersonContribution => ({
   id: Number(person.id),
-  name: person.name || '',
-  profile_path: person.profile_path || null,
+  name: typeof person.name === 'string' ? person.name : '',
+  profile_path: typeof person.profile_path === 'string' && person.profile_path ? person.profile_path : null,
   popularity: Number(person.popularity) || 0,
 });
 
 const extractAnalyticsContribution = (show: Show, details: any): AnalyticsMediaContribution => {
   const genres = Array.from(new Set<string>(
     (Array.isArray(details?.genres) ? details.genres : [])
-      .map((genre: any) => String(genre?.name || '').trim())
+      .map((genre: { name?: unknown } | null) => String(genre?.name || '').trim())
       .filter((name: string) => name.length > 0),
   ));
 
@@ -194,6 +195,10 @@ export function useProAnalytics(shows: Show[], libraryReady = true) {
   });
   const [loading, setLoading] = useState(false);
   const data = ownedData?.uid === uid ? ownedData.data : null;
+  // Revue Codex #944 : genres et acteurs de chaque titre vu, persistés avec le snapshot, pour que Mes chiffres
+  // ne dépende pas des caches de détails bornés à 80 entrées.
+  const [ownedContributions, setOwnedContributions] = useState<{ uid: string; value: ProfileAnalyticsSnapshot['contributions'] } | null>(null);
+  const contributions = ownedContributions?.uid === uid ? ownedContributions.value : null;
 
   useEffect(() => {
     let isMounted = true;
@@ -257,6 +262,7 @@ export function useProAnalytics(shows: Show[], libraryReady = true) {
       });
       const { snapshot } = reconciliation;
       writeSnapshotCache(uid, snapshot);
+      if (isMounted) setOwnedContributions({ uid, value: { ...snapshot.contributions } });
 
       const resultCacheKey = `${uid}:${snapshot.signature}`;
       const exactResult = analyticsResultCache.get(resultCacheKey);
@@ -349,6 +355,7 @@ export function useProAnalytics(shows: Show[], libraryReady = true) {
 
       if (!isMounted) return;
       setLoading(false);
+      setOwnedContributions({ uid, value: { ...snapshot.contributions } });
       if (failedMetadataKeys.size === 0) {
         setOwnedData({ uid, data: snapshot.data });
         persistCompleteDisplayBaseline(snapshot);
@@ -367,5 +374,5 @@ export function useProAnalytics(shows: Show[], libraryReady = true) {
     return () => { isMounted = false; };
   }, [uid, shows, libraryReady]);
 
-  return { data, loading };
+  return { data, loading, contributions };
 }

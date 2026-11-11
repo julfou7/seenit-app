@@ -3,6 +3,7 @@ import { ChevronDown, Loader2 } from 'lucide-react';
 import { useProAnalytics } from '../hooks/useProAnalytics';
 import { type Show } from '../types';
 import { tmdb } from '../features/shows/tmdb';
+import { getProfileAnalyticsMediaKey } from '../features/profile/profileAnalyticsSnapshot';
 import {
   PROFILE_MONTH_LABELS,
   PROFILE_WEEKDAY_LABELS,
@@ -62,7 +63,7 @@ export function ProAnalyticsDashboard({
   onPersonClick?: (personId: number) => void;
   onFate?: () => void;
 }) {
-  const { data, loading } = useProAnalytics(shows, libraryReady);
+  const { data, loading, contributions } = useProAnalytics(shows, libraryReady);
   const { viewings, imports } = useMemo(() => partitionProfileViewings(collectProfileViewings(shows)), [shows]);
   const yearTotals = useMemo(() => listProfileYearTotals(viewings), [viewings]);
   const [pickedYear, setPickedYear] = useState<number | null>(null);
@@ -72,10 +73,20 @@ export function ProAnalyticsDashboard({
   const stats = useMemo(() => buildProfileYearStats(viewings, year), [viewings, year]);
   const yearViewings = useMemo(() => viewings.filter(viewing => new Date(viewing.watchedAt).getFullYear() === year), [viewings, year]);
   const showsById = useMemo(() => new Map(shows.map(show => [show.id, show])), [shows]);
+  // Revue Codex #944 : genres et rôles principaux viennent des contributions persistées des statistiques (tous les
+  // titres vus) ; les caches de détails ne servent qu'en repli pour un titre pas encore réconcilié.
   const details = (show: Show | undefined) => show?.tmdbId ? tmdb.peekRenderableMediaDetails(show.tmdbId, show.mediaType) : null;
+  const contributionOf = (show: Show | undefined) => show ? contributions?.[getProfileAnalyticsMediaKey(show)]?.value ?? null : null;
   const genreOf = (showId: string) => {
-    const genres = (details(showsById.get(showId)) as { genres?: { name?: string }[] } | null)?.genres;
+    const show = showsById.get(showId);
+    const known = contributionOf(show)?.genres.find(Boolean);
+    if (known) return known;
+    const genres = (details(show) as { genres?: { name?: string }[] } | null)?.genres;
     return genres?.find(genre => genre?.name)?.name ?? null;
+  };
+  const leadsOf = (show: Show) => {
+    const actors = contributionOf(show)?.actors;
+    return actors?.length ? actors.slice(0, 3).map(actor => ({ id: actor.id, name: actor.name, profile_path: actor.profile_path })) : leadCastFromDetails(details(show), show.mediaType);
   };
   const rhythm = useMemo(() => buildProfileRhythm(viewings, now), [viewings]);
   const typicalDay = useMemo(() => buildTypicalDay(yearViewings), [yearViewings]);
@@ -84,7 +95,7 @@ export function ProAnalyticsDashboard({
   const insights = buildProfileInsights(viewings, now, genreOf);
   const genres = buildGenreShares(yearViewings, now, genreOf);
   const reactions = useMemo(() => buildProfileReactions(shows), [shows]);
-  const leads = buildLeadActors(yearViewings, shows, show => leadCastFromDetails(details(show), show.mediaType));
+  const leads = buildLeadActors(yearViewings, shows, leadsOf);
   const fallbackLeads = data?.topActors.slice(0, 3) ?? [];
   const badges = useMemo(() => data ? buildTieredBadges({
     centenaire: data.totalEpisodesSeen + data.totalMoviesSeen,

@@ -147,6 +147,10 @@ test('SEENIT-PROFILE-005 animations une fois à l’entrée, sur transform et op
   const dial = read('src/components/profile/MonthDial.tsx');
   assert.match(dial, /aria-pressed=\{picked === month\}/);
   assert.match(dial, /setPicked\(current => current === month \? null : month\)/);
+  const dashboard = read('src/components/ProAnalyticsDashboard.tsx');
+  assert.match(dashboard, /const \{ data, loading, contributions \} = useProAnalytics\(shows, libraryReady\)/);
+  assert.match(dashboard, /contributions\?\.\[getProfileAnalyticsMediaKey\(show\)\]\?\.value/, 'genres et têtes d’affiche sur tous les titres vus (revue Codex #944)');
+  assert.match(read('src/hooks/useProAnalytics.ts'), /return \{ data, loading, contributions \};/);
   assert.match(dial, /left: `\$\{\(x \/ 322 \* 100\)\.toFixed\(2\)\}%`/, 'les mois suivent un cadran rétréci (revue Codex #944)');
   assert.match(css, /\.moi-dial\{position:relative;width:min\(322px,100%\);aspect-ratio:1\}/);
   assert.match(read('src/screens/ProfileScreen.tsx'), /next\.kind !== 'home' && pageRef\.current\.kind === 'home'\) homeScroll\.current/, 'la position de Moi survit à un passage entre deux sous-pages');
