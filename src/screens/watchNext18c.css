@@ -166,6 +166,6 @@
 .movie-ticket--cinema .movie-ticket__stub > span,.movie-ticket--cinema .movie-ticket__stub > span { color:#f2c36b; }
 .movie-ticket--horizontal.movie-ticket--cinema .movie-ticket__stub { background:linear-gradient(#4a3a17,#2a210e); }
 /* Retour terrain v1.4.292 : affiche 88 × 132 (2:3), diffuseur posé en bas de l'affiche au lieu d'une ligne de texte. */
-.movie-ticket--horizontal,.movie-ticket--horizontal .movie-ticket__body,.movie-ticket--horizontal .movie-ticket__stub { min-height:132px; }
+.movie-ticket--horizontal,.movie-ticket--horizontal .movie-ticket__body,.movie-ticket--horizontal .movie-ticket__main,.movie-ticket--horizontal .movie-ticket__stub { min-height:132px; }
 .movie-ticket--horizontal .movie-ticket__poster { width:88px; min-height:132px; }
 .movie-ticket--horizontal .movie-ticket__provider { top:auto; right:auto; bottom:7px; left:6px; width:24px; height:24px; border-radius:6px; }

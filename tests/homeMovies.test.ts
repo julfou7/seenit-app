@@ -91,3 +91,15 @@ test('SEENIT-UX-022 revue Codex #943 : la preuve « en salle » survit au redém
   assert.match(card, /onEnrich: runtime && !missingProof \? undefined : enrich/);
   assert.match(card, /\(movieRuntime\(show, known\) && !needsCinemaProof\(known\)\)\) return;/);
 });
+
+test('SEENIT-UX-022 billet horizontal : affiche 88 × 132 au 2:3, diffuseur sur l’affiche, aucune hauteur à 150 px', () => {
+  const css = readFileSync(new URL('../src/screens/watchNext18c.css', import.meta.url), 'utf8');
+  const last = css.trim().split('\n').slice(-4).join('\n');
+  // Revue Codex #949 : la partie principale suit aussi les 132 px, sinon l'affiche s'étire à 150 px.
+  assert.match(last, /\.movie-ticket--horizontal \.movie-ticket__main,\.movie-ticket--horizontal \.movie-ticket__stub \{ min-height:132px; \}/);
+  assert.match(last, /\.movie-ticket--horizontal \.movie-ticket__poster \{ width:88px; min-height:132px; \}/);
+  assert.match(last, /\.movie-ticket--horizontal \.movie-ticket__provider \{[^}]*bottom:7px/);
+  const card = readFileSync(new URL('../src/components/cards/MovieTicketCard.tsx', import.meta.url), 'utf8');
+  assert.match(card, /\{rating\}\{providerBadge\}<\/div>/);
+  assert.doesNotMatch(card, /<span>\{countdown \? `Sortie le \$\{countdown\.date\}` : providerName/);
+});
