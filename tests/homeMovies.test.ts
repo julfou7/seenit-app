@@ -84,7 +84,7 @@ test('SEENIT-UX-022 revue Codex #943 : notes chargées pour toute la liste, Chez
 test('SEENIT-UX-022 revue Codex #943 : la preuve « en salle » survit au redémarrage, sinon le billet la recharge', async () => {
   const { createMediaDetailRenderSnapshot, MEDIA_DETAIL_RENDER_SCHEMA_VERSION } = await import('../src/features/shows/mediaDetailRenderSnapshot.ts');
   const snapshot = createMediaDetailRenderSnapshot({ id: 7, runtime: 115, release_dates: { results: [{ iso_3166_1: 'US', release_dates: [{ type: 3, release_date: '2026-10-01' }] }, { iso_3166_1: 'FR', release_dates: [{ type: 3, release_date: '2026-10-22T00:00:00.000Z', note: '', certification: '' }] }] } }, 'movie');
-  assert.equal(MEDIA_DETAIL_RENDER_SCHEMA_VERSION, 3);
+  assert.equal(MEDIA_DETAIL_RENDER_SCHEMA_VERSION, 4);
   assert.deepEqual(snapshot.release_dates, { results: [{ iso_3166_1: 'FR', release_dates: [{ type: 3, release_date: '2026-10-22T00:00:00.000Z' }] }] });
   assert.equal(createMediaDetailRenderSnapshot({ id: 8, name: 'Série' }, 'tv').release_dates, undefined);
   const card = read('src/components/cards/MovieTicketCard.tsx');

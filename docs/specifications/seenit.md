@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.292**
+Version applicative : **1.4.293**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1597,7 +1597,7 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
 - **SEENIT-PROFILE-002** — Devenir des séries commencées, calculé par une seule fonction partagée par Moi,
   Mes chiffres, Mon année et l'écran dédié : abandonnée (statut), terminée (statut ou série finie à jour),
   en pause (un épisode encore regardable et aucun épisode vu depuis 60 jours, `seriesPause` comme
-  l'accueil), en cours sinon ; les séries archivées non abandonnées et jamais commencées sont exclues.
+  l'accueil), en cours sinon ; les séries archivées ni finies ni abandonnées et les séries jamais commencées sont exclues.
   L'écran « Séries laissées en route » montre le constat (heures déjà passées, épisode médian de
   décrochage), « Où tu décroches » (avant l'épisode 3, en saison 1, en saison 2, saison 3 et après), les
   séries à trois épisodes ou moins de la fin, celles en pause puis abandonnées ; la phrase de survie au-delà
@@ -1631,7 +1631,20 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   sont des calques à ombre fixe dont seule l'opacité varie ; les anneaux de badge surgissent au lieu d'être
   tracés). En mouvement réduit tout s'affiche dans son état final ; Séries laissées en route et l'accueil
   n'ajoutent aucune animation.
+- **SEENIT-PROFILE-006** — Chiffres par période depuis l'inscription (retour terrain v1.4.292, #942). Mes
+  chiffres, Mon année et la carte « Ton année » de Moi lisent une seule portée de visionnages réels : rien avant
+  le jour de création du compte, aucun rattrapage (trois épisodes ou plus d'une même série marqués à moins de
+  cinq minutes d'écart, jamais les films) et aucune journée d'import de plus de 24 h. Le rattrapage n'est donc
+  jamais un marathon ni une journée record. Les totaux (épisodes, films, badges de volume) comptent tout ; une
+  note indique la date d'inscription et le nombre d'épisodes marqués d'un coup écartés. Une série finie compte
+  comme terminée même archivée, et la fin d'une série se lit aussi dans son statut TMDB.
+- **SEENIT-UX-023** — Statut de diffusion de la fiche série (régression de la refonte des fiches, #942). La
+  pastille de statut ouvre la rangée de pastilles : En diffusion et la date du prochain épisode quand il appartient
+  à la saison en cours, Renouvelée et la saison suivante datée (ou annoncée), En cours sans date annoncée, En
+  production, Prévue, Terminée ou Annulée. Le cache des fiches garde le dernier et le prochain épisode diffusés
+  pour que le statut s'affiche hors ligne.
 - **SEENIT-UX-022** — Films à voir ([handoff](../design/refonte-moi-films-explorer-2026-11-11.md), #942).
+  En liste horizontale, l'affiche fait 88 × 132 px (2:3) et porte le logo du diffuseur ; la ligne de texte du diffuseur disparaît.
   Trois tris remplacent la mention « Ajouts les plus récents » : Récents (défaut, ordre d'ajout de
   `SEENIT-UX-016`), Mieux notés (note TMDB décroissante, film sans note en dernier ; les notes manquantes
   sont lues dans le cache disque puis chez TMDB, deux à la fois) et Chez moi (films disponibles sur une

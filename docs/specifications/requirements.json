@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.292",
+  "applicationVersion": "1.4.293",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -4057,6 +4057,38 @@
         {
           "file": "tests/profileMoi.test.ts",
           "contains": "Moi · Mon année : titre de l’année et année en séries, sans film"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PROFILE-006",
+      "title": "Chiffres par période depuis l'inscription, sans rattrapage marqué d'un coup ni journée d'import",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-006 chiffres depuis l’inscription, sans rattrapage marqué d’un coup ni faux marathon"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-023",
+      "title": "Statut de diffusion de la fiche série en pastille, conservé par le cache des fiches",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/seriesAirStatus.test.ts",
+          "contains": "SEENIT-UX-023 statut réel de diffusion : en diffusion, renouvelée, en cours, terminée, annulée"
+        },
+        {
+          "file": "tests/seriesAirStatus.test.ts",
+          "contains": "SEENIT-UX-023 la fiche série affiche le statut en pastille et le cache des fiches garde les épisodes diffusés"
         }
       ]
     },

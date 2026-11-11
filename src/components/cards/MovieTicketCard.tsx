@@ -128,14 +128,16 @@ export const MovieTicketCard = React.memo(function MovieTicketCard({ actor = nul
     } catch { if (mounted.current) setError(true); }
     finally { inFlight.current = false; if (mounted.current) setPendingFrom(null); }
   }
+  // Retour terrain v1.4.292 : le diffuseur se pose sur l'affiche, la ligne gagnée rapproche l'affiche du 2:3.
+  const providerBadge = provider && <span className="movie-ticket__provider" role="img" aria-label={providerName || 'Diffuseur'} title={providerName || undefined}><img src={provider} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></span>;
   if (layout === 'horizontal') return <div ref={cardRef} className={`movie-ticket movie-ticket--horizontal${variant}${visibleWatched ? ' movie-ticket--watched' : ''}${phase ? ` movie-ticket--${phase.kind}` : ''}`} data-movie-ticket={show.id} style={{ '--ticket-hue': hue } as React.CSSProperties}>
     <div className="movie-ticket__body">
       <div className="movie-ticket__main">
         {poster && <img className="movie-ticket__ambient" src={poster} alt="" aria-hidden="true" loading="lazy" />}
         <div className="movie-ticket__tint" aria-hidden="true" />
         <button className="movie-ticket__open" type="button" aria-label={`Ouvrir ${show.title}, film${year ? ` de ${year}` : ''}`} onClick={() => onOpen(show.id, 'movie')} />
-        <div className="movie-ticket__poster"><span aria-hidden="true">{initials}</span>{poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" aria-hidden="true" loading="lazy" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}{rating}</div>
-        <div className="movie-ticket__info"><h3>{show.title}</h3><p className="movie-ticket__meta">{meta}</p>{actor && <MovieActorLine actor={actor} list onOpen={openActor} />}<p>{provider && <img src={provider} alt={providerName || 'Diffuseur'} title={providerName || undefined} loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}<span>{countdown ? `Sortie le ${countdown.date}` : providerName || (release.kind === 'cinema' ? 'En salle' : year)}</span></p></div>
+        <div className="movie-ticket__poster"><span aria-hidden="true">{initials}</span>{poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" aria-hidden="true" loading="lazy" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}{rating}{providerBadge}</div>
+        <div className="movie-ticket__info"><h3>{show.title}</h3><p className="movie-ticket__meta">{meta}</p>{actor && <MovieActorLine actor={actor} list onOpen={openActor} />}{countdown && <p><span>Sortie le {countdown.date}</span></p>}</div>
         {visibleWatched && <button type="button" className="movie-ticket__undo" aria-label={`Annuler le visionnage de ${show.title}`} disabled={pendingFrom !== null} onClick={toggle}><SeenItWatchedStamp screen className="movie-ticket__undo-stamp" /></button>}
       </div>
       <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span>{stubTop}</span><strong className={late ? 'movie-ticket__late' : undefined}>{stubValue}</strong></div>
@@ -150,7 +152,7 @@ export const MovieTicketCard = React.memo(function MovieTicketCard({ actor = nul
         {visibleWatched && <SeenItWatchedStamp key={phase?.sequence || 0} className="movie-ticket__stamp" />}
         {rating}
       </div>
-      {provider && <span className="movie-ticket__provider" role="img" aria-label={providerName || 'Diffuseur'} title={providerName || undefined}><img src={provider} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></span>}
+      {providerBadge}
       {canMark && <SeenItCheckButton glyph="screen" size={26} className="movie-ticket__check" error={error} isWatched={visibleWatched} pending={pendingFrom !== null} title={`Marquer ${show.title} comme ${watched ? 'non vu' : 'vu'}`} onClick={toggle} />}
       {visibleWatched && <button type="button" className="movie-ticket__undo" aria-label={`Annuler le visionnage de ${show.title}`} disabled={pendingFrom !== null} onClick={toggle}><SeenItWatchedStamp className="movie-ticket__undo-stamp" /></button>}
       <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span className={late ? 'movie-ticket__late' : undefined}>{stubTop}<strong>{stubValue}</strong></span>{countdown && <small>{countdown.date}</small>}</div>

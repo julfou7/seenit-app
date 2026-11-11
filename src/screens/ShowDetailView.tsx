@@ -35,6 +35,7 @@ import { MovieDownloadButton, MovieDownloadTrack, MovieUndecidedTrack, type Film
 import { removeRecentImport } from '../features/downloads/recentImports';
 import { downloadGroup } from '../features/downloads/downloadGroups';
 import { availabilityHint } from '../features/downloads/downloadAvailability';
+import { seriesAirStatus, type SeriesAirTone } from '../features/shows/seriesAirStatus';
 
 interface ShowDetailViewProps {
   model: ShowDetailViewModel;
@@ -46,7 +47,8 @@ const PreciseVersionPage = lazy(() => import('./mediaDetail/PreciseVersionPage')
 /** #879 — épisode coché en mode téléchargement ; `future` : à programmer pour sa sortie. */
 type PickedEpisode = { season: number; episode: number; future: boolean };
 
-const STATUS_LABELS: Record<string, string> = { Ended: 'Terminée', Canceled: 'Annulée', 'Returning Series': 'En cours', 'In Production': 'En production', 'Post Production': 'Post-production', Planned: 'Prévue', Pilot: 'Pilote', ended: 'Terminée', canceled: 'Annulée', returning: 'En cours' };
+// Retour terrain v1.4.292 : le statut de diffusion redevient une pastille lisible (SEENIT-UX-023).
+const AIR_TONE_CLASS: Record<SeriesAirTone, string> = { airing: 'text-emerald-300 shadow-[inset_0_0_0_1px_rgba(52,211,153,0.45)]', renewed: 'text-[#F2C36B] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.5)]', ongoing: 'text-sky-200', ended: 'text-zinc-300', canceled: 'text-rose-300 shadow-[inset_0_0_0_1px_rgba(251,113,133,0.45)]' };
 
 export function formatDuration(minutes?: number | null): string {
   if (!minutes || minutes <= 0) return '';
@@ -81,12 +83,12 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const genres: Array<{ id: number; name: string }> = frenchGenres(tmdbDetails?.genres); // « Reality » → « Téléréalité »
   const year = (tmdbDetails?.first_air_date || tmdbDetails?.release_date || show?.firstAirDate || '').slice(0, 4);
   const rawStatus = isSeries ? (tmdbDetails?.status || show?.status) : null;
-  const statusText = rawStatus ? STATUS_LABELS[rawStatus] || null : null;
+  const airStatus = isSeries ? seriesAirStatus(tmdbDetails) : null;
   const lastYear = (tmdbDetails?.last_air_date || '').slice(0, 4);
   const years = isSeries && year && lastYear && lastYear !== year && (rawStatus === 'Ended' || rawStatus === 'Canceled') ? `${year}–${lastYear}` : year;
   const seasonCount = tmdbDetails?.number_of_seasons || seasons.length;
   const meta = isSeries
-    ? [years, seasonCount ? `${seasonCount} saison${seasonCount > 1 ? 's' : ''}` : '', statusText && statusText !== 'Terminée' ? statusText : '', genres.slice(0, 2).map(genre => genre.name).join(', ')].filter(Boolean).join(' · ')
+    ? [years, seasonCount ? `${seasonCount} saison${seasonCount > 1 ? 's' : ''}` : '', genres.slice(0, 2).map(genre => genre.name).join(', ')].filter(Boolean).join(' · ')
     : [year, formatDuration(tmdbDetails?.runtime), genres.slice(0, 2).map(genre => genre.name).join(', ')].filter(Boolean).join(' · ');
   const tmdbRating = Number(tmdbDetails?.vote_average) > 0 ? formatRating(Number(tmdbDetails.vote_average)) : null;
 
@@ -409,6 +411,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           {!tmdbDetails ? <><div className="h-7 w-20 rounded-lg bg-zinc-800/80 animate-pulse" /><div className="h-7 w-14 rounded-lg bg-zinc-800/80 animate-pulse" /></> : <>
             {isAtCinema && <DetailChip className="text-[#F2C36B] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.5)]">🎟 Au cinéma</DetailChip>}
             {isUpcomingMovie && <DetailChip className="text-[#F2C36B]">À venir</DetailChip>}
+            {airStatus && <DetailChip className={AIR_TONE_CLASS[airStatus.tone]} aria-label={`Série ${airStatus.label.toLowerCase()}${airStatus.detail ? `, ${airStatus.detail}` : ''}`}><strong>{airStatus.label}</strong>{airStatus.detail && <small className="text-[11px] font-semibold opacity-75">· {airStatus.detail}</small>}</DetailChip>}
             {tmdbRating && <DetailChip>★ {tmdbRating} TMDB</DetailChip>}
             <DetailChip className={ratingInfo.colorClass} aria-label={ratingInfo.provenance ? `${ratingInfo.label}, classification ${ratingInfo.provenance}` : ratingInfo.label} title={ratingInfo.provenance ? `${ratingInfo.provenance} · ${ratingInfo.label}` : ratingInfo.label}><strong>{ratingInfo.label}</strong>{ratingInfo.provenance && <small className="text-[9px] font-semibold opacity-65">{ratingInfo.provenance}</small>}</DetailChip>
             {hasTrailer && <button type="button" onClick={() => setTrailerModalVideos(ytVideos)} className="inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-[#18181b] px-2.5 text-[12px] font-bold text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"><Play size={12} className="fill-current" />Bande-annonce</button>}

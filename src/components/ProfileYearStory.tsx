@@ -3,13 +3,13 @@ import type { Show } from '../types';
 import {
   PROFILE_MONTH_SHORT,
   buildProfileProjection,
-  collectProfileViewings,
   countUndatedProfileViewings,
   defaultProfileYear,
   formatProfileHours,
   formatProfileImportNote,
+  formatProfileScopeNote,
   formatProfileUndatedNote,
-  partitionProfileViewings,
+  scopeProfileViewings,
 } from '../features/profile/profileYearStats';
 import { buildMediaMonths, buildProfileCalendar, buildProfileYearRecords, buildTopSeries, buildYearHeadline, buildYearInSeries } from '../features/profile/profileYearRecap';
 import { countSeriesFatesInYear, type SeriesFateEntry } from '../features/profile/profileSeriesFate';
@@ -30,8 +30,9 @@ function Reveal({ className = 'moi-card', label, children }: { className?: strin
 }
 
 /** SEENIT-PROFILE-004 : Mon année — calendrier, records, année en séries (jamais de film), films ou séries, top. */
-export function ProfileYearStory({ shows, fate, libraryReady = true, onFate }: { shows: Show[]; fate: readonly SeriesFateEntry[]; libraryReady?: boolean; onFate?: () => void }) {
-  const { viewings, imports } = useMemo(() => partitionProfileViewings(collectProfileViewings(shows)), [shows]);
+export function ProfileYearStory({ shows, fate, since = null, libraryReady = true, onFate }: { shows: Show[]; fate: readonly SeriesFateEntry[]; since?: number | null; libraryReady?: boolean; onFate?: () => void }) {
+  const scope = useMemo(() => scopeProfileViewings(shows, since), [shows, since]);
+  const { viewings, imports } = scope;
   const now = Date.now();
   const year = defaultProfileYear(viewings, now);
   const headline = useMemo(() => buildYearHeadline(viewings, year), [viewings, year]);
@@ -45,6 +46,7 @@ export function ProfileYearStory({ shows, fate, libraryReady = true, onFate }: {
   const [allMonths, setAllMonths] = useState(false);
   const monthsReveal = useRevealFocus<HTMLDivElement>('.moi-series-month');
   const importNote = formatProfileImportNote(imports, year);
+  const scopeNote = formatProfileScopeNote(scope, year);
   const undatedNote = useMemo(() => formatProfileUndatedNote(countUndatedProfileViewings(shows)), [shows]);
 
   if (!calendar.record) {
@@ -167,7 +169,7 @@ export function ProfileYearStory({ shows, fate, libraryReady = true, onFate }: {
         <small>{projection.remaining} {projection.remaining > 1 ? 'épisodes restants' : 'épisode restant'} · {projection.perWeek.toLocaleString('fr-FR')} par semaine en moyenne</small>
       </div>}
 
-      {(importNote || undatedNote) && <p className="moi-import">{[importNote, undatedNote].filter(Boolean).join(' · ')}</p>}
+      {(scopeNote || importNote || undatedNote) && <p className="moi-import">{[scopeNote, importNote, undatedNote].filter(Boolean).join(' · ')}</p>}
     </div>
   );
 }
