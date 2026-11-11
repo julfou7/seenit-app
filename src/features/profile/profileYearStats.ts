@@ -202,7 +202,11 @@ export function scopeProfileViewings(shows: readonly Show[], since: number | nul
   const signupDay = since !== null && Number.isFinite(since) && since > 0 ? new Date(since).setHours(0, 0, 0, 0) : null;
   // Retour terrain v1.4.293 : un compte peut exister des mois avant le vrai démarrage ; la première journée d'import
   // (bibliothèque chargée) marque ce démarrage, et l'historique Plex daté d'avant n'est pas de la vie SeenIt.
-  const importDay = imports.length > 0 ? new Date(imports[0].watchedAt).setHours(0, 0, 0, 0) : null;
+  const firstImport = imports.length > 0 ? new Date(imports[0].watchedAt).setHours(0, 0, 0, 0) : null;
+  // Revue Codex #952 : ce n'est un démarrage que si aucun Vu marqué dans l'app ne le précède (seules des lectures
+  // Plex datées peuvent exister avant) ; sinon c'est un rattrapage tardif et l'historique d'avant reste compté.
+  const usedBefore = firstImport !== null && dated.some(viewing => !viewing.plexTime && viewing.watchedAt < firstImport && (signupDay === null || viewing.watchedAt >= signupDay));
+  const importDay = usedBefore ? null : firstImport;
   const sinceSource = importDay !== null && (signupDay === null || importDay > signupDay) ? 'import' : signupDay !== null ? 'signup' : null;
   const sinceDay = sinceSource === 'import' ? importDay : signupDay;
   let beforeSince = 0;

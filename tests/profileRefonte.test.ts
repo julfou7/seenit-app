@@ -261,6 +261,7 @@ test('SEENIT-PROFILE-006 retour terrain v1.4.293 : les chiffres partent du premi
   // Bibliothèque chargée le 14 juillet : 40 épisodes datés de l'import, plus un historique Plex de mars à juin.
   const imported = series('bib', {}, Array.from({ length: 40 }, (_, index) => [`1x${index + 1}`, importAt + index * 1_000] as [string, number]));
   const plexBefore = series('plex', {}, [['1x1', at(2026, 3, 2)], ['1x2', at(2026, 4, 9)], ['1x3', at(2026, 5, 20)]]);
+  for (const record of Object.values(plexBefore.episodeRecords || {})) (record as { plexImported?: boolean }).plexImported = true;
   const after = series('apres', {}, [['1x1', at(2026, 7, 2)]]);
   const scope = scopeProfileViewings([imported, plexBefore, after], signup);
   assert.equal(scope.sinceSource, 'import');
@@ -268,6 +269,11 @@ test('SEENIT-PROFILE-006 retour terrain v1.4.293 : les chiffres partent du premi
   assert.deepEqual(scope.viewings.map(viewing => viewing.showId), ['apres']);
   assert.equal(scope.beforeSince, 3);
   assert.equal(formatProfileScopeNote(scope, 2026), 'Depuis ton arrivée sur SeenIt le 14 juillet 2026 (premier import)');
+  // Revue Codex #952 : des Vu marqués dans l'app avant la grosse journée prouvent l'usage ; c'est un rattrapage tardif.
+  const marked = series('marques', {}, [['1x1', at(2026, 0, 10)], ['1x2', at(2026, 1, 12)], ['1x3', at(2026, 2, 26)]]);
+  const late = scopeProfileViewings([marked, imported], at(2026, 0, 2));
+  assert.equal(late.sinceSource, 'signup');
+  assert.equal(late.viewings.length, 3, 'l’historique antérieur au rattrapage reste compté');
   // Sans import, la création du compte reste la borne.
   const plain = scopeProfileViewings([plexBefore, after], signup);
   assert.equal(plain.sinceSource, 'signup');

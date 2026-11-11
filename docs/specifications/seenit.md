@@ -1637,8 +1637,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   n'ajoutent aucune animation.
 - **SEENIT-PROFILE-006** — Chiffres par période depuis l'inscription (retour terrain v1.4.292, #942). Mes
   chiffres, Mon année et la carte « Ton année » de Moi lisent une seule portée de visionnages réels : rien avant
-  le jour de création du compte (ou le jour du premier import s'il est postérieur : bibliothèque chargée, l'historique
-  Plex daté d'avant n'est pas de la vie SeenIt), aucun rattrapage (trois épisodes ou plus d'une même série marqués à moins de
+  le jour de création du compte (ou le jour du premier import s'il est postérieur et qu'aucun Vu marqué dans l'app ne le
+  précède : bibliothèque chargée, l'historique Plex daté d'avant n'est pas de la vie SeenIt ; sinon c'est un
+  rattrapage tardif et l'historique antérieur reste compté), aucun rattrapage (trois épisodes ou plus d'une même série marqués à moins de
   cinq minutes d'écart, jamais les films) et aucune journée d'import de plus de 24 h. Le rattrapage n'est donc
   jamais un marathon ni une journée record. Les totaux (épisodes, films, badges de volume) comptent tout ; une
   note indique la date d'inscription et le nombre d'épisodes marqués d'un coup écartés. Une série finie compte
