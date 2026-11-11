@@ -304,6 +304,9 @@ rappels et actualités des séries restent visibles.
   nouvel épisode est sorti depuis le dernier visionnage, classées par dernière activité ;
 - **Pas vu depuis un moment** reçoit les autres séries encore regardables ;
 - **Films à voir** reçoit les films suivis non vus dont la sortie n'est pas future.
+  Trois tris (Récents par défaut, Mieux notés, Chez moi) et une carte « À l'affiche » tirée au hasard
+  parmi les dix films les mieux notés, sortis et non vus ; un film dont la sortie s'avère future une fois
+  ses détails connus affiche « sortie dans N j » sans bouton Vu (`SEENIT-UX-022`).
 
 Une série n'entre dans **À Regarder** que si SeenIt possède une preuve positive qu'au moins un épisode
 a déjà été diffusé : progression déjà enregistrée, `totalAiredEpisodes > 0`, `firstAirDate` passée ou du
@@ -496,7 +499,7 @@ la v1.4.280, `SEENIT-C411-004`), **Pépites**,
   persistance client. Ces listes expirent rapidement afin de laisser TMDB reprendre la main sur les
   données volatiles.
 - Le hero réserve 368 px, avec ses indicateurs à l’intérieur ; les catégories et la grille restent stables au chargement.
-- La loupe reste accessible dans la rangée collante à toute profondeur ; aucune recherche ne dépend d’un geste de défilement caché.
+- La recherche reste accessible à toute profondeur : champ posé sur l’image à la une tant qu’elle est visible, puis loupe de la rangée collante ; une seule entrée est visible à la fois et aucune recherche ne dépend d’un geste de défilement caché (`SEENIT-DISCOVER-008`).
 - Le scroll infini conserve des clés de cartes stables, évite de rerendre les cartes déjà chargées pour
   un simple changement d'en-tête et ne matérialise que les lignes visibles avec un débord borné. Des
   espaceurs conservent la hauteur logique des pages déjà chargées. La fin de pagination suit les

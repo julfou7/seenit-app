@@ -300,6 +300,12 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
 
 - **SEENIT-DISCOVER-004** — Recherche et fiche de personnages de fiction E-40..49 / P-01..12 : [complément4c](../design/explorer-personnage-2026-10-29.md), #398/#787. Source validée : bibliothèque et univers reliés prouvés, index public borné côté backend, cache et quotas ; personnages distincts des acteurs. La recherche filtre un index local des distributions publiques par titre (14 j, IndexedDB, sans donnée privée) alimenté par `/api/media/characters/index` (24 titres par lot, cache serveur compact partagé, échecs et délai de reprise signalés) : une frappe ne relance aucun balayage de la bibliothèque et un quota atteint produit une couverture partielle signalée puis reprise, jamais une liste vide silencieuse. La route historique `/api/media/characters` reste servie pour les APK installées. Progression privée et favoris locaux par UID. Les ratios vus et co-crédits exigent les identités exactes des épisodes ; les calculs incomplets sont signalés, jamais fabriqués depuis aggregate_credits seul. Fiche personnage (#872) : le nom d'univers ne vient que d'une source exacte (collection TMDB, ou l'œuvre elle-même) ; un groupe du catalogue sans nom propre masque l'univers au lieu d'emprunter le titre de son premier membre. Tant que les apparitions ne sont pas toutes vérifiées, « vus par toi » affiche au moins les vus déjà prouvés (« ≥ N »), jamais « — » quand un épisode vu est connu. La fiche, ouverte depuis la recherche, occupe tout l'écran et défile jusqu'en bas même si la zone visible a été mesurée clavier ouvert : une couche de dialogue ne suit le clavier que pendant une saisie.
 
+- **SEENIT-DISCOVER-008** — Recherche sur l'image à la une ([handoff](../design/refonte-moi-films-explorer-2026-11-11.md), #942).
+  Tant que l'image à la une est visible, un champ « Rechercher un film, une série… » posé en haut de
+  l'image ouvre la recherche (même entrée que la loupe), sans hauteur ajoutée ; la loupe ronde de la barre
+  collante est alors masquée et revient dès que ce champ sort de l'écran, si bien qu'un seul contrôle de
+  recherche est visible et qu'E-03 (recherche à toute profondeur) reste vraie. Le rang « #N » quitte le coin
+  haut de l'image et se place à droite des badges.
 - **SEENIT-DISCOVER-007** — Explorer reste frais et fluide (#853) :
   - **Tendances du jour.** « Tout », « Films » et « Séries » partent de la tendance TMDB du jour,
     complétée par celle de la semaine, sans doublon. Le complément « populaire » ne garde que les
@@ -1584,6 +1590,16 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   À venir groupe Aujourd’hui, Cette semaine (sept jours suivants), Plus tard selon le calendrier local.
   L’historique mixte est paginé par dix. Les sections vides disparaissent et les états chargement,
   cache hors ligne et synchronisation restent explicites. Les films affichent six billets puis Voir en liste, avec pagination par douze ; toucher le tampon Vu annule le marquage.
+- **SEENIT-UX-022** — Films à voir ([handoff](../design/refonte-moi-films-explorer-2026-11-11.md), #942).
+  Trois tris remplacent la mention « Ajouts les plus récents » : Récents (défaut, ordre d'ajout de
+  `SEENIT-UX-016`), Mieux notés (note TMDB décroissante, film sans note en dernier) et Chez moi (films
+  disponibles sur une plateforme choisie du compte ou sur son Plex ; les diffuseurs inconnus sont chargés
+  en un lot groupé). Au-dessus des billets, dans les deux présentations, la carte « À l'affiche » tire au
+  hasard un film parmi les dix mieux notés de la liste, sortis et non vus ; elle disparaît sous trois films
+  éligibles, ne parle jamais de « ce soir » et reste stable jusqu'au prochain tirage demandé. Chaque billet
+  montre la note sur l'affiche et « durée · genre » ; aucun titre, accroche acteur ni diffuseur n'est coupé.
+  Un film dont la date de sortie est future affiche « sortie dans N j » et n'a aucun bouton Vu ; une date
+  inconnue vaut sortie. Un film en salle affiche « au cinéma » et sa durée au lieu d'une heure de fin.
 - **SEENIT-UX-016** — Les cartes 8f et les tickets films réutilisent les écritures réversibles existantes.
   La séparation des groupes et leur présentation suivent désormais `SEENIT-UX-018`.
   Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;

@@ -34,7 +34,7 @@ test('#229 conserve un premier lot borné puis rend les quatre carrousels progre
 
   // La refonte accueil borne chaque rail à six cartes, puis ouvre une liste par lots.
   assert.match(watchListSource, /items\.slice\(0, limit\)/);
-  assert.match(watchListSource, /orderedMovies\.slice\(0, movieList \? movieCount : movieRailLimit\)/);
+  assert.match(watchListSource, /visibleMovies\.slice\(0, movieList \? movieCount : movieRailLimit\)/);
   assert.match(watchListSource, /id="films-a-voir-18c"/);
 
   assert.doesNotMatch(
@@ -68,7 +68,7 @@ test('#729 conserve les accès aux listes complètes par les icônes de vue', ()
   assert.doesNotMatch(carouselUxCss, /::after/);
   assert.match(watchListSource, /<HomeLayoutSwitch label=\{label\} list=\{expanded\}/);
   assert.match(watchListSource, /<HomeLayoutSwitch label="Films"/);
-  assert.match(watchListSource, /items=\{orderedMovies\.slice\(movieCount\)\}/);
+  assert.match(watchListSource, /items=\{visibleMovies\.slice\(movieCount\)\}/);
 });
 
 test('#690 aligne la hiérarchie 8f et retire les compteurs redondants', () => {

@@ -170,10 +170,6 @@ export const HeroCard = React.memo(function HeroCard({
       />
       <div className="absolute bottom-0 inset-x-0 h-[75%] bg-gradient-to-t from-black via-black/75 to-transparent pointer-events-none" />
 
-      <div className="absolute top-0 right-0 bg-[#E5A93D] text-black px-4 py-2.5 rounded-bl-[24px] shadow-[-4px_4px_20px_rgba(229,169,61,0.3)] flex flex-col items-center justify-center z-20">
-        <span className="text-xl sm:text-2xl font-black leading-none tracking-tighter">#{rank}</span>
-      </div>
-
       <div className="absolute bottom-0 inset-x-0 px-5 pb-10 flex flex-col justify-end z-10 w-full">
         <div className="flex flex-wrap items-center gap-2 mb-1.5">
           <span
@@ -205,6 +201,8 @@ export const HeroCard = React.memo(function HeroCard({
               {isAtCinema ? 'Au Cinéma' : isUpcoming ? 'À Venir' : 'Disponible'}
             </span>
           )}
+          {/* SEENIT-DISCOVER-008 : le rang quitte le coin haut, laissé au champ de recherche. */}
+          <span className="explorer-hero-rank ml-auto" aria-label={`Rang ${rank}`}>#{rank}</span>
         </div>
 
         <h2 className="seenit-media-title text-[38px] font-extrabold uppercase tracking-tight leading-[1.05] mb-1 line-clamp-2 drop-shadow-xl">

@@ -14,6 +14,7 @@ marquées comme livrées décrivent le comportement attendu du runtime courant.
 Explorer (#774) : pendant la saisie, champ à 8 px au-dessus du clavier, navigation basse masquée.
 Fermeture du clavier/blur : retour à la disposition normale sans vider la recherche ni les filtres.
 Une loupe à gauche de la navigation Explorer rouvre la recherche et le clavier sans déplacer les résultats.
+Au sommet d'Explorer, un champ de recherche de 48 px est posé sur l'image à la une ; la loupe ronde de la rangée collante n'apparaît qu'une fois ce champ sorti de l'écran (`SEENIT-DISCOVER-008`). Films à voir : pastilles de tri de 44 px, carte « À l'affiche » 252 px avec « Voir la fiche » et « Tirer un autre film » (44 px), billets sans texte tronqué (`SEENIT-UX-022`).
 Cette action explicite reste accessible après repli de la barre, avec cible tactile >=44 px et nom accessible.
 
 ### Bandes-annonces — contrat #447

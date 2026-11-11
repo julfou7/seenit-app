@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import type { Show } from '../../types';
-import { tmdb } from '../../features/shows/tmdb';
+import { tmdb, isMovieAtCinema } from '../../features/shows/tmdb';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 import { createWatchProviderRequestLimiter } from '../../features/providers/watchProviderRequestPolicy';
 import { createPassiveCardEnrichmentGate } from '../../features/providers/passiveCardEnrichmentPolicy';
@@ -9,6 +9,7 @@ import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { seriesCardPosterCandidates, seriesCardPosterCrossOrigin } from '../../features/watchlist/seriesCardPresentation';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../../features/watchlist/posterHue';
 import { movieEndTime, movieRuntime } from '../../features/watchlist/watchNext18c';
+import { formatMovieRating, formatMovieRuntime, formatReleaseCountdown, homeMovieRelease, readHomeMovieFacts } from '../../features/watchlist/homeMovies';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import type { TicketActor } from '../../features/people/movieActors';
 import { MovieActorLine } from './MovieActorLine';
@@ -76,6 +77,17 @@ export const MovieTicketCard = React.memo(function MovieTicketCard({ actor = nul
   }, [watched]);
   const visibleWatched = pendingFrom ?? watched;
   const end = movieEndTime(start, runtime);
+  // SEENIT-UX-022 : note, durée · genre et sortie lues dans les détails déjà en cache ; jamais de Vu avant la sortie.
+  const facts = readHomeMovieFacts(show, details || cached);
+  const release = homeMovieRelease(facts.releaseDate, isMovieAtCinema(details || cached), start);
+  const meta = [formatMovieRuntime(runtime), facts.genre].filter(Boolean).join(' · ') || String(year);
+  const countdown = release.kind === 'upcoming' ? formatReleaseCountdown(release) : null;
+  const canMark = release.kind !== 'upcoming' || visibleWatched;
+  const stubTop = countdown ? countdown.top : release.kind === 'cinema' ? 'au cinéma' : end?.afterMidnight ? 'après minuit' : 'fin à';
+  const stubValue = countdown ? countdown.value : release.kind === 'cinema' ? formatMovieRuntime(runtime) || '—' : end ? end.label.replace('fin ', '') : '—';
+  const late = !countdown && release.kind !== 'cinema' && Boolean(end?.afterMidnight);
+  const rating = facts.rating !== null && <span className="movie-ticket__rating" aria-label={`Note ${formatMovieRating(facts.rating)} sur 10`}>★ {formatMovieRating(facts.rating)}</span>;
+  const variant = countdown ? ' movie-ticket--upcoming' : release.kind === 'cinema' ? ' movie-ticket--cinema' : '';
   const provider = getFormattedProviderLogo(providerLogo, providerName);
   const initials = show.title.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join('').toUpperCase();
   const handlePosterLoad = (image: HTMLImageElement) => {
@@ -103,34 +115,35 @@ export const MovieTicketCard = React.memo(function MovieTicketCard({ actor = nul
     } catch { if (mounted.current) setError(true); }
     finally { inFlight.current = false; if (mounted.current) setPendingFrom(null); }
   }
-  if (layout === 'horizontal') return <div ref={cardRef} className={`movie-ticket movie-ticket--horizontal${visibleWatched ? ' movie-ticket--watched' : ''}${phase ? ` movie-ticket--${phase.kind}` : ''}`} data-movie-ticket={show.id} style={{ '--ticket-hue': hue } as React.CSSProperties}>
+  if (layout === 'horizontal') return <div ref={cardRef} className={`movie-ticket movie-ticket--horizontal${variant}${visibleWatched ? ' movie-ticket--watched' : ''}${phase ? ` movie-ticket--${phase.kind}` : ''}`} data-movie-ticket={show.id} style={{ '--ticket-hue': hue } as React.CSSProperties}>
     <div className="movie-ticket__body">
       <div className="movie-ticket__main">
         {poster && <img className="movie-ticket__ambient" src={poster} alt="" aria-hidden="true" loading="lazy" />}
         <div className="movie-ticket__tint" aria-hidden="true" />
         <button className="movie-ticket__open" type="button" aria-label={`Ouvrir ${show.title}, film${year ? ` de ${year}` : ''}`} onClick={() => onOpen(show.id, 'movie')} />
-        <div className="movie-ticket__poster" aria-hidden="true"><span>{initials}</span>{poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" loading="lazy" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}</div>
-        <div className="movie-ticket__info"><h3>{show.title}</h3>{actor && <MovieActorLine actor={actor} list onOpen={openActor} />}<p>{provider && <img src={provider} alt={providerName || 'Diffuseur'} title={providerName || undefined} loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}<span>{year}</span></p></div>
+        <div className="movie-ticket__poster"><span aria-hidden="true">{initials}</span>{poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" aria-hidden="true" loading="lazy" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}{rating}</div>
+        <div className="movie-ticket__info"><h3>{show.title}</h3><p className="movie-ticket__meta">{meta}</p>{actor && <MovieActorLine actor={actor} list onOpen={openActor} />}<p>{provider && <img src={provider} alt={providerName || 'Diffuseur'} title={providerName || undefined} loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />}<span>{countdown ? `Sortie le ${countdown.date}` : providerName || (release.kind === 'cinema' ? 'En salle' : year)}</span></p></div>
         {visibleWatched && <button type="button" className="movie-ticket__undo" aria-label={`Annuler le visionnage de ${show.title}`} disabled={pendingFrom !== null} onClick={toggle}><SeenItWatchedStamp screen className="movie-ticket__undo-stamp" /></button>}
       </div>
-      <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span>{end?.afterMidnight ? 'après minuit' : 'fin à'}</span><strong className={end?.afterMidnight ? 'movie-ticket__late' : undefined}>{end ? end.label.replace('fin ', '') : '—'}</strong></div>
-      <SeenItCheckButton glyph="screen" size={26} className="movie-ticket__check" error={error} isWatched={visibleWatched} pending={pendingFrom !== null} title={`Marquer ${show.title} comme ${watched ? 'non vu' : 'vu'}`} onClick={toggle} />
+      <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span>{stubTop}</span><strong className={late ? 'movie-ticket__late' : undefined}>{stubValue}</strong></div>
+      {canMark && <SeenItCheckButton glyph="screen" size={26} className="movie-ticket__check" error={error} isWatched={visibleWatched} pending={pendingFrom !== null} title={`Marquer ${show.title} comme ${watched ? 'non vu' : 'vu'}`} onClick={toggle} />}
     </div>
     <span className="sr-only" role="status" aria-live="polite">{error ? 'Le visionnage n’a pas pu être enregistré.' : phase ? `${show.title} marqué ${visibleWatched ? 'vu' : 'non vu'}` : ''}</span>
   </div>;
-  return <div ref={cardRef} className={`movie-ticket movie-ticket--${layout}${visibleWatched ? ' movie-ticket--watched' : ''}${phase ? ` movie-ticket--${phase.kind}` : ''}`} data-movie-ticket={show.id} style={{ '--ticket-hue': hue } as React.CSSProperties}>
+  return <div ref={cardRef} className={`movie-ticket movie-ticket--${layout}${variant}${visibleWatched ? ' movie-ticket--watched' : ''}${phase ? ` movie-ticket--${phase.kind}` : ''}`} data-movie-ticket={show.id} style={{ '--ticket-hue': hue } as React.CSSProperties}>
     <div className="movie-ticket__body">
-      <button className="movie-ticket__open" type="button" aria-label={`Ouvrir ${show.title}, film${year ? ` de ${year}` : ''}${end ? `, ${end.label}` : ''}`} onClick={() => onOpen(show.id, 'movie')} />
+      <button className="movie-ticket__open" type="button" aria-label={`Ouvrir ${show.title}, film${year ? ` de ${year}` : ''}${countdown ? `, ${countdown.top} ${countdown.value}` : end && release.kind === 'released' ? `, ${end.label}` : ''}`} onClick={() => onOpen(show.id, 'movie')} />
       <div className="movie-ticket__poster" aria-hidden="true"><span>{initials}</span>{poster && <img src={poster} crossOrigin={posterCrossOrigin} alt="" loading="lazy" decoding="async" onLoad={event => handlePosterLoad(event.currentTarget)} onError={() => setPosterIndex(index => index + 1)} />}
         {visibleWatched && <SeenItWatchedStamp key={phase?.sequence || 0} className="movie-ticket__stamp" />}
+        {rating}
       </div>
       {provider && <span className="movie-ticket__provider" role="img" aria-label={providerName || 'Diffuseur'} title={providerName || undefined}><img src={provider} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></span>}
-      <SeenItCheckButton glyph="screen" size={26} className="movie-ticket__check" error={error} isWatched={visibleWatched} pending={pendingFrom !== null} title={`Marquer ${show.title} comme ${watched ? 'non vu' : 'vu'}`} onClick={toggle} />
+      {canMark && <SeenItCheckButton glyph="screen" size={26} className="movie-ticket__check" error={error} isWatched={visibleWatched} pending={pendingFrom !== null} title={`Marquer ${show.title} comme ${watched ? 'non vu' : 'vu'}`} onClick={toggle} />}
       {visibleWatched && <button type="button" className="movie-ticket__undo" aria-label={`Annuler le visionnage de ${show.title}`} disabled={pendingFrom !== null} onClick={toggle}><SeenItWatchedStamp className="movie-ticket__undo-stamp" /></button>}
-      <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span className={end?.afterMidnight ? 'movie-ticket__late' : undefined}>{end?.afterMidnight ? 'après minuit' : 'fin à'}<strong>{end ? end.label.replace('fin ', '') : '—'}</strong></span></div>
+      <div key={phase?.sequence || 0} className="movie-ticket__stub" aria-hidden="true"><span className={late ? 'movie-ticket__late' : undefined}>{stubTop}<strong>{stubValue}</strong></span>{countdown && <small>{countdown.date}</small>}</div>
     </div>
     <h3>{show.title}</h3>
-    <div className="movie-ticket__metadata"><span>{year}</span></div>
+    <div className="movie-ticket__metadata"><span>{meta}</span></div>
     <MovieActorLine actor={actor} onOpen={openActor} />
     <span className="sr-only" role="status" aria-live="polite">{error ? 'Le visionnage n’a pas pu être enregistré.' : phase ? `${show.title} marqué ${visibleWatched ? 'vu' : 'non vu'}` : ''}</span>
   </div>;

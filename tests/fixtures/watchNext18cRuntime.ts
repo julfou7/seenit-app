@@ -155,3 +155,6 @@ export const deleteDoc = async (path: string[]) => { telemetry.writes.push({path
 export function makePaginationBatch() {
  useShowsStore.setState(state=>({shows:[...state.shows,...Array.from({length:18},(_,i)=>({...base,id:`series-more-${i}`,tmdbId:800+i,title:`Pagination ${i}`}))]}));
 }
+
+// SEENIT-UX-022 : le billet lit la preuve « au cinéma » ; les harnais n’en fournissent pas.
+export const isMovieAtCinema = (_media: unknown) => false;

@@ -98,3 +98,6 @@ export function terrain226CalendarExamples() {
 }
 // Raccourci Plex de l'accueil : la synchro est simulée, sans moteur Plex ni Firebase.
 export const performPlexSync = async (_options?: unknown) => {};
+
+// SEENIT-UX-022 : le billet lit la preuve « au cinéma » ; les harnais n’en fournissent pas.
+export const isMovieAtCinema = (_media: unknown) => false;
