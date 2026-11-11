@@ -227,8 +227,8 @@ test('Moi · Ma liste en étagères avec filtre par type et grille complète par
 
 test('Moi · Mes chiffres et Mon année gardent un seul or, les données réelles et les personnes', () => {
   assert.match(dashboardSource, /buildProfileYearStats\(viewings, year\)/);
-  assert.match(dashboardSource, /partitionProfileViewings\(collectProfileViewings\(shows\)\)/);
-  assert.match(storySource, /partitionProfileViewings\(collectProfileViewings\(shows\)\)/);
+  assert.match(dashboardSource, /scopeProfileViewings\(shows, since\)/);
+  assert.match(storySource, /scopeProfileViewings\(shows, since\)/);
   for (const title of ['Heures par mois', 'Tendances', 'Ce que tu regardes', 'Quand tu regardes', 'Où tu regardes', 'Séries laissées en route', 'Tes réactions', 'Tes têtes d’affiche', 'Badges']) assert.ok(dashboardSource.includes(title), title);
   assert.match(dashboardSource, /onPersonClick\?\.\(person\.id\)/);
   assert.doesNotMatch(dashboardSource, /indigo|rose-|emerald|cinephileArchetype/);

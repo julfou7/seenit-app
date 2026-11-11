@@ -148,6 +148,76 @@ export function partitionProfileViewings(viewings: readonly ProfileViewing[]): {
   return { viewings: viewings.filter(viewing => !excluded.has(historyLocalDayKey(viewing.watchedAt))), imports };
 }
 
+// SEENIT-PROFILE-006 : trois épisodes ou plus d'une même série marqués à moins de cinq minutes d'écart ne sont
+// pas un marathon mais un rattrapage (saison ou série marquée d'un coup, série vue par le passé).
+export const PROFILE_CATCH_UP_GAP_MS = 5 * 60_000;
+export const PROFILE_CATCH_UP_MIN = 3;
+
+/** Visionnages marqués en rafale, série par série ; les films ne sont jamais groupés. */
+export function findProfileCatchUps(viewings: readonly ProfileViewing[]): Set<ProfileViewing> {
+  const byShow = new Map<string, ProfileViewing[]>();
+  for (const viewing of viewings) {
+    if (viewing.mediaType !== 'tv') continue;
+    const list = byShow.get(viewing.showId);
+    if (list) list.push(viewing); else byShow.set(viewing.showId, [viewing]);
+  }
+  const catchUps = new Set<ProfileViewing>();
+  for (const list of byShow.values()) {
+    if (list.length < PROFILE_CATCH_UP_MIN) continue;
+    list.sort((left, right) => left.watchedAt - right.watchedAt);
+    let start = 0;
+    for (let index = 1; index <= list.length; index++) {
+      if (index < list.length && list[index].watchedAt - list[index - 1].watchedAt <= PROFILE_CATCH_UP_GAP_MS) continue;
+      if (index - start >= PROFILE_CATCH_UP_MIN) for (let member = start; member < index; member++) catchUps.add(list[member]);
+      start = index;
+    }
+  }
+  return catchUps;
+}
+
+export interface ProfileViewingScope {
+  /** Visionnages réels : depuis l'inscription, hors rattrapages et journées d'import. */
+  viewings: ProfileViewing[];
+  imports: ProfileImportDay[];
+  catchUp: { count: number; minutes: number };
+  /** Début du jour de l'inscription, ou null si la date du compte est inconnue. */
+  since: number | null;
+  beforeSince: number;
+}
+
+/**
+ * SEENIT-PROFILE-006 : les chiffres par période (mois, semaines, rythme, records, marathons, top de l'année)
+ * ne décrivent que ce qui a été regardé avec SeenIt : rien avant le jour de l'inscription, ni les rattrapages
+ * marqués d'un coup, ni les journées d'import. Les totaux du Profil, eux, comptent tout.
+ */
+export function scopeProfileViewings(shows: readonly Show[], since: number | null = null): ProfileViewingScope {
+  const all = collectProfileViewings(shows);
+  const catchUps = findProfileCatchUps(all);
+  let minutes = 0;
+  for (const viewing of catchUps) minutes += viewing.minutes;
+  const sinceDay = since !== null && Number.isFinite(since) && since > 0 ? new Date(since).setHours(0, 0, 0, 0) : null;
+  let beforeSince = 0;
+  const kept = all.filter(viewing => {
+    if (catchUps.has(viewing)) return false;
+    if (sinceDay !== null && viewing.watchedAt < sinceDay) { beforeSince++; return false; }
+    return true;
+  });
+  const { viewings, imports } = partitionProfileViewings(kept);
+  return { viewings, imports, catchUp: { count: catchUps.size, minutes }, since: sinceDay, beforeSince };
+}
+
+const sinceDate = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+/** « Depuis ton inscription le 3 juillet 2026 · sans 16 épisodes marqués d'un coup », ou null. */
+export function formatProfileScopeNote(scope: Pick<ProfileViewingScope, 'since' | 'beforeSince' | 'catchUp'>, year: number): string | null {
+  const parts: string[] = [];
+  if (scope.since !== null && scope.beforeSince > 0 && new Date(scope.since).getFullYear() === year) parts.push(`Depuis ton inscription le ${sinceDate.format(new Date(scope.since))}`);
+  if (scope.catchUp.count > 0) parts.push(`sans ${scope.catchUp.count.toLocaleString('fr-FR')} ${scope.catchUp.count > 1 ? 'épisodes marqués' : 'épisode marqué'} d’un coup`);
+  if (parts.length === 0) return null;
+  const text = parts.join(' · ');
+  return text[0].toUpperCase() + text.slice(1);
+}
+
 const importDate = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long' });
 
 /** « Sans l'import du 14 juillet (4 586 h) » pour l'année affichée, sinon null. */

@@ -8,15 +8,15 @@ import {
   PROFILE_MONTH_LABELS,
   PROFILE_WEEKDAY_LABELS,
   buildProfileYearStats,
-  collectProfileViewings,
   countUndatedProfileViewings,
   defaultProfileYear,
   formatProfileHours,
   formatProfileImportNote,
+  formatProfileScopeNote,
   formatProfilePunchSlot,
   formatProfileUndatedNote,
   listProfileYearTotals,
-  partitionProfileViewings,
+  scopeProfileViewings,
 } from '../features/profile/profileYearStats';
 import {
   PROFILE_REACTIONS,
@@ -53,18 +53,21 @@ function Head({ title, note }: { title: string; note?: string }) {
 export function ProAnalyticsDashboard({
   shows,
   fate,
+  since = null,
   libraryReady = true,
   onPersonClick,
   onFate,
 }: {
   shows: Show[];
   fate: readonly SeriesFateEntry[];
+  since?: number | null;
   libraryReady?: boolean;
   onPersonClick?: (personId: number) => void;
   onFate?: () => void;
 }) {
   const { data, loading, contributions } = useProAnalytics(shows, libraryReady);
-  const { viewings, imports } = useMemo(() => partitionProfileViewings(collectProfileViewings(shows)), [shows]);
+  const scope = useMemo(() => scopeProfileViewings(shows, since), [shows, since]);
+  const { viewings, imports } = scope;
   const yearTotals = useMemo(() => listProfileYearTotals(viewings), [viewings]);
   const [pickedYear, setPickedYear] = useState<number | null>(null);
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
@@ -105,9 +108,13 @@ export function ProAnalyticsDashboard({
   }) : [], [data, viewings]);
   const fateSummary = useMemo(() => summarizeSeriesFate(fate), [fate]);
   const importNote = formatProfileImportNote(imports, year);
+  const scopeNote = formatProfileScopeNote(scope, year);
   const undatedNote = useMemo(() => formatProfileUndatedNote(countUndatedProfileViewings(shows)), [shows]);
 
   const isCurrentYear = year === new Date(now).getFullYear();
+  // SEENIT-PROFILE-006 : l'année de l'inscription commence le jour de l'inscription.
+  const sinceLabel = scope.since !== null && scope.beforeSince > 0 && new Date(scope.since).getFullYear() === year
+    ? `Depuis le ${new Date(scope.since).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : null;
   const fullDays = Math.floor(stats.minutes / 1440);
   const maxWeek = Math.max(1, ...weeks.map(week => week.minutes));
   const seriesShare = stats.minutes > 0 ? Math.round(stats.seriesMinutes / stats.minutes * 100) : 0;
@@ -119,7 +126,7 @@ export function ProAnalyticsDashboard({
   return (
     <div className="moi-stats">
       <div className="moi-stats-top">
-        <span>{isCurrentYear ? 'Depuis le 1er janvier' : `En ${year}`}</span>
+        <span>{sinceLabel ?? (isCurrentYear ? 'Depuis le 1er janvier' : `En ${year}`)}</span>
         <div className="moi-year-picker">
           <button type="button" className="moi-year" onClick={() => setYearMenuOpen(open => !open)} disabled={yearTotals.length < 2}
             aria-haspopup="listbox" aria-expanded={yearMenuOpen} aria-label={yearTotals.length < 2 ? `Année ${year}` : `Année ${year}, choisir une autre année`}>
@@ -302,7 +309,7 @@ export function ProAnalyticsDashboard({
         </>}
       </Reveal>
 
-      {(importNote || undatedNote) && <p className="moi-import">{[importNote, undatedNote].filter(Boolean).join(' · ')}</p>}
+      {(scopeNote || importNote || undatedNote) && <p className="moi-import">{[scopeNote, importNote, undatedNote].filter(Boolean).join(' · ')}</p>}
     </div>
   );
 }

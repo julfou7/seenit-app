@@ -329,6 +329,9 @@ Le marquage Vu préserve cette distinction ; les anciennes preuves ambiguës son
 par le worker de détails, sans demander une actualisation manuelle.
 Cette réparation inclut les anciens booléens false et les séries terminées ou archivées.
 Elle conserve le statut de suivi utilisateur, distinct du statut de diffusion TMDB.
+La fiche série montre ce statut de diffusion en pastille, en tête des pastilles : En diffusion (prochain épisode
+daté), Renouvelée (saison suivante annoncée, avec sa date), En cours (sans date annoncée), En production, Prévue,
+Terminée ou Annulée (`SEENIT-UX-023`).
 Le cadre 8f reste partagé avec À venir. Historique utilise la liste compacte v3. Vu anime la reprise réellement avancée et son
 tampon SeenIt ; À jour permet de revenir sur le dernier épisode marqué pendant cette session.
 Pendant une écriture Firestore lente, le marquage reste en attente : aucun délai arbitraire
@@ -337,6 +340,7 @@ Le succès et son animation attendent l'acquittement réel ; seul un rejet défi
 l'état précédent et affiche l'erreur. Un changement de compte ignore le résultat pour le nouvel UID.
 
 Les films sont des billets déchirables en carrousel affiche ou liste horizontale, triés par ajout récent puis identité, sans déplacement lors de l’enrichissement.
+En liste horizontale, l'affiche fait 88 × 132 px (2:3) et porte le logo du diffuseur en bas à gauche ; aucune ligne de texte ne le répète.
 Le talon affiche en grand l’heure de fin calculée depuis Maintenant, actualisée chaque minute, orange
 après minuit. Sans durée, aucune fin n’est inventée. Six films sont visibles, puis Voir en liste donne accès à la liste paginée par douze. La bascule carrousel/liste conserve le même marquage.
 Une coche aboutie déchire le talon et conserve le tampon Vu ; toucher ce tampon ou Annuler recolle
@@ -424,7 +428,12 @@ Les durées utilisent la durée réelle connue d'un visionnage, sinon les estima
 (45 min par épisode, 110 min par film). Un visionnage n'est daté que sur preuve : date de l'épisode ou du
 film, ou pour un film la dernière action « vu » ; jamais la date de modification du document (synchro des
 fiches, import). Les visionnages sans date (films importés de TV Time) ne sont pas comptés et leur nombre
-est indiqué ; ceux sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les badges
+est indiqué ; ceux sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les chiffres par
+période (mois, semaines, rythme, jours d'affilée, records, marathons, année en séries, top) ne comptent que
+les visionnages depuis le jour de l'inscription à SeenIt, sans les rattrapages : trois épisodes ou plus d'une
+même série marqués à moins de cinq minutes d'écart (série vue par le passé marquée d'un coup). Les totaux
+(épisodes, films, séries terminées) comptent tout, et une note dit ce qui a été écarté (`SEENIT-PROFILE-006`).
+Une série finie compte comme terminée même archivée. Les badges
 ont des paliers : Centenaire (visionnages) 100, 500, 1 000, 2 500, 5 000, 7 500, 10 000 ; Oiseau de nuit
 (nuits avec un visionnage daté entre 23 h et 5 h) 10, 25, 50, 100 ; Grand écran (films) 1, 25, 75, 150, 300 ;
 Binge-Master (séries terminées) 1, 5, 15, 30. Aucun archétype n'est affiché dans Moi.

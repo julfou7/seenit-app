@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { LibraryScreen, type LibraryTypeFilter } from './LibraryScreen';
 import { MoiFateRow, MoiYearCard } from '../components/profile/MoiYearCard';
-import { collectProfileViewings, partitionProfileViewings } from '../features/profile/profileYearStats';
+import { scopeProfileViewings } from '../features/profile/profileYearStats';
 import { buildSeriesFate, summarizeSeriesFate } from '../features/profile/profileSeriesFate';
 import { getTodayStr } from '../lib/utils';
 import { useToastStore } from '../store/toastStore';
@@ -33,14 +33,20 @@ function useSeriesFate() {
   return { shows, loading, entries };
 }
 
+/** SEENIT-PROFILE-006 : date d'inscription du compte, borne des chiffres par période. */
+function profileSince(): number | null {
+  const created = Date.parse(auth.currentUser?.metadata?.creationTime || '');
+  return Number.isFinite(created) ? created : null;
+}
+
 const ProfileStatsContent = React.memo(function ProfileStatsContent({ onPersonClick, onFate }: { onPersonClick: (personId: number) => void; onFate: () => void }) {
   const { shows, loading, entries } = useSeriesFate();
-  return <ProAnalyticsDashboard shows={shows} fate={entries} libraryReady={!loading} onPersonClick={onPersonClick} onFate={onFate} />;
+  return <ProAnalyticsDashboard shows={shows} fate={entries} since={profileSince()} libraryReady={!loading} onPersonClick={onPersonClick} onFate={onFate} />;
 });
 
 const ProfileYearContent = React.memo(function ProfileYearContent({ onFate }: { onFate: () => void }) {
   const { shows, loading, entries } = useSeriesFate();
-  return <ProfileYearStory shows={shows} fate={entries} libraryReady={!loading} onFate={onFate} />;
+  return <ProfileYearStory shows={shows} fate={entries} since={profileSince()} libraryReady={!loading} onFate={onFate} />;
 });
 
 const ProfileFateContent = React.memo(function ProfileFateContent({ onShowClick }: { onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void }) {
@@ -50,7 +56,8 @@ const ProfileFateContent = React.memo(function ProfileFateContent({ onShowClick 
 
 const MoiHome = React.memo(function MoiHome({ onPage, onShowClick }: { onPage: (page: ProfilePage) => void; onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void }) {
   const { shows, entries } = useSeriesFate();
-  const viewings = useMemo(() => partitionProfileViewings(collectProfileViewings(shows)).viewings, [shows]);
+  const since = profileSince();
+  const viewings = useMemo(() => scopeProfileViewings(shows, since).viewings, [shows, since]);
   const fate = useMemo(() => summarizeSeriesFate(entries), [entries]);
   const libraryView = useMemo(() => ({ kind: 'shelves' as const, onOpenSection: (id: string, title: string, type: LibraryTypeFilter) => onPage({ kind: 'section', id, title, type }) }), [onPage]);
   return <>

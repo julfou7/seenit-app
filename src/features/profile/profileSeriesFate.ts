@@ -49,7 +49,7 @@ export function buildSeriesFate(shows: readonly Show[], now: number, today: stri
     if (!show?.id || show.mediaType !== 'tv') continue;
     const watched = historyEpisodeEntries(show);
     const dropped = show.status === 'dropped';
-    if (watched.length === 0 || (show.isArchived && !dropped)) continue;
+    if (watched.length === 0) continue;
     let last: { season: number; episode: number } | null = null;
     let minutesSpent = 0;
     for (const { key, record } of watched) {
@@ -61,7 +61,10 @@ export function buildSeriesFate(shows: readonly Show[], now: number, today: stri
     const resume = resolveWatchCardResume(show, today);
     const total = positive(show.totalAiredEpisodes);
     const remaining = total ? Math.max(0, total - watched.length) : null;
-    const finished = !dropped && (show.status === 'completed' || (resume.upToDate && show.seriesEnded === true));
+    // Retour terrain v1.4.292 : une série finie le reste même archivée, et la fin se lit aussi dans le statut TMDB.
+    const ended = show.seriesEnded === true || show.tmdbStatus === 'Ended' || show.tmdbStatus === 'Canceled';
+    const finished = !dropped && (show.status === 'completed' || (resume.upToDate && ended));
+    if (show.isArchived && !dropped && !finished) continue;
     const fate: SeriesFate = dropped ? 'dropped' : finished ? 'finished'
       : resume.episode && !resume.upToDate && pause.days >= SERIES_PAUSE_DAYS ? 'paused' : 'active';
     entries.push({

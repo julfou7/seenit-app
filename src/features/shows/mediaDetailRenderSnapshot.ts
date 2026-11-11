@@ -2,7 +2,8 @@ import { prepareTrailerVideos } from '../trailers/trailerPolicy.ts';
 
 export type MediaDetailRenderType = 'tv' | 'movie';
 
-export const MEDIA_DETAIL_RENDER_SCHEMA_VERSION = 3;
+// Version 4 : dernier et prochain épisode diffusés pour le statut de diffusion de la fiche série (SEENIT-UX-023).
+export const MEDIA_DETAIL_RENDER_SCHEMA_VERSION = 4;
 export const MEDIA_DETAIL_RENDER_MAX_GENRES = 24;
 export const MEDIA_DETAIL_RENDER_MAX_KEYWORDS = 40;
 export const MEDIA_DETAIL_RENDER_MAX_LOGOS = 8;
@@ -67,7 +68,8 @@ const compactCastMember = (item: any) => {
   };
 };
 
-const compactSeason = (item: any) => {
+interface SeasonSource { id?: unknown; name?: unknown; season_number?: unknown; episode_count?: unknown; air_date?: string | null; poster_path?: string | null; overview?: unknown }
+const compactSeason = (item: SeasonSource | null | undefined) => {
   if (!item || !Number.isFinite(Number(item.season_number))) return null;
   return {
     id: Number.isFinite(Number(item.id)) ? Number(item.id) : undefined,
@@ -91,6 +93,13 @@ interface VideoSource {
   iso_3166_1?: string;
   published_at?: string;
 }
+
+interface AirEpisodeSource { air_date?: unknown; season_number?: unknown; episode_number?: unknown }
+const compactAirEpisode = (item: AirEpisodeSource | null | undefined) => {
+  if (!item || typeof item.air_date !== 'string') return null;
+  const season = Number(item.season_number), episode = Number(item.episode_number);
+  return { air_date: item.air_date, season_number: Number.isFinite(season) ? season : null, episode_number: Number.isFinite(episode) ? episode : null };
+};
 
 const compactVideo = (item: VideoSource | null | undefined) => {
   if (!item?.key || item.site !== 'YouTube') return null;
@@ -139,7 +148,7 @@ export function createMediaDetailRenderSnapshot(
         .map(({ languageLabel: _languageLabel, typeLabel: _typeLabel, ...video }) => video)
     : [];
   const networks = Array.isArray(details?.networks)
-    ? details.networks.map((network: any) => ({
+    ? details.networks.map((network: { id?: unknown; name?: unknown; logo_path?: string | null; origin_country?: string } | null) => ({
         id: Number.isFinite(Number(network?.id)) ? Number(network.id) : undefined,
         name: network?.name ? String(network.name) : undefined,
         logo_path: network?.logo_path || null,
@@ -190,11 +199,16 @@ export function createMediaDetailRenderSnapshot(
     vote_count: Number.isFinite(Number(details?.vote_count)) ? Number(details.vote_count) : undefined,
     runtime: Number.isFinite(Number(details?.runtime)) ? Number(details.runtime) : undefined,
     episode_run_time: Array.isArray(details?.episode_run_time)
-      ? details.episode_run_time.filter((value: any) => Number.isFinite(Number(value))).slice(0, 4).map(Number)
+      ? details.episode_run_time.filter((value: unknown) => Number.isFinite(Number(value))).slice(0, 4).map(Number)
       : undefined,
     number_of_seasons: Number.isFinite(Number(details?.number_of_seasons)) ? Number(details.number_of_seasons) : undefined,
     number_of_episodes: Number.isFinite(Number(details?.number_of_episodes)) ? Number(details.number_of_episodes) : undefined,
     status: details?.status || undefined,
+    ...(type === 'tv' ? {
+      last_air_date: typeof details?.last_air_date === 'string' ? details.last_air_date : undefined,
+      next_episode_to_air: compactAirEpisode(details?.next_episode_to_air),
+      last_episode_to_air: compactAirEpisode(details?.last_episode_to_air),
+    } : {}),
     tagline: details?.tagline || undefined,
     origin_country: Array.isArray(details?.origin_country) ? details.origin_country.slice(0, 8) : undefined,
     networks,

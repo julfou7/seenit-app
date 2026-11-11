@@ -186,3 +186,44 @@ test('SEENIT-PROFILE-004 retour terrain v1.4.291 : top de l’année avec affich
   assert.deepEqual(top.map(entry => [entry.title, entry.share, Math.round(entry.relative * 100)]), [['A', 60, 100], ['B', 40, 67]]);
   assert.match(read('src/components/ProfileYearStory.tsx'), /% de ton temps séries/);
 });
+
+test('SEENIT-PROFILE-002 retour terrain v1.4.292 : une série finie archivée compte comme terminée', () => {
+  const shows = [
+    series('archived-done', { isArchived: true, status: 'completed' }, [['1x1', NOW - 20 * DAY]]),
+    series('archived-ended', { isArchived: true, tmdbStatus: 'Ended', totalAiredEpisodes: 2, nextEpisodeToWatch: null }, [['1x1', NOW - 20 * DAY], ['1x2', NOW - 19 * DAY]]),
+    series('archived-left', { isArchived: true, ...next(1, 2) }, [['1x1', NOW - 20 * DAY]]),
+  ];
+  const byId = Object.fromEntries(buildSeriesFate(shows, NOW, TODAY).map(entry => [entry.show.id, entry.fate]));
+  assert.equal(byId['archived-done'], 'finished');
+  assert.equal(byId['archived-left'], undefined, 'une série archivée non finie reste hors du devenir');
+});
+
+test('SEENIT-PROFILE-006 chiffres depuis l’inscription, sans rattrapage marqué d’un coup ni faux marathon', async () => {
+  const { scopeProfileViewings, formatProfileScopeNote, findProfileCatchUps } = await import('../src/features/profile/profileYearStats.ts');
+  const since = at(2026, 6, 3, 15);
+  const bulkAt = at(2026, 6, 4, 10);
+  // Série vue par le passé, marquée en entier le lendemain de l'inscription : seize épisodes à quelques secondes d'écart.
+  const bulk = series('passe', {}, Array.from({ length: 16 }, (_, index) => [`1x${index + 1}`, bulkAt + index * 2_000] as [string, number]));
+  // Vraie soirée : trois épisodes à 45 minutes d'écart.
+  const binge = series('soiree', {}, [['1x1', at(2026, 8, 5, 21)], ['1x2', at(2026, 8, 5, 21) + 45 * 60_000], ['1x3', at(2026, 8, 5, 21) + 90 * 60_000]]);
+  // Lecture Plex datée avant l'inscription.
+  const before = series('avant', {}, [['1x1', at(2025, 2, 1)]]);
+  const scope = scopeProfileViewings([bulk, binge, before], since);
+  assert.equal(scope.catchUp.count, 16);
+  assert.equal(scope.beforeSince, 1);
+  assert.deepEqual([...new Set(scope.viewings.map(viewing => viewing.showId))], ['soiree']);
+  assert.equal(scope.since, new Date(since).setHours(0, 0, 0, 0), 'le jour de l’inscription compte en entier');
+  const records = buildProfileYearRecords(scope.viewings, 2026);
+  assert.equal(records.marathon?.title, 'soiree', 'le rattrapage n’est jamais un marathon');
+  assert.equal(records.marathon?.episodes, 3);
+  assert.equal(formatProfileScopeNote(scope, 2026), 'Depuis ton inscription le 3 juillet 2026 · sans 16 épisodes marqués d’un coup');
+  assert.equal(formatProfileScopeNote({ ...scope, catchUp: { count: 0, minutes: 0 } }, 2025), null);
+  // Deux épisodes rapprochés ne suffisent pas, les films ne sont jamais groupés.
+  const pair = [view('a', bulkAt), view('a', bulkAt + 1_000), view('m1', bulkAt, 110, 'movie'), view('m2', bulkAt, 110, 'movie'), view('m3', bulkAt, 110, 'movie')];
+  assert.equal(findProfileCatchUps(pair).size, 0);
+  // Sans date d'inscription connue, rien n'est coupé avant.
+  assert.equal(scopeProfileViewings([before], null).viewings.length, 1);
+  // Les écrans de chiffres passent tous par la même portée, bornée par la date de création du compte.
+  for (const path of ['src/components/ProAnalyticsDashboard.tsx', 'src/components/ProfileYearStory.tsx', 'src/screens/ProfileScreen.tsx']) assert.match(read(path), /scopeProfileViewings\(shows, since\)/);
+  assert.match(read('src/screens/ProfileScreen.tsx'), /metadata\?\.creationTime/);
+});
