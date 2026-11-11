@@ -193,7 +193,9 @@ export function buildLeadActors(viewings: readonly ProfileViewing[], shows: read
     picked.push(person);
     if (picked.length === PROFILE_LEAD_LIMIT) break;
   }
-  return picked.length >= 3 ? picked : [];
+  // Revue Codex #948 : une sélection diversifiée de une ou deux personnes reste affichée ; le repli global n'est
+  // utilisé qu'en l'absence totale de données.
+  return picked;
 }
 
 /** Trois premiers du générique, dans l'ordre TMDB ; pour une série, le cumul d'épisodes départage. */

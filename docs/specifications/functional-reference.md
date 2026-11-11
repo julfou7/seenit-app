@@ -407,12 +407,15 @@ Réglages et porte un point or lorsqu'une mise à jour de l'application est disp
 - **Mes chiffres** (`SEENIT-PROFILE-003`) : cadran des douze mois (valeur sous chaque mois, détail du mois
   au toucher), trois repères (rythme sur 28 jours, journée type, jours d'affilée), tendances sur douze
   semaines avec leur valeur et au plus trois constats nets, part séries/films et quatre genres au temps,
-  semaine en tranches de trois heures, six plateformes en part du temps et part sans plateforme connue à
-  part, résumé des séries laissées en route, réactions (dès dix épisodes notés), têtes d'affiche (trois
-  premiers rôles au temps de visionnage) et badges à niveaux.
+  semaine en tranches de trois heures (sur les seules lectures Plex à l'heure réelle dès qu'il y en a
+  vingt dans l'année, sinon à l'heure des Vu, ce qui est annoncé), six plateformes en part du temps et
+  part sans plateforme connue à part, résumé des séries laissées en route, réactions (dès dix épisodes
+  notés), têtes d'affiche (trois premiers rôles des titres vus, cinq personnes au plus classées par nombre
+  de titres puis par temps, chacune apportant un titre encore absent) et badges à niveaux, sans animation.
+- Une étiquette de plateforme ou de genre ne se coupe qu'entre deux mots.
 - **Mon année** (`SEENIT-PROFILE-004`) : l'année jour par jour, quatre records, « Ton année en séries »
   (la série la plus regardée de chaque mois, jamais de film), films ou séries mois par mois, devenir des
-  séries de l'année, top cinq et « Et maintenant ».
+  séries de l'année, top cinq (affiche, heures, épisodes, part du temps séries) et « Et maintenant ».
 
 Mes chiffres et Mon année s'animent une fois à l'entrée de chaque bloc dans l'écran, en mouvement réduit
 tout s'affiche directement (`SEENIT-PROFILE-005`) ; Séries laissées en route ne s'anime pas.

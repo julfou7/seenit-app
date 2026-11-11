@@ -172,6 +172,8 @@ test('SEENIT-PROFILE-003 retour terrain v1.4.291 : grille sur les heures Plex, t
   const leads = buildLeadActors([view('lioness', NOW, 900), view('avatar', NOW, 160), view('lupin', NOW, 120), view('saul', NOW, 60)], shows,
     show => show.id === 'lioness' ? [lead(1), lead(2), lead(3)] : show.id === 'avatar' ? [lead(1), lead(4)] : show.id === 'lupin' ? [lead(5)] : [lead(6)]);
   assert.deepEqual(leads.map(person => person.id), [1, 5, 6], 'une seule personne par série déjà représentée');
+  assert.deepEqual(buildLeadActors([view('lioness', NOW, 900)], [series('lioness')], () => [lead(1), lead(2), lead(3)]).map(person => person.id), [1], 'une seule série vue : une tête d’affiche, jamais le repli global (revue Codex #948)');
+  assert.deepEqual(buildLeadActors([], [], () => null), []);
   const dashboard = read('src/components/ProAnalyticsDashboard.tsx');
   assert.match(dashboard, /<div key=\{badge\.id\} className="moi-badge">/);
   assert.doesNotMatch(dashboard, /closestBadge/);
