@@ -1601,7 +1601,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   montre la note sur l'affiche et « durée · genre » ; aucun titre, accroche acteur ni diffuseur n'est coupé
   (le billet horizontal mesure au moins 150 px, la hauteur de la carte série).
   Un film dont la date de sortie est future affiche « sortie dans N j » et n'a aucun bouton Vu ; une date
-  inconnue vaut sortie. Un film en salle affiche « au cinéma » et sa durée au lieu d'une heure de fin.
+  inconnue vaut sortie. Un film en salle affiche « au cinéma » et sa durée au lieu d'une heure de fin ; la
+  preuve détaillée des sorties françaises est conservée dans l'instantané de détails (schéma 3) et un film
+  sorti depuis moins de 120 jours qui ne l'a pas encore est rechargé une fois.
 - **SEENIT-UX-016** — Les cartes 8f et les tickets films réutilisent les écritures réversibles existantes.
   La séparation des groupes et leur présentation suivent désormais `SEENIT-UX-018`.
   Un Vu abouti anime l'épisode quitté, la nouvelle reprise réelle, le segment et un tampon SeenIt ;

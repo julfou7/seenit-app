@@ -16,6 +16,9 @@ import { MovieActorLine } from './MovieActorLine';
 import { SeenItWatchedStamp } from './SeenItWatchedStamp';
 
 const detailLimiter = createWatchProviderRequestLimiter(2);
+// Fenêtre large autour de celle de la politique cinéma : seuls ces films ont besoin de la preuve détaillée.
+const CINEMA_PROOF_PAST_DAYS = 120;
+const CINEMA_PROOF_FUTURE_DAYS = 30;
 const detailGate = createPassiveCardEnrichmentGate(240);
 interface Props {
   actor?: TicketActor | null;
@@ -39,8 +42,18 @@ export const MovieTicketCard = React.memo(function MovieTicketCard({ actor = nul
   const inFlight = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const runtime = movieRuntime(show, details || cached);
+  // Revue Codex #943 : un film sorti récemment sans preuve « en salle » détaillée est rechargé une fois, même
+  // si sa durée est déjà connue (ancien instantané sans release_dates).
+  const needsCinemaProof = (value: unknown) => {
+    const date = readHomeMovieFacts(show, value).releaseDate;
+    if (!date || (value && typeof value === 'object' && 'release_dates' in value)) return false;
+    const age = (start - new Date(`${date}T12:00:00`).getTime()) / 86_400_000;
+    return age >= -CINEMA_PROOF_FUTURE_DAYS && age <= CINEMA_PROOF_PAST_DAYS;
+  };
+  const missingProof = needsCinemaProof(details || cached);
   const enrich = useCallback(() => {
-    if (!show.tmdbId || movieRuntime(show, tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie'))) return;
+    const known = show.tmdbId ? tmdb.peekRenderableMediaDetails(show.tmdbId, 'movie') : null;
+    if (!show.tmdbId || (movieRuntime(show, known) && !needsCinemaProof(known))) return;
     const key = `movie:${show.tmdbId}`;
     if (!detailGate.tryStart(key)) return;
     void detailLimiter.run(async () => {
@@ -54,7 +67,7 @@ export const MovieTicketCard = React.memo(function MovieTicketCard({ actor = nul
     }).catch(() => detailGate.fail(key));
   }, [show.id, show.tmdbId, onRuntime]);
   const { cardRef, providerLogo, providerName } = usePassiveWatchProvider({
-    tmdbId: show.tmdbId, mediaType: 'movie', retainInLibraryCache: true, onEnrich: runtime ? undefined : enrich,
+    tmdbId: show.tmdbId, mediaType: 'movie', retainInLibraryCache: true, onEnrich: runtime && !missingProof ? undefined : enrich,
   });
   const movieDetails = details && typeof details === 'object' ? details as { release_date?: string; genres?: Array<{ name: string }> } : null;
   const local = show as Show & { releaseDate?: string; year?: number | string };

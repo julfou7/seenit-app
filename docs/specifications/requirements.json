@@ -3947,6 +3947,10 @@
         {
           "file": "tests/homeMovies.test.ts",
           "contains": "SEENIT-UX-022 revue Codex #943 : notes chargées pour toute la liste, Chez moi sans plateforme = Plex seul, diffuseurs périmés réactualisés"
+        },
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 revue Codex #943 : la preuve « en salle » survit au redémarrage, sinon le billet la recharge"
         }
       ]
     },
