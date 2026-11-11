@@ -74,8 +74,9 @@ test('SEENIT-UX-022 l’accueil branche tri, À l’affiche, billets sans coupe 
 
 test('SEENIT-UX-022 revue Codex #943 : notes chargées pour toute la liste, Chez moi sans plateforme = Plex seul, diffuseurs périmés réactualisés', () => {
   const section = read('src/screens/WatchNextSection.tsx');
-  assert.match(section, /const missingDetailsKey = orderedMovies\.filter\(show => show\.tmdbId && !movieDetails\(show\)\)/);
-  assert.match(section, /primeMediaRenderSnapshotFromPersistentCache\(id, 'movie'\)\) && current\) await tmdb\.getMovieDetails\(id\)/);
+  assert.match(section, /const missingDetailsKey = orderedMovies\.filter\(show => show\.tmdbId && !movieFactsStore\.current\.has\(show\.tmdbId\) && !movieDetails\(show\)\)/);
+  assert.match(section, /const result = await tmdb\.getMovieDetails\(show\.tmdbId\)/);
+  assert.match(section, /if \(details && current\) rememberMovieFacts\(show, details\)/, 'les faits survivent à l’éviction des caches bornés');
   assert.match(section, /if \(!preferredPlatforms\.length\) return false;/);
   assert.match(section, /!readWatchProviderCache\(show\.tmdbId, 'movie'\)\)\.map\(show => show\.tmdbId\)/, 'un cache périmé est rechargé');
 });
