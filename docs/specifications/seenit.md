@@ -1612,12 +1612,18 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   têtes d'affiche (trois premiers rôles des titres vus, au temps de visionnage, repli sur les acteurs
   fréquents) et badges à niveaux (paliers de la carte fonctionnelle, anneau vers le palier suivant).
   Le vocabulaire parle de jours, jamais de soirs, faute d'heure prouvée pour tous les visionnages.
+  Retour terrain v1.4.291 : marquer Vu dans l'app date le geste, pas le visionnage ; dès vingt lectures Plex
+  à l'heure réelle dans l'année, « Quand tu regardes » ne compte qu'elles, sinon il annonce montrer l'heure
+  des Vu. Les têtes d'affiche (cinq au plus) sont classées par nombre de titres puis par temps, et une
+  personne n'entre que si elle apporte une série ou un film encore absent du classement. Les badges ne
+  s'animent pas ; une étiquette de plateforme ne se coupe qu'entre deux mots.
 - **SEENIT-PROFILE-004** — Mon année : titre « L'année X, puis Y » d'après les séries les plus regardées,
   calendrier jour par jour (quatre niveaux, journée record), mois record, plus longue suite de jours, plus
   gros marathon d'une série en un jour et plus longue pause, « Ton année en séries » (série la plus
   regardée de chaque mois avec affiche et étiquette tirée des données, jamais de film ni de note, six mois
   puis le reste à la demande), films ou séries mois par mois et un constat si la part des films bascule de
-  dix points, devenir des séries de l'année, top cinq au temps et « Et maintenant ».
+  dix points, devenir des séries de l'année, top cinq au temps (affiche, barre relative au premier, heures,
+  épisodes et part du temps séries) et « Et maintenant ».
 - **SEENIT-PROFILE-005** — Mes chiffres et Mon année s'animent une seule fois à l'entrée de chaque bloc dans
   l'écran (IntersectionObserver, seuil 0,12) : apparition, barres et colonnes qui poussent, surgissement,
   secteurs du cadran depuis le centre et total compté par `requestAnimationFrame`, lueur douce ou reflet sur

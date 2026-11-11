@@ -98,9 +98,9 @@ test('SEENIT-PROFILE-003 constats nets seulement, genres en part du temps et ré
 
 test('SEENIT-PROFILE-003 têtes d’affiche : trois premiers rôles, classés au temps ; nuits pour Oiseau de nuit', () => {
   const lead = (id: number) => ({ id, name: `P${id}`, profile_path: null });
-  const shows = [series('a', { isFavorite: true }), series('b'), series('c')];
-  const leads = buildLeadActors([view('a', NOW, 300), view('b', NOW, 120), view('c', NOW, 60)], shows, show => show.id === 'a' ? [lead(1), lead(2), lead(3), lead(4)] : show.id === 'b' ? [lead(2), lead(5)] : [lead(6)]);
-  assert.deepEqual(leads.map(person => [person.id, person.minutes, person.titles, person.favorites]), [[2, 420, 2, 1], [1, 300, 1, 1], [3, 300, 1, 1]]);
+  const shows = [series('a', { isFavorite: true }), series('b'), series('c'), series('d')];
+  const leads = buildLeadActors([view('a', NOW, 300), view('b', NOW, 120), view('c', NOW, 60), view('d', NOW, 30)], shows, show => show.id === 'a' ? [lead(1), lead(2), lead(3), lead(4)] : show.id === 'b' ? [lead(2), lead(5)] : show.id === 'c' ? [lead(6)] : [lead(7)]);
+  assert.deepEqual(leads.map(person => [person.id, person.minutes, person.titles, person.favorites]), [[2, 420, 2, 1], [6, 60, 1, 0], [7, 30, 1, 0]], 'nombre de titres d’abord, puis une personne par série nouvelle');
   assert.ok(!leads.some(person => person.id === 4), 'le quatrième rôle n’est pas une tête d’affiche');
   assert.deepEqual(leadCastFromDetails({ credits: { cast: [{ id: 9, name: 'B', order: 1 }, { id: 8, name: 'A', order: 0 }] } }, 'movie')?.map(person => person.id), [8, 9]);
   assert.equal(countNightViewings([view('a', at(2026, 1, 1, 23)), view('a', at(2026, 1, 2, 2)), view('a', at(2026, 1, 3, 21)), view('a', at(2026, 1, 4, 23), 45, 'tv', 'a', false)]), 1, 'une nuit s’étend sur minuit, heure inconnue ignorée');
@@ -156,4 +156,31 @@ test('SEENIT-PROFILE-005 animations une fois à l’entrée, sur transform et op
   assert.match(read('src/screens/ProfileScreen.tsx'), /next\.kind !== 'home' && pageRef\.current\.kind === 'home'\) homeScroll\.current/, 'la position de Moi survit à un passage entre deux sous-pages');
   assert.match(css, /\.moi-dial-month\[data-state=current\]\{color:#fff;background:rgba\(229,169,61,\.16\);box-shadow:inset 0 0 0 1\.5px #E5A93D\}/);
   assert.doesNotMatch(read('src/components/profile/SeriesFateScreen.tsx'), /moi-reveal|moi-pop|moi-grow|moi-glow/, 'aucune animation sur Séries laissées en route');
+});
+
+test('SEENIT-PROFILE-003 retour terrain v1.4.291 : grille sur les heures Plex, têtes d’affiche variées, badges statiques', async () => {
+  const { buildProfileYearStats, PROFILE_PUNCH_PLEX_MIN } = await import('../src/features/profile/profileYearStats.ts');
+  const morningMarks = Array.from({ length: 30 }, (_, index) => ({ ...view('a', at(2026, 1, 1 + index, 8)) }));
+  const plexEvenings = Array.from({ length: PROFILE_PUNCH_PLEX_MIN }, (_, index) => ({ ...view('b', at(2026, 2, 1 + index, 22)), plexTime: true }));
+  const withPlex = buildProfileYearStats([...morningMarks, ...plexEvenings], 2026, NOW).punch;
+  assert.equal(withPlex.source, 'plex');
+  assert.equal(withPlex.slot?.fromHour, 21, 'les Vu marqués le matin ne déplacent plus le créneau');
+  const marksOnly = buildProfileYearStats([...morningMarks, ...plexEvenings.slice(1)], 2026, NOW).punch;
+  assert.equal(marksOnly.source, 'mark', 'sous vingt lectures Plex, la grille dit qu’elle montre l’heure des Vu');
+  const lead = (id: number) => ({ id, name: `P${id}`, profile_path: null });
+  const shows = [series('lioness'), series('avatar'), series('lupin'), series('saul')];
+  const leads = buildLeadActors([view('lioness', NOW, 900), view('avatar', NOW, 160), view('lupin', NOW, 120), view('saul', NOW, 60)], shows,
+    show => show.id === 'lioness' ? [lead(1), lead(2), lead(3)] : show.id === 'avatar' ? [lead(1), lead(4)] : show.id === 'lupin' ? [lead(5)] : [lead(6)]);
+  assert.deepEqual(leads.map(person => person.id), [1, 5, 6], 'une seule personne par série déjà représentée');
+  const dashboard = read('src/components/ProAnalyticsDashboard.tsx');
+  assert.match(dashboard, /<div key=\{badge\.id\} className="moi-badge">/);
+  assert.doesNotMatch(dashboard, /closestBadge/);
+  assert.match(dashboard, /stats\.punch\.source === 'plex' \? 'heures de lecture Plex' : 'heure des Vu'/);
+  assert.match(read('src/screens/moi.css'), /\.moi-root \.home-load-more:last-child\{margin-bottom:8px\}/);
+});
+
+test('SEENIT-PROFILE-004 retour terrain v1.4.291 : top de l’année avec affiche, part du temps séries et écart au premier', () => {
+  const top = buildTopSeries([view('a', at(2026, 1, 1), 300, 'tv', 'A'), view('a', at(2026, 1, 2), 300, 'tv', 'A'), view('b', at(2026, 1, 3), 400, 'tv', 'B'), view('f', at(2026, 1, 4), 500, 'movie', 'F')], 2026);
+  assert.deepEqual(top.map(entry => [entry.title, entry.share, Math.round(entry.relative * 100)]), [['A', 60, 100], ['B', 40, 67]]);
+  assert.match(read('src/components/ProfileYearStory.tsx'), /% de ton temps séries/);
 });
