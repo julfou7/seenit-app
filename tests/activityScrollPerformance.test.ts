@@ -77,7 +77,7 @@ test('#229 borne le rendu initial des carrousels progressifs et conserve Voir to
   assert.match(watchListSource, /groups=\{\[continueWatchingShows, nouveautesShows, pasVuDepuisUnMomentShows\]\}/);
   assert.match(watchListSource, /movies=\{filmsAVoirShows\}/);
   assert.match(watchListSource, /items\.slice\(0, limit\)/);
-  assert.match(watchListSource, /orderedMovies\.slice\(0, movieList \? movieCount : movieRailLimit\)/);
+  assert.match(watchListSource, /visibleMovies\.slice\(0, movieList \? movieCount : movieRailLimit\)/);
 
   assert.match(watchListSource, /setMovieCount\(count => count \+ HOME_PAGE_SIZE\)/);
   assert.match(watchListSource, /limit \+ HOME_PAGE_SIZE/);

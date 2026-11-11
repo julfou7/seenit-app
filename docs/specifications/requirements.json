@@ -3915,6 +3915,58 @@
           "contains": "SEENIT-NOTIFICATION-010 les notifications gardent leur heure réelle et les cartes calculées leur première apparition"
         }
       ]
+    },
+    {
+      "id": "SEENIT-UX-022",
+      "title": "Films à voir : tri Récents / Mieux notés / Chez moi, carte À l'affiche, billets sans texte coupé et pas de Vu avant la sortie",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 lit note, genre et date de sortie dans les détails sans en inventer"
+        },
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 un film non sorti a un compte à rebours ; une date inconnue vaut sortie"
+        },
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 trie Récents, Mieux notés (sans note en dernier) et filtre Chez moi"
+        },
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 À l’affiche tire parmi les dix mieux notés, sortis et non vus, jamais sous trois films"
+        },
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 l’accueil branche tri, À l’affiche, billets sans coupe et pas de Vu avant la sortie"
+        },
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 revue Codex #943 : notes chargées pour toute la liste, Chez moi sans plateforme = Plex seul, diffuseurs périmés réactualisés"
+        },
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 revue Codex #943 : la preuve « en salle » survit au redémarrage, sinon le billet la recharge"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DISCOVER-008",
+      "title": "Explorer : champ de recherche posé sur l'image à la une, une seule loupe visible",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/explorerSearchVisibility.test.ts",
+          "contains": "SEENIT-DISCOVER-008 recherche posée sur l’image à la une, une seule loupe visible à la fois"
+        }
+      ]
     }
   ]
 }

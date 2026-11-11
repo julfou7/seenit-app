@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Moi · Mon année</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+body{margin:0}
+a{color:#F2C36B;text-decoration:none}a:hover{color:#FFF2B8}
+@keyframes growX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes popIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+@keyframes glowGold{0%,100%{box-shadow:0 0 0 0 rgba(242,195,107,0)}50%{box-shadow:0 0 14px 2px rgba(242,195,107,.8)}}
+@keyframes glowSoft{0%,100%{box-shadow:0 0 0 0 rgba(242,195,107,0)}50%{box-shadow:0 0 7px 0 rgba(242,195,107,.4)}}
+@keyframes textGlow{0%,100%{text-shadow:0 0 0 rgba(242,195,107,0)}50%{text-shadow:0 0 12px rgba(242,195,107,.95)}}
+@keyframes sweep{0%{transform:translateX(-100%)}60%,100%{transform:translateX(180%)}}
+@media (prefers-reduced-motion: reduce){[data-anim]{animation:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 2600px; box-sizing: border-box; background: #0B0B0D; color: #ffffff; font-family: 'Plus Jakarta Sans', Inter, sans-serif; padding: 18px 16px 28px; display: flex; flex-direction: column; gap: 12px">
+
+  <!-- Barre de titre : page ouverte depuis Moi -->
+  <div style="display: flex; align-items: center; gap: 12px">
+    <a href="Moi.dc.html" aria-label="Retour à Moi" style="width: 44px; height: 44px; border-radius: 22px; background: #1C1C1F; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); color: #e4e4e7; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em">Mon année</h1>
+  </div>
+
+  <!-- Titre de l'année -->
+  <div style="display: flex; flex-direction: column; gap: 8px; padding: 6px 2px 0">
+    <div style="display: flex; justify-content: space-between; align-items: center">
+      <span style="font-size: 13px; font-weight: 700; color: #a1a1aa">Ton année, jusqu’ici</span>
+      <button type="button" style="height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); background: #1C1C1F; color: #e4e4e7; font-family: inherit; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px">2026
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+      </button>
+    </div>
+    <h2 style="margin: 0; font-size: 27px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.15">L’année <span style="color: #F2C36B">Lioness</span>, puis <span style="color: #F2C36B">Au micro !</span></h2>
+    <span style="font-size: 13px; color: #a1a1aa">216 h · 165 épisodes · 51 films · 112 soirs devant l’écran</span>
+  </div>
+
+  <!-- 1. L'année jour par jour -->
+  <section data-sec="s1" style="border-radius: 24px; background: radial-gradient(120% 60% at 50% 0%, rgba(229,169,61,0.14), rgba(21,21,24,0) 62%), #151518; box-shadow: inset 0 0 0 1px rgba(229,169,61,0.28); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s1.op}}; transform: {{v.s1.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h3 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">2026, jour par jour</h3>
+      <span style="font-size: 12.5px; color: #a1a1aa">une case = un jour</span>
+    </div>
+    <div role="img" aria-label="Calendrier de l’année : peu de visionnages au printemps, beaucoup de juillet à octobre" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 12px">
+      <sc-for list="{{months}}" as="month" hint-placeholder-count="12">
+        <div data-anim="1" style="display: flex; flex-direction: column; gap: 5px; animation: {{month.anim}}">
+          <span style="font-size: 10.5px; font-weight: 800; letter-spacing: 0.04em; color: {{month.labelColor}}">{{month.label}}</span>
+          <div style="display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px">
+            <sc-for list="{{month.cells}}" as="cell" hint-placeholder-count="35">
+              <span data-anim="1" style="aspect-ratio: 1; border-radius: 2px; background: {{cell.bg}}; animation: {{cell.anim}}"></span>
+            </sc-for>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+    <div style="display: flex; align-items: center; justify-content: flex-end; gap: 5px; font-size: 11px; font-weight: 600; color: #a1a1aa">
+      <span>moins</span>
+      <span style="width: 10px; height: 10px; border-radius: 2px; background: #222226"></span>
+      <span style="width: 10px; height: 10px; border-radius: 2px; background: rgba(229,169,61,0.3)"></span>
+      <span style="width: 10px; height: 10px; border-radius: 2px; background: rgba(229,169,61,0.55)"></span>
+      <span style="width: 10px; height: 10px; border-radius: 2px; background: #E5A93D"></span>
+      <span style="width: 10px; height: 10px; border-radius: 2px; background: #FFF2B8"></span>
+      <span>plus</span>
+    </div>
+    <p style="margin: 0; padding: 10px 12px; border-radius: 12px; background: rgba(229,169,61,0.1); font-size: 12.5px; line-height: 1.5; color: #e4e4e7">Journée record : <strong data-anim="1" style="color: #F2C36B; animation: textGlow 2.4s ease-in-out 1s infinite">samedi 15 août, 7 h 20</strong> devant quatre films.</p>
+  </section>
+
+  <!-- 2. Records -->
+  <div data-sec="s2" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; opacity: {{v.s2.op}}; transform: {{v.s2.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="border-radius: 18px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 14px; display: flex; flex-direction: column; gap: 4px; animation: popIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) 100ms both; animation-name: {{v.s2.pop}}" data-anim="1">
+      <span style="font-size: 11.5px; font-weight: 700; color: #a1a1aa">Mois record</span>
+      <span data-anim="1" style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em; animation: textGlow 2.4s ease-in-out 1s infinite">Août · 63 h</span>
+      <span style="font-size: 12px; color: #a1a1aa">13 films, 52 épisodes</span>
+    </div>
+    <div style="border-radius: 18px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 14px; display: flex; flex-direction: column; gap: 4px; animation: popIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) 210ms both; animation-name: {{v.s2.pop}}" data-anim="1">
+      <span style="font-size: 11.5px; font-weight: 700; color: #a1a1aa">Jours d’affilée</span>
+      <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em">6 jours</span>
+      <span style="font-size: 12px; color: #a1a1aa">du 12 au 17 octobre</span>
+    </div>
+    <div style="border-radius: 18px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 14px; display: flex; flex-direction: column; gap: 4px; animation: popIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) 320ms both; animation-name: {{v.s2.pop}}" data-anim="1">
+      <span style="font-size: 11.5px; font-weight: 700; color: #a1a1aa">Plus gros marathon</span>
+      <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em">8 épisodes</span>
+      <span style="font-size: 12px; color: #a1a1aa">Lioness, le 6 septembre</span>
+    </div>
+    <div style="border-radius: 18px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 14px; display: flex; flex-direction: column; gap: 4px; animation: popIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) 430ms both; animation-name: {{v.s2.pop}}" data-anim="1">
+      <span style="font-size: 11.5px; font-weight: 700; color: #a1a1aa">Plus longue pause</span>
+      <span style="font-size: 20px; font-weight: 800; letter-spacing: -0.02em">41 jours</span>
+      <span style="font-size: 12px; color: #a1a1aa">du 28 mars au 8 mai</span>
+    </div>
+  </div>
+
+  <!-- 3. Ton année en séries : uniquement des séries, avec leur affiche -->
+  <section data-sec="s3" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s3.op}}; transform: {{v.s3.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <h3 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Ton année en séries</h3>
+    <span style="margin-top: -8px; font-size: 12.5px; line-height: 1.45; color: #a1a1aa">Chaque mois, la série que tu as le plus regardée.</span>
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span style="width: 34px; font-size: 11.5px; font-weight: 800; color: #ffffff; flex-shrink: 0">NOV</span>
+        <div aria-hidden="true" style="width: 44px; height: 66px; border-radius: 9px; background: linear-gradient(160deg, #d9d2c2, #6b6558); display: flex; align-items: flex-end; padding: 5px; box-sizing: border-box; font-size: 8.5px; font-weight: 800; color: #f4f4f5; flex-shrink: 0">SLOW HORSES</div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+          <span style="font-size: 15px; font-weight: 700; line-height: 19px">Slow Horses</span>
+          <div style="display: flex; align-items: center; gap: 8px"><div style="flex: 1; height: 6px; border-radius: 3px; background: #232327"><div data-anim="1" style="width: 36%; height: 6px; border-radius: 3px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both; animation-name: {{v.s3.gx}}"></div></div><span style="font-size: 12.5px; font-weight: 700; color: #d4d4d8; flex-shrink: 0">6 ép. · 5 h</span></div>
+          <span style="align-self: flex-start; padding: 3px 8px; border-radius: 8px; background: #1C1C1F; color: #d4d4d8; font-size: 11.5px; font-weight: 700">en cours · saison 6</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span style="width: 34px; font-size: 11.5px; font-weight: 800; color: #a1a1aa; flex-shrink: 0">OCT</span>
+        <div aria-hidden="true" style="width: 44px; height: 66px; border-radius: 9px; background: linear-gradient(160deg, #3a4a6a, #121a2b); display: flex; align-items: flex-end; padding: 5px; box-sizing: border-box; font-size: 8.5px; font-weight: 800; color: #f4f4f5; flex-shrink: 0">CITADEL</div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+          <span style="font-size: 15px; font-weight: 700; line-height: 19px">Citadel</span>
+          <div style="display: flex; align-items: center; gap: 8px"><div style="flex: 1; height: 6px; border-radius: 3px; background: #232327"><div data-anim="1" style="width: 64%; height: 6px; border-radius: 3px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 240ms both; animation-name: {{v.s3.gx}}"></div></div><span style="font-size: 12.5px; font-weight: 700; color: #d4d4d8; flex-shrink: 0">12 ép. · 9 h</span></div>
+          <span style="align-self: flex-start; padding: 3px 8px; border-radius: 8px; background: #1C1C1F; color: #d4d4d8; font-size: 11.5px; font-weight: 700">Saison 2 terminée</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span style="width: 34px; font-size: 11.5px; font-weight: 800; color: #FFF2B8; flex-shrink: 0">SEP</span>
+        <div aria-hidden="true" style="width: 44px; height: 66px; border-radius: 9px; background: linear-gradient(160deg, #6b4a2a, #2a1c12); display: flex; align-items: flex-end; padding: 5px; box-sizing: border-box; font-size: 8.5px; font-weight: 800; color: #f4f4f5; flex-shrink: 0">LIONESS</div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+          <span style="font-size: 15px; font-weight: 700; line-height: 19px">Lioness</span>
+          <div style="display: flex; align-items: center; gap: 8px"><div style="flex: 1; height: 6px; border-radius: 3px; background: #232327"><div data-anim="1" style="width: 100%; height: 6px; border-radius: 3px; background: #F2C36B; position: relative; overflow: hidden; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 330ms both; animation-name: {{v.s3.gx}}"><span aria-hidden="true" data-anim="1" style="position: absolute; top: 0; bottom: 0; left: 0; width: 60%; background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,0.85), rgba(255,255,255,0)); animation: sweep 2.8s ease-in-out 1.4s infinite"></span></div></div><span style="font-size: 12.5px; font-weight: 700; color: #FFF2B8; flex-shrink: 0">19 ép. · 14 h</span></div>
+          <span style="align-self: flex-start; padding: 3px 8px; border-radius: 8px; background: rgba(229,169,61,0.14); color: #F2C36B; font-size: 11.5px; font-weight: 700">Marathon · 8 épisodes en un jour</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span style="width: 34px; font-size: 11.5px; font-weight: 800; color: #a1a1aa; flex-shrink: 0">AOÛ</span>
+        <div aria-hidden="true" style="width: 44px; height: 66px; border-radius: 9px; background: linear-gradient(160deg, #1f5a5a, #10282c); display: flex; align-items: flex-end; padding: 5px; box-sizing: border-box; font-size: 8.5px; font-weight: 800; color: #f4f4f5; flex-shrink: 0">BLACK SPACE</div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+          <span style="font-size: 15px; font-weight: 700; line-height: 19px">Black Space</span>
+          <div style="display: flex; align-items: center; gap: 8px"><div style="flex: 1; height: 6px; border-radius: 3px; background: #232327"><div data-anim="1" style="width: 79%; height: 6px; border-radius: 3px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 420ms both; animation-name: {{v.s3.gx}}"></div></div><span style="font-size: 12.5px; font-weight: 700; color: #d4d4d8; flex-shrink: 0">14 ép. · 11 h</span></div>
+          <span style="align-self: flex-start; padding: 3px 8px; border-radius: 8px; background: rgba(229,169,61,0.14); color: #F2C36B; font-size: 11.5px; font-weight: 700">Série terminée en 9 jours</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <span style="width: 34px; font-size: 11.5px; font-weight: 800; color: #a1a1aa; flex-shrink: 0">JUIL</span>
+        <div aria-hidden="true" style="width: 44px; height: 66px; border-radius: 9px; background: linear-gradient(160deg, #4a2a5a, #1c1226); display: flex; align-items: flex-end; padding: 5px; box-sizing: border-box; font-size: 8.5px; font-weight: 800; color: #f4f4f5; flex-shrink: 0">AU MICRO !</div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+          <span style="font-size: 15px; font-weight: 700; line-height: 19px">Au micro !</span>
+          <div style="display: flex; align-items: center; gap: 8px"><div style="flex: 1; height: 6px; border-radius: 3px; background: #232327"><div data-anim="1" style="width: 86%; height: 6px; border-radius: 3px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 510ms both; animation-name: {{v.s3.gx}}"></div></div><span style="font-size: 12.5px; font-weight: 700; color: #d4d4d8; flex-shrink: 0">16 ép. · 12 h</span></div>
+          <span style="align-self: flex-start; padding: 3px 8px; border-radius: 8px; background: #1C1C1F; color: #d4d4d8; font-size: 11.5px; font-weight: 700">La reprise après 41 jours de pause</span>
+        </div>
+      </div>
+    </div>
+    <button type="button" style="height: 44px; border-radius: 12px; border: 0; background: #1C1C1F; color: #d4d4d8; font-family: inherit; font-size: 13px; font-weight: 700">Janvier à juin · afficher les 6 mois</button>
+  </section>
+
+  <!-- 4. Films ou séries, mois par mois -->
+  <section data-sec="s4" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 12px; opacity: {{v.s4.op}}; transform: {{v.s4.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <h3 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Films ou séries, mois par mois</h3>
+    <div role="img" aria-label="Part des films et des séries chaque mois : les séries dominent de juillet à septembre, les films depuis octobre" style="display: flex; flex-direction: column; gap: 6px">
+      <div style="height: 112px; display: flex; align-items: flex-end; gap: 6px">
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both; animation-name: {{v.s4.gy}}"><div style="height: 12px; border-radius: 4px 4px 1px 1px; background: #e4e4e7"></div><div style="height: 16px; border-radius: 1px 1px 3px 3px; background: #E5A93D"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 180ms both; animation-name: {{v.s4.gy}}"><div style="height: 7px; border-radius: 4px 4px 1px 1px; background: #e4e4e7"></div><div style="height: 9px; border-radius: 1px 1px 3px 3px; background: #E5A93D"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 240ms both; animation-name: {{v.s4.gy}}"><div style="height: 14px; border-radius: 4px 4px 1px 1px; background: #e4e4e7"></div><div style="height: 7px; border-radius: 1px 1px 3px 3px; background: #E5A93D"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 300ms both; animation-name: {{v.s4.gy}}"><div style="height: 2px; border-radius: 1px; background: #2a2a2f"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 360ms both; animation-name: {{v.s4.gy}}"><div style="height: 4px; border-radius: 2px; background: #e4e4e7"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 420ms both; animation-name: {{v.s4.gy}}"><div style="height: 4px; border-radius: 2px; background: #e4e4e7"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 480ms both; animation-name: {{v.s4.gy}}"><div style="height: 21px; border-radius: 4px 4px 1px 1px; background: #e4e4e7"></div><div style="height: 31px; border-radius: 1px 1px 3px 3px; background: #E5A93D"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 540ms both; animation-name: {{v.s4.gy}}"><div style="height: 42px; border-radius: 4px 4px 1px 1px; background: #e4e4e7"></div><div style="height: 68px; border-radius: 1px 1px 3px 3px; background: #E5A93D"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 600ms both; animation-name: {{v.s4.gy}}"><div style="height: 10px; border-radius: 4px 4px 1px 1px; background: #e4e4e7"></div><div style="height: 52px; border-radius: 1px 1px 3px 3px; background: #E5A93D"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 660ms both; animation-name: {{v.s4.gy}}"><div style="height: 30px; border-radius: 4px 4px 1px 1px; background: #e4e4e7"></div><div style="height: 23px; border-radius: 1px 1px 3px 3px; background: #E5A93D"></div></div>
+        <div data-anim="1" style="flex: 1; display: flex; flex-direction: column; gap: 2px; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 720ms both; animation-name: {{v.s4.gy}}"><div style="height: 17px; border-radius: 4px 4px 1px 1px; background: #e4e4e7"></div><div style="height: 10px; border-radius: 1px 1px 3px 3px; background: #E5A93D"></div></div>
+      </div>
+      <div style="display: flex; gap: 6px; font-size: 11px; font-weight: 700; color: #a1a1aa; text-align: center"><span style="flex: 1">J</span><span style="flex: 1">F</span><span style="flex: 1">M</span><span style="flex: 1">A</span><span style="flex: 1">M</span><span style="flex: 1">J</span><span style="flex: 1">J</span><span style="flex: 1; color: #FFF2B8">A</span><span style="flex: 1">S</span><span style="flex: 1">O</span><span style="flex: 1; color: #ffffff">N</span></div>
+    </div>
+    <div style="display: flex; gap: 16px; font-size: 12.5px; font-weight: 700">
+      <span style="display: flex; align-items: center; gap: 6px; color: #F2C36B"><span style="width: 10px; height: 10px; border-radius: 3px; background: #E5A93D"></span>Séries · 124 h</span>
+      <span style="display: flex; align-items: center; gap: 6px; color: #e4e4e7"><span style="width: 10px; height: 10px; border-radius: 3px; background: #e4e4e7"></span>Films · 92 h</span>
+    </div>
+    <p style="margin: 0; font-size: 12.5px; line-height: 1.5; color: #d4d4d8">L’été était aux séries, l’automne est au cinéma : <strong data-anim="1" style="color: #F2C36B; animation: textGlow 2.4s ease-in-out 1s infinite">59 % de films</strong> depuis octobre.</p>
+  </section>
+
+  <!-- 5. Tes séries en 2026 -->
+  <section data-sec="s5" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s5.op}}; transform: {{v.s5.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h3 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Tes séries en 2026</h3>
+      <span style="font-size: 13px; color: #a1a1aa">34 séries regardées · que sont-elles devenues ?</span>
+    </div>
+    <div role="img" aria-label="3 terminées, 18 en cours, 9 en pause, 4 abandonnées" data-anim="1" style="height: 14px; display: flex; gap: 3px; transform-origin: left center; animation: growX 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 100ms both; animation-name: {{v.s5.gx}}">
+      <div style="flex: 3; border-radius: 7px 2px 2px 7px; background: #FFF2B8"></div>
+      <div style="flex: 18; border-radius: 2px; background: #E5A93D"></div>
+      <div style="flex: 9; border-radius: 2px; background: #8a6a2b"></div>
+      <div style="flex: 4; border-radius: 2px 7px 7px 2px; background: #52525b"></div>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; font-size: 12.5px; font-weight: 700">
+      <span style="display: flex; align-items: center; gap: 6px; color: #e4e4e7"><span style="width: 10px; height: 10px; border-radius: 3px; background: #FFF2B8"></span>3 terminées</span>
+      <span style="display: flex; align-items: center; gap: 6px; color: #e4e4e7"><span style="width: 10px; height: 10px; border-radius: 3px; background: #E5A93D"></span>18 en cours</span>
+      <span style="display: flex; align-items: center; gap: 6px; color: #e4e4e7"><span style="width: 10px; height: 10px; border-radius: 3px; background: #8a6a2b"></span>9 en pause depuis 2 mois</span>
+      <span style="display: flex; align-items: center; gap: 6px; color: #e4e4e7"><span style="width: 10px; height: 10px; border-radius: 3px; background: #52525b"></span>4 abandonnées</span>
+    </div>
+    <a href="Abandons.dc.html" style="height: 46px; border-radius: 14px; background: #1C1C1F; box-shadow: inset 0 0 0 1px rgba(229,169,61,0.5); color: #F2C36B; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center">Voir les séries laissées en route</a>
+  </section>
+
+  <!-- 6. Top de l'année -->
+  <section data-sec="s6" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 12px; opacity: {{v.s6.op}}; transform: {{v.s6.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h3 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Ton top de l’année</h3>
+      <span style="font-size: 12.5px; color: #a1a1aa">au temps passé</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 48px"><span data-anim="1" style="width: 18px; font-size: 18px; font-weight: 800; color: #F2C36B; animation: textGlow 2.4s ease-in-out 1s infinite">1</span><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px"><span style="font-size: 14.5px; font-weight: 700">Lioness</span><div style="height: 6px; border-radius: 3px; background: #232327"><div style="width: 100%; height: 6px; border-radius: 3px; background: #F2C36B"></div></div></div><span style="width: 62px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">14 h · 19 ép.</span></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 48px"><span style="width: 18px; font-size: 18px; font-weight: 800; color: #F2C36B">2</span><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px"><span style="font-size: 14.5px; font-weight: 700">Au micro !</span><div style="height: 6px; border-radius: 3px; background: #232327"><div style="width: 86%; height: 6px; border-radius: 3px; background: #E5A93D"></div></div></div><span style="width: 62px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">12 h · 16 ép.</span></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 48px"><span style="width: 18px; font-size: 18px; font-weight: 800; color: #F2C36B">3</span><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px"><span style="font-size: 14.5px; font-weight: 700">The Recruit</span><div style="height: 6px; border-radius: 3px; background: #232327"><div style="width: 64%; height: 6px; border-radius: 3px; background: #E5A93D"></div></div></div><span style="width: 62px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">9 h · 12 ép.</span></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 48px"><span style="width: 18px; font-size: 18px; font-weight: 800; color: #a1a1aa">4</span><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px"><span style="font-size: 14.5px; font-weight: 700">Lupin</span><div style="height: 6px; border-radius: 3px; background: #232327"><div style="width: 50%; height: 6px; border-radius: 3px; background: #8a6a2b"></div></div></div><span style="width: 62px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">7 h · 9 ép.</span></div>
+      <div style="display: flex; align-items: center; gap: 12px; min-height: 48px"><span style="width: 18px; font-size: 18px; font-weight: 800; color: #a1a1aa">5</span><div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px"><span style="font-size: 14.5px; font-weight: 700">Daredevil : Born Again</span><div style="height: 6px; border-radius: 3px; background: #232327"><div style="width: 43%; height: 6px; border-radius: 3px; background: #8a6a2b"></div></div></div><span style="width: 62px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">6 h · 7 ép.</span></div>
+    </div>
+  </section>
+
+  <!-- 7. Et maintenant -->
+  <section data-sec="s7" style="margin-top: auto; border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(229,169,61,0.28); padding: 18px; display: flex; flex-direction: column; gap: 6px; opacity: {{v.s7.op}}; transform: {{v.s7.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <span style="font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: #F2C36B">ET MAINTENANT</span>
+    <p style="margin: 0; font-size: 14px; line-height: 1.55; color: #e4e4e7">À ce rythme, tu finiras 2026 autour de <strong style="color: #ffffff">270 h</strong>. Il te reste 212 h dans tes séries en cours : de quoi tenir jusqu’en mai.</p>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":2600}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    const calm = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!calm) this.watch();
+  }
+  componentWillUnmount() {
+    clearTimeout(this._t3);
+    (this._c || []).forEach(clearTimeout);
+    if (this._io) this._io.disconnect();
+  }
+  watch() {
+    this.setState({ seen: {} });
+    if (typeof IntersectionObserver !== 'function') { this.cascade(200); return; }
+    let heard = false;
+    this._io = new IntersectionObserver(entries => {
+      heard = true;
+      const next = Object.assign({}, (this.state || {}).seen || {});
+      let changed = false;
+      entries.forEach(entry => {
+        const id = entry.target.getAttribute('data-sec');
+        if (entry.isIntersecting && !next[id]) { next[id] = true; changed = true; this._io.unobserve(entry.target); }
+      });
+      if (changed) this.setState({ seen: next });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('[data-sec]').forEach(el => this._io.observe(el));
+    this._t3 = setTimeout(() => { if (!heard) this.cascade(0); }, 1500);
+  }
+  cascade(start) {
+    (this._c || []).forEach(clearTimeout);
+    this._c = ['s1', 's2', 's3', 's4', 's5', 's6', 's7'].map((id, i) => setTimeout(() => {
+      const next = Object.assign({}, (this.state || {}).seen || {});
+      next[id] = true;
+      this.setState({ seen: next });
+    }, start + i * 240));
+  }
+  motion() {
+    const seen = (this.state || {}).seen || null;
+    const v = {};
+    ['s1', 's2', 's3', 's4', 's5', 's6', 's7'].forEach(id => {
+      const on = !seen || !!seen[id];
+      v[id] = { on: on, op: on ? 1 : 0, tf: on ? 'translateY(0px)' : 'translateY(22px)', gx: on ? 'growX' : 'none', gy: on ? 'growY' : 'none', pop: on ? 'popIn' : 'none' };
+    });
+    return v;
+  }
+  renderVals() {
+    const v = this.motion();
+    const hours = [16, 9, 12, 0, 2, 2, 30, 63, 36, 30, 16, 0];
+    const labels = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
+    const tones = ['#222226', 'rgba(229,169,61,0.3)', 'rgba(229,169,61,0.55)', '#E5A93D', '#FFF2B8'];
+    const months = hours.map((total, month) => {
+      const offset = (new Date(2026, month, 1).getDay() + 6) % 7;
+      const days = new Date(2026, month + 1, 0).getDate();
+      const cells = [];
+      for (let blank = 0; blank < offset; blank++) cells.push({ bg: 'transparent' });
+      for (let day = 1; day <= days; day++) {
+        const future = month > 10 || (month === 10 && day > 10);
+        if (future) { cells.push({ bg: 'rgba(255,255,255,0.035)' }); continue; }
+        if (month === 7 && day === 15) { cells.push({ bg: tones[4], anim: v.s1.on ? 'glowGold 2.2s ease-in-out 1.6s infinite' : 'none' }); continue; }
+        const weekend = (offset + day - 1) % 7 >= 5 ? 1.5 : 1;
+        const noise = Math.abs(Math.sin(month * 97.13 + day * 13.37) * 43758.5453) % 1;
+        const weight = total / 63;
+        let level = 0;
+        if (total > 0 && noise > 1 - Math.min(0.8, 0.12 + weight * 0.75)) {
+          const value = weight * weekend * (0.4 + noise);
+          level = value > 1.25 ? 3 : value > 0.6 ? 2 : 1;
+        }
+        cells.push({ bg: tones[level] });
+      }
+      cells.forEach(cell => { if (!cell.anim) cell.anim = 'none'; });
+      return { label: labels[month], labelColor: month === 7 ? '#FFF2B8' : month === 10 ? '#ffffff' : '#a1a1aa', cells, anim: v.s1.on ? 'popIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) ' + (120 + month * 70) + 'ms both' : 'none' };
+    });
+    return { months, v };
+  }
+}
+</script>
+</body>
+</html>

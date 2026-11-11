@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Search, SlidersHorizontal, WifiOff, X } from 'lucide-react';
 import { type DiscoverViewModel } from './discoverViewModel';
 import { DiscoverSearchDock } from '../components/DiscoverSearchDock';
@@ -43,6 +43,17 @@ export function DiscoverView({ model }: DiscoverViewProps) {
   }, []);
   const resultModel = { ...model, onShowClick: (id: string | number, type?: 'tv' | 'movie') => { closeKeyboard(); model.onShowClick(id, type); }, openPersonModal: (id: number) => { closeKeyboard(); model.openPersonModal(id); } };
   const [filterTab, setFilterTab] = useState<FilterTab>('Plateformes');
+  // Un seul contrôle de recherche visible : la loupe de la barre collante revient dès que le champ de l'image sort de l'écran.
+  const heroSearchRef = useRef<HTMLButtonElement>(null);
+  const [heroSearchVisible, setHeroSearchVisible] = useState(false);
+  const heroSearchShown = !isSearchMode && showHeroSurface && visibleHeroItems.length > 0;
+  useEffect(() => {
+    const target = heroSearchRef.current;
+    if (!heroSearchShown || !target || typeof IntersectionObserver !== 'function') { setHeroSearchVisible(false); return; }
+    const observer = new IntersectionObserver(([entry]) => setHeroSearchVisible(entry.isIntersecting), { root: containerRef.current, threshold: 0 });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [heroSearchShown, containerRef]);
   const openFilter = (tab?: FilterTab) => { if (tab) setFilterTab(tab); setShowGenreMenu(true); };
   const clearFilters = () => {
     setSelectedPlatforms([]); setSelectedGenres([]); setPegi('Tous'); setMinRating('Toutes');
@@ -61,6 +72,8 @@ export function DiscoverView({ model }: DiscoverViewProps) {
     <div ref={containerRef} data-watch-provider-root="" className="explorer-scroll flex-1 overflow-y-auto hide-scrollbar pb-nav">
       {showHeroSurface && loading && !visibleHeroItems.length && <HeroSkeleton />}
       {showHeroSurface && visibleHeroItems.length > 0 && <div className="explorer-hero">
+        {/* SEENIT-DISCOVER-008 : la recherche est posée sur l'image à la une, sans hauteur ajoutée. */}
+        {!isSearchMode && <button ref={heroSearchRef} type="button" className="explorer-hero-search" aria-label="Rechercher" onClick={enterSearch}><Search size={20} aria-hidden="true" /><span>Rechercher un film, une série…</span></button>}
         <div ref={heroCarouselRef} onScroll={handleHeroScroll} className="flex w-full overflow-x-auto snap-x snap-mandatory hide-scrollbar">
           {visibleHeroItems.map((item, index) => <div key={`${item.media_type}_${item.id}`} className="w-full shrink-0 snap-center">
             <HeroCard media={item} details={heroDetails[item.id]} onShowClick={onShowClick} onOpenTrailer={() => setPreviewMedia(item)}
@@ -72,7 +85,7 @@ export function DiscoverView({ model }: DiscoverViewProps) {
       </div>}
       <div className="explorer-controls">
         <div className="explorer-category-row">
-          {!isSearchMode && <><button type="button" className="explorer-control-search" aria-label="Rechercher" onClick={enterSearch}><Search size={20} /></button>
+          {!isSearchMode && <>{!heroSearchVisible && <button type="button" className="explorer-control-search" aria-label="Rechercher" onClick={enterSearch}><Search size={20} /></button>}
             <button type="button" className="explorer-control-filter" aria-label="Filtres" onClick={() => openFilter()}><SlidersHorizontal size={20} />{activeFilterCount > 0 && <span className="explorer-count">{activeFilterCount}</span>}</button></>}
           {CATEGORIES.filter(category => category.id !== 'Top C411' || model.c411Available).map(category => <button type="button" key={category.id} className="explorer-category" aria-pressed={activeCategory === category.id}
             disabled={Boolean(query.trim()) && !isSearchCompatibleCategory(category.id)} onClick={() => setActiveCategory(category.id)}>{category.label}</button>)}

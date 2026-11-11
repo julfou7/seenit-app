@@ -2,7 +2,7 @@ import { prepareTrailerVideos } from '../trailers/trailerPolicy.ts';
 
 export type MediaDetailRenderType = 'tv' | 'movie';
 
-export const MEDIA_DETAIL_RENDER_SCHEMA_VERSION = 2;
+export const MEDIA_DETAIL_RENDER_SCHEMA_VERSION = 3;
 export const MEDIA_DETAIL_RENDER_MAX_GENRES = 24;
 export const MEDIA_DETAIL_RENDER_MAX_KEYWORDS = 40;
 export const MEDIA_DETAIL_RENDER_MAX_LOGOS = 8;
@@ -18,7 +18,12 @@ const compactNamedItem = (item: { id?: unknown; name?: unknown } | null | undefi
   };
 };
 
-const compactImage = (item: any) => {
+interface ImageSource { file_path?: unknown; iso_639_1?: string | null; aspect_ratio?: unknown; vote_average?: unknown }
+interface KeywordSource { id?: unknown; name?: unknown }
+interface ReleaseSource { type?: unknown; release_date?: unknown; note?: unknown }
+interface CountryReleasesSource { iso_3166_1?: unknown; release_dates?: ReleaseSource[] }
+
+const compactImage = (item: ImageSource | null | undefined) => {
   if (!item?.file_path) return null;
   return {
     file_path: String(item.file_path),
@@ -28,7 +33,7 @@ const compactImage = (item: any) => {
   };
 };
 
-const compactKeyword = (item: any) => {
+const compactKeyword = (item: KeywordSource | null | undefined) => {
   if (!item?.name) return null;
   return {
     id: Number.isFinite(Number(item.id)) ? Number(item.id) : undefined,
@@ -145,6 +150,20 @@ export function createMediaDetailRenderSnapshot(
     imdb_id: details.external_ids.imdb_id || undefined,
     tvdb_id: Number.isFinite(Number(details.external_ids.tvdb_id)) ? Number(details.external_ids.tvdb_id) : undefined,
   } : undefined;
+  // Revue Codex #943 : la preuve « en salle » (sorties françaises détaillées) survit au redémarrage,
+  // sinon un film en salle repasserait en « fin à » sur le billet de l'accueil.
+  const countries: CountryReleasesSource[] | null = type === 'movie' && Array.isArray(details?.release_dates?.results) ? details.release_dates.results : null;
+  const frenchReleases = countries?.find(country => country?.iso_3166_1 === 'FR');
+  const releaseDates = countries ? {
+    results: Array.isArray(frenchReleases?.release_dates) ? [{
+      iso_3166_1: 'FR',
+      release_dates: frenchReleases.release_dates.slice(0, 12).map(release => ({
+        type: Number(release?.type),
+        release_date: typeof release?.release_date === 'string' ? release.release_date : undefined,
+        ...(typeof release?.note === 'string' && release.note ? { note: release.note } : {}),
+      })),
+    }] : [],
+  } : undefined;
   const belongsToCollection = details?.belongs_to_collection ? {
     id: Number.isFinite(Number(details.belongs_to_collection.id)) ? Number(details.belongs_to_collection.id) : undefined,
     name: details.belongs_to_collection.name || undefined,
@@ -181,6 +200,7 @@ export function createMediaDetailRenderSnapshot(
     networks,
     external_ids: externalIds,
     belongs_to_collection: belongsToCollection,
+    ...(releaseDates ? { release_dates: releaseDates } : {}),
     seasons,
     images: { logos },
     videos: { results: videos },

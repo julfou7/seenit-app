@@ -21,3 +21,12 @@ test('SEENIT-UX-019 #870 une fiche média ouverte depuis la recherche d’Explor
   // Vérification réelle du rendu : scripts/navbar-browser-checks.cjs (recherche → fiche → retour).
   assert.match(read('scripts/navbar-browser-checks.cjs'), /#870 fiche ouverte depuis la recherche avec la barre/);
 });
+test('SEENIT-DISCOVER-008 recherche posée sur l’image à la une, une seule loupe visible à la fois', () => {
+  const view = read('src/screens/DiscoverViewCore.tsx'), hero = read('src/screens/DiscoverHero.tsx'), css = read('src/screens/explorer.css');
+  assert.match(view, /className="explorer-hero-search" aria-label="Rechercher" onClick=\{enterSearch\}><Search size=\{20\} aria-hidden="true" \/><span>Rechercher un film, une série…<\/span>/);
+  assert.match(view, /\{!heroSearchVisible && <button type="button" className="explorer-control-search" aria-label="Rechercher" onClick=\{enterSearch\}>/);
+  assert.match(view, /new IntersectionObserver\(\(\[entry\]\) => setHeroSearchVisible\(entry\.isIntersecting\), \{ root: containerRef\.current, threshold: 0 \}\)/);
+  assert.match(css, /\.explorer-hero-search\{position:absolute;z-index:30;left:16px;right:16px;top:14px;height:48px/);
+  assert.doesNotMatch(hero, /rounded-bl-\[24px\]/, 'le rang ne masque plus le coin du champ');
+  assert.match(hero, /className="explorer-hero-rank ml-auto" aria-label=\{`Rang \$\{rank\}`\}>#\{rank\}/);
+});

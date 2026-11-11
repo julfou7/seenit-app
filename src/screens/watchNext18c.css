@@ -141,3 +141,27 @@
 .movie-ticket-rail > .home-load-more,.movie-ticket-rail::after { grid-row:1 / span 4;align-self:start; }
 .movie-ticket-rail::after { width:var(--layout-anchor-tail,0px); height:1px; }
 .movie-ticket--horizontal .movie-ticket__info h3 { min-height:36px; }
+
+/* SEENIT-UX-022 : aucun texte coupé, note sur l'affiche, durée · genre, film non sorti sans Vu. */
+.movie-ticket h3,.movie-ticket--poster > h3 { display:block; height:auto; min-height:0; overflow:visible; -webkit-line-clamp:unset; overflow-wrap:anywhere; }
+.movie-ticket__poster { pointer-events:none; }
+.movie-ticket__rating { position:absolute; z-index:3; left:7px; top:7px; display:inline-flex; align-items:center; height:22px; padding:0 7px; border-radius:11px; background:#0b0b0dd1; color:#f2c36b; font-size:11px; font-weight:800; line-height:1; }
+.movie-ticket--horizontal .movie-ticket__rating { left:5px; top:5px; height:20px; padding:0 6px; font-size:10.5px; }
+.movie-ticket__meta { color:#d4d4d8 !important; font-weight:600; }
+.movie-ticket__metadata > span { color:#d4d4d8; font-size:12px; font-weight:600; }
+.movie-actor-slot,.movie-ticket--poster > .movie-actor-slot,.movie-actor-slot--list { height:auto; min-height:44px; }
+.movie-actor-line strong,.movie-actor-line small,.movie-actor-slot--list small { white-space:normal; overflow:visible; text-overflow:clip; display:block; -webkit-line-clamp:unset; overflow-wrap:anywhere; }
+.movie-ticket__info p { height:auto; white-space:normal; }.movie-ticket__info p span { overflow:visible; text-overflow:clip; }
+.movie-ticket--horizontal,.movie-ticket--horizontal .movie-ticket__body { height:auto; min-height:150px; }
+.movie-ticket--horizontal .movie-ticket__body { align-items:stretch; }
+.movie-ticket__main { height:auto; min-height:150px; padding-block:10px; }
+.movie-ticket--horizontal .movie-ticket__poster { height:auto; min-height:150px; align-self:stretch; margin-block:-10px; }
+.movie-ticket--horizontal .movie-ticket__poster > img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.movie-ticket--horizontal .movie-ticket__stub { height:auto; min-height:150px; }
+.movie-ticket--horizontal .movie-ticket__info,.movie-ticket--horizontal .movie-ticket__info h3 { max-height:none; min-height:0; }
+.movie-ticket--upcoming .movie-ticket__stub { background:#1c1c1f; }
+.movie-ticket--horizontal.movie-ticket--upcoming .movie-ticket__stub { padding-bottom:8px; }
+.movie-ticket--poster.movie-ticket--upcoming .movie-ticket__stub { padding-right:10px; justify-content:space-between; }
+.movie-ticket__stub > small { color:#d4d4d8; font-size:11px; font-weight:700; }
+.movie-ticket--cinema .movie-ticket__stub > span,.movie-ticket--cinema .movie-ticket__stub > span { color:#f2c36b; }
+.movie-ticket--horizontal.movie-ticket--cinema .movie-ticket__stub { background:linear-gradient(#4a3a17,#2a210e); }

@@ -1,0 +1,121 @@
+{
+  "v": 3,
+  "attachments": {},
+  "boards": {
+    "Abandons.dc.html": {
+      "h": 1680,
+      "is_interactive": true,
+      "radius": 28,
+      "title": "3 · Séries laissées en route",
+      "w": 390,
+      "x": 940,
+      "y": 0
+    },
+    "Annee.dc.html": {
+      "h": 2600,
+      "is_interactive": true,
+      "radius": 28,
+      "title": "2 · Mon année",
+      "w": 390,
+      "x": 470,
+      "y": 0
+    },
+    "Films.dc.html": {
+      "h": 1400,
+      "radius": 28,
+      "title": "4 · Films à voir — billets",
+      "w": 390,
+      "x": 1530,
+      "y": 0
+    },
+    "FilmsRail.dc.html": {
+      "h": 830,
+      "radius": 28,
+      "title": "5 · Films à voir — affiches (billets)",
+      "w": 390,
+      "x": 2000,
+      "y": 0
+    },
+    "Main.dc.html": {
+      "h": 3496,
+      "is_interactive": true,
+      "radius": 28,
+      "title": "1 · Mes chiffres",
+      "w": 390,
+      "x": 0,
+      "y": 0
+    },
+    "Moi.dc.html": {
+      "h": 1856,
+      "is_interactive": true,
+      "radius": 28,
+      "title": "0 · Moi — page unique",
+      "w": 390,
+      "x": -470,
+      "y": 0
+    },
+    "ExplorerHero.dc.html": {
+      "h": 844,
+      "radius": 28,
+      "title": "6 · Explorer — recherche posée sur l’image",
+      "w": 390,
+      "x": 2590,
+      "y": 0
+    },
+    "Accueil.dc.html": {
+      "h": 2080,
+      "is_interactive": true,
+      "radius": 28,
+      "title": "7 · Accueil — l’existant + écrans 4 et 5",
+      "w": 390,
+      "x": 3060,
+      "y": 0
+    }
+  },
+  "createdOnFiles": {
+    "at": "2026-11-10T09:00:00Z",
+    "v": 1
+  },
+  "designSystems": [],
+  "launch": {
+    "view": "canvas"
+  },
+  "notes": {
+    "titre": {
+      "kind": "title1",
+      "maxW": 1800,
+      "text": "Moi — page unique, Chiffres, Mon année, séries laissées en route",
+      "w": 240,
+      "x": -470,
+      "y": -300
+    },
+    "titreFilms": {
+      "kind": "title1",
+      "maxW": 860,
+      "text": "Accueil — Films à voir",
+      "w": 240,
+      "x": 1530,
+      "y": -300
+    },
+    "titreExplorer": {
+      "kind": "title1",
+      "maxW": 860,
+      "text": "Explorer — recherche",
+      "w": 240,
+      "x": 2590,
+      "y": -300
+    }
+  },
+  "order": [
+    "Moi.dc.html",
+    "Main.dc.html",
+    "Annee.dc.html",
+    "Abandons.dc.html",
+    "Films.dc.html",
+    "FilmsRail.dc.html",
+    "ExplorerHero.dc.html",
+    "Accueil.dc.html"
+  ],
+  "pages": [],
+  "title": "SeenIt · Moi — refonte"
+}

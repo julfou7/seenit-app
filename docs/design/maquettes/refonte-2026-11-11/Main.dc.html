@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Moi · Chiffres</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+body{margin:0}
+a{color:#F2C36B;text-decoration:none}a:hover{color:#FFF2B8}
+@keyframes dialPulse{0%,100%{opacity:.15}50%{opacity:1}}
+@keyframes growX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes growY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes popIn{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
+@keyframes glowGold{0%,100%{box-shadow:0 0 0 0 rgba(242,195,107,0)}50%{box-shadow:0 0 14px 2px rgba(242,195,107,.8)}}
+@keyframes glowSoft{0%,100%{box-shadow:0 0 0 0 rgba(242,195,107,0)}50%{box-shadow:0 0 7px 0 rgba(242,195,107,.4)}}
+@keyframes textGlow{0%,100%{text-shadow:0 0 0 rgba(242,195,107,0)}50%{text-shadow:0 0 12px rgba(242,195,107,.95)}}
+@keyframes sweep{0%{transform:translateX(-100%)}60%,100%{transform:translateX(180%)}}
+@keyframes ringDraw{from{stroke-dashoffset:157}to{stroke-dashoffset:0}}
+@keyframes ringGlow{0%,100%{filter:drop-shadow(0 0 0 rgba(242,195,107,0))}50%{filter:drop-shadow(0 0 6px rgba(242,195,107,.9))}}
+@media (prefers-reduced-motion: reduce){[data-pulse],[data-anim]{animation:none !important}}
+</style>
+</helmet>
+<div style="width: 390px; height: 3496px; box-sizing: border-box; background: #0B0B0D; color: #ffffff; font-family: 'Plus Jakarta Sans', Inter, sans-serif; padding: 18px 16px 28px; display: flex; flex-direction: column; gap: 12px">
+
+  <!-- Barre de titre : page ouverte depuis Moi -->
+  <div style="display: flex; align-items: center; gap: 12px">
+    <a href="Moi.dc.html" aria-label="Retour à Moi" style="width: 44px; height: 44px; border-radius: 22px; background: #1C1C1F; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.1); color: #e4e4e7; display: flex; align-items: center; justify-content: center; flex-shrink: 0">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg>
+    </a>
+    <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em">Mes chiffres</h1>
+  </div>
+
+  <!-- Période -->
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 0">
+    <span style="font-size: 13px; font-weight: 700; color: #a1a1aa">Depuis le 1er janvier</span>
+    <button type="button" style="height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid rgba(255,255,255,0.1); background: #1C1C1F; color: #e4e4e7; font-family: inherit; font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px">2026
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg>
+    </button>
+  </div>
+
+  <!-- 1. L'année en un regard : cadran animé, un mois s'ouvre au toucher, le centre revient à l'année -->
+  <section style="border-radius: 24px; background: radial-gradient(120% 70% at 50% 0%, rgba(229,169,61,0.16), rgba(21,21,24,0) 62%), #151518; box-shadow: inset 0 0 0 1px rgba(229,169,61,0.28); padding: 18px; display: flex; flex-direction: column; gap: 14px; align-items: center">
+    <span style="align-self: flex-start; font-size: 11.5px; font-weight: 800; letter-spacing: 0.06em; color: #F2C36B">HEURES PAR MOIS</span>
+    <div role="group" aria-label="Heures par mois en 2026" style="position: relative; width: 322px; height: 322px">
+      <svg width="322" height="322" viewBox="0 0 322 322" aria-hidden="true" style="display: block; overflow: visible">
+        <defs><linearGradient id="or" x1="10%" y1="5%" x2="90%" y2="95%"><stop offset="0%" stop-color="#FFF2B8"></stop><stop offset="32%" stop-color="#F5C518"></stop><stop offset="70%" stop-color="#E5A93D"></stop><stop offset="100%" stop-color="#B37812"></stop></linearGradient></defs>
+        <circle cx="161" cy="161" r="120" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"></circle>
+        <circle cx="161" cy="161" r="92" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"></circle>
+        <g onClick="{{ pick0 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s0.tf}}; opacity: {{s0.op}}; transition: {{s0.tr}}"><path d="M164.3 97.1 L165.1 82.9 A78.2 78.2 0 0 1 196.5 91.3 L190.1 104.0 A64 64 0 0 0 164.3 97.1 Z" fill="#8a6a2b"></path></g>
+        <g onClick="{{ pick1 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s1.tf}}; opacity: {{s1.op}}; transition: {{s1.tr}}"><path d="M195.9 107.3 L200.2 100.6 A72.0 72.0 0 0 1 221.4 121.8 L214.7 126.1 A64 64 0 0 0 195.9 107.3 Z" fill="#8a6a2b"></path></g>
+        <g onClick="{{ pick2 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s2.tf}}; opacity: {{s2.op}}; transition: {{s2.tr}}"><path d="M218.0 131.9 L227.5 127.1 A74.7 74.7 0 0 1 235.6 157.1 L224.9 157.7 A64 64 0 0 0 218.0 131.9 Z" fill="#8a6a2b"></path></g>
+        <g onClick="{{ pick3 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s3.tf}}; opacity: {{s3.op}}; transition: {{s3.tr}}"><path d="M224.9 164.3 L229.9 164.6 A69.0 69.0 0 0 1 222.5 192.3 L218.0 190.1 A64 64 0 0 0 224.9 164.3 Z" fill="#2a2a2f"></path></g>
+        <g onClick="{{ pick4 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s4.tf}}; opacity: {{s4.op}}; transition: {{s4.tr}}"><path d="M214.7 195.9 L218.9 198.6 A69.0 69.0 0 0 1 198.6 218.9 L195.9 214.7 A64 64 0 0 0 214.7 195.9 Z" fill="#8a6a2b"></path></g>
+        <g onClick="{{ pick5 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s5.tf}}; opacity: {{s5.op}}; transition: {{s5.tr}}"><path d="M190.1 218.0 L192.3 222.5 A69.0 69.0 0 0 1 164.6 229.9 L164.3 224.9 A64 64 0 0 0 190.1 218.0 Z" fill="#8a6a2b"></path></g>
+        <g onClick="{{ pick6 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s6.tf}}; opacity: {{s6.op}}; transition: {{s6.tr}}"><path d="M157.7 224.9 L156.3 251.5 A90.7 90.7 0 0 1 119.8 241.8 L131.9 218.0 A64 64 0 0 0 157.7 224.9 Z" fill="#c9952f"></path></g>
+        <g onClick="{{ pick7 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s7.tf}}; opacity: {{s7.op}}; transition: {{s7.tr}}"><path d="M126.1 214.7 L95.6 261.6 A120.0 120.0 0 0 1 60.4 226.4 L107.3 195.9 A64 64 0 0 0 126.1 214.7 Z" fill="url(#or)"></path></g>
+        <g onClick="{{ pick8 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s8.tf}}; opacity: {{s8.op}}; transition: {{s8.tr}}"><path d="M104.0 190.1 L75.5 204.6 A96.0 96.0 0 0 1 65.1 166.0 L97.1 164.3 A64 64 0 0 0 104.0 190.1 Z" fill="#c9952f"></path></g>
+        <g onClick="{{ pick9 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s9.tf}}; opacity: {{s9.op}}; transition: {{s9.tr}}"><path d="M97.1 157.7 L70.5 156.3 A90.7 90.7 0 0 1 80.2 119.8 L104.0 131.9 A64 64 0 0 0 97.1 157.7 Z" fill="#c9952f"></path></g>
+        <g onClick="{{ pick10 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s10.tf}}; opacity: {{s10.op}}; transition: {{s10.tr}}"><path d="M107.3 126.1 L95.4 118.4 A78.2 78.2 0 0 1 118.4 95.4 L126.1 107.3 A64 64 0 0 0 107.3 126.1 Z" fill="#E5A93D"></path><path d="M107.3 126.1 L95.4 118.4 A78.2 78.2 0 0 1 118.4 95.4 L126.1 107.3 A64 64 0 0 0 107.3 126.1 Z" fill="none" stroke="#FFF2B8" stroke-width="2.5" stroke-linejoin="round" data-pulse="1" style="animation: dialPulse 1.8s ease-in-out infinite"></path></g>
+        <g onClick="{{ pick11 }}" style="cursor: pointer; transform-origin: 161px 161px; transform: {{s11.tf}}; opacity: {{s11.op}}; transition: {{s11.tr}}"><path d="M131.9 104.0 L129.7 99.5 A69.0 69.0 0 0 1 157.4 92.1 L157.7 97.1 A64 64 0 0 0 131.9 104.0 Z" fill="rgba(255,255,255,0.02)" stroke="#52525b" stroke-width="1" stroke-dasharray="3 3"></path></g>
+      </svg>
+      <button type="button" aria-label="Revenir au total de l’année" onClick="{{ clear }}" style="position: absolute; left: 99px; top: 99px; width: 124px; height: 124px; padding: 0; border: 0; border-radius: 62px; background: transparent; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px">
+        <span style="font-size: 12.5px; font-weight: 700; color: #a1a1aa">{{c.top}}</span>
+        <span style="font-size: 40px; font-weight: 800; letter-spacing: -1.5px; line-height: 44px; color: #F2C36B">{{c.big}}</span>
+        <span style="font-size: 11.5px; font-weight: 600; color: #a1a1aa">{{c.sub}}</span>
+      </button>
+      <button type="button" aria-label="janvier : 16 heures" aria-pressed="{{ b0.on }}" onClick="{{ pick0 }}" style="position: absolute; left: 177px; top: -6px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b0.bg}}; color: {{b0.fg}}; box-shadow: {{b0.ring}}; transform: scale({{b0.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">janv</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">16</span></button>
+      <button type="button" aria-label="février : 9 heures" aria-pressed="{{ b1.on }}" onClick="{{ pick1 }}" style="position: absolute; left: 244px; top: 33px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b1.bg}}; color: {{b1.fg}}; box-shadow: {{b1.ring}}; transform: scale({{b1.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">févr</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">9</span></button>
+      <button type="button" aria-label="mars : 12 heures" aria-pressed="{{ b2.on }}" onClick="{{ pick2 }}" style="position: absolute; left: 283px; top: 100px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b2.bg}}; color: {{b2.fg}}; box-shadow: {{b2.ring}}; transform: scale({{b2.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">mars</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">12</span></button>
+      <button type="button" aria-label="avril : 0 heures" aria-pressed="{{ b3.on }}" onClick="{{ pick3 }}" style="position: absolute; left: 283px; top: 178px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b3.bg}}; color: {{b3.fg}}; box-shadow: {{b3.ring}}; transform: scale({{b3.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">avr</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">0</span></button>
+      <button type="button" aria-label="mai : 2 heures" aria-pressed="{{ b4.on }}" onClick="{{ pick4 }}" style="position: absolute; left: 244px; top: 245px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b4.bg}}; color: {{b4.fg}}; box-shadow: {{b4.ring}}; transform: scale({{b4.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">mai</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">2</span></button>
+      <button type="button" aria-label="juin : 2 heures" aria-pressed="{{ b5.on }}" onClick="{{ pick5 }}" style="position: absolute; left: 177px; top: 284px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b5.bg}}; color: {{b5.fg}}; box-shadow: {{b5.ring}}; transform: scale({{b5.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">juin</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">2</span></button>
+      <button type="button" aria-label="juillet : 30 heures" aria-pressed="{{ b6.on }}" onClick="{{ pick6 }}" style="position: absolute; left: 99px; top: 284px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b6.bg}}; color: {{b6.fg}}; box-shadow: {{b6.ring}}; transform: scale({{b6.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">juil</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">30</span></button>
+      <button type="button" aria-label="août : 63 heures" aria-pressed="{{ b7.on }}" onClick="{{ pick7 }}" style="position: absolute; left: 32px; top: 245px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b7.bg}}; color: {{b7.fg}}; box-shadow: {{b7.ring}}; transform: scale({{b7.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">août</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">63</span></button>
+      <button type="button" aria-label="septembre : 36 heures" aria-pressed="{{ b8.on }}" onClick="{{ pick8 }}" style="position: absolute; left: -7px; top: 178px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b8.bg}}; color: {{b8.fg}}; box-shadow: {{b8.ring}}; transform: scale({{b8.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">sept</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">36</span></button>
+      <button type="button" aria-label="octobre : 30 heures" aria-pressed="{{ b9.on }}" onClick="{{ pick9 }}" style="position: absolute; left: -7px; top: 100px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b9.bg}}; color: {{b9.fg}}; box-shadow: {{b9.ring}}; transform: scale({{b9.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">oct</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">30</span></button>
+      <button type="button" aria-label="novembre : 16 heures" aria-pressed="{{ b10.on }}" onClick="{{ pick10 }}" style="position: absolute; left: 32px; top: 33px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b10.bg}}; color: {{b10.fg}}; box-shadow: {{b10.ring}}; transform: scale({{b10.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">nov</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">16</span></button>
+      <button type="button" aria-label="décembre : à venir" aria-pressed="{{ b11.on }}" onClick="{{ pick11 }}" style="position: absolute; left: 99px; top: -6px; width: 46px; height: 44px; padding: 0; border: 0; border-radius: 14px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; background: {{b11.bg}}; color: {{b11.fg}}; box-shadow: {{b11.ring}}; transform: scale({{b11.sc}}); transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease"><span style="font-size: 11px; font-weight: 700; line-height: 13px">déc</span><span style="font-size: 13.5px; font-weight: 800; line-height: 16px">–</span></button>
+    </div>
+    <span style="font-size: 12.5px; line-height: 1.45; color: #a1a1aa; text-align: center">Novembre en cours : <strong style="color: #ffffff">16 h</strong>. Touche un mois pour voir son détail.</span>
+    <div style="align-self: stretch; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 2px"><span style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em">165</span><span style="font-size: 12px; color: #a1a1aa">épisodes</span></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 2px"><span style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em">51</span><span style="font-size: 12px; color: #a1a1aa">films</span></div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 2px"><span style="font-size: 22px; font-weight: 800; letter-spacing: -0.02em">9 jours</span><span style="font-size: 12px; color: #a1a1aa">pleins</span></div>
+    </div>
+    <p style="margin: 0; align-self: stretch; font-size: 13px; line-height: 1.5; color: #d4d4d8; text-align: center">Ton année s’est jouée depuis l’été : <strong style="color: #F2C36B">81 % de tes heures</strong> depuis juillet, record en août avec 63 h.</p>
+  </section>
+
+  <!-- 2. Trois repères -->
+  <div data-sec="s2" style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; opacity: {{v.s2.op}}; transform: {{v.s2.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="border-radius: 18px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 14px 12px; display: flex; flex-direction: column; gap: 4px; animation: popIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) 100ms both; animation-name: {{v.s2.pop}}" data-anim="1">
+      <span style="font-size: 11.5px; font-weight: 700; color: #a1a1aa">Rythme</span>
+      <span style="font-size: 19px; font-weight: 800; letter-spacing: -0.02em">7 h 45</span>
+      <span style="font-size: 11.5px; color: #a1a1aa">par semaine</span>
+      <span style="margin-top: 2px; font-size: 11.5px; font-weight: 800; color: #F2C36B">▲ 19 %</span>
+    </div>
+    <div style="border-radius: 18px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 14px 12px; display: flex; flex-direction: column; gap: 4px; animation: popIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) 210ms both; animation-name: {{v.s2.pop}}" data-anim="1">
+      <span style="font-size: 11.5px; font-weight: 700; color: #a1a1aa">Soirée type</span>
+      <span style="font-size: 19px; font-weight: 800; letter-spacing: -0.02em">1 h 55</span>
+      <span style="font-size: 11.5px; color: #a1a1aa">2 titres</span>
+      <span style="margin-top: 2px; font-size: 11.5px; font-weight: 700; color: #a1a1aa">112 soirs</span>
+    </div>
+    <div style="border-radius: 18px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 14px 12px; display: flex; flex-direction: column; gap: 4px; animation: popIn 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.2) 320ms both; animation-name: {{v.s2.pop}}" data-anim="1">
+      <span style="font-size: 11.5px; font-weight: 700; color: #a1a1aa">D’affilée</span>
+      <span style="font-size: 19px; font-weight: 800; letter-spacing: -0.02em">3 jours</span>
+      <span style="font-size: 11.5px; color: #a1a1aa">en cours</span>
+      <span style="margin-top: 2px; font-size: 11.5px; font-weight: 700; color: #a1a1aa">record 6</span>
+    </div>
+  </div>
+
+  <!-- 3. Tendances -->
+  <section data-sec="s3" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s3.op}}; transform: {{v.s3.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Tendances</h2>
+      <span style="font-size: 12.5px; color: #a1a1aa">12 dernières semaines</span>
+    </div>
+    <span style="font-size: 12px; font-weight: 600; color: #a1a1aa">Heures par semaine</span>
+    <div role="img" aria-label="Heures par semaine sur douze semaines : 13, 9, 12, 11, 6, 5, 8, 7, 6, 8, 7 et 10" style="display: flex; flex-direction: column; gap: 6px">
+      <div style="height: 100px; display: flex; align-items: stretch; gap: 6px">
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #d4d4d8">13</span><span data-anim="1" style="width: 100%; height: 80px; border-radius: 5px 5px 2px 2px; background: #5f4a1f; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 120ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #d4d4d8">9</span><span data-anim="1" style="width: 100%; height: 55px; border-radius: 5px 5px 2px 2px; background: #5f4a1f; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 175ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #d4d4d8">12</span><span data-anim="1" style="width: 100%; height: 74px; border-radius: 5px 5px 2px 2px; background: #5f4a1f; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 230ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #d4d4d8">11</span><span data-anim="1" style="width: 100%; height: 68px; border-radius: 5px 5px 2px 2px; background: #5f4a1f; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 285ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #d4d4d8">6</span><span data-anim="1" style="width: 100%; height: 37px; border-radius: 5px 5px 2px 2px; background: #5f4a1f; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 340ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #d4d4d8">5</span><span data-anim="1" style="width: 100%; height: 31px; border-radius: 5px 5px 2px 2px; background: #5f4a1f; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 395ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #d4d4d8">8</span><span data-anim="1" style="width: 100%; height: 49px; border-radius: 5px 5px 2px 2px; background: #5f4a1f; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 450ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #d4d4d8">7</span><span data-anim="1" style="width: 100%; height: 43px; border-radius: 5px 5px 2px 2px; background: #5f4a1f; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 505ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #F2C36B">6</span><span data-anim="1" style="width: 100%; height: 37px; border-radius: 5px 5px 2px 2px; background: #E5A93D; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 560ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #F2C36B">8</span><span data-anim="1" style="width: 100%; height: 49px; border-radius: 5px 5px 2px 2px; background: #E5A93D; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 615ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #F2C36B">7</span><span data-anim="1" style="width: 100%; height: 43px; border-radius: 5px 5px 2px 2px; background: #E5A93D; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 670ms both; animation-name: {{v.s3.gy}}"></span></span>
+        <span style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px"><span style="font-size: 11px; font-weight: 800; color: #FFF2B8">10</span><span data-anim="1" style="width: 100%; height: 62px; border-radius: 5px 5px 2px 2px; background: #F2C36B; transform-origin: center bottom; animation: growY 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) 725ms both, glowSoft 3s ease-in-out 1.6s infinite; animation-name: {{v.s3.gyglow}}"></span></span>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: #a1a1aa"><span>fin août</span><span>28 derniers jours</span></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: #1C1C1F">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2C36B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17 9 11l4 4 8-8"></path><path d="M15 7h6v6"></path></svg>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">Tu repars à la hausse</span><span style="font-size: 12px; color: #a1a1aa">31 h ces 28 jours, 26 h les 28 précédents</span></div>
+        <span data-anim="1" style="font-size: 13px; font-weight: 800; color: #F2C36B; animation: textGlow 2.4s ease-in-out 1s infinite">+19 %</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: #1C1C1F">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2C36B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"></path></svg>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">Le cinéma prend le dessus</span><span style="font-size: 12px; color: #a1a1aa">58 % de films depuis octobre, 38 % avant</span></div>
+        <span style="font-size: 13px; font-weight: 800; color: #F2C36B">+20 pts</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: #1C1C1F">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F2C36B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-3 0-6 1-9Z"></path></svg>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 14px; font-weight: 700">Le thriller monte</span><span style="font-size: 12px; color: #a1a1aa">28 % de ton temps cet automne, 17 % avant</span></div>
+        <span style="font-size: 13px; font-weight: 800; color: #F2C36B">+11 pts</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Ce que tu regardes -->
+  <section data-sec="s4" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s4.op}}; transform: {{v.s4.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Ce que tu regardes</h2>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div role="img" aria-label="Séries 57 % du temps, films 43 %" data-anim="1" style="height: 14px; border-radius: 7px; overflow: hidden; display: flex; gap: 3px; transform-origin: left center; animation: growX 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 100ms both; animation-name: {{v.s4.gx}}">
+        <div style="width: 57%; background: #E5A93D; border-radius: 7px 2px 2px 7px"></div>
+        <div style="flex: 1; background: #e4e4e7; border-radius: 2px 7px 7px 2px"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12.5px"><span style="font-weight: 700; color: #F2C36B">Séries · 124 h · 57 %</span><span style="font-weight: 700; color: #e4e4e7">Films · 92 h · 43 %</span></div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 86px; font-size: 13.5px; font-weight: 700">Thriller</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 100%; height: 8px; border-radius: 4px; background: #E5A93D; position: relative; overflow: hidden; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both; animation-name: {{v.s4.gx}}"><span aria-hidden="true" data-anim="1" style="position: absolute; top: 0; bottom: 0; left: 0; width: 60%; background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,0.85), rgba(255,255,255,0)); animation: sweep 2.8s ease-in-out 1.4s infinite"></span></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">24 %</span><span style="width: 14px; font-size: 11px; font-weight: 800; color: #F2C36B">▲</span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 86px; font-size: 13.5px; font-weight: 700">Action</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 83%; height: 8px; border-radius: 4px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 240ms both; animation-name: {{v.s4.gx}}"></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">20 %</span><span style="width: 14px; font-size: 11px; font-weight: 800; color: #F2C36B">▲</span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 86px; font-size: 13.5px; font-weight: 700">Drame</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 71%; height: 8px; border-radius: 4px; background: #8a6a2b; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 330ms both; animation-name: {{v.s4.gx}}"></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">17 %</span><span style="width: 14px; font-size: 11px; font-weight: 800; color: #a1a1aa">▼</span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 86px; font-size: 13.5px; font-weight: 700">Animation</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 42%; height: 8px; border-radius: 4px; background: #8a6a2b; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 420ms both; animation-name: {{v.s4.gx}}"></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">10 %</span><span style="width: 14px; font-size: 11px; font-weight: 800; color: #a1a1aa">=</span></div>
+    </div>
+  </section>
+
+  <!-- 5. Quand tu regardes -->
+  <section data-sec="s5" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 12px; opacity: {{v.s5.op}}; transform: {{v.s5.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Quand tu regardes</h2>
+      <span style="font-size: 13px; color: #a1a1aa">Ton créneau : <strong data-anim="1" style="color: #F2C36B; animation: textGlow 2.4s ease-in-out 1s infinite">le dimanche, de 21 h à minuit</strong></span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 4px" role="img" aria-label="Carte de la semaine par tranches de trois heures : les soirées et le week-end dominent">
+      <div style="display: flex; gap: 4px; padding-left: 38px; font-size: 10.5px; font-weight: 600; color: #a1a1aa">
+        <span style="flex: 1">0 h</span><span style="flex: 1">3 h</span><span style="flex: 1">6 h</span><span style="flex: 1">9 h</span><span style="flex: 1">12 h</span><span style="flex: 1">15 h</span><span style="flex: 1">18 h</span><span style="flex: 1">21 h</span>
+      </div>
+      <sc-for list="{{punch}}" as="row" hint-placeholder-count="7">
+        <div style="display: flex; align-items: center; gap: 4px">
+          <span style="width: 34px; font-size: 12px; font-weight: 700; color: #d4d4d8">{{row.day}}</span>
+          <sc-for list="{{row.cells}}" as="cell" hint-placeholder-count="8">
+            <span data-anim="1" style="flex: 1; height: 24px; border-radius: 6px; background: {{cell.bg}}; animation: {{cell.anim}}"></span>
+          </sc-for>
+        </div>
+      </sc-for>
+    </div>
+  </section>
+
+  <!-- 6. Où tu regardes -->
+  <section data-sec="s6" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s6.op}}; transform: {{v.s6.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Où tu regardes</h2>
+      <span style="font-size: 12.5px; color: #a1a1aa">part du temps</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 104px; font-size: 13.5px; font-weight: 700">Netflix</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 100%; height: 8px; border-radius: 4px; background: #E5A93D; position: relative; overflow: hidden; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both; animation-name: {{v.s6.gx}}"><span aria-hidden="true" data-anim="1" style="position: absolute; top: 0; bottom: 0; left: 0; width: 60%; background: linear-gradient(100deg, rgba(255,255,255,0), rgba(255,255,255,0.85), rgba(255,255,255,0)); animation: sweep 2.8s ease-in-out 1.4s infinite"></span></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">13 %</span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 104px; font-size: 13.5px; font-weight: 700">Paramount+</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 77%; height: 8px; border-radius: 4px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 240ms both; animation-name: {{v.s6.gx}}"></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">10 %</span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 104px; font-size: 13.5px; font-weight: 700">Plex</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 69%; height: 8px; border-radius: 4px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 330ms both; animation-name: {{v.s6.gx}}"></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">9 %</span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 104px; font-size: 13.5px; font-weight: 700">Canal+</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 54%; height: 8px; border-radius: 4px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 420ms both; animation-name: {{v.s6.gx}}"></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">7 %</span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 104px; font-size: 13.5px; font-weight: 700">Prime Video</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 46%; height: 8px; border-radius: 4px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 510ms both; animation-name: {{v.s6.gx}}"></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">6 %</span></div>
+      <div style="display: flex; align-items: center; gap: 10px"><span style="width: 104px; font-size: 13.5px; font-weight: 700">Disney+</span><div style="flex: 1; height: 8px; border-radius: 4px; background: #232327"><div data-anim="1" style="width: 38%; height: 8px; border-radius: 4px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 600ms both; animation-name: {{v.s6.gx}}"></div></div><span style="width: 40px; text-align: right; font-size: 12.5px; font-weight: 700; color: #d4d4d8">5 %</span></div>
+    </div>
+    <p style="margin: 0; padding: 10px 12px; border-radius: 12px; background: #1C1C1F; font-size: 12px; line-height: 1.5; color: #a1a1aa">Le reste, 50 % de ton temps, n’a <strong style="color: #d4d4d8">pas de plateforme connue</strong> : surtout des films importés. Il n’est plus mélangé dans « Autres ».</p>
+  </section>
+
+  <!-- 7. Séries laissées en route -->
+  <section data-sec="s7" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(229,169,61,0.28); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s7.op}}; transform: {{v.s7.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Séries laissées en route</h2>
+      <span style="font-size: 13px; color: #a1a1aa">Sur 27 en cours, <strong style="color: #ffffff">9 n’ont plus bougé depuis 2 mois</strong> · 4 abandonnées</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div aria-hidden="true" style="width: 44px; height: 66px; border-radius: 9px; background: linear-gradient(160deg, #3b4a5a, #1c2430); display: flex; align-items: flex-end; padding: 5px; box-sizing: border-box; font-size: 9px; font-weight: 800; color: #e4e4e7; flex-shrink: 0">TK</div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+          <span style="font-size: 15px; font-weight: 700">The Killing</span>
+          <span style="font-size: 12px; color: #a1a1aa">Arrêtée à S02 | E04 · il y a 4 mois</span>
+          <div style="height: 6px; border-radius: 3px; background: #232327"><div data-anim="1" style="width: 38%; height: 6px; border-radius: 3px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both; animation-name: {{v.s7.gx}}"></div></div>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 12px">
+        <div aria-hidden="true" style="width: 44px; height: 66px; border-radius: 9px; background: linear-gradient(160deg, #1f5a5a, #10282c); display: flex; align-items: flex-end; padding: 5px; box-sizing: border-box; font-size: 9px; font-weight: 800; color: #e4e4e7; flex-shrink: 0">BS</div>
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+          <span style="font-size: 15px; font-weight: 700">Black Space</span>
+          <span style="font-size: 12px; color: #a1a1aa">Plus que 3 épisodes · il y a 3 mois</span>
+          <div style="height: 6px; border-radius: 3px; background: #232327"><div data-anim="1" style="width: 63%; height: 6px; border-radius: 3px; background: #E5A93D; transform-origin: left center; animation: growX 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 240ms both; animation-name: {{v.s7.gx}}"></div></div>
+        </div>
+      </div>
+    </div>
+    <p style="margin: 0; font-size: 12.5px; line-height: 1.5; color: #d4d4d8">Tu décroches le plus souvent <strong style="color: #F2C36B">avant la fin de la saison 1</strong>.</p>
+    <a href="Abandons.dc.html" style="height: 46px; border-radius: 14px; background: #E5A93D; color: #000000; font-size: 14px; font-weight: 800; display: flex; align-items: center; justify-content: center">Voir les 13 séries</a>
+  </section>
+
+  <!-- 8. Tes réactions -->
+  <section data-sec="s8" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s8.op}}; transform: {{v.s8.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Tes réactions</h2>
+      <span style="font-size: 12.5px; color: #a1a1aa">96 épisodes notés</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <div role="img" aria-label="41 J’adore, 44 Bien, 11 Bof" data-anim="1" style="height: 12px; border-radius: 6px; overflow: hidden; display: flex; gap: 3px; transform-origin: left center; animation: growX 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 100ms both; animation-name: {{v.s8.gx}}">
+        <div style="width: 43%; background: #F2C36B; border-radius: 6px 2px 2px 6px"></div>
+        <div style="width: 46%; background: #8a6a2b; border-radius: 2px"></div>
+        <div style="flex: 1; background: #52525b; border-radius: 2px 6px 6px 2px"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700"><span style="color: #F2C36B">J’adore · 41</span><span style="color: #d4d4d8">Bien · 44</span><span style="color: #a1a1aa">Bof · 11</span></div>
+    </div>
+    <span style="font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: #a1a1aa">LES PLUS AIMÉES</span>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px">
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div aria-hidden="true" style="height: 132px; border-radius: 12px; background: linear-gradient(160deg, #6b4a2a, #2a1c12); display: flex; align-items: flex-end; padding: 8px; box-sizing: border-box; font-size: 11px; font-weight: 800; color: #f4f4f5">LIONESS</div>
+        <span style="font-size: 13px; font-weight: 700">Lioness</span><span data-anim="1" style="font-size: 11.5px; color: #F2C36B; font-weight: 700; animation: textGlow 2.4s ease-in-out 1s infinite">14 J’adore</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div aria-hidden="true" style="height: 132px; border-radius: 12px; background: linear-gradient(160deg, #4a2a5a, #1c1226); display: flex; align-items: flex-end; padding: 8px; box-sizing: border-box; font-size: 11px; font-weight: 800; color: #f4f4f5">AU MICRO !</div>
+        <span style="font-size: 13px; font-weight: 700">Au micro !</span><span style="font-size: 11.5px; color: #F2C36B; font-weight: 700">11 J’adore</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px">
+        <div aria-hidden="true" style="height: 132px; border-radius: 12px; background: linear-gradient(160deg, #2a3f6b, #121a2a); display: flex; align-items: flex-end; padding: 8px; box-sizing: border-box; font-size: 11px; font-weight: 800; color: #f4f4f5">LUPIN</div>
+        <span style="font-size: 13px; font-weight: 700">Lupin</span><span style="font-size: 11.5px; color: #F2C36B; font-weight: 700">7 J’adore</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. Têtes d'affiche -->
+  <section data-sec="s9" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 12px; opacity: {{v.s9.op}}; transform: {{v.s9.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Tes têtes d’affiche</h2>
+      <span style="font-size: 12.5px; color: #a1a1aa">rôles principaux</span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 8px">
+      <button type="button" style="min-height: 52px; padding: 0; border: 0; background: transparent; color: inherit; font-family: inherit; text-align: left; display: flex; align-items: center; gap: 12px">
+        <span aria-hidden="true" style="width: 44px; height: 44px; border-radius: 22px; background: #2a2a2f; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #d4d4d8; flex-shrink: 0">ZS</span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Zoe Saldaña</span><span style="font-size: 12px; color: #a1a1aa">4 titres vus · 1 favori</span></span>
+        <span data-anim="1" style="font-size: 12.5px; font-weight: 800; color: #F2C36B; animation: textGlow 2.4s ease-in-out 1s infinite">31 h</span>
+      </button>
+      <button type="button" style="min-height: 52px; padding: 0; border: 0; background: transparent; color: inherit; font-family: inherit; text-align: left; display: flex; align-items: center; gap: 12px">
+        <span aria-hidden="true" style="width: 44px; height: 44px; border-radius: 22px; background: #2a2a2f; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #d4d4d8; flex-shrink: 0">OS</span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Omar Sy</span><span style="font-size: 12px; color: #a1a1aa">3 titres vus · 1 favori</span></span>
+        <span style="font-size: 12.5px; font-weight: 800; color: #F2C36B">19 h</span>
+      </button>
+      <button type="button" style="min-height: 52px; padding: 0; border: 0; background: transparent; color: inherit; font-family: inherit; text-align: left; display: flex; align-items: center; gap: 12px">
+        <span aria-hidden="true" style="width: 44px; height: 44px; border-radius: 22px; background: #2a2a2f; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; color: #d4d4d8; flex-shrink: 0">LD</span>
+        <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Leonardo DiCaprio</span><span style="font-size: 12px; color: #a1a1aa">5 films vus</span></span>
+        <span style="font-size: 12.5px; font-weight: 800; color: #F2C36B">13 h</span>
+      </button>
+    </div>
+  </section>
+
+  <!-- 10. Badges à niveaux -->
+  <section data-sec="s10" style="border-radius: 22px; background: #151518; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.06); padding: 18px; display: flex; flex-direction: column; gap: 14px; opacity: {{v.s10.op}}; transform: {{v.s10.tf}}; transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)">
+    <div style="display: flex; justify-content: space-between; align-items: baseline">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.01em">Badges</h2>
+      <span style="font-size: 12.5px; color: #a1a1aa">prochain palier</span>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+        <svg data-anim="1" style="animation: ringGlow 2.4s ease-in-out 1.6s infinite" width="60" height="60" viewBox="0 0 60 60" role="img" aria-label="Centenaire, niveau 4, 85 % du palier suivant"><circle cx="30" cy="30" r="25" fill="none" stroke="#2a2a2f" stroke-width="5"></circle><circle cx="30" cy="30" r="25" fill="none" stroke="#E5A93D" stroke-width="5" stroke-linecap="round" stroke-dasharray="133.5 157" transform="rotate(-90 30 30)" data-anim="1" style="animation: ringDraw 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) 150ms both; animation-name: {{v.s10.ring}}"></circle><text x="30" y="35" text-anchor="middle" font-family="'Plus Jakarta Sans', Inter, sans-serif" font-size="15" font-weight="800" fill="#F2C36B">4</text></svg>
+        <span style="font-size: 12.5px; font-weight: 700; line-height: 1.2">Centenaire</span><span style="font-size: 11px; color: #a1a1aa; line-height: 1.3">6 377 vus sur 7 500</span>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+        <svg width="60" height="60" viewBox="0 0 60 60" role="img" aria-label="Oiseau de nuit, niveau 2, 40 % du palier suivant"><circle cx="30" cy="30" r="25" fill="none" stroke="#2a2a2f" stroke-width="5"></circle><circle cx="30" cy="30" r="25" fill="none" stroke="#E5A93D" stroke-width="5" stroke-linecap="round" stroke-dasharray="63 157" transform="rotate(-90 30 30)" data-anim="1" style="animation: ringDraw 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) 290ms both; animation-name: {{v.s10.ring}}"></circle><text x="30" y="35" text-anchor="middle" font-family="'Plus Jakarta Sans', Inter, sans-serif" font-size="15" font-weight="800" fill="#F2C36B">2</text></svg>
+        <span style="font-size: 12.5px; font-weight: 700; line-height: 1.2">Oiseau de nuit</span><span style="font-size: 11px; color: #a1a1aa; line-height: 1.3">20 nuits sur 50</span>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+        <svg width="60" height="60" viewBox="0 0 60 60" role="img" aria-label="Grand écran, niveau 3, 62 % du palier suivant"><circle cx="30" cy="30" r="25" fill="none" stroke="#2a2a2f" stroke-width="5"></circle><circle cx="30" cy="30" r="25" fill="none" stroke="#E5A93D" stroke-width="5" stroke-linecap="round" stroke-dasharray="97 157" transform="rotate(-90 30 30)" data-anim="1" style="animation: ringDraw 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) 430ms both; animation-name: {{v.s10.ring}}"></circle><text x="30" y="35" text-anchor="middle" font-family="'Plus Jakarta Sans', Inter, sans-serif" font-size="15" font-weight="800" fill="#F2C36B">3</text></svg>
+        <span style="font-size: 12.5px; font-weight: 700; line-height: 1.2">Grand écran</span><span style="font-size: 11px; color: #a1a1aa; line-height: 1.3">112 films sur 150</span>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center">
+        <svg width="60" height="60" viewBox="0 0 60 60" role="img" aria-label="Binge-Master, niveau 1, 60 % du palier suivant"><circle cx="30" cy="30" r="25" fill="none" stroke="#2a2a2f" stroke-width="5"></circle><circle cx="30" cy="30" r="25" fill="none" stroke="#E5A93D" stroke-width="5" stroke-linecap="round" stroke-dasharray="94 157" transform="rotate(-90 30 30)" data-anim="1" style="animation: ringDraw 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) 570ms both; animation-name: {{v.s10.ring}}"></circle><text x="30" y="35" text-anchor="middle" font-family="'Plus Jakarta Sans', Inter, sans-serif" font-size="15" font-weight="800" fill="#F2C36B">1</text></svg>
+        <span style="font-size: 12.5px; font-weight: 700; line-height: 1.2">Binge-Master</span><span style="font-size: 11px; color: #a1a1aa; line-height: 1.3">3 séries finies sur 5</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Une seule note d'import, en pied -->
+  <p style="margin: auto 4px 0; font-size: 11.5px; line-height: 1.5; color: #a1a1aa">Sans 3 journées d’import (4 604 h) ni 26 visionnages sans date. Depuis toujours : 6 377 visionnages, dont 112 films.</p>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":3496}}'>
+class Component extends DCLogic {
+  componentDidMount() {
+    const calm = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (calm) return;
+    this.play();
+    this.watch();
+  }
+  watch() {
+    this.setState({ seen: {} });
+    if (typeof IntersectionObserver !== 'function') { this.cascade(200); return; }
+    let heard = false;
+    this._io = new IntersectionObserver(entries => {
+      heard = true;
+      const next = Object.assign({}, (this.state || {}).seen || {});
+      let changed = false;
+      entries.forEach(entry => {
+        const id = entry.target.getAttribute('data-sec');
+        if (entry.isIntersecting && !next[id]) { next[id] = true; changed = true; this._io.unobserve(entry.target); }
+      });
+      if (changed) this.setState({ seen: next });
+    }, { threshold: 0.12 });
+    document.querySelectorAll('[data-sec]').forEach(el => this._io.observe(el));
+    this._t3 = setTimeout(() => { if (!heard) this.cascade(0); }, 1500);
+  }
+  cascade(start) {
+    (this._c || []).forEach(clearTimeout);
+    this._c = ['s2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10'].map((id, i) => setTimeout(() => {
+      const next = Object.assign({}, (this.state || {}).seen || {});
+      next[id] = true;
+      this.setState({ seen: next });
+    }, start + i * 240));
+  }
+  replayPage() {
+    if (this._io) this._io.disconnect();
+    clearTimeout(this._t3);
+    this.setState({ seen: {} });
+    this.cascade(750);
+  }
+  componentWillUnmount() {
+    clearInterval(this._tw); clearTimeout(this._t1); clearTimeout(this._t2); clearTimeout(this._t3);
+    (this._c || []).forEach(clearTimeout);
+    if (this._io) this._io.disconnect();
+  }
+  play() {
+    clearTimeout(this._t1); clearTimeout(this._t2);
+    this.setState({ stage: 0, picked: -1, shown: 0 });
+    this._t1 = setTimeout(() => { this.setState({ stage: 1 }); this.tween(216, 1100); }, 60);
+    this._t2 = setTimeout(() => this.setState({ stage: 2 }), 1700);
+  }
+  tween(to, ms) {
+    clearInterval(this._tw);
+    const st = this.state || {};
+    const from = typeof st.shown === 'number' ? st.shown : to;
+    const t0 = Date.now();
+    this._tw = setInterval(() => {
+      const k = Math.min(1, (Date.now() - t0) / ms);
+      this.setState({ shown: Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3))) });
+      if (k >= 1) clearInterval(this._tw);
+    }, 16);
+  }
+  renderVals() {
+    const hours = [16, 9, 12, 0, 2, 2, 30, 63, 36, 30, 16, null];
+    const names = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+    const details = ['5 films · 9 ép.', '2 films · 7 ép.', '3 films · 10 ép.', 'rien regardé', '3 épisodes', '1 film', '7 films · 23 ép.', '13 films · 53 ép.', '8 films · 28 ép.', '7 films · 23 ép.', '5 films · 9 ép.', 'à venir'];
+    const record = 7, current = 10;
+    const st = this.state || {};
+    const stage = typeof st.stage === 'number' ? st.stage : 2;
+    const picked = typeof st.picked === 'number' ? st.picked : -1;
+    const target = picked < 0 ? 216 : hours[picked];
+    const shown = typeof st.shown === 'number' ? st.shown : target;
+    const out = {};
+    hours.forEach((value, i) => {
+      const angle = (i * 30 + 15) * Math.PI / 180;
+      const on = picked === i;
+      const move = on ? 'translate(' + (6 * Math.sin(angle)).toFixed(1) + 'px, ' + (-6 * Math.cos(angle)).toFixed(1) + 'px) scale(1)' : 'translate(0px, 0px) scale(1)';
+      out['s' + i] = {
+        tf: stage === 0 ? 'translate(0px, 0px) scale(0.5)' : move,
+        op: stage === 0 ? 0 : (picked < 0 || on ? 1 : 0.3),
+        tr: stage === 0 ? 'none' : stage === 1
+          ? 'transform 650ms cubic-bezier(0.2, 0.9, 0.3, 1.25) ' + (i * 55) + 'ms, opacity 400ms ease ' + (i * 55) + 'ms'
+          : 'transform 350ms cubic-bezier(0.2, 0.9, 0.3, 1.25), opacity 300ms ease'
+      };
+      out['b' + i] = {
+        on: on,
+        sc: on ? 1.12 : 1,
+        bg: on ? '#E5A93D' : (i === current ? 'rgba(229,169,61,0.16)' : 'transparent'),
+        fg: on ? '#000000' : (i === current ? '#ffffff' : i === record ? '#FFF2B8' : value ? '#d4d4d8' : '#8b8b93'),
+        ring: !on && i === current ? 'inset 0 0 0 1.5px #E5A93D' : 'none'
+      };
+      out['pick' + i] = () => {
+        const next = picked === i ? -1 : i;
+        this.setState({ picked: next, stage: 2 });
+        this.tween(next < 0 ? 216 : (hours[next] || 0), 380);
+      };
+    });
+    out.clear = () => {
+      if (picked < 0) { this.play(); this.replayPage(); return; }
+      this.setState({ picked: -1 });
+      this.tween(216, 380);
+    };
+    out.c = {
+      top: picked < 0 ? 'en 2026' : names[picked],
+      big: picked >= 0 && hours[picked] === null ? '–' : shown + ' h',
+      sub: picked < 0 ? 'devant l’écran' : details[picked]
+    };
+    const tones = ['#222226', 'rgba(229,169,61,0.28)', 'rgba(229,169,61,0.5)', 'rgba(229,169,61,0.78)', '#F2C36B'];
+    const grid = [
+      ['Lun', [0, 0, 0, 0, 1, 0, 1, 2]],
+      ['Mar', [0, 0, 0, 0, 0, 0, 1, 2]],
+      ['Mer', [0, 0, 0, 0, 1, 1, 2, 2]],
+      ['Jeu', [0, 0, 0, 0, 0, 0, 1, 3]],
+      ['Ven', [1, 0, 0, 0, 0, 1, 2, 3]],
+      ['Sam', [2, 0, 0, 1, 1, 2, 3, 3]],
+      ['Dim', [1, 0, 0, 1, 2, 2, 3, 4]]
+    ];
+    const seen = st.seen || null;
+    out.v = {};
+    ['s2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10'].forEach(id => {
+      const on = !seen || !!seen[id];
+      out.v[id] = {
+        op: on ? 1 : 0,
+        tf: on ? 'translateY(0px)' : 'translateY(22px)',
+        gx: on ? 'growX' : 'none',
+        gy: on ? 'growY' : 'none',
+        gyglow: on ? 'growY, glowSoft' : 'none',
+        pop: on ? 'popIn' : 'none',
+        ring: on ? 'ringDraw' : 'none'
+      };
+    });
+    const cellsOn = out.v.s5.op === 1;
+    out.punch = grid.map(([day, levels], row) => ({ day, cells: levels.map((level, col) => ({
+      bg: tones[level],
+      anim: !cellsOn ? 'none' : 'popIn 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.3) ' + (120 + (row + col) * 40) + 'ms both' + (level === 4 ? ', glowGold 2.2s ease-in-out 1.6s infinite' : '')
+    })) }));
+    return out;
+  }
+}
+</script>
+</body>
+</html>

@@ -175,3 +175,23 @@
 .home-notifications-page__empty strong { font-size:20px; font-weight:800; }.home-notifications-page__empty p { font-size:15px; line-height:1.5; color:#d4d4d8; }
 .home-notifications-page__state { font-size:15px; color:#d4d4d8; }
 .home-notifications-page__hint { margin:4px 4px 0; font-size:13px; line-height:1.45; color:#71717a; }
+
+/* SEENIT-UX-022 : tri des films et carte « À l'affiche ». */
+.home-movie-sort { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 12px; }
+.home-movie-sort button { min-height:44px; padding:0 14px; border-radius:22px; background:#1c1c1f; box-shadow:inset 0 0 0 1px #ffffff14; color:#d4d4d8; font-size:13.5px; font-weight:700; cursor:pointer; }
+.home-movie-sort button[aria-pressed="true"] { background:#e5a93d; color:#000; font-weight:800; box-shadow:none; }
+.home-movie-empty { margin:0 0 12px; color:#a1a1aa; font-size:13px; line-height:1.5; }
+.home-featured-movie { position:relative; overflow:hidden; min-height:252px; margin:0 0 14px; border-radius:24px; background:linear-gradient(135deg,#3a1220,#14101a); box-shadow:inset 0 0 0 1px #e5a93d59; display:flex; flex-direction:column; justify-content:flex-end; }
+.home-featured-movie__image { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.home-featured-movie::after { content:""; position:absolute; inset:0; background:linear-gradient(0deg,#0b0b0df5 0%,#0b0b0d8c 48%,#0b0b0d00 80%); pointer-events:none; }
+.home-featured-movie__eyebrow { position:absolute; z-index:1; left:16px; top:14px; display:inline-flex; align-items:center; height:26px; padding:0 10px; border-radius:13px; background:#0b0b0db3; box-shadow:inset 0 0 0 1px #e5a93d80; color:#f2c36b; font-size:11.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; }
+.home-featured-movie__body { position:relative; z-index:1; display:flex; flex-direction:column; gap:6px; padding:64px 16px 16px; }
+.home-featured-movie__body h3 { margin:0; color:#fff; font-size:23px; font-weight:800; line-height:1.15; letter-spacing:-.02em; overflow-wrap:anywhere; }
+.home-featured-movie__meta { margin:0; color:#e4e4e7; font-size:13px; font-weight:600; }.home-featured-movie__meta strong { color:#f2c36b; }
+.home-featured-movie__why { margin:0; color:#d4d4d8; font-size:12.5px; }
+.home-featured-movie__actions { display:flex; align-items:center; gap:8px; margin-top:6px; }
+.home-featured-movie__provider { width:44px; height:44px; flex-shrink:0; overflow:hidden; border-radius:13px; box-shadow:inset 0 0 0 1px #ffffff24; }
+.home-featured-movie__provider img { width:100%; height:100%; object-fit:cover; }
+.home-featured-movie__open { flex:1; min-height:44px; border-radius:14px; background:#e5a93d; color:#000; font-size:14px; font-weight:800; cursor:pointer; }
+.home-featured-movie__shuffle { width:44px; height:44px; flex-shrink:0; display:grid; place-items:center; border-radius:14px; background:#1c1c1fe6; box-shadow:inset 0 0 0 1px #ffffff1f; color:#e4e4e7; cursor:pointer; }
+.home-featured-movie__shuffle svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round; }
