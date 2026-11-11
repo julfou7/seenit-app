@@ -196,6 +196,10 @@ test('SEENIT-PROFILE-002 retour terrain v1.4.292 : une série finie archivée co
   const byId = Object.fromEntries(buildSeriesFate(shows, NOW, TODAY).map(entry => [entry.show.id, entry.fate]));
   assert.equal(byId['archived-done'], 'finished');
   assert.equal(byId['archived-left'], undefined, 'une série archivée non finie reste hors du devenir');
+  // Revue Codex #949 : archivée et terminée chez TMDB, mais un épisode sur vingt seulement : pas terminée.
+  const partial = buildSeriesFate([series('archived-partial', { isArchived: true, tmdbStatus: 'Ended', nextEpisodeToWatch: null }, [['1x1', NOW - 20 * DAY]])], NOW, TODAY);
+  assert.equal(partial.length, 0);
+  assert.equal(byId['archived-ended'], 'finished');
 });
 
 test('SEENIT-PROFILE-006 chiffres depuis l’inscription, sans rattrapage marqué d’un coup ni faux marathon', async () => {
@@ -221,6 +225,15 @@ test('SEENIT-PROFILE-006 chiffres depuis l’inscription, sans rattrapage marqu�
   // Deux épisodes rapprochés ne suffisent pas, les films ne sont jamais groupés.
   const pair = [view('a', bulkAt), view('a', bulkAt + 1_000), view('m1', bulkAt, 110, 'movie'), view('m2', bulkAt, 110, 'movie'), view('m3', bulkAt, 110, 'movie')];
   assert.equal(findProfileCatchUps(pair).size, 0);
+  // Revue Codex #949 : sans heure connue, pas de rafale ; une journée d'import se lit avant les rafales.
+  const noon = [1, 2, 3].map(index => ({ ...view('jour', at(2026, 8, 1, 12)), season: index, timeKnown: false }));
+  assert.equal(findProfileCatchUps(noon).size, 0);
+  const importAt = at(2026, 8, 10, 9);
+  const imported = series('import', {}, Array.from({ length: 30 }, (_, index) => [`1x${index + 1}`, importAt + index * 1_000] as [string, number]));
+  const film = (id: string): Show => ({ ...series(id, { mediaType: 'movie', status: 'completed' }), seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: importAt + 60_000 } } });
+  const mixed = scopeProfileViewings([imported, film('f1'), film('f2')], since);
+  assert.equal(mixed.imports.length, 1);
+  assert.equal(mixed.viewings.length, 0, 'les films de la journée d’import sortent avec elle');
   // Sans date d'inscription connue, rien n'est coupé avant.
   assert.equal(scopeProfileViewings([before], null).viewings.length, 1);
   // Les écrans de chiffres passent tous par la même portée, bornée par la date de création du compte.

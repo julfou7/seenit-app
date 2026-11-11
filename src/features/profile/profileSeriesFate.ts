@@ -63,7 +63,9 @@ export function buildSeriesFate(shows: readonly Show[], now: number, today: stri
     const remaining = total ? Math.max(0, total - watched.length) : null;
     // Retour terrain v1.4.292 : une série finie le reste même archivée, et la fin se lit aussi dans le statut TMDB.
     const ended = show.seriesEnded === true || show.tmdbStatus === 'Ended' || show.tmdbStatus === 'Canceled';
-    const finished = !dropped && (show.status === 'completed' || (resume.upToDate && ended));
+    // Revue Codex #949 : la reprise tient une série archivée pour « à jour » ; archivée, il faut tous les épisodes diffusés.
+    const caughtUp = show.isArchived ? Boolean(total && watched.length >= total) : resume.upToDate;
+    const finished = !dropped && (show.status === 'completed' || (caughtUp && ended));
     if (show.isArchived && !dropped && !finished) continue;
     const fate: SeriesFate = dropped ? 'dropped' : finished ? 'finished'
       : resume.episode && !resume.upToDate && pause.days >= SERIES_PAUSE_DAYS ? 'paused' : 'active';

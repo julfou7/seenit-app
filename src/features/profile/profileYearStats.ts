@@ -157,7 +157,8 @@ export const PROFILE_CATCH_UP_MIN = 3;
 export function findProfileCatchUps(viewings: readonly ProfileViewing[]): Set<ProfileViewing> {
   const byShow = new Map<string, ProfileViewing[]>();
   for (const viewing of viewings) {
-    if (viewing.mediaType !== 'tv') continue;
+    // Revue Codex #949 : une heure inconnue (midi par défaut) ne prouve aucune rafale.
+    if (viewing.mediaType !== 'tv' || !viewing.timeKnown) continue;
     const list = byShow.get(viewing.showId);
     if (list) list.push(viewing); else byShow.set(viewing.showId, [viewing]);
   }
@@ -191,18 +192,18 @@ export interface ProfileViewingScope {
  * marqués d'un coup, ni les journées d'import. Les totaux du Profil, eux, comptent tout.
  */
 export function scopeProfileViewings(shows: readonly Show[], since: number | null = null): ProfileViewingScope {
-  const all = collectProfileViewings(shows);
-  const catchUps = findProfileCatchUps(all);
+  // Revue Codex #949 : les journées d'import se lisent sur tous les visionnages, avant de retirer les rafales.
+  const { viewings: dated, imports } = partitionProfileViewings(collectProfileViewings(shows));
+  const catchUps = findProfileCatchUps(dated);
   let minutes = 0;
   for (const viewing of catchUps) minutes += viewing.minutes;
   const sinceDay = since !== null && Number.isFinite(since) && since > 0 ? new Date(since).setHours(0, 0, 0, 0) : null;
   let beforeSince = 0;
-  const kept = all.filter(viewing => {
+  const viewings = dated.filter(viewing => {
     if (catchUps.has(viewing)) return false;
     if (sinceDay !== null && viewing.watchedAt < sinceDay) { beforeSince++; return false; }
     return true;
   });
-  const { viewings, imports } = partitionProfileViewings(kept);
   return { viewings, imports, catchUp: { count: catchUps.size, minutes }, since: sinceDay, beforeSince };
 }
 
