@@ -13,10 +13,19 @@ import { SeenItLogo } from '../components/SeenItLogo';
 import { cn } from '../lib/utils';
 import { buildLibraryMedia } from './libraryPresentation';
 
+export type LibraryTypeFilter = 'all' | 'tv' | 'movie';
+/** SEENIT-PROFILE-001 : Moi affiche des étagères ; « Tout voir » ou une ligne ouvre la grille complète d'une section. */
+export type LibraryView = { kind: 'shelves'; onOpenSection: (id: string, title: string, type: LibraryTypeFilter) => void } | { kind: 'section'; id: string; type: LibraryTypeFilter };
+
 interface Props {
   onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void;
   isEmbedded?: boolean;
+  view?: LibraryView;
 }
+
+const SHELF_SECTIONS = ['watching', 'toWatchMovie', 'favorites'] as const;
+const SHELF_SIZE = 10;
+const SECTION_TYPE: Record<string, 'tv' | 'movie' | null> = { favorites: null, watching: 'tv', toStartTv: 'tv', upcomingTv: 'tv', toWatchCinema: 'movie', toWatchMovie: 'movie', upToDate: 'tv', completedMovies: 'movie' };
 
 const LIBRARY_GRID_BATCH_SIZE = 12;
 
@@ -115,13 +124,13 @@ const LibrarySectionGrid = React.memo(function LibrarySectionGrid(props: Library
   previous.onAddClick === next.onAddClick
 );
 
-export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, isEmbedded = false }: Props) {
+export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, isEmbedded = false, view }: Props) {
   const { shows, addShow, deleteShow } = useShows();
   const updateShow = useShowsStore(state => state.updateShowOptimistic);
   const showToast = useToastStore(state => state.showToast);
 
   const [previewMedia, setPreviewMedia] = useState<TMDBMedia | null>(null);
-  const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = useState<LibraryTypeFilter>('all');
 
   const handleShowClick = useCallback((id: string | number, mediaType?: 'tv' | 'movie') => {
     onShowClick(String(id), mediaType);
@@ -330,10 +339,11 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
     return result.filter(s => s.data.length > 0);
   }, [shows]);
 
-  // Une section vidée entre-temps laisse la place à En cours, puis à la première restante.
-  const activeSection = sections.find(section => section.id === selectedSectionId)
-    ?? sections.find(section => section.id === 'watching')
-    ?? sections[0];
+  const activeType = view?.kind === 'section' ? view.type : typeFilter;
+  const byType = (items: LibraryItem[]) => activeType === 'all' ? items : items.filter(item => (item.show.mediaType === 'movie' ? 'movie' : 'tv') === activeType);
+  const typedSections = sections.map(section => ({ ...section, data: byType(section.data) })).filter(section => section.data.length > 0);
+  const counts = { all: shows.length, tv: shows.filter(show => show.mediaType !== 'movie').length, movie: shows.filter(show => show.mediaType === 'movie').length };
+  const sectionPage = view?.kind === 'section' ? sections.find(section => section.id === view.id) : undefined;
 
   const previewShow = previewMedia ? findCurrentShow(previewMedia) : undefined;
 
@@ -359,40 +369,57 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
         </div>
       )}
 
-      {sections.length === 0 ? (
+      {view?.kind === 'section' ? (
+        sectionPage && byType(sectionPage.data).length > 0 ? (
+          <LibrarySectionGrid
+            key={`${sectionPage.id}:${activeType}`}
+            data={byType(sectionPage.data)}
+            onShowClick={handleShowClick}
+            onToggleWatched={handleToggleWatched}
+            onLongPress={handleLongPress}
+            onAddClick={handleAddMedia}
+          />
+        ) : <div className="moi-empty"><strong>Cette section est vide</strong></div>
+      ) : sections.length === 0 ? (
         <div className={cn("moi-empty", !isEmbedded && "pt-20")}>
           <Inbox size={32} className="text-zinc-600" aria-hidden="true" />
           <strong>Ta liste est vide</strong>
           <span>Ajoute une série ou un film depuis Explorer pour le retrouver ici.</span>
         </div>
       ) : (
-        <div className="pb-2">
-          <div className="moi-chips" role="group" aria-label="Sections de Ma liste">
-            {sections.map(section => {
-              const selected = section.id === activeSection?.id;
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  className="moi-chip"
-                  aria-pressed={selected}
-                  onClick={() => startTransition(() => setSelectedSectionId(section.id))}
-                >
-                  {section.title}
-                  <span className="moi-chip-count">{section.data.length}</span>
-                </button>
-              );
-            })}
+        <div className="moi-library">
+          <div className="moi-type-filter" role="group" aria-label="Filtrer Ma liste par type">
+            {([['all', 'Tout'], ['tv', 'Séries'], ['movie', 'Films']] as const).map(([value, label]) => (
+              <button key={value} type="button" aria-pressed={typeFilter === value} onClick={() => startTransition(() => setTypeFilter(value))}>
+                {value !== 'all' && <i className="moi-type-dot" data-type={value} aria-hidden="true" />}{label}<span>{counts[value].toLocaleString('fr-FR')}</span>
+              </button>
+            ))}
           </div>
-          {activeSection && (
-            <LibrarySectionGrid
-              key={activeSection.id}
-              data={activeSection.data}
-              onShowClick={handleShowClick}
-              onToggleWatched={handleToggleWatched}
-              onLongPress={handleLongPress}
-              onAddClick={handleAddMedia}
-            />
+          {typedSections.filter(section => (SHELF_SECTIONS as readonly string[]).includes(section.id)).sort((a, b) => SHELF_SECTIONS.indexOf(a.id as typeof SHELF_SECTIONS[number]) - SHELF_SECTIONS.indexOf(b.id as typeof SHELF_SECTIONS[number])).map(section => (
+            <section key={section.id} className="moi-shelf" aria-labelledby={`moi-shelf-${section.id}`}>
+              <div className="moi-shelf-head">
+                <h3 id={`moi-shelf-${section.id}`}>{section.title}<span className="moi-shelf-count">{section.data.length}</span></h3>
+                <button type="button" className="moi-shelf-all" onClick={() => view?.kind === 'shelves' && view.onOpenSection(section.id, section.title, typeFilter)}>Tout voir</button>
+              </div>
+              <div className="moi-shelf-rail">
+                {section.data.slice(0, SHELF_SIZE).map(({ media, show }) => (
+                  <div key={getMediaKey(media.media_type, media.id)} className="moi-shelf-item">
+                    <GridMediaCard media={media} show={show} showProgress={true} onShowClick={handleShowClick} onToggleWatched={handleToggleWatched} onLongPress={handleLongPress} onAddClick={handleAddMedia} />
+                  </div>
+                ))}
+              </div>
+            </section>
+          ))}
+          {typedSections.some(section => !(SHELF_SECTIONS as readonly string[]).includes(section.id)) && (
+            <div className="moi-section-rows">
+              {typedSections.filter(section => !(SHELF_SECTIONS as readonly string[]).includes(section.id)).map(section => (
+                <button key={section.id} type="button" className="moi-section-row" onClick={() => view?.kind === 'shelves' && view.onOpenSection(section.id, section.title, typeFilter)}>
+                  {SECTION_TYPE[section.id] && <i className="moi-type-dot" data-type={SECTION_TYPE[section.id]!} aria-hidden="true" />}
+                  <span>{section.title}</span>
+                  <small>{section.data.length.toLocaleString('fr-FR')}</small>
+                </button>
+              ))}
+            </div>
           )}
         </div>
       )}

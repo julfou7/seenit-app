@@ -46,9 +46,8 @@ test('#229 suspend le travail lourd interne du Profil sans remonter ses sous-vue
   assert.match(profileSource, /import React, \{ Activity,/);
   assert.match(profileSource, /new IntersectionObserver/);
   assert.match(profileSource, /const profileContentVisible = isProfileVisible && !showSettings/);
-  assert.match(profileSource, /const \[mountedProfileTabs, setMountedProfileTabs\]/);
-  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'stats' \? 'visible' : 'hidden'\}>/);
-  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'library' \? 'visible' : 'hidden'\}>/);
+  assert.match(profileSource, /<Activity mode=\{profileContentVisible && page\.kind === 'home' \? 'visible' : 'hidden'\}>/);
+  assert.match(profileSource, /lazy\(\(\) => import\('\.\.\/components\/ProAnalyticsDashboard'\)/, 'Mes chiffres ne démarre qu’à son ouverture');
   assert.match(profileSource, /showSettings && isProfileVisible/);
   assert.match(
     profileSource,

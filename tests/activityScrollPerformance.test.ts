@@ -28,8 +28,10 @@ test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
   assert.match(librarySource, /data\.slice\(0, visibleCount\)\.map/);
   assert.match(librarySource, /setVisibleCount\(current => Math\.min\(data\.length, current \+ LIBRARY_GRID_BATCH_SIZE\)\)/);
   assert.match(librarySource, /<LoadMore\n\s+previews=\{data\.slice\(visibleCount, visibleCount \+ 3\)/, 'le seul « Afficher plus » de l’app (SEENIT-UX-020)');
-  assert.match(librarySource, /<LibrarySectionGrid\s+key=\{activeSection\.id\}/,
-    'une seule section est montée à la fois et repart d’un lot borné à chaque changement de pastille');
+  assert.match(librarySource, /<LibrarySectionGrid\s+key=\{`\$\{sectionPage\.id\}:\$\{activeType\}`\}/,
+    'la grille complète ne monte qu’une section et repart d’un lot borné (SEENIT-PROFILE-001)');
+  assert.match(librarySource, /const SHELF_SIZE = 10;/);
+  assert.match(librarySource, /section\.data\.slice\(0, SHELF_SIZE\)\.map/, 'une étagère monte au plus dix cartes');
   assert.match(librarySource, /key=\{getMediaKey\(media\.media_type, media\.id\)\}/);
   assert.match(librarySource, /onShowClick=\{handleShowClick\}/);
   assert.doesNotMatch(librarySource, /section\.data\.map\(/);
@@ -37,9 +39,9 @@ test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
   assert.doesNotMatch(librarySource, /key=\{`\$\{media\.id\}_\$\{idx\}`\}/);
 });
 
-test('SEENIT-PERF-001 garde la rangée de pastilles de Ma Liste en scroll libre', () => {
-  assert.match(librarySource, /className="moi-chips"/);
-  assert.match(moiCss, /\.moi-chips\{display:flex;gap:8px;overflow-x:auto/);
+test('SEENIT-PERF-001 garde les étagères de Ma Liste en scroll libre', () => {
+  assert.match(librarySource, /className="moi-shelf-rail"/);
+  assert.match(moiCss, /\.moi-shelf-rail\{display:flex;gap:10px;overflow-x:auto;padding:4px 16px 2px;scroll-snap-type:x proximity/);
   assert.doesNotMatch(librarySource, /snap-x/);
   assert.doesNotMatch(librarySource, /snap-mandatory/);
   assert.doesNotMatch(librarySource, /snap-start/);
@@ -57,10 +59,9 @@ test('SEENIT-PERF-001 préserve les cartes inchangées et la sous-vue Profil', (
   assert.doesNotMatch(librarySource, /showsByMediaKey/);
 
   assert.match(profileSource, /const ProfileStatsContent = React\.memo/);
-  assert.match(profileSource, /const \[mountedProfileTabs, setMountedProfileTabs\]/);
-  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'stats' \? 'visible' : 'hidden'\}>/);
-  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'library' \? 'visible' : 'hidden'\}>/);
-  assert.match(profileSource, /<LibraryScreen onShowClick=\{handleLibraryShowClick\} isEmbedded=\{true\} \/>/);
+  assert.match(profileSource, /<Activity mode=\{profileContentVisible && page\.kind === 'home' \? 'visible' : 'hidden'\}>/);
+  assert.match(profileSource, /<LibraryScreen onShowClick=\{onShowClick\} isEmbedded=\{true\} view=\{libraryView\} \/>/);
+  assert.match(profileSource, /const MoiHome = React\.memo/);
   assert.match(profileSource, /export const ProfileScreen = React\.memo/);
   assert.doesNotMatch(profileSource, /<LibraryScreen onShowClick=\{\(id, mediaType\) =>/);
 });

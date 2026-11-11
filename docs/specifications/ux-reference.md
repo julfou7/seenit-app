@@ -46,7 +46,7 @@ Ce contrat automatisé ne vaut pas preuve de lecture ou de rotation sur un tél�
 | Navigation basse | Deux taps espacés de moins de 350 ms | Le premier appui revient d'un niveau ou remonte à la racine, le second réinitialise la page active | Contrat `SEENIT-UX-005`, portée locale et toast propre à l'écran ; A → B → B exclu. |
 | Double appui Explorer | Reset + remontée | Recherche vide, catégorie Tout, plateformes/genres vides, âge Tous, note Toutes, tri populaire descendant, hero première carte | Préserver ce raccourci volontaire, montrer son effet ; jamais effacer les préférences du compte. |
 | Explorer, liste verticale | Swipe / défilement vertical | La descente masque la barre de recherche ; une remontée la réaffiche | La loupe à gauche de la navigation permet aussi de la rouvrir sans défilement ; un swipe de descente ne doit jamais rouvrir la recherche. |
-| Double appui Moi | Reset + remontée | Ferme Réglages/personne, revient à Ma liste et nettoie l'état local de Ma liste, Chiffres et Mon année | Ne modifie aucun suivi ni statistique. |
+| Double appui Moi | Reset + remontée | Ferme Réglages/personne et toute sous-page (Mes chiffres, Mon année, Séries laissées en route, section), revient en haut de la page unique et repart d'un filtre Tout | Ne modifie aucun suivi ni statistique. |
 | Double appui À voir | Reset + remontée | Revient à À Regarder, replie les sections et remet les carrousels au début | Ne modifie aucune progression. |
 | Double appui Télécharger | Reset + remontée | Revient à Mes téléchargements, ferme la configuration, vide recherche/filtres/résultats locaux | N'annule ni n'efface aucun transfert. |
 | Carrousels séries réduits « À Regarder » | Glissement horizontal | Avance carte par carte avec snap horizontal obligatoire ; la suite reste virtualisée/préchargée sans marqueur terminal | Chaque carte est un arrêt. Le rail Films à voir conserve son défilement libre. La bascule à deux icônes Carrousel/Liste de l’en-tête reste l’alternative accessible vers la liste verticale exhaustive (#729). |
@@ -88,10 +88,9 @@ Le contrat d'appui/reset de #178 est distinct de cet ordre visuel et désormais 
   Le passage A → B → B ne doit pas consommer le premier tap comme un reset inattendu.
 - Chaque page restaure sa sous-vue initiale, replie ses panneaux et efface ses recherches, filtres et
   expansions locales, puis affiche un toast reprenant le glyphe SeenIt de l’onglet en **or**, comme la
-  navigation active. À voir revient à À Regarder, Moi à Ma liste, Télécharger à Mes téléchargements
-  et Explorer à son filtre Tout. Le reset Moi invalide aussi tout l’état UI local de **Ma liste** (pastille
-  choisie, lots chargés), de **Chiffres** et de **Mon année**, même si ces sous-vues ont déjà été montées puis
-  masquées ; leur prochain affichage repart de leur état initial.
+  navigation active. À voir revient à À Regarder, Moi en haut de sa page unique, Télécharger à Mes téléchargements
+  et Explorer à son filtre Tout. Le reset Moi invalide aussi tout l’état UI local de la page unique (filtre
+  de **Ma liste**, étagères) et ferme la sous-page ouverte ; le prochain affichage repart de l’état initial.
   Cette couleur de contexte de navigation ne modifie pas les vrais toasts métier de téléchargement, qui
   conservent leur présentation bleue.
 - Chaque reset a une alternative visible accessible et ne touche ni bibliothèque, ni progression,
@@ -367,3 +366,5 @@ cartes/page, heure locale et horaire provisoire explicites, sans résultat. OK s
 donne stade/source/information de diffusion ; aucune ouverture supposée. Précédents/Suivants
 et Actualiser restent accessibles à la télécommande. Retour retrouve la tuile Sport, sans
 modifier les équipes choisies. La Home anticipe le prochain match sans suivi live.
+
+Moi (`SEENIT-PROFILE-001`) : page unique ; carte « Ton année » avec boutons 46 px, ligne « séries laissées en route » de 68 px, filtre Tout · Séries · Films de 44 px, étagères défilantes avec « Tout voir » (44 px), lignes de section de 52 px ; chaque sous-page a un bouton retour rond de 44 px. Dans Mes chiffres, chaque mois du cadran est un bouton de 46 × 44 px et le centre revient au total.

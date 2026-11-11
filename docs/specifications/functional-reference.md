@@ -207,7 +207,7 @@ La barre basse possède trois destinations toujours visibles, dans cet ordre :
 
 1. **À Voir** : accueil opérationnel ;
 2. **Explorer** : recherche et découverte TMDB ;
-3. **Moi** (`profile`) : Ma liste, Chiffres, Mon année et accès Réglages.
+3. **Moi** (`profile`) : page unique — ton année, séries laissées en route, Ma liste en étagères, accès à Mes chiffres, Mon année et Réglages.
 
 La destination **Télécharger** n'apparaît que lorsque le compte courant a explicitement activé la
 fonctionnalité personnelle Téléchargements dans Réglages. Lorsqu'elle est visible, elle s'insère en
@@ -390,41 +390,46 @@ annulation.
 L'onglet **Moi** affiche en tête l'identité Google (photo ou initiales locales déterministes dans un
 cercle or, jamais une seconde image distante ni une image cassée), l'année d'inscription et le nombre de
 titres suivis. Toucher l'avatar ouvre les réglages rapides du compte ; la roue de 44 px à droite ouvre
-Réglages et porte un point or lorsqu'une mise à jour de l'application est disponible. Un sélecteur à trois
-segments, or quand il est actif, donne accès à :
+Réglages et porte un point or lorsqu'une mise à jour de l'application est disponible. Depuis le 11/11
+([dossier](../design/refonte-moi-films-explorer-2026-11-11.md)), Moi est une **page unique** sans onglets
+(`SEENIT-PROFILE-001`) :
 
-- **Ma liste** (sous-vue initiale) : une rangée de pastilles défilante, une par section non vide avec son
-  nombre de titres, puis la grille trois colonnes des cartes habituelles (note, plateforme, progression,
-  bandeau d'action rapide de suivi/visionnage) de la seule section choisie. Les sections restent Favoris,
-  En cours, À commencer, À venir, Au cinéma, Films à voir, À jour et Films vus ; une même fiche peut
-  apparaître dans les favoris et dans sa section métier. La pastille En cours est choisie par défaut,
-  sinon la première section non vide ; si la section choisie se vide, la sélection retombe sur cette règle.
-- **Chiffres** : pour l'année choisie (année courante par défaut, « Depuis le 1er janvier » ; le bouton
-  année parcourt les années qui ont des visionnages), un grand total « Devant l'écran » en or avec son
-  équivalent en jours pleins, épisodes et films vus, puis « Heures par mois » (une barre par mois écoulé,
-  le record nommé, la valeur d'un mois au toucher), « Quand tu regardes » (jour × heure sur la fenêtre de
-  huit heures la plus regardée, taille = temps, créneau dominant nommé), « Où tu regardes » (Plex pour les
-  visionnages importés de Plex, sinon le diffuseur du titre, quatre au plus puis Autres), les badges
-  Centenaire, Oiseau de nuit, Grand écran et Binge-Master avec leur progression, et les personnes
-  fréquentes, chacune ouvrant sa fiche personne.
-- **Mon année** : un titre qui nomme les deux séries les plus regardées, puis le récit mois par mois, du
-  plus récent au plus ancien (série dominante ou « Mois cinéma », affiche, heures relatives, record de
-  jours consécutifs), et « Et maintenant » : à partir du rythme des quatre dernières semaines, la date
-  estimée de fin de la série en cours la plus regardée.
+- **Ton année** : total d'heures, épisodes et films de l'année, douze barres « Heures par mois » portant
+  chacune sa valeur (record en or, mois en cours en blanc, mois à venir en pointillé), puis « Mes chiffres »
+  et « Mon année », qui s'ouvrent comme des pages avec retour (même position de défilement au retour).
+- **N séries laissées en route** (absente à zéro) ouvre la page dédiée (`SEENIT-PROFILE-002`) : constat,
+  « Où tu décroches », « Presque finies », « En pause » (une série en cours sans épisode vu depuis 60 jours,
+  même règle que « Pas vu depuis un moment » de l'accueil) et « Abandonnées » ; chaque ligne ouvre la fiche.
+- **Ma liste** : filtre Tout · Séries · Films avec compteurs, étagères En cours, Films à voir et Favoris
+  (cartes habituelles, titre blanc sur une ligne, badge SÉRIE indigo ou FILM rose), puis une ligne par
+  section restante (À commencer, À venir, Au cinéma, À jour, Films vus) ; « Tout voir » ou une ligne ouvre
+  la grille complète de la section, paginée par douze.
+- **Mes chiffres** (`SEENIT-PROFILE-003`) : cadran des douze mois (valeur sous chaque mois, détail du mois
+  au toucher), trois repères (rythme sur 28 jours, journée type, jours d'affilée), tendances sur douze
+  semaines avec leur valeur et au plus trois constats nets, part séries/films et quatre genres au temps,
+  semaine en tranches de trois heures, six plateformes en part du temps et part sans plateforme connue à
+  part, résumé des séries laissées en route, réactions (dès dix épisodes notés), têtes d'affiche (trois
+  premiers rôles au temps de visionnage) et badges à niveaux.
+- **Mon année** (`SEENIT-PROFILE-004`) : l'année jour par jour, quatre records, « Ton année en séries »
+  (la série la plus regardée de chaque mois, jamais de film), films ou séries mois par mois, devenir des
+  séries de l'année, top cinq et « Et maintenant ».
+
+Mes chiffres et Mon année s'animent une fois à l'entrée de chaque bloc dans l'écran, en mouvement réduit
+tout s'affiche directement (`SEENIT-PROFILE-005`) ; Séries laissées en route ne s'anime pas.
 
 Les durées utilisent la durée réelle connue d'un visionnage, sinon les estimations des statistiques
 (45 min par épisode, 110 min par film). Un visionnage n'est daté que sur preuve : date de l'épisode ou du
 film, ou pour un film la dernière action « vu » ; jamais la date de modification du document (synchro des
 fiches, import). Les visionnages sans date (films importés de TV Time) ne sont pas comptés et leur nombre
-est indiqué ; ceux sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les seuils
-des quatre badges restent ceux des statistiques historiques : Centenaire à 100 contenus ou épisodes vus,
-Oiseau de nuit à 10 épisodes ou 500 minutes, Grand écran au premier film vu, Binge-Master à une série
-terminée ou 20 épisodes. Aucun archétype ni répartition par genre n'est affiché dans Moi.
+est indiqué ; ceux sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les badges
+ont des paliers : Centenaire (visionnages) 100, 500, 1 000, 2 500, 5 000, 7 500, 10 000 ; Oiseau de nuit
+(nuits avec un visionnage daté entre 23 h et 5 h) 10, 25, 50, 100 ; Grand écran (films) 1, 25, 75, 150, 300 ;
+Binge-Master (séries terminées) 1, 5, 15, 30. Aucun archétype n'est affiché dans Moi.
 
-Pour préserver la navigation sur les grandes bibliothèques, Ma liste ne monte que la section choisie :
-douze cartes à l'ouverture puis douze de plus par « Charger plus ». Ma liste, Chiffres et Mon année
-conservent leur état après leur première ouverture, tandis que leurs traitements sont suspendus
-lorsqu'elles sont cachées ; les statistiques avancées ne démarrent qu'à la première ouverture de Chiffres.
+Pour préserver la navigation sur les grandes bibliothèques, chaque étagère de Ma liste monte au plus dix
+cartes et la grille d'une section douze cartes puis douze de plus. La page Moi reste montée pendant une
+sous-page ; Mes chiffres, Mon année et Séries laissées en route sont chargées à leur ouverture et les
+statistiques avancées ne démarrent qu'à la première ouverture de Mes chiffres.
 
 Les statistiques avancées conservent par UID une baseline locale versionnée. Elles réaffichent donc le
 dernier résultat complet dès la réouverture de l'application, puis appliquent les changements de la

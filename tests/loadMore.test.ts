@@ -54,7 +54,8 @@ test('SEENIT-UX-020 #873 toutes les paginations réutilisent le contrôle partag
   const surfaces: Array<[string, RegExp]> = [
     ['src/components/MovieActorProfile.tsx', /<LoadMore previews=\{grid\.slice\(limit, limit \+ 3\)/],
     ['src/screens/mediaDetail/detailSections.tsx', /<LoadMore round previews=\{cast\.slice\(limit, limit \+ 3\)/],
-    ['src/components/ProAnalyticsDashboard.tsx', /<LoadMore round previews=\{people\.slice\(PEOPLE_PREVIEW, PEOPLE_PREVIEW \+ 3\)/],
+    ['src/components/profile/SeriesFateScreen.tsx', /<LoadMore previews=\{entries\.slice\(PAUSED_PREVIEW, PAUSED_PREVIEW \+ 3\)/],
+    ['src/components/ProfileYearStory.tsx', /<LoadMore previews=\{hiddenMonths\.slice\(0, 3\)/],
     ['src/screens/PersonDetailModal.tsx', /<LoadMore previews=\{filteredCredits\.slice\(visibleCredits\.length, visibleCredits\.length \+ 3\)/],
     // Retour terrain du 09/11 : Moi · Films à voir avait gardé « Charger plus ».
     ['src/screens/LibraryScreen.tsx', /<LoadMore\n\s+previews=\{data\.slice\(visibleCount, visibleCount \+ 3\)/]
@@ -84,8 +85,8 @@ test('SEENIT-UX-020 #873 le focus clavier suit le dépliage et le repli sans se 
   assert.match(control, /next\?\.focus\(\{ preventScroll: true \}\);/);
   assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /onLoad=\{\(\) => \{ reveal\.focusItem\(limit\); setLimit\(limit \+ CAST_STEP\); \}\}/);
   assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /onClick=\{\(\) => \{ setLimit\(CAST_FIRST\); reveal\.focusLoadMore\(\); \}\}/);
-  assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /reveal\.focusItem\(PEOPLE_PREVIEW\)/);
-  assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /setExpanded\(false\); reveal\.focusLoadMore\(\);/);
+  assert.match(read('src/components/profile/SeriesFateScreen.tsx'), /onLoad=\{\(\) => \{ setAll\(true\); reveal\.focusItem\(PAUSED_PREVIEW\); \}\}/);
+  assert.match(read('src/components/ProfileYearStory.tsx'), /monthsReveal\.focusItem\(SERIES_MONTHS_PREVIEW\)/);
   assert.match(read('src/components/MovieActorProfile.tsx'), /filmographyReveal\.focusItem\(limit\); setLimit/);
   assert.match(read('src/screens/PersonDetailModal.tsx'), /creditsReveal\.focusItem\(visibleCredits\.length\);/);
 });

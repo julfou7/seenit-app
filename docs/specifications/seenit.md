@@ -861,11 +861,9 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   d'UI parent sans rapport. Explorer matérialise trente cartes au premier rendu puis uniquement les lignes
   visibles avec trois lignes de débord de chaque côté ; des espaceurs conservent la hauteur et la position
   exactes du scroll infini sans garder tout son DOM, ses images décodées et ses Effects.
-- Les sous-vues Ma liste, Chiffres et Mon année de l'onglet Moi sont chargées à leur première ouverture
-  puis conservent leur état ; lorsqu'elles sont masquées par une autre sous-vue, Réglages ou un autre onglet,
-  leurs Effects sont suspendus. Leur réouverture ne remonte pas en rafale les cartes déjà visitées. Ma liste
-  est la sous-vue initiale : les statistiques avancées et leurs enrichissements TMDB ne démarrent qu'à la
-  première ouverture de Chiffres.
+- La page unique de Moi reste montée (Effects suspendus) pendant une sous-page, Réglages ou un autre onglet ;
+  Mes chiffres, Mon année et Séries laissées en route sont chargées à la demande, et les statistiques
+  avancées et leurs enrichissements TMDB ne démarrent qu'à la première ouverture de Mes chiffres.
 - Les statistiques avancées du Profil conservent une baseline locale versionnée et cloisonnée par UID,
   composée du résultat affichable, des compteurs agrégés et des contributions TMDB indexées par
   `mediaType + tmdbId`. Après redémarrage, cette baseline est restituée immédiatement puis réconciliée
@@ -878,9 +876,8 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   de travail plus volumineux (médias, agrégats et contributions) réside dans IndexedDB : une limite de quota
   `localStorage`, une interruption de lot ou un échec TMDB ne peuvent donc jamais remplacer la dernière
   baseline d'affichage complète par un classement partiel. La baseline historique v1 est migrée puis retirée.
-- Ma liste ne monte qu'une section à la fois, choisie par une pastille qui affiche son nombre de titres.
-  Sa grille monte au plus douze cartes à l'ouverture de la section puis douze de plus par « Charger plus » ;
-  changer de pastille repart d'un lot borné. À Regarder conserve ses rails fenêtrés : au moins huit cartes,
+- Ma liste monte au plus dix cartes par étagère ; la grille complète d'une section monte au plus douze
+  cartes à son ouverture puis douze de plus par « Charger plus ». À Regarder conserve ses rails fenêtrés : au moins huit cartes,
   complétées seulement par les cartes visibles et trois cartes de débord de chaque côté, les cartes sorties
   de la fenêtre étant remplacées par des espaceurs qui préservent la largeur, l'inertie et la position du rail. Les objets de
   carte issus d'un média inchangé restent référentiellement stables, y compris après une synchronisation
@@ -1590,6 +1587,44 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   À venir groupe Aujourd’hui, Cette semaine (sept jours suivants), Plus tard selon le calendrier local.
   L’historique mixte est paginé par dix. Les sections vides disparaissent et les états chargement,
   cache hors ligne et synchronisation restent explicites. Les films affichent six billets puis Voir en liste, avec pagination par douze ; toucher le tampon Vu annule le marquage.
+- **SEENIT-PROFILE-001** — Moi en page unique ([dossier](../design/refonte-moi-films-explorer-2026-11-11.md), #942).
+  Plus d'onglets Ma liste / Chiffres / Mon année : la carte « Ton année » (total, épisodes, films, douze
+  barres chiffrées, mois en cours et record distingués), la ligne des séries laissées en route puis Ma liste.
+  Ma liste filtre Tout · Séries · Films, montre En cours, Films à voir et Favoris en étagères (gabarit de
+  carte habituel, titre blanc sur une ligne, badge SÉRIE indigo ou FILM rose) et une ligne par autre section ;
+  « Tout voir » ou une ligne ouvre la grille complète. Mes chiffres, Mon année, Séries laissées en route et
+  une section s'ouvrent comme des pages avec retour ; le retour rend la même position de défilement.
+- **SEENIT-PROFILE-002** — Devenir des séries commencées, calculé par une seule fonction partagée par Moi,
+  Mes chiffres, Mon année et l'écran dédié : abandonnée (statut), terminée (statut ou série finie à jour),
+  en pause (un épisode encore regardable et aucun épisode vu depuis 60 jours, `seriesPause` comme
+  l'accueil), en cours sinon ; les séries archivées non abandonnées et jamais commencées sont exclues.
+  L'écran « Séries laissées en route » montre le constat (heures déjà passées, épisode médian de
+  décrochage), « Où tu décroches » (avant l'épisode 3, en saison 1, en saison 2, saison 3 et après), les
+  séries à trois épisodes ou moins de la fin, celles en pause puis abandonnées ; la phrase de survie au-delà
+  de la saison 1 n'apparaît qu'à partir de dix séries comparables. Aucun bloc vide, aucune animation.
+- **SEENIT-PROFILE-003** — Mes chiffres : cadran des douze mois (valeur et mois en trois ou quatre lettres,
+  détail du mois au toucher, retour au total), rythme hebdomadaire sur 28 jours et sa variation quand chaque
+  fenêtre compte dix visionnages, journée type médiane, jours d'affilée (en cours et record), douze semaines
+  glissantes chiffrées, au plus trois constats nets (rythme ±10 %, part des films et genre ±10 points sur 60
+  jours contre les 120 précédents), part séries/films et quatre genres au temps avec tendance sur 90 jours,
+  semaine en huit tranches de trois heures, six plateformes en part du temps sans ligne « Autres » et la part
+  sans plateforme connue à part, résumé des séries laissées en route, réactions dès dix épisodes notés,
+  têtes d'affiche (trois premiers rôles des titres vus, au temps de visionnage, repli sur les acteurs
+  fréquents) et badges à niveaux (paliers de la carte fonctionnelle, anneau vers le palier suivant).
+  Le vocabulaire parle de jours, jamais de soirs, faute d'heure prouvée pour tous les visionnages.
+- **SEENIT-PROFILE-004** — Mon année : titre « L'année X, puis Y » d'après les séries les plus regardées,
+  calendrier jour par jour (quatre niveaux, journée record), mois record, plus longue suite de jours, plus
+  gros marathon d'une série en un jour et plus longue pause, « Ton année en séries » (série la plus
+  regardée de chaque mois avec affiche et étiquette tirée des données, jamais de film ni de note, six mois
+  puis le reste à la demande), films ou séries mois par mois et un constat si la part des films bascule de
+  dix points, devenir des séries de l'année, top cinq au temps et « Et maintenant ».
+- **SEENIT-PROFILE-005** — Mes chiffres et Mon année s'animent une seule fois à l'entrée de chaque bloc dans
+  l'écran (IntersectionObserver, seuil 0,12) : apparition, barres et colonnes qui poussent, surgissement,
+  secteurs du cadran depuis le centre et total compté par `requestAnimationFrame`, lueur douce ou reflet sur
+  l'élément fort de chaque section. Toutes les animations portent sur `transform` et `opacity` (les lueurs
+  sont des calques à ombre fixe dont seule l'opacité varie ; les anneaux de badge surgissent au lieu d'être
+  tracés). En mouvement réduit tout s'affiche dans son état final ; Séries laissées en route et l'accueil
+  n'ajoutent aucune animation.
 - **SEENIT-UX-022** — Films à voir ([handoff](../design/refonte-moi-films-explorer-2026-11-11.md), #942).
   Trois tris remplacent la mention « Ajouts les plus récents » : Récents (défaut, ordre d'ajout de
   `SEENIT-UX-016`), Mieux notés (note TMDB décroissante, film sans note en dernier ; les notes manquantes
