@@ -41,7 +41,7 @@ test('SEENIT-PERF-001 borne le montage visible de Ma Liste', () => {
 
 test('SEENIT-PERF-001 garde les étagères de Ma Liste en scroll libre', () => {
   assert.match(librarySource, /className="moi-shelf-rail"/);
-  assert.match(moiCss, /\.moi-shelf-rail\{display:flex;gap:10px;overflow-x:auto;padding:4px 16px 2px;scroll-snap-type:x proximity/);
+  assert.match(moiCss, /\.moi-shelf-rail\{display:flex;gap:10px;overflow-x:auto;padding:4px 16px 2px;scroll-padding-inline:16px;scroll-snap-type:x proximity/);
   assert.doesNotMatch(librarySource, /snap-x/);
   assert.doesNotMatch(librarySource, /snap-mandatory/);
   assert.doesNotMatch(librarySource, /snap-start/);

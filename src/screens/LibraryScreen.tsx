@@ -24,6 +24,7 @@ interface Props {
 }
 
 const SHELF_SECTIONS = ['watching', 'toWatchMovie', 'favorites'] as const;
+const LIBRARY_ALL_SHELVES_MAX = 3;
 const SHELF_SIZE = 10;
 const SECTION_TYPE: Record<string, 'tv' | 'movie' | null> = { favorites: null, watching: 'tv', toStartTv: 'tv', upcomingTv: 'tv', toWatchCinema: 'movie', toWatchMovie: 'movie', upToDate: 'tv', completedMovies: 'movie' };
 
@@ -342,6 +343,12 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
   const activeType = view?.kind === 'section' ? view.type : typeFilter;
   const byType = (items: LibraryItem[]) => activeType === 'all' ? items : items.filter(item => (item.show.mediaType === 'movie' ? 'movie' : 'tv') === activeType);
   const typedSections = sections.map(section => ({ ...section, data: byType(section.data) })).filter(section => section.data.length > 0);
+  // Retour terrain v1.4.293 : avec trois sections ou moins (filtre Films : à voir et vus), tout défile en étagère.
+  const isShelf = (id: string) => (SHELF_SECTIONS as readonly string[]).includes(id);
+  const allShelves = typedSections.length <= LIBRARY_ALL_SHELVES_MAX;
+  const shelfRank = (id: string) => isShelf(id) ? SHELF_SECTIONS.indexOf(id as typeof SHELF_SECTIONS[number]) : SHELF_SECTIONS.length;
+  const shelfSections = typedSections.filter(section => allShelves || isShelf(section.id)).sort((a, b) => shelfRank(a.id) - shelfRank(b.id));
+  const rowSections = allShelves ? [] : typedSections.filter(section => !isShelf(section.id));
   const counts = { all: shows.length, tv: shows.filter(show => show.mediaType !== 'movie').length, movie: shows.filter(show => show.mediaType === 'movie').length };
   const sectionPage = view?.kind === 'section' ? sections.find(section => section.id === view.id) : undefined;
 
@@ -395,7 +402,7 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
               </button>
             ))}
           </div>
-          {typedSections.filter(section => (SHELF_SECTIONS as readonly string[]).includes(section.id)).sort((a, b) => SHELF_SECTIONS.indexOf(a.id as typeof SHELF_SECTIONS[number]) - SHELF_SECTIONS.indexOf(b.id as typeof SHELF_SECTIONS[number])).map(section => (
+          {shelfSections.map(section => (
             <section key={section.id} className="moi-shelf" aria-labelledby={`moi-shelf-${section.id}`}>
               <div className="moi-shelf-head">
                 <h3 id={`moi-shelf-${section.id}`}>{section.title}<span className="moi-shelf-count">{section.data.length}</span></h3>
@@ -410,9 +417,9 @@ export const LibraryScreen = React.memo(function LibraryScreen({ onShowClick, is
               </div>
             </section>
           ))}
-          {typedSections.some(section => !(SHELF_SECTIONS as readonly string[]).includes(section.id)) && (
+          {rowSections.length > 0 && (
             <div className="moi-section-rows">
-              {typedSections.filter(section => !(SHELF_SECTIONS as readonly string[]).includes(section.id)).map(section => (
+              {rowSections.map(section => (
                 <button key={section.id} type="button" className="moi-section-row" onClick={() => view?.kind === 'shelves' && view.onOpenSection(section.id, section.title, typeFilter)}>
                   {SECTION_TYPE[section.id] && <i className="moi-type-dot" data-type={SECTION_TYPE[section.id]!} aria-hidden="true" />}
                   <span>{section.title}</span>
