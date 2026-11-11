@@ -39,6 +39,8 @@ export function seriesAirStatus(details: SeriesAirDetails | null | undefined, no
   const last = details?.last_episode_to_air || null;
   const nextSeason = Number(next?.season_number);
   const date = formatAirDate(next?.air_date, now);
+  // Revue Codex #949 : sans épisode déjà diffusé, c'est une première diffusion, pas un renouvellement.
+  if (next && !last) return { label: status === 'In Production' ? 'En production' : 'Prévue', tone: 'renewed', detail: date ? `première diffusion le ${date}` : null };
   if (next && Number.isFinite(nextSeason)) {
     // Même saison que le dernier épisode diffusé : la saison passe en ce moment.
     if (last && Number(last.season_number) === nextSeason) return { label: 'En diffusion', tone: 'airing', detail: date ? `prochain épisode le ${date}` : null };

@@ -15,6 +15,9 @@ test('SEENIT-UX-023 statut réel de diffusion : en diffusion, renouvelée, en co
     { label: 'Renouvelée', tone: 'renewed', detail: 'saison 3 le 12 mars 2027' });
   assert.deepEqual(seriesAirStatus({ status: 'Returning Series', next_episode_to_air: null }, NOW), { label: 'En cours', tone: 'ongoing', detail: 'pas de date annoncée' });
   assert.equal(seriesAirStatus({ status: 'In Production' }, NOW)?.label, 'En production');
+  assert.deepEqual(seriesAirStatus({ status: 'Planned', last_episode_to_air: null, next_episode_to_air: { season_number: 1, air_date: '2026-12-02' } }, NOW),
+    { label: 'Prévue', tone: 'renewed', detail: 'première diffusion le 2 déc.' }, 'une série inédite n’est pas « renouvelée »');
+  assert.equal(seriesAirStatus({ status: 'In Production', next_episode_to_air: { season_number: 1, air_date: '2027-01-10' } }, NOW)?.label, 'En production');
   assert.equal(seriesAirStatus(null, NOW), null);
 });
 
