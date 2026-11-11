@@ -3,10 +3,8 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { Show } from '../src/types.ts';
 import {
-  buildProfileBadges,
   buildProfileProjection,
   buildProfileYearStats,
-  buildProfileYearStory,
   collectProfileViewings,
   defaultProfileYear,
   countUndatedProfileViewings,
@@ -17,6 +15,8 @@ import {
   listProfileYears,
   partitionProfileViewings,
 } from '../src/features/profile/profileYearStats.ts';
+import { buildTieredBadges } from '../src/features/profile/profileDashboard.ts';
+import { buildYearInSeries, buildYearHeadline } from '../src/features/profile/profileYearRecap.ts';
 
 const profileSource = readFileSync('src/screens/ProfileScreen.tsx', 'utf8');
 const librarySource = readFileSync('src/screens/LibraryScreen.tsx', 'utf8');
@@ -99,45 +99,43 @@ test('Moi · Chiffres par année : total, mois jusqu’au mois courant, record e
   assert.equal(stats.months.length, 10, 'janvier à octobre pour l’année courante');
   assert.equal(stats.months[6], 8 * 45 + 155);
   assert.equal(stats.recordMonth, 6);
-  assert.deepEqual(stats.platforms.map(platform => platform.name), ['Netflix', 'Plex', 'Autres']);
-  assert.equal(stats.platforms.reduce((sum, platform) => sum + platform.minutes, 0), stats.minutes);
+  assert.deepEqual(stats.platforms.map(platform => platform.name), ['Netflix', 'Plex'], 'plus de ligne « Autres »');
+  assert.equal(stats.unknownPlatformShare, Math.round(155 / stats.minutes * 100), 'le temps sans plateforme connue est annoncé à part');
+  assert.equal(stats.monthEpisodes[6], 8);
+  assert.equal(stats.monthFilms[6], 1);
+  assert.equal(stats.seriesMinutes + stats.filmMinutes, stats.minutes);
 
   const past = buildProfileYearStats(collectProfileViewings(library()), 2025, NOW);
   assert.equal(past.months.length, 12);
   assert.equal(past.episodes, 3);
 });
 
-test('Moi · Quand tu regardes ignore les heures inconnues et nomme le créneau', () => {
+test('Moi · Quand tu regardes : la semaine en tranches de trois heures, heures inconnues ignorées', () => {
   const shows = library();
   shows.push(show({ id: 'legacy', title: 'Import', seenEpisodes: ['1x1'], episodeRecords: { '1x1': { watchedAt: at(2026, 9, 4, 9), watchedTimeKnown: false } } }));
   const { punch } = buildProfileYearStats(collectProfileViewings(shows), 2026, NOW);
-  assert.equal(punch.hours.length, 8);
+  assert.deepEqual(punch.hours, [0, 3, 6, 9, 12, 15, 18, 21]);
   assert.equal(punch.rows.length, 7);
-  assert.ok(!punch.hours.includes(9) || punch.rows.every(row => row[punch.hours.indexOf(9)] === 0));
-  assert.ok(punch.slot);
-  assert.match(formatProfilePunchSlot(punch.slot), /^[a-z]+, \d+ h – \d+ h$/);
+  assert.ok(punch.rows.every(row => row[3] === 0), 'le visionnage de 9 h sans heure prouvée est ignoré');
   assert.equal(Math.max(...punch.rows.flat()), 1);
-
-  assert.equal(punch.startHour, 15, 'la fenêtre couvre aussi le film vu à 15 h');
-  const evening = buildProfileYearStats(collectProfileViewings([library()[0]]), 2026, NOW).punch;
-  assert.equal(evening.startHour, 18, 'à égalité, la fenêtre de soirée 18 h – 2 h est retenue');
-
+  assert.ok(punch.slot);
+  assert.equal(punch.slot.fromHour % 3, 0);
+  assert.match(formatProfilePunchSlot(punch.slot), /^le [a-z]+, de (\d+ h|minuit) à (\d+ h|minuit)$/);
+  assert.equal(formatProfilePunchSlot({ day: 6, fromHour: 21, toHour: 0 }), 'le dimanche, de 21 h à minuit');
   const empty = buildProfileYearStats([], 2026, NOW);
-  assert.equal(empty.punch.startHour, 18);
   assert.equal(empty.punch.slot, null);
   assert.equal(empty.recordMonth, null);
 });
 
-test('Moi · Mon année raconte les mois récents d’abord et détecte une série de jours', () => {
-  const story = buildProfileYearStory(collectProfileViewings(library()), 2026);
-  assert.ok(story);
-  assert.equal(story.headline, 'L’année Better Call Saul, puis Breaking Bad.');
-  assert.deepEqual(story.months.map(month => month.month), [9, 6]);
-  assert.equal(story.months[0].title, 'Better Call Saul · 10 épisodes');
-  assert.equal(story.months[0].event, 'Record · 10 jours d’affilée');
-  assert.equal(story.months[1].title, 'Breaking Bad · 8 épisodes');
-  assert.equal(story.months[1].share, 1);
-  assert.equal(buildProfileYearStory([], 2026), null);
+test('Moi · Mon année : titre de l’année et année en séries, sans film', () => {
+  const viewings = collectProfileViewings(library());
+  assert.equal(buildYearHeadline(viewings, 2026).lead, 'Better Call Saul');
+  assert.equal(buildYearHeadline(viewings, 2026).second, 'Breaking Bad');
+  const months = buildYearInSeries(viewings, library(), 2026, NOW);
+  assert.deepEqual(months.map(month => month.month), [9, 6]);
+  assert.deepEqual(months.map(month => month.title), ['Better Call Saul', 'Breaking Bad']);
+  assert.ok(months.every(month => month.title !== 'Dune'), 'jamais de film');
+  assert.equal(months[0].tag?.label, 'En cours');
 });
 
 test('Moi · projection « tu finis le… » sur les quatre dernières semaines', () => {
@@ -182,57 +180,58 @@ test('Moi · un film importé sans date de visionnage n’est jamais daté par l
   assert.equal(countUndatedProfileViewings([imported, undatedEpisode, watchedInApp]), 3);
   assert.equal(formatProfileUndatedNote(3), '3 visionnages sans date ne sont pas comptés (import sans date de visionnage).');
   assert.equal(formatProfileUndatedNote(0), null);
-  assert.equal(buildProfileYearStory(viewings, 2026)?.months.length, 1, 'plus de « Mois cinéma » fabriqué en août');
+  assert.equal(buildYearInSeries(viewings, [imported, undatedEpisode, watchedInApp], 2026, NOW).length, 0, 'aucun mois fabriqué depuis la synchro');
 });
 
-test('Moi · badges : mêmes seuils historiques, progression bornée', () => {
-  const badges = buildProfileBadges({ totalMinutes: 300, totalEpisodesSeen: 8, totalMoviesSeen: 0, completedTvCount: 0 });
+test('Moi · badges à niveaux : palier atteint, prochain palier et progression bornée', () => {
+  const badges = buildTieredBadges({ centenaire: 6377, night_owl: 20, big_screen: 112, binge_master: 3 });
   assert.deepEqual(badges.map(badge => badge.title), ['Centenaire', 'Oiseau de nuit', 'Grand écran', 'Binge-Master']);
-  assert.deepEqual(badges.map(badge => badge.unlocked), [false, false, false, false]);
-  assert.equal(badges[0].detail, '8 / 100 vus');
+  assert.deepEqual(badges.map(badge => badge.level), [5, 1, 3, 1]);
+  assert.equal(badges[0].detail, `${(6377).toLocaleString('fr-FR')} sur ${(7500).toLocaleString('fr-FR')} vus`);
+  assert.equal(badges[1].detail, '20 sur 25 nuits');
+  assert.equal(badges[2].detail, '112 sur 150 films');
+  assert.equal(badges[3].detail, '3 sur 5 séries finies');
   assert.ok(badges.every(badge => badge.progress >= 0 && badge.progress < 1));
-
-  const unlocked = buildProfileBadges({ totalMinutes: 30_000, totalEpisodesSeen: 418, totalMoviesSeen: 54, completedTvCount: 6 });
-  assert.ok(unlocked.every(badge => badge.unlocked && badge.progress === 1));
-  assert.equal(unlocked[2].detail, '54 films');
-  assert.equal(unlocked[3].detail, '6 séries finies');
+  const first = buildTieredBadges({ centenaire: 8, night_owl: 0, big_screen: 0, binge_master: 0 });
+  assert.deepEqual(first.map(badge => badge.level), [0, 0, 0, 0], 'les anciens seuils deviennent le niveau 1');
+  const max = buildTieredBadges({ centenaire: 12_000, night_owl: 100, big_screen: 300, binge_master: 30 });
+  assert.ok(max.every(badge => badge.progress === 1 && badge.next === null && /palier maximal/.test(badge.detail)));
 });
 
-test('Moi · onglet en trois sous-vues, Ma liste par défaut et Réglages derrière la roue', () => {
+test('Moi · page unique : plus d’onglets, sous-pages avec retour et Réglages derrière la roue', () => {
   assert.match(profileSource, /import '\.\/moi\.css'/);
-  assert.match(profileSource, /type ProfileTab = 'library' \| 'stats' \| 'year'/);
-  assert.match(profileSource, /\['library', 'Ma liste'\], \['stats', 'Chiffres'\], \['year', 'Mon année'\]/);
-  assert.match(profileSource, /useState<ProfileTab>\('library'\)/);
+  assert.match(profileSource, /type ProfilePage = \{ kind: 'home' \}/);
+  assert.doesNotMatch(profileSource, /PROFILE_TABS|ProfileTab|moi-seg/);
+  assert.match(profileSource, /<MoiYearCard viewings=\{viewings\}/);
+  assert.match(profileSource, /<MoiFateRow left=\{fate\.left\.length\}/);
+  assert.match(profileSource, /aria-label="Retour à Moi"/);
+  assert.match(profileSource, /if \(page\.kind !== 'home'\) backHome\(\);/);
+  assert.match(profileSource, /lazy\(\(\) => import\('\.\.\/components\/ProAnalyticsDashboard'\)/);
   assert.match(profileSource, /aria-label="Réglages"/);
   assert.match(profileSource, /hasUpdate && <span className="moi-gear-dot"/);
   assert.match(profileSource, /titres suivis/);
-  assert.match(profileSource, /<Activity mode=\{profileContentVisible && activeTab === 'year' \? 'visible' : 'hidden'\}>/);
   assert.doesNotMatch(profileSource, /<SeenItLogo/);
   assert.match(moiCss, /\.moi-gear\{[^}]*width:44px;height:44px/);
-  assert.match(moiCss, /\.moi-seg button\[aria-pressed=true\]\{background:#E5A93D;color:#000/);
 });
 
-test('Moi · Ma liste en pastilles comptées et grille unique des cartes habituelles', () => {
-  assert.match(librarySource, /className="moi-chips" role="group"/);
-  assert.match(librarySource, /aria-pressed=\{selected\}/);
-  assert.match(librarySource, /<span className="moi-chip-count">\{section\.data\.length\}<\/span>/);
+test('Moi · Ma liste en étagères avec filtre par type et grille complète par section', () => {
+  assert.match(librarySource, /aria-label="Filtrer Ma liste par type"/);
+  assert.match(librarySource, /\[\['all', 'Tout'\], \['tv', 'Séries'\], \['movie', 'Films'\]\]/);
+  assert.match(librarySource, /const SHELF_SECTIONS = \['watching', 'toWatchMovie', 'favorites'\] as const;/);
+  assert.match(librarySource, />Tout voir</);
   assert.match(librarySource, /<GridMediaCard[\s\S]*showProgress=\{true\}/);
   assert.doesNotMatch(librarySource, /hideBadges=\{true\}/);
-  assert.doesNotMatch(librarySource, /emoji/);
-  assert.match(librarySource, /sections\.find\(section => section\.id === 'watching'\)/);
+  assert.match(moiCss, /\.moi-shelf-item\{width:112px;flex-shrink:0;scroll-snap-align:start;--seenit-media-title:#fff\}/);
+  assert.match(moiCss, /\.moi-type-dot\[data-type=tv\]\{background:#4F46E5\}\.moi-type-dot\[data-type=movie\]\{background:#E11D48\}/);
 });
 
-test('Moi · Chiffres et Mon année gardent un seul or et les personnes fréquentes', () => {
+test('Moi · Mes chiffres et Mon année gardent un seul or, les données réelles et les personnes', () => {
   assert.match(dashboardSource, /buildProfileYearStats\(viewings, year\)/);
   assert.match(dashboardSource, /partitionProfileViewings\(collectProfileViewings\(shows\)\)/);
   assert.match(storySource, /partitionProfileViewings\(collectProfileViewings\(shows\)\)/);
-  assert.match(dashboardSource, /Devant l’écran/);
-  assert.match(dashboardSource, /Heures par mois/);
-  assert.match(dashboardSource, /Quand tu regardes/);
-  assert.match(dashboardSource, /Où tu regardes/);
-  assert.match(dashboardSource, /buildProfileBadges\(data\)/);
+  for (const title of ['Heures par mois', 'Tendances', 'Ce que tu regardes', 'Quand tu regardes', 'Où tu regardes', 'Séries laissées en route', 'Tes réactions', 'Tes têtes d’affiche', 'Badges']) assert.ok(dashboardSource.includes(title), title);
   assert.match(dashboardSource, /onPersonClick\?\.\(person\.id\)/);
   assert.doesNotMatch(dashboardSource, /indigo|rose-|emerald|cinephileArchetype/);
-  assert.match(storySource, /Et maintenant/);
-  assert.match(storySource, /buildProfileProjection\(shows, viewings\)/);
+  for (const title of ['jour par jour', 'Ton année en séries', 'Films ou séries, mois par mois', 'Ton top de l’année', 'Et maintenant']) assert.ok(storySource.includes(title), title);
+  assert.match(storySource, /buildProfileProjection\(shows, viewings, now\)/);
 });

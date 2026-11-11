@@ -3967,6 +3967,104 @@
           "contains": "SEENIT-DISCOVER-008 recherche posée sur l’image à la une, une seule loupe visible à la fois"
         }
       ]
+    },
+    {
+      "id": "SEENIT-PROFILE-001",
+      "title": "Moi en page unique, Ma liste en étagères avec filtre par type et sous-pages avec retour",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/profileMoi.test.ts",
+          "contains": "Moi · page unique : plus d’onglets, sous-pages avec retour et Réglages derrière la roue"
+        },
+        {
+          "file": "tests/profileMoi.test.ts",
+          "contains": "Moi · Ma liste en étagères avec filtre par type et grille complète par section"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PROFILE-002",
+      "title": "Devenir des séries partagé avec l'accueil et écran Séries laissées en route",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-002 en pause = 60 jours sans épisode vu, avec la même fonction que l’accueil"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-002 résumé : presque finies, où tu décroches, point de décrochage, survie au-delà de la saison 1"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PROFILE-003",
+      "title": "Mes chiffres : cadran, repères, tendances chiffrées, genres, créneaux, plateformes, réactions, têtes d'affiche et badges à niveaux",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 rythme, journée type, jours d’affilée et douze semaines"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 constats nets seulement, genres en part du temps et réactions"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 têtes d’affiche : trois premiers rôles, classés au temps ; nuits pour Oiseau de nuit"
+        },
+        {
+          "file": "tests/profileMoi.test.ts",
+          "contains": "Moi · Quand tu regardes : la semaine en tranches de trois heures, heures inconnues ignorées"
+        },
+        {
+          "file": "tests/profileMoi.test.ts",
+          "contains": "Moi · badges à niveaux : palier atteint, prochain palier et progression bornée"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PROFILE-004",
+      "title": "Mon année : calendrier, records, année en séries sans film, films ou séries et top",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-004 calendrier, records, année en séries sans film, films ou séries et top"
+        },
+        {
+          "file": "tests/profileMoi.test.ts",
+          "contains": "Moi · Mon année : titre de l’année et année en séries, sans film"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PROFILE-005",
+      "title": "Animations de Mes chiffres et Mon année une fois à l'entrée, sur transform et opacity",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-005 animations une fois à l’entrée, sur transform et opacity seulement, coupées en mouvement réduit"
+        }
+      ]
     }
   ]
 }

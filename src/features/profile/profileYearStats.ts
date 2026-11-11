@@ -1,7 +1,7 @@
 import type { Show } from '../../types.ts';
 import { historyEpisodeEntries } from '../history/historyRecords.ts';
 import { historyLocalDayKey, resolveHistoryTimestamp } from '../history/historyPresentation.ts';
-import { getProfilePlatformName, type AnalyticsData } from './profileAnalyticsSnapshot.ts';
+import { getProfilePlatformName } from './profileAnalyticsSnapshot.ts';
 
 // Mêmes estimations que les compteurs du Profil lorsque la durée réelle manque.
 const EPISODE_MINUTES = 45;
@@ -14,8 +14,11 @@ export const PROFILE_MONTH_LABELS = ['Janvier', 'Février', 'Mars', 'Avril', 'Ma
 export const PROFILE_MONTH_SHORT = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUIN', 'JUIL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
 export const PROFILE_WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 const WEEKDAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
-const PUNCH_WINDOW_HOURS = 8;
-const DEFAULT_PUNCH_START = 18;
+// SEENIT-PROFILE-003 : la semaine entière en huit tranches de trois heures, sans fenêtre glissante.
+const PUNCH_SLOT_HOURS = 3;
+const PUNCH_SLOTS = 24 / PUNCH_SLOT_HOURS;
+const PROFILE_PLATFORM_LIMIT = 6;
+export const PROFILE_UNKNOWN_PLATFORM = 'Autres';
 
 export interface ProfileViewing {
   showId: string;
@@ -182,7 +185,7 @@ export function defaultProfileYear(viewings: readonly ProfileViewing[], now = Da
 }
 
 export interface ProfilePunchCard {
-  startHour: number;
+  /** Début de chaque tranche de trois heures : 0, 3, … 21. */
   hours: number[];
   rows: number[][];
   slot: { day: number; fromHour: number; toHour: number } | null;
@@ -194,54 +197,46 @@ export interface ProfileYearStats {
   episodes: number;
   films: number;
   months: number[];
+  monthEpisodes: number[];
+  monthFilms: number[];
+  seriesMinutes: number;
+  filmMinutes: number;
   recordMonth: number | null;
   punch: ProfilePunchCard;
+  /** Six plateformes au plus, en part du temps total ; le temps sans plateforme connue est à part. */
   platforms: { name: string; minutes: number; share: number }[];
+  unknownPlatformShare: number;
+  days: number;
 }
 
 const yearViewings = (viewings: readonly ProfileViewing[], year: number) =>
   viewings.filter(viewing => new Date(viewing.watchedAt).getFullYear() === year);
 
-/** Fenêtre de huit heures consécutives la plus regardée ; 18 h – 2 h par défaut. */
+/** Semaine en tranches de trois heures ; le créneau est la case la plus regardée. */
 function buildPunchCard(viewings: readonly ProfileViewing[]): ProfilePunchCard {
-  const grid = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
-  const byHour = new Array<number>(24).fill(0);
+  const grid = Array.from({ length: 7 }, () => new Array<number>(PUNCH_SLOTS).fill(0));
   for (const viewing of viewings) {
     if (!viewing.timeKnown) continue;
     const date = new Date(viewing.watchedAt);
-    const day = (date.getDay() + 6) % 7;
-    grid[day][date.getHours()] += viewing.minutes;
-    byHour[date.getHours()] += viewing.minutes;
+    grid[(date.getDay() + 6) % 7][Math.floor(date.getHours() / PUNCH_SLOT_HOURS)] += viewing.minutes;
   }
-
-  // Parcours depuis 18 h : à égalité, la fenêtre de soirée de la maquette l'emporte.
-  let startHour = DEFAULT_PUNCH_START;
-  let best = 0;
-  for (let step = 0; step < 24; step++) {
-    const start = (DEFAULT_PUNCH_START + step) % 24;
-    let sum = 0;
-    for (let offset = 0; offset < PUNCH_WINDOW_HOURS; offset++) sum += byHour[(start + offset) % 24];
-    if (sum > best) { best = sum; startHour = start; }
-  }
-  const hours = Array.from({ length: PUNCH_WINDOW_HOURS }, (_, offset) => (startHour + offset) % 24);
-  const max = Math.max(0, ...grid.flatMap(row => hours.map(hour => row[hour])));
-  const rows = grid.map(row => hours.map(hour => max > 0 ? row[hour] / max : 0));
-
+  const hours = Array.from({ length: PUNCH_SLOTS }, (_, index) => index * PUNCH_SLOT_HOURS);
+  const max = Math.max(0, ...grid.flat());
+  const rows = grid.map(row => row.map(value => max > 0 ? value / max : 0));
   let slot: ProfilePunchCard['slot'] = null;
   if (max > 0) {
-    let bestDay = 0, bestIndex = 0;
-    grid.forEach((row, day) => hours.forEach((hour, index) => {
-      if (row[hour] > grid[bestDay][hours[bestIndex]]) { bestDay = day; bestIndex = index; }
-    }));
-    const value = (index: number) => index >= 0 && index < hours.length ? grid[bestDay][hours[index]] : -1;
-    const fromIndex = value(bestIndex - 1) > value(bestIndex + 1) ? bestIndex - 1 : bestIndex;
-    slot = { day: bestDay, fromHour: hours[fromIndex], toHour: (hours[fromIndex] + 2) % 24 };
+    let bestDay = 0, bestSlot = 0;
+    grid.forEach((row, day) => row.forEach((value, index) => { if (value > grid[bestDay][bestSlot]) { bestDay = day; bestSlot = index; } }));
+    slot = { day: bestDay, fromHour: hours[bestSlot], toHour: (hours[bestSlot] + PUNCH_SLOT_HOURS) % 24 };
   }
-  return { startHour, hours, rows, slot };
+  return { hours, rows, slot };
 }
 
+const hourLabel = (hour: number) => hour === 0 ? 'minuit' : `${hour} h`;
+
+/** « le dimanche, de 21 h à minuit ». */
 export function formatProfilePunchSlot(slot: NonNullable<ProfilePunchCard['slot']>): string {
-  return `${WEEKDAY_NAMES[slot.day]}, ${slot.fromHour} h – ${slot.toHour} h`;
+  return `le ${WEEKDAY_NAMES[slot.day]}, de ${hourLabel(slot.fromHour)} à ${hourLabel(slot.toHour)}`;
 }
 
 export function buildProfileYearStats(viewings: readonly ProfileViewing[], year: number, now = Date.now()): ProfileYearStats {
@@ -249,23 +244,28 @@ export function buildProfileYearStats(viewings: readonly ProfileViewing[], year:
   const inYear = yearViewings(viewings, year);
   const monthCount = year === current.getFullYear() ? current.getMonth() + 1 : 12;
   const months = new Array<number>(monthCount).fill(0);
+  const monthEpisodes = new Array<number>(monthCount).fill(0);
+  const monthFilms = new Array<number>(monthCount).fill(0);
   const platformMinutes = new Map<string, number>();
-  let minutes = 0, episodes = 0, films = 0;
+  const dayKeys = new Set<string>();
+  let minutes = 0, episodes = 0, films = 0, seriesMinutes = 0, filmMinutes = 0;
   for (const viewing of inYear) {
     minutes += viewing.minutes;
-    if (viewing.mediaType === 'tv') episodes++; else films++;
     const month = new Date(viewing.watchedAt).getMonth();
+    if (viewing.mediaType === 'tv') { episodes++; seriesMinutes += viewing.minutes; if (month < monthCount) monthEpisodes[month]++; }
+    else { films++; filmMinutes += viewing.minutes; if (month < monthCount) monthFilms[month]++; }
     if (month < monthCount) months[month] += viewing.minutes;
     platformMinutes.set(viewing.platform, (platformMinutes.get(viewing.platform) || 0) + viewing.minutes);
+    dayKeys.add(historyLocalDayKey(viewing.watchedAt));
   }
 
   const recordValue = Math.max(0, ...months);
-  const ranked = [...platformMinutes.entries()]
-    .filter(([name]) => name !== 'Autres')
-    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]));
-  const others = (platformMinutes.get('Autres') || 0) + ranked.slice(4).reduce((sum, [, value]) => sum + value, 0);
-  const platforms = [...ranked.slice(0, 4), ...(others > 0 ? [['Autres', others] as [string, number]] : [])]
-    .map(([name, value]) => ({ name, minutes: value, share: minutes > 0 ? Math.round(value / minutes * 100) : 0 }));
+  const share = (value: number) => minutes > 0 ? Math.round(value / minutes * 100) : 0;
+  const platforms = [...platformMinutes.entries()]
+    .filter(([name]) => name !== PROFILE_UNKNOWN_PLATFORM)
+    .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+    .slice(0, PROFILE_PLATFORM_LIMIT)
+    .map(([name, value]) => ({ name, minutes: value, share: share(value) }));
 
   return {
     year,
@@ -273,100 +273,16 @@ export function buildProfileYearStats(viewings: readonly ProfileViewing[], year:
     episodes,
     films,
     months,
+    monthEpisodes,
+    monthFilms,
+    seriesMinutes,
+    filmMinutes,
     recordMonth: recordValue > 0 ? months.indexOf(recordValue) : null,
     punch: buildPunchCard(inYear),
     platforms,
+    unknownPlatformShare: share(platformMinutes.get(PROFILE_UNKNOWN_PLATFORM) || 0),
+    days: dayKeys.size,
   };
-}
-
-export interface ProfileStoryMonth {
-  month: number;
-  title: string;
-  posterPath: string | null;
-  minutes: number;
-  share: number;
-  event: string | null;
-}
-
-export interface ProfileYearStory {
-  year: number;
-  headline: string;
-  months: ProfileStoryMonth[];
-}
-
-const plural = (count: number, singular: string, pluralForm = `${singular}s`) => `${count} ${count > 1 ? pluralForm : singular}`;
-
-/** Le récit mois par mois : la série la plus regardée, ou le cinéma quand il domine. */
-export function buildProfileYearStory(viewings: readonly ProfileViewing[], year: number): ProfileYearStory | null {
-  const inYear = yearViewings(viewings, year);
-  if (inYear.length === 0) return null;
-
-  const showMinutes = new Map<string, { title: string; minutes: number }>();
-  const months = new Map<number, { shows: Map<string, { title: string; posterPath: string | null; minutes: number; episodes: number }>; filmMinutes: number; films: number; filmPoster: string | null; minutes: number }>();
-  const days = new Set<string>();
-  for (const viewing of inYear) {
-    const month = new Date(viewing.watchedAt).getMonth();
-    days.add(historyLocalDayKey(viewing.watchedAt));
-    let bucket = months.get(month);
-    if (!bucket) { bucket = { shows: new Map(), filmMinutes: 0, films: 0, filmPoster: null, minutes: 0 }; months.set(month, bucket); }
-    bucket.minutes += viewing.minutes;
-    if (viewing.mediaType === 'movie') {
-      bucket.films++;
-      bucket.filmMinutes += viewing.minutes;
-      bucket.filmPoster ??= viewing.posterPath;
-      continue;
-    }
-    const entry = bucket.shows.get(viewing.showId) || { title: viewing.title, posterPath: viewing.posterPath, minutes: 0, episodes: 0 };
-    entry.minutes += viewing.minutes;
-    entry.episodes++;
-    bucket.shows.set(viewing.showId, entry);
-    const total = showMinutes.get(viewing.showId) || { title: viewing.title, minutes: 0 };
-    total.minutes += viewing.minutes;
-    showMinutes.set(viewing.showId, total);
-  }
-
-  const streak = longestDayStreak([...days]);
-  const maxMinutes = Math.max(...[...months.values()].map(bucket => bucket.minutes));
-  const storyMonths = [...months.entries()]
-    .sort((left, right) => right[0] - left[0])
-    .map(([month, bucket]): ProfileStoryMonth => {
-      const topShow = [...bucket.shows.values()].sort((left, right) => right.minutes - left.minutes || left.title.localeCompare(right.title))[0];
-      const cinema = bucket.films > 0 && (!topShow || bucket.filmMinutes > topShow.minutes);
-      return {
-        month,
-        title: cinema ? `Mois cinéma · ${plural(bucket.films, 'film')}` : `${topShow.title} · ${plural(topShow.episodes, 'épisode')}`,
-        posterPath: cinema ? bucket.filmPoster : topShow.posterPath,
-        minutes: bucket.minutes,
-        share: maxMinutes > 0 ? bucket.minutes / maxMinutes : 0,
-        event: streak && streak.month === month ? `Record · ${streak.length} jours d’affilée` : null,
-      };
-    });
-
-  const topTitles = [...showMinutes.values()]
-    .sort((left, right) => right.minutes - left.minutes || left.title.localeCompare(right.title))
-    .slice(0, 2)
-    .map(entry => entry.title);
-  const films = inYear.filter(viewing => viewing.mediaType === 'movie').length;
-  const headline = topTitles.length === 2
-    ? `L’année ${topTitles[0]}, puis ${topTitles[1]}.`
-    : topTitles.length === 1 ? `L’année ${topTitles[0]}.` : `L’année cinéma · ${plural(films, 'film')}.`;
-
-  return { year, headline, months: storyMonths };
-}
-
-function longestDayStreak(dayKeys: string[]): { length: number; month: number } | null {
-  const ordinals = dayKeys
-    .map(key => { const [year, month, day] = key.split('-').map(Number); return Date.UTC(year, month - 1, day) / DAY_MS; })
-    .sort((left, right) => left - right);
-  let best: { length: number; end: number } | null = null;
-  let runStart = 0;
-  for (let index = 0; index < ordinals.length; index++) {
-    if (index > 0 && ordinals[index] !== ordinals[index - 1] + 1) runStart = index;
-    const length = index - runStart + 1;
-    if (!best || length > best.length) best = { length, end: ordinals[index] };
-  }
-  if (!best || best.length < 3) return null;
-  return { length: best.length, month: new Date(best.end * DAY_MS).getUTCMonth() };
 }
 
 export interface ProfileProjection {
@@ -407,28 +323,4 @@ export function buildProfileProjection(shows: readonly Show[], viewings: readonl
     };
   }
   return best;
-}
-
-export interface ProfileBadge {
-  id: 'centenaire' | 'night_owl' | 'big_screen' | 'binge_master';
-  title: string;
-  progress: number;
-  unlocked: boolean;
-  detail: string;
-}
-
-/** Les quatre badges historiques, mêmes seuils, avec leur progression. */
-export function buildProfileBadges(data: Pick<AnalyticsData, 'totalMinutes' | 'totalEpisodesSeen' | 'totalMoviesSeen' | 'completedTvCount'>): ProfileBadge[] {
-  const { totalMinutes, totalEpisodesSeen: episodes, totalMoviesSeen: movies, completedTvCount: completedTv } = data;
-  const seen = episodes + movies;
-  const badge = (id: ProfileBadge['id'], title: string, progress: number, unlocked: boolean, detail: string): ProfileBadge =>
-    ({ id, title, progress: unlocked ? 1 : Math.min(0.99, Math.max(0, progress)), unlocked, detail });
-  return [
-    badge('centenaire', 'Centenaire', seen / 100, seen >= 100, seen >= 100 ? `${seen.toLocaleString('fr-FR')} vus` : `${seen} / 100 vus`),
-    badge('night_owl', 'Oiseau de nuit', Math.max(episodes / 10, totalMinutes / 500), episodes >= 10 || totalMinutes >= 500,
-      episodes >= 10 || totalMinutes >= 500 ? `${Math.round(totalMinutes / 60).toLocaleString('fr-FR')} h` : `${episodes} / 10 épisodes`),
-    badge('big_screen', 'Grand écran', movies, movies >= 1, movies >= 1 ? plural(movies, 'film') : '0 / 1 film'),
-    badge('binge_master', 'Binge-Master', Math.max(completedTv, episodes / 20), completedTv >= 1 || episodes >= 20,
-      completedTv >= 1 ? plural(completedTv, 'série finie', 'séries finies') : episodes >= 20 ? `${episodes} épisodes` : `${episodes} / 20 épisodes`),
-  ];
 }
