@@ -105,8 +105,12 @@ export const ProfileScreen = React.memo(function ProfileScreen({
     window.history.pushState({ ...currentState, isModal: true, isPersonDetailModal: true, personId }, '');
   }, []);
 
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  // Revue Codex #944 : seule la sortie de la page Moi mémorise sa position ; passer d'une sous-page à une autre
+  // (Mes chiffres → Séries laissées en route) ne l'écrase pas.
   const openPage = useCallback((next: ProfilePage) => {
-    if (rootRef.current && next.kind !== 'home') homeScroll.current = rootRef.current.scrollTop;
+    if (rootRef.current && next.kind !== 'home' && pageRef.current.kind === 'home') homeScroll.current = rootRef.current.scrollTop;
     startTransition(() => setPage(next));
     requestAnimationFrame(() => { if (rootRef.current) rootRef.current.scrollTop = 0; });
   }, []);

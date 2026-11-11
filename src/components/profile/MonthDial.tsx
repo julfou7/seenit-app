@@ -81,7 +81,8 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
         const [x, y] = point(LABEL_RADIUS, month * 30 + 15);
         const known = month < minutes.length;
         return (
-          <button key={label} type="button" className="moi-dial-month" style={{ left: x - 23, top: y - 22 }}
+          // Revue Codex #944 : position en pourcentage du cadran, qui peut rétrécir sous 322 px (écran de 360 px).
+          <button key={label} type="button" className="moi-dial-month" style={{ left: `${(x / 322 * 100).toFixed(2)}%`, top: `${(y / 322 * 100).toFixed(2)}%` }}
             data-state={!known ? 'future' : month === recordMonth ? 'record' : month === currentMonth ? 'current' : minutes[month] <= 0 ? 'empty' : 'past'}
             aria-pressed={picked === month} aria-label={`${PROFILE_MONTH_LABELS[month]} : ${known ? `${hours(minutes[month])} heures` : 'à venir'}`}
             onClick={() => setPicked(current => current === month ? null : month)}>

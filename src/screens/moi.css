@@ -127,7 +127,7 @@
 .moi-fate-action{flex-shrink:0;min-height:44px;padding:0 14px;border-radius:14px;background:#1C1C1F;box-shadow:inset 0 0 0 1px rgba(229,169,61,.5);color:#F2C36B;font-size:13.5px;font-weight:800;display:flex;align-items:center}
 .moi-fate-action[data-strong=true]{background:#E5A93D;color:#000;box-shadow:none}
 .moi-dial-card{align-items:center}.moi-dial-card>.moi-eyebrow{align-self:flex-start}
-.moi-dial{position:relative;width:322px;height:322px;max-width:100%}
+.moi-dial{position:relative;width:min(322px,100%);aspect-ratio:1}
 .moi-dial>svg{display:block;width:100%;height:100%;overflow:visible}
 .moi-dial-guide{fill:none;stroke:rgba(255,255,255,.05);stroke-width:1}
 .moi-dial-sector{transform-box:view-box;transform-origin:161px 161px;transition:transform .35s cubic-bezier(.2,.9,.3,1.25),opacity .3s ease}
@@ -139,11 +139,11 @@
 .moi-dial[data-play=true] .moi-dial-sector{animation:moiSector .65s cubic-bezier(.2,.9,.3,1.25) var(--delay) backwards}
 .moi-dial-center{position:absolute;left:30.7%;top:30.7%;width:38.6%;height:38.6%;padding:0;border:0;border-radius:50%;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer}
 .moi-dial-center>span{font-size:12.5px;font-weight:700;color:#a1a1aa}.moi-dial-center>strong{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:44px;color:#F2C36B}.moi-dial-center>small{font-size:11.5px;font-weight:600;color:#a1a1aa;text-align:center}
-.moi-dial-month{position:absolute;width:46px;height:44px;padding:0;border:0;border-radius:14px;background:transparent;color:#d4d4d8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;transition:transform .25s ease,background-color .25s ease,color .25s ease}
+.moi-dial-month{position:absolute;width:46px;height:44px;transform:translate(-50%,-50%);padding:0;border:0;border-radius:14px;background:transparent;color:#d4d4d8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;transition:transform .25s ease,background-color .25s ease,color .25s ease}
 .moi-dial-month>span{font-size:11px;font-weight:700;line-height:13px}.moi-dial-month>b{font-size:13.5px;font-weight:800;line-height:16px}
 .moi-dial-month[data-state=record]{color:#FFF2B8}.moi-dial-month[data-state=empty],.moi-dial-month[data-state=future]{color:#8b8b93}
 .moi-dial-month[data-state=current]{color:#fff;background:rgba(229,169,61,.16);box-shadow:inset 0 0 0 1.5px #E5A93D}
-.moi-dial-month[aria-pressed=true]{background:#E5A93D;color:#000;box-shadow:none;transform:scale(1.12)}
+.moi-dial-month[aria-pressed=true]{background:#E5A93D;color:#000;box-shadow:none;transform:translate(-50%,-50%) scale(1.12)}
 .moi-dial-facts{align-self:stretch;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;text-align:center}
 .moi-dial-facts>span{display:flex;flex-direction:column;gap:2px}.moi-dial-facts b{font-size:22px;font-weight:800;letter-spacing:-.02em}.moi-dial-facts small{font-size:12px;color:#a1a1aa}
 .moi-tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.moi-tiles--two{grid-template-columns:repeat(2,minmax(0,1fr))}
