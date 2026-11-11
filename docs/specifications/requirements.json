@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.293",
+  "applicationVersion": "1.4.294",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -3977,6 +3977,10 @@
       ],
       "tests": [
         {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-001 retour terrain v1.4.293 : trois sections ou moins défilent toutes en étagère, alignées sur la marge"
+        },
+        {
           "file": "tests/profileMoi.test.ts",
           "contains": "Moi · page unique : plus d’onglets, sous-pages avec retour et Réglages derrière la roue"
         },
@@ -4012,6 +4016,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 retour terrain v1.4.293 : cadran sans chevauchement, secteurs touchables"
+        },
         {
           "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-003 retour terrain v1.4.291 : grille sur les heures Plex, têtes d’affiche variées, badges statiques"
@@ -4068,6 +4076,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-006 retour terrain v1.4.293 : les chiffres partent du premier import quand il suit la création du compte"
+        },
         {
           "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-006 chiffres depuis l’inscription, sans rattrapage marqué d’un coup ni faux marathon"

@@ -181,8 +181,10 @@ export interface ProfileViewingScope {
   viewings: ProfileViewing[];
   imports: ProfileImportDay[];
   catchUp: { count: number; minutes: number };
-  /** Début du jour de l'inscription, ou null si la date du compte est inconnue. */
+  /** Début du jour où SeenIt a commencé à suivre les visionnages, ou null s'il est inconnu. */
   since: number | null;
+  /** `import` : la première journée d'import (chargement de la bibliothèque) est postérieure à la création du compte. */
+  sinceSource: 'signup' | 'import' | null;
   beforeSince: number;
 }
 
@@ -197,22 +199,34 @@ export function scopeProfileViewings(shows: readonly Show[], since: number | nul
   const catchUps = findProfileCatchUps(dated);
   let minutes = 0;
   for (const viewing of catchUps) minutes += viewing.minutes;
-  const sinceDay = since !== null && Number.isFinite(since) && since > 0 ? new Date(since).setHours(0, 0, 0, 0) : null;
+  const signupDay = since !== null && Number.isFinite(since) && since > 0 ? new Date(since).setHours(0, 0, 0, 0) : null;
+  // Retour terrain v1.4.293 : un compte peut exister des mois avant le vrai démarrage ; la première journée d'import
+  // (bibliothèque chargée) marque ce démarrage, et l'historique Plex daté d'avant n'est pas de la vie SeenIt.
+  const firstImport = imports.length > 0 ? new Date(imports[0].watchedAt).setHours(0, 0, 0, 0) : null;
+  // Revue Codex #952 : ce n'est un démarrage que si aucun Vu marqué dans l'app ne le précède (seules des lectures
+  // Plex datées peuvent exister avant) ; sinon c'est un rattrapage tardif et l'historique d'avant reste compté.
+  const usedBefore = firstImport !== null && dated.some(viewing => !viewing.plexTime && viewing.watchedAt < firstImport && (signupDay === null || viewing.watchedAt >= signupDay));
+  const importDay = usedBefore ? null : firstImport;
+  const sinceSource = importDay !== null && (signupDay === null || importDay > signupDay) ? 'import' : signupDay !== null ? 'signup' : null;
+  const sinceDay = sinceSource === 'import' ? importDay : signupDay;
   let beforeSince = 0;
   const viewings = dated.filter(viewing => {
     if (catchUps.has(viewing)) return false;
     if (sinceDay !== null && viewing.watchedAt < sinceDay) { beforeSince++; return false; }
     return true;
   });
-  return { viewings, imports, catchUp: { count: catchUps.size, minutes }, since: sinceDay, beforeSince };
+  return { viewings, imports, catchUp: { count: catchUps.size, minutes }, since: sinceDay, sinceSource, beforeSince };
 }
 
 const sinceDate = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
 
-/** « Depuis ton inscription le 3 juillet 2026 · sans 16 épisodes marqués d'un coup », ou null. */
-export function formatProfileScopeNote(scope: Pick<ProfileViewingScope, 'since' | 'beforeSince' | 'catchUp'>, year: number): string | null {
+/** « Depuis ton arrivée sur SeenIt le 3 juillet 2026 · sans 16 épisodes marqués d'un coup », ou null. */
+export function formatProfileScopeNote(scope: Pick<ProfileViewingScope, 'since' | 'sinceSource' | 'beforeSince' | 'catchUp'>, year: number): string | null {
   const parts: string[] = [];
-  if (scope.since !== null && scope.beforeSince > 0 && new Date(scope.since).getFullYear() === year) parts.push(`Depuis ton inscription le ${sinceDate.format(new Date(scope.since))}`);
+  if (scope.since !== null && scope.beforeSince > 0 && new Date(scope.since).getFullYear() === year) {
+    const date = sinceDate.format(new Date(scope.since));
+    parts.push(scope.sinceSource === 'import' ? `Depuis ton arrivée sur SeenIt le ${date} (premier import)` : `Depuis ton inscription le ${date}`);
+  }
   if (scope.catchUp.count > 0) parts.push(`sans ${scope.catchUp.count.toLocaleString('fr-FR')} ${scope.catchUp.count > 1 ? 'épisodes marqués' : 'épisode marqué'} d’un coup`);
   if (parts.length === 0) return null;
   const text = parts.join(' · ');

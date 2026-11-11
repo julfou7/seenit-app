@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.293**
+Version applicative : **1.4.294**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1594,6 +1594,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   carte habituel, titre blanc sur une ligne, badge SÉRIE indigo ou FILM rose) et une ligne par autre section ;
   « Tout voir » ou une ligne ouvre la grille complète. Mes chiffres, Mon année, Séries laissées en route et
   une section s'ouvrent comme des pages avec retour ; le retour rend la même position de défilement.
+  Avec trois sections ou moins (filtre Films : à voir et vus), toutes défilent en étagère ; la première carte
+  d'une étagère s'aligne sur la marge de 16 px du titre.
 - **SEENIT-PROFILE-002** — Devenir des séries commencées, calculé par une seule fonction partagée par Moi,
   Mes chiffres, Mon année et l'écran dédié : abandonnée (statut), terminée (statut ou série finie à jour),
   en pause (un épisode encore regardable et aucun épisode vu depuis 60 jours, `seriesPause` comme
@@ -1616,7 +1618,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   à l'heure réelle dans l'année, « Quand tu regardes » ne compte qu'elles, sinon il annonce montrer l'heure
   des Vu. Les têtes d'affiche (cinq au plus) sont classées par nombre de titres puis par temps, et une
   personne n'entre que si elle apporte une série ou un film encore absent du classement. Les badges ne
-  s'animent pas ; une étiquette de plateforme ne se coupe qu'entre deux mots.
+  s'animent pas ; une étiquette de plateforme ne se coupe qu'entre deux mots. Retour v1.4.293 : toucher un
+  secteur du cadran ouvre son mois comme son étiquette ; le secteur choisi, détaché et en plein rebond, ne passe
+  jamais sous l'étiquette de son mois, qui ne grossit pas.
 - **SEENIT-PROFILE-004** — Mon année : titre « L'année X, puis Y » d'après les séries les plus regardées,
   calendrier jour par jour (quatre niveaux, journée record), mois record, plus longue suite de jours, plus
   gros marathon d'une série en un jour et plus longue pause, « Ton année en séries » (série la plus
@@ -1633,7 +1637,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   n'ajoutent aucune animation.
 - **SEENIT-PROFILE-006** — Chiffres par période depuis l'inscription (retour terrain v1.4.292, #942). Mes
   chiffres, Mon année et la carte « Ton année » de Moi lisent une seule portée de visionnages réels : rien avant
-  le jour de création du compte, aucun rattrapage (trois épisodes ou plus d'une même série marqués à moins de
+  le jour de création du compte (ou le jour du premier import s'il est postérieur et qu'aucun Vu marqué dans l'app ne le
+  précède : bibliothèque chargée, l'historique Plex daté d'avant n'est pas de la vie SeenIt ; sinon c'est un
+  rattrapage tardif et l'historique antérieur reste compté), aucun rattrapage (trois épisodes ou plus d'une même série marqués à moins de
   cinq minutes d'écart, jamais les films) et aucune journée d'import de plus de 24 h. Le rattrapage n'est donc
   jamais un marathon ni une journée record. Les totaux (épisodes, films, badges de volume) comptent tout ; une
   note indique la date d'inscription et le nombre d'épisodes marqués d'un coup écartés. Une série finie compte

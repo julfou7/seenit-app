@@ -430,7 +430,7 @@ film, ou pour un film la dernière action « vu » ; jamais la date de modificat
 fiches, import). Les visionnages sans date (films importés de TV Time) ne sont pas comptés et leur nombre
 est indiqué ; ceux sans heure prouvée comptent dans leur mois mais jamais dans « Quand tu regardes ». Les chiffres par
 période (mois, semaines, rythme, jours d'affilée, records, marathons, année en séries, top) ne comptent que
-les visionnages depuis le jour de l'inscription à SeenIt, sans les rattrapages : trois épisodes ou plus d'une
+les visionnages depuis le jour de l'inscription à SeenIt (ou du premier import, s'il est postérieur), sans les rattrapages : trois épisodes ou plus d'une
 même série marqués à moins de cinq minutes d'écart (série vue par le passé marquée d'un coup). Les totaux
 (épisodes, films, séries terminées) comptent tout, et une note dit ce qui a été écarté (`SEENIT-PROFILE-006`).
 Une série finie compte comme terminée même archivée. Les badges

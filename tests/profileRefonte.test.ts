@@ -240,3 +240,51 @@ test('SEENIT-PROFILE-006 chiffres depuis l’inscription, sans rattrapage marqu�
   for (const path of ['src/components/ProAnalyticsDashboard.tsx', 'src/components/ProfileYearStory.tsx', 'src/screens/ProfileScreen.tsx']) assert.match(read(path), /scopeProfileViewings\(shows, since\)/);
   assert.match(read('src/screens/ProfileScreen.tsx'), /metadata\?\.creationTime/);
 });
+
+test('SEENIT-PROFILE-003 retour terrain v1.4.293 : cadran sans chevauchement, secteurs touchables', async () => {
+  const { MONTH_DIAL, monthDialLabelClearance, monthDialSectorReach } = await import('../src/components/profile/monthDialGeometry.ts');
+  // Le secteur le plus grand, détaché et en plein rebond, reste sous le coin intérieur d'une étiquette en diagonale.
+  assert.ok(monthDialSectorReach() + 2 <= monthDialLabelClearance(), `${monthDialSectorReach()} contre ${monthDialLabelClearance()}`);
+  assert.ok(MONTH_DIAL.hitRadius < monthDialLabelClearance(), 'la zone de toucher d’un secteur ne passe pas sous les étiquettes');
+  assert.ok(Math.max(...MONTH_DIAL.guides) <= MONTH_DIAL.inner + MONTH_DIAL.maxGrowth);
+  const dial = read('src/components/profile/MonthDial.tsx');
+  assert.match(dial, /className="moi-dial-hit"[^>]*onClick=\{\(\) => setPicked\(current => current === month \? null : month\)\}/);
+  const css = read('src/screens/moi.css');
+  assert.match(css, /\.moi-dial-month\[aria-pressed=true\]\{background:#E5A93D;color:#000;box-shadow:none\}/, 'l’étiquette choisie ne grossit plus');
+  assert.match(css, /\.moi-dial-hit\{fill:transparent;pointer-events:all;cursor:pointer/);
+});
+
+test('SEENIT-PROFILE-006 retour terrain v1.4.293 : les chiffres partent du premier import quand il suit la création du compte', async () => {
+  const { scopeProfileViewings, formatProfileScopeNote } = await import('../src/features/profile/profileYearStats.ts');
+  const signup = at(2026, 2, 25, 10);
+  const importAt = at(2026, 6, 14, 9);
+  // Bibliothèque chargée le 14 juillet : 40 épisodes datés de l'import, plus un historique Plex de mars à juin.
+  const imported = series('bib', {}, Array.from({ length: 40 }, (_, index) => [`1x${index + 1}`, importAt + index * 1_000] as [string, number]));
+  const plexBefore = series('plex', {}, [['1x1', at(2026, 3, 2)], ['1x2', at(2026, 4, 9)], ['1x3', at(2026, 5, 20)]]);
+  for (const record of Object.values(plexBefore.episodeRecords || {})) (record as { plexImported?: boolean }).plexImported = true;
+  const after = series('apres', {}, [['1x1', at(2026, 7, 2)]]);
+  const scope = scopeProfileViewings([imported, plexBefore, after], signup);
+  assert.equal(scope.sinceSource, 'import');
+  assert.equal(scope.since, new Date(importAt).setHours(0, 0, 0, 0));
+  assert.deepEqual(scope.viewings.map(viewing => viewing.showId), ['apres']);
+  assert.equal(scope.beforeSince, 3);
+  assert.equal(formatProfileScopeNote(scope, 2026), 'Depuis ton arrivée sur SeenIt le 14 juillet 2026 (premier import)');
+  // Revue Codex #952 : des Vu marqués dans l'app avant la grosse journée prouvent l'usage ; c'est un rattrapage tardif.
+  const marked = series('marques', {}, [['1x1', at(2026, 0, 10)], ['1x2', at(2026, 1, 12)], ['1x3', at(2026, 2, 26)]]);
+  const late = scopeProfileViewings([marked, imported], at(2026, 0, 2));
+  assert.equal(late.sinceSource, 'signup');
+  assert.equal(late.viewings.length, 3, 'l’historique antérieur au rattrapage reste compté');
+  // Sans import, la création du compte reste la borne.
+  const plain = scopeProfileViewings([plexBefore, after], signup);
+  assert.equal(plain.sinceSource, 'signup');
+  assert.equal(plain.viewings.length, 4);
+});
+
+test('SEENIT-PROFILE-001 retour terrain v1.4.293 : trois sections ou moins défilent toutes en étagère, alignées sur la marge', () => {
+  const library = read('src/screens/LibraryScreen.tsx');
+  assert.match(library, /const LIBRARY_ALL_SHELVES_MAX = 3;/);
+  assert.match(library, /const allShelves = typedSections\.length <= LIBRARY_ALL_SHELVES_MAX;/);
+  assert.match(library, /const rowSections = allShelves \? \[\] : /);
+  assert.match(library, /\{shelfSections\.map\(section => \(/);
+  assert.match(read('src/screens/moi.css'), /\.moi-shelf-rail\{[^}]*padding:4px 16px 2px;scroll-padding-inline:16px;scroll-snap-type:x proximity/);
+});
