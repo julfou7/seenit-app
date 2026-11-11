@@ -148,15 +148,21 @@ export function buildMediaMonths(viewings: readonly ProfileViewing[], year: numb
   return { series, films, insight };
 }
 
-/** Cinq séries au temps passé dans l'année. */
-export function buildTopSeries(viewings: readonly ProfileViewing[], year: number): { showId: string; title: string; minutes: number; episodes: number }[] {
-  const totals = new Map<string, { showId: string; title: string; minutes: number; episodes: number }>();
+export interface ProfileTopSeries { showId: string; title: string; posterPath: string | null; minutes: number; episodes: number; share: number; relative: number }
+
+/** Cinq séries au temps passé dans l'année, avec leur affiche, leur part du temps séries et leur écart au n° 1. */
+export function buildTopSeries(viewings: readonly ProfileViewing[], year: number): ProfileTopSeries[] {
+  const totals = new Map<string, Omit<ProfileTopSeries, 'share' | 'relative'>>();
+  let seriesMinutes = 0;
   for (const viewing of inYear(viewings, year)) {
     if (viewing.mediaType !== 'tv') continue;
-    const entry = totals.get(viewing.showId) || { showId: viewing.showId, title: viewing.title, minutes: 0, episodes: 0 };
+    seriesMinutes += viewing.minutes;
+    const entry = totals.get(viewing.showId) || { showId: viewing.showId, title: viewing.title, posterPath: viewing.posterPath, minutes: 0, episodes: 0 };
     entry.minutes += viewing.minutes; entry.episodes++; totals.set(viewing.showId, entry);
   }
-  return [...totals.values()].sort((a, b) => b.minutes - a.minutes || a.title.localeCompare(b.title)).slice(0, 5);
+  const top = [...totals.values()].sort((a, b) => b.minutes - a.minutes || a.title.localeCompare(b.title)).slice(0, 5);
+  const best = Math.max(1, top[0]?.minutes || 0);
+  return top.map(entry => ({ ...entry, share: seriesMinutes > 0 ? Math.round(entry.minutes / seriesMinutes * 100) : 0, relative: entry.minutes / best }));
 }
 
 /** « L'année X, puis Y » d'après les deux séries les plus regardées ; neutre sans série. */

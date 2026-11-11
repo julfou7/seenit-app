@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.291",
+  "applicationVersion": "1.4.292",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -4014,6 +4014,10 @@
       "tests": [
         {
           "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 retour terrain v1.4.291 : grille sur les heures Plex, têtes d’affiche variées, badges statiques"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-003 rythme, journée type, jours d’affilée et douze semaines"
         },
         {
@@ -4042,6 +4046,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-004 retour terrain v1.4.291 : top de l’année avec affiche, part du temps séries et écart au premier"
+        },
         {
           "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-004 calendrier, records, année en séries sans film, films ou séries et top"

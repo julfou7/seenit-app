@@ -114,7 +114,6 @@ export function ProAnalyticsDashboard({
   const maxGenre = Math.max(1, ...genres.map(genre => genre.share));
   const maxShare = Math.max(1, ...stats.platforms.map(platform => platform.share));
   const topBucket = fateSummary.buckets.reduce((best, bucket) => bucket.count > best.count ? bucket : best, fateSummary.buckets[0]);
-  const closestBadge = badges.filter(badge => badge.next !== null).sort((a, b) => b.progress - a.progress)[0];
   const pickYear = (next: number) => { setPickedYear(next); setYearMenuOpen(false); };
 
   return (
@@ -202,8 +201,9 @@ export function ProAnalyticsDashboard({
       {/* 5. Quand tu regardes */}
       <Reveal label="Quand tu regardes">
         {() => <>
-          <Head title="Quand tu regardes" />
+          <Head title="Quand tu regardes" note={stats.punch.source === 'plex' ? 'heures de lecture Plex' : 'heure des Vu'} />
           <p className="moi-note">{stats.punch.slot ? <>Ton créneau : <b className="moi-glow-text">{formatProfilePunchSlot(stats.punch.slot)}</b></> : 'Les heures apparaissent dès qu’un visionnage est daté à la minute.'}</p>
+          {stats.punch.slot && stats.punch.source === 'mark' && <p className="moi-aside">Calculé à l’heure où tu marques Vu dans l’app, qui peut être bien après le visionnage. Les lectures Plex donnent l’heure réelle et prennent le relais dès qu’elles sont assez nombreuses.</p>}
           <div className="moi-punch" role="img" aria-label={stats.punch.slot ? `Créneau le plus regardé : ${formatProfilePunchSlot(stats.punch.slot)}` : 'Aucune heure de visionnage connue'}>
             <span />
             {stats.punch.hours.map(hour => <span key={hour} className="moi-punch-hour">{hour} h</span>)}
@@ -291,8 +291,8 @@ export function ProAnalyticsDashboard({
         {() => <>
           <Head title="Badges" note="prochain palier" />
           {data ? <div className="moi-badges">
-            {badges.map((badge, index) => (
-              <div key={badge.id} className={`moi-badge moi-pop${badge === closestBadge ? ' moi-glow' : ''}`} style={delay(150 + index * 140)}>
+            {badges.map(badge => (
+              <div key={badge.id} className="moi-badge">
                 <span className="moi-ring" style={{ background: `conic-gradient(#E5A93D ${Math.round(badge.progress * 100)}%, #27272a 0)` }} role="img"
                   aria-label={`${badge.title}, niveau ${badge.level}, ${Math.round(badge.progress * 100)} % du palier suivant`}><span>{badge.level}</span></span>
                 <strong>{badge.title}</strong><small>{badge.detail}</small>

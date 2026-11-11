@@ -146,11 +146,16 @@ export function ProfileYearStory({ shows, fate, libraryReady = true, onFate }: {
 
       {/* 6. Ton top de l'année */}
       {top.length > 0 && <Reveal label="Ton top de l’année">
-        <div className="moi-card-head"><h3>Ton top de l’année</h3><small>au temps passé</small></div>
+        <div className="moi-card-head"><h3>Ton top de l’année</h3><small>séries, au temps passé</small></div>
         {top.map((entry, index) => (
           <div key={entry.showId} className="moi-top-row moi-pop" style={delay(100 + index * 90)}>
             <b className={index === 0 ? 'moi-glow-text' : undefined} data-podium={index < 3}>{index + 1}</b>
-            <span><strong>{entry.title}</strong><small>{formatProfileHours(entry.minutes)} · {entry.episodes} ép.</small></span>
+            {imageUrl(entry.posterPath, 'w92') ? <img src={imageUrl(entry.posterPath, 'w92')!} alt="" loading="lazy" decoding="async" /> : <span className="moi-fate-poster" aria-hidden="true" />}
+            <span className="moi-fate-text">
+              <strong>{entry.title}</strong>
+              <span className="moi-meter"><span className="moi-track"><i className="moi-grow-x" style={{ width: `${Math.round(entry.relative * 100)}%`, ...delay(150 + index * 90) }} /></span><small>{formatProfileHours(entry.minutes)}</small></span>
+              <small>{entry.episodes} {entry.episodes > 1 ? 'épisodes' : 'épisode'} · {entry.share} % de ton temps séries</small>
+            </span>
           </div>
         ))}
       </Reveal>}

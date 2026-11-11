@@ -18,6 +18,9 @@ const WEEKDAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samed
 const PUNCH_SLOT_HOURS = 3;
 const PUNCH_SLOTS = 24 / PUNCH_SLOT_HOURS;
 const PROFILE_PLATFORM_LIMIT = 6;
+// Retour terrain v1.4.291 : marquer Vu le matin ne veut pas dire regarder le matin. Dès vingt lectures Plex à
+// l'heure réelle, la grille ne compte qu'elles ; sinon elle dit qu'elle montre l'heure des Vu.
+export const PROFILE_PUNCH_PLEX_MIN = 20;
 export const PROFILE_UNKNOWN_PLATFORM = 'Autres';
 
 export interface ProfileViewing {
@@ -29,6 +32,8 @@ export interface ProfileViewing {
   platform: string;
   watchedAt: number;
   timeKnown: boolean;
+  /** L'heure vient d'une lecture Plex (heure réelle), pas d'un Vu marqué dans l'app (heure du geste). */
+  plexTime?: boolean;
   minutes: number;
 }
 
@@ -93,6 +98,7 @@ export function collectProfileViewings(shows: readonly Show[]): ProfileViewing[]
         season: 0,
         platform: record?.plexImported === true ? 'Plex' : platform,
         ...timing,
+        plexTime: record?.plexImported === true,
         minutes: asPositiveNumber(record?.runtime) || MOVIE_MINUTES,
       });
       continue;
@@ -107,6 +113,7 @@ export function collectProfileViewings(shows: readonly Show[]): ProfileViewing[]
         season,
         platform: record?.plexImported === true ? 'Plex' : platform,
         ...timing,
+        plexTime: record?.plexImported === true,
         minutes: asPositiveNumber(record?.runtime) || EPISODE_MINUTES,
       });
     }
@@ -187,6 +194,8 @@ export function defaultProfileYear(viewings: readonly ProfileViewing[], now = Da
 export interface ProfilePunchCard {
   /** Début de chaque tranche de trois heures : 0, 3, … 21. */
   hours: number[];
+  /** `plex` : heures réelles de lecture Plex ; `mark` : heure à laquelle les Vu ont été marqués. */
+  source: 'plex' | 'mark';
   rows: number[][];
   slot: { day: number; fromHour: number; toHour: number } | null;
 }
@@ -213,10 +222,13 @@ const yearViewings = (viewings: readonly ProfileViewing[], year: number) =>
   viewings.filter(viewing => new Date(viewing.watchedAt).getFullYear() === year);
 
 /** Semaine en tranches de trois heures ; le créneau est la case la plus regardée. */
-function buildPunchCard(viewings: readonly ProfileViewing[]): ProfilePunchCard {
+function buildPunchCard(all: readonly ProfileViewing[]): ProfilePunchCard {
+  const timed = all.filter(viewing => viewing.timeKnown);
+  const plex = timed.filter(viewing => viewing.plexTime);
+  const source = plex.length >= PROFILE_PUNCH_PLEX_MIN ? 'plex' : 'mark';
+  const viewings = source === 'plex' ? plex : timed;
   const grid = Array.from({ length: 7 }, () => new Array<number>(PUNCH_SLOTS).fill(0));
   for (const viewing of viewings) {
-    if (!viewing.timeKnown) continue;
     const date = new Date(viewing.watchedAt);
     grid[(date.getDay() + 6) % 7][Math.floor(date.getHours() / PUNCH_SLOT_HOURS)] += viewing.minutes;
   }
@@ -229,7 +241,7 @@ function buildPunchCard(viewings: readonly ProfileViewing[]): ProfilePunchCard {
     grid.forEach((row, day) => row.forEach((value, index) => { if (value > grid[bestDay][bestSlot]) { bestDay = day; bestSlot = index; } }));
     slot = { day: bestDay, fromHour: hours[bestSlot], toHour: (hours[bestSlot] + PUNCH_SLOT_HOURS) % 24 };
   }
-  return { hours, rows, slot };
+  return { hours, source, rows, slot };
 }
 
 const hourLabel = (hour: number) => hour === 0 ? 'minuit' : `${hour} h`;

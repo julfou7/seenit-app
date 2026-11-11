@@ -160,12 +160,18 @@ export function buildProfileReactions(shows: readonly Show[]): ProfileReactions 
 export interface ProfileLeadCast { id: number; name: string; profile_path: string | null }
 export interface ProfileLeadActor extends ProfileLeadCast { minutes: number; titles: number; favorites: number }
 export const PROFILE_LEAD_BILLING = 3;
+export const PROFILE_LEAD_LIMIT = 5;
 
-/** Têtes d'affiche : acteurs des trois premiers rôles des titres vus, classés par temps de visionnage cumulé. */
+/**
+ * Têtes d'affiche : acteurs des trois premiers rôles des titres vus, classés par nombre de titres puis par temps.
+ * Retour terrain v1.4.291 : une personne n'entre que si elle apporte un titre encore absent du classement, pour ne
+ * pas montrer trois acteurs d'une même série très regardée.
+ */
 export function buildLeadActors(viewings: readonly ProfileViewing[], shows: readonly Show[], leadsOf: (show: Show) => readonly ProfileLeadCast[] | null): ProfileLeadActor[] {
   const minutesByShow = new Map<string, number>();
   for (const viewing of viewings) minutesByShow.set(viewing.showId, (minutesByShow.get(viewing.showId) || 0) + viewing.minutes);
   const people = new Map<number, ProfileLeadActor>();
+  const titlesByPerson = new Map<number, string[]>();
   for (const show of shows) {
     const minutes = minutesByShow.get(show.id);
     if (!minutes) continue;
@@ -174,10 +180,22 @@ export function buildLeadActors(viewings: readonly ProfileViewing[], shows: read
       const person = people.get(lead.id) || { ...lead, minutes: 0, titles: 0, favorites: 0 };
       person.minutes += minutes; person.titles++; if (show.isFavorite) person.favorites++;
       people.set(lead.id, person);
+      titlesByPerson.set(lead.id, [...(titlesByPerson.get(lead.id) || []), show.id]);
     }
   }
-  const ranked = [...people.values()].sort((a, b) => b.minutes - a.minutes || b.titles - a.titles || a.name.localeCompare(b.name));
-  return ranked.length >= 3 ? ranked.slice(0, 3) : [];
+  const ranked = [...people.values()].sort((a, b) => b.titles - a.titles || b.minutes - a.minutes || a.name.localeCompare(b.name));
+  const covered = new Set<string>();
+  const picked: ProfileLeadActor[] = [];
+  for (const person of ranked) {
+    const titles = titlesByPerson.get(person.id) || [];
+    if (!titles.some(title => !covered.has(title))) continue;
+    titles.forEach(title => covered.add(title));
+    picked.push(person);
+    if (picked.length === PROFILE_LEAD_LIMIT) break;
+  }
+  // Revue Codex #948 : une sélection diversifiée de une ou deux personnes reste affichée ; le repli global n'est
+  // utilisé qu'en l'absence totale de données.
+  return picked;
 }
 
 /** Trois premiers du générique, dans l'ordre TMDB ; pour une série, le cumul d'épisodes départage. */

@@ -34,7 +34,7 @@
 .moi-note{margin:0;font-size:13px;line-height:1.45;color:#d4d4d8}
 .moi-note b{color:#fff}
 .moi-import{margin:0;font-size:12px;line-height:1.4;color:#71717a}
-.moi-where{display:grid;grid-template-columns:86px 1fr auto;gap:10px;align-items:center}
+.moi-where{display:grid;grid-template-columns:104px 1fr auto;gap:10px;align-items:center}
 .moi-where>small{min-width:40px;font-size:12px;font-weight:700;color:#a1a1aa;text-align:right;white-space:nowrap}
 .moi-track{height:8px;border-radius:4px;background:#232327;overflow:hidden}
 .moi-track>i{display:block;height:100%;border-radius:inherit;background:#E5A93D}
@@ -59,7 +59,7 @@
 .moi-next>small{font-size:12.5px;color:#8b8b94}
 @keyframes moFade{from{opacity:0}to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.moi-panel{animation:none}}
-.moi-where>span{font-size:13px;font-weight:700;color:#e4e4e7;overflow-wrap:anywhere}
+.moi-where>span{font-size:13px;font-weight:700;color:#e4e4e7;overflow-wrap:normal;word-break:normal;hyphens:none}
 .moi-where[data-strong=true]>span,.moi-where[data-strong=true]>small{color:#F2C36B}
 /* SEENIT-PROFILE-001 : page unique. */
 .moi-home-top{display:flex;flex-direction:column;gap:12px;padding:0 16px}
@@ -121,7 +121,7 @@
 .moi-fate-facts>span{padding:12px;border-radius:14px;background:rgba(11,11,13,.6);display:flex;flex-direction:column;gap:2px}.moi-fate-facts b{font-size:18px;font-weight:800}.moi-fate-facts small{font-size:12px;color:#a1a1aa}
 .moi-fate-item{display:flex;align-items:center;gap:12px;width:100%;min-height:66px;padding:0;border:0;background:transparent;color:#fff;text-align:left;cursor:pointer}
 .moi-fate-item--static{cursor:default}
-.moi-fate-item img,.moi-fate-poster,.moi-series-month img{width:44px;height:66px;flex-shrink:0;border-radius:9px;object-fit:cover;background:#1C1C1F}
+.moi-fate-item img,.moi-fate-poster,.moi-series-month img,.moi-top-row img{width:44px;height:66px;flex-shrink:0;border-radius:9px;object-fit:cover;background:#1C1C1F}
 .moi-fate-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}.moi-fate-text>strong{font-size:15px;font-weight:700;overflow-wrap:anywhere}.moi-fate-text>small{font-size:12px;color:#a1a1aa}
 .moi-fate-text .moi-track{height:6px;border-radius:3px}.moi-track>i[data-muted=true]{background:#71717a}
 .moi-fate-action{flex-shrink:0;min-height:44px;padding:0 14px;border-radius:14px;background:#1C1C1F;box-shadow:inset 0 0 0 1px rgba(229,169,61,.5);color:#F2C36B;font-size:13.5px;font-weight:800;display:flex;align-items:center}
@@ -186,9 +186,9 @@ i[data-level="1"]{background:rgba(229,169,61,.3)}i[data-level="2"]{background:rg
 .moi-stack{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;transform-origin:center bottom}
 .moi-stack>i{display:block;border-radius:3px}.moi-stack>i[data-kind=movie]{background:#e4e4e7}.moi-stack>i[data-kind=tv]{background:#E5A93D}.moi-stack>i[data-kind=empty]{height:2px;background:#2a2a2f}
 .moi-stack>small{margin-top:4px;font-size:11px;font-weight:700;color:#a1a1aa;text-align:center}
-.moi-top-row{display:flex;align-items:center;gap:12px;min-height:48px}
+.moi-top-row{display:flex;align-items:center;gap:12px;min-height:66px}
 .moi-top-row>b{width:18px;font-size:18px;font-weight:800;color:#a1a1aa}.moi-top-row>b[data-podium=true]{color:#F2C36B}
-.moi-top-row>span{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.moi-top-row strong{font-size:14.5px;font-weight:700;overflow-wrap:anywhere}.moi-top-row small{font-size:12px;color:#a1a1aa}
+.moi-top-row>.moi-fate-text{flex:1;min-width:0}.moi-top-row strong{font-size:14.5px;font-weight:700;overflow-wrap:anywhere}.moi-top-row small{font-size:12px;color:#a1a1aa}
 /* SEENIT-PROFILE-005 : animations à l'entrée dans l'écran, uniquement transform et opacity. */
 .moi-reveal{transition:opacity .6s ease,transform .6s cubic-bezier(.2,.8,.2,1)}
 .moi-reveal[data-seen=false]{opacity:0;transform:translateY(22px)}
@@ -208,3 +208,6 @@ i[data-level="1"]{background:rgba(229,169,61,.3)}i[data-level="2"]{background:rg
 @keyframes moiText{0%,100%{opacity:1}50%{opacity:.72}}
 @keyframes moiSweep{0%{transform:translateX(-100%)}60%,100%{transform:translateX(180%)}}
 @media (prefers-reduced-motion:reduce){.moi-reveal,.moi-reveal *,.moi-dial *,.moi-glow::after,.moi-sweep::after{animation:none !important;transition:none !important}.moi-reveal[data-seen=false],.moi-reveal[data-seen=false] *{opacity:1 !important;transform:none !important}.moi-dial[data-play=false] .moi-dial-sector{opacity:1;transform:none}}
+/* Retour terrain v1.4.291 : pas de grand vide en bas des pages de Moi. */
+.moi-root .moi-panel:last-child,.moi-root .moi-library{padding-bottom:0}
+.moi-root .home-load-more:last-child{margin-bottom:8px}

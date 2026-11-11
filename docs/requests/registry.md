@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-11-006 | 2026-11-11 | Retour v1.4.291 : « Quand tu regardes » ne doit pas refléter l'heure où l'on marque Vu ; têtes d'affiche variées (pas que Lioness) ; plus d'animation sur les badges ; top de l'année avec affiche et chiffres clairs ; « Paramount+ » non coupé ; moins de vide en bas des pages de Moi. | `SEENIT-PROFILE-003`, `SEENIT-PROFILE-004`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
 | USR-2026-11-11-003 | 2026-11-11 | Maquettes Moi validées : page unique sans onglets, Ma liste en étagères avec badge rouge-rose FILM / indigo SÉRIE et filtre, cartes au gabarit d'Explorer (titre blanc, taille constante), barres chiffrées et mois en cours visible. | `SEENIT-PROFILE-001`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
 | USR-2026-11-11-004 | 2026-11-11 | « En pause » = 60 jours sans épisode vu ; badges à niveaux et têtes d'affiche acceptés ; « Ton année en séries » sans films ni notes ; plus de ligne « Autres » dans Où tu regardes. | `SEENIT-PROFILE-002`, `SEENIT-PROFILE-003`, `SEENIT-PROFILE-004`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
 | USR-2026-11-11-005 | 2026-11-11 | Mes chiffres et Mon année animés « woaw » (cadran, barres, lueurs, halo discret sur la dernière semaine) ; aucune animation ajoutée sur Séries laissées en route ni sur l'accueil. | `SEENIT-PROFILE-005`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
