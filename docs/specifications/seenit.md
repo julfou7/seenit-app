@@ -1592,12 +1592,14 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   cache hors ligne et synchronisation restent explicites. Les films affichent six billets puis Voir en liste, avec pagination par douze ; toucher le tampon Vu annule le marquage.
 - **SEENIT-UX-022** — Films à voir ([handoff](../design/refonte-moi-films-explorer-2026-11-11.md), #942).
   Trois tris remplacent la mention « Ajouts les plus récents » : Récents (défaut, ordre d'ajout de
-  `SEENIT-UX-016`), Mieux notés (note TMDB décroissante, film sans note en dernier) et Chez moi (films
-  disponibles sur une plateforme choisie du compte ou sur son Plex ; les diffuseurs inconnus sont chargés
-  en un lot groupé). Au-dessus des billets, dans les deux présentations, la carte « À l'affiche » tire au
+  `SEENIT-UX-016`), Mieux notés (note TMDB décroissante, film sans note en dernier ; les notes manquantes
+  sont lues dans le cache disque puis chez TMDB, deux à la fois) et Chez moi (films disponibles sur une
+  plateforme choisie du compte ou sur son Plex ; sans plateforme choisie, seul le Plex compte ; les
+  diffuseurs inconnus ou périmés sont rechargés en un lot groupé). Au-dessus des billets, dans les deux présentations, la carte « À l'affiche » tire au
   hasard un film parmi les dix mieux notés de la liste, sortis et non vus ; elle disparaît sous trois films
   éligibles, ne parle jamais de « ce soir » et reste stable jusqu'au prochain tirage demandé. Chaque billet
-  montre la note sur l'affiche et « durée · genre » ; aucun titre, accroche acteur ni diffuseur n'est coupé.
+  montre la note sur l'affiche et « durée · genre » ; aucun titre, accroche acteur ni diffuseur n'est coupé
+  (le billet horizontal mesure au moins 150 px, la hauteur de la carte série).
   Un film dont la date de sortie est future affiche « sortie dans N j » et n'a aucun bouton Vu ; une date
   inconnue vaut sortie. Un film en salle affiche « au cinéma » et sa durée au lieu d'une heure de fin.
 - **SEENIT-UX-016** — Les cartes 8f et les tickets films réutilisent les écritures réversibles existantes.

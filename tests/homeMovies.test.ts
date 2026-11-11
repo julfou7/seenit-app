@@ -71,3 +71,11 @@ test('SEENIT-UX-022 l’accueil branche tri, À l’affiche, billets sans coupe 
   assert.match(css, /SEENIT-UX-022[^]*\.movie-ticket h3,\.movie-ticket--poster > h3 \{ display:block; height:auto; min-height:0; overflow:visible; -webkit-line-clamp:unset/);
   assert.doesNotMatch(read('src/components/cards/FeaturedMovieCard.tsx'), /ce soir/i);
 });
+
+test('SEENIT-UX-022 revue Codex #943 : notes chargées pour toute la liste, Chez moi sans plateforme = Plex seul, diffuseurs périmés réactualisés', () => {
+  const section = read('src/screens/WatchNextSection.tsx');
+  assert.match(section, /const missingDetailsKey = orderedMovies\.filter\(show => show\.tmdbId && !movieDetails\(show\)\)/);
+  assert.match(section, /primeMediaRenderSnapshotFromPersistentCache\(id, 'movie'\)\) && current\) await tmdb\.getMovieDetails\(id\)/);
+  assert.match(section, /if \(!preferredPlatforms\.length\) return false;/);
+  assert.match(section, /!readWatchProviderCache\(show\.tmdbId, 'movie'\)\)\.map\(show => show\.tmdbId\)/, 'un cache périmé est rechargé');
+});

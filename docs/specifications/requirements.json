@@ -3943,6 +3943,10 @@
         {
           "file": "tests/homeMovies.test.ts",
           "contains": "SEENIT-UX-022 l’accueil branche tri, À l’affiche, billets sans coupe et pas de Vu avant la sortie"
+        },
+        {
+          "file": "tests/homeMovies.test.ts",
+          "contains": "SEENIT-UX-022 revue Codex #943 : notes chargées pour toute la liste, Chez moi sans plateforme = Plex seul, diffuseurs périmés réactualisés"
         }
       ]
     },

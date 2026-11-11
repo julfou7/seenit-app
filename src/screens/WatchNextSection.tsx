@@ -99,6 +99,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const [movieSort, setMovieSort] = useState<HomeMovieSort>('recent');
   const [featured, setFeatured] = useState<{ seed: number; id: string | null }>(() => ({ seed: Math.floor(Math.random() * 1_000), id: null }));
   const [, setProviderRevision] = useState(0);
+  const [, setDetailsRevision] = useState(0);
   const plexCache = usePlexAvailabilityStore(state => state.cache);
   const activeRef = useRef(active); activeRef.current = active;
   const mounted = useRef(true);
@@ -178,9 +179,11 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     return facts;
   };
   const preferredPlatforms = readUserScopedJson<number[]>(auth.currentUser?.uid ?? null, 'platforms', []);
+  // Revue Codex #943 : sans plateforme choisie, seul le Plex du compte compte comme « chez moi ».
   const movieAtHome = (show: Show) => {
     if (!show.tmdbId) return false;
     if (plexCache[getPlexMediaKey(show.tmdbId, 'movie')]?.available) return true;
+    if (!preferredPlatforms.length) return false;
     const results = tmdb.peekWatchProviders(show.tmdbId, 'movie')?.results ?? readWatchProviderCache(show.tmdbId, 'movie', { allowStale: true })?.data?.results;
     return Boolean(extractOfficialStreamingProvider(results, preferredPlatforms));
   };
@@ -193,8 +196,24 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
     const seed = nextFeaturedSeed(featuredPool, previous.seed, featuredId);
     return { seed, id: featuredPool[seed]?.id ?? null };
   });
-  // « Chez moi » charge en un lot groupé les diffuseurs encore inconnus, puis recalcule le filtre une seule fois.
-  const missingProviderKey = movieSort === 'home' ? orderedMovies.filter(show => show.tmdbId && !tmdb.peekWatchProviders(show.tmdbId, 'movie') && !readWatchProviderCache(show.tmdbId, 'movie', { allowStale: true })).map(show => show.tmdbId).join(',') : '';
+  // « Chez moi » charge en un lot groupé les diffuseurs inconnus ou périmés (revue Codex #943), puis recalcule le filtre
+  // une seule fois ; un cache périmé sert en attendant sa réactualisation.
+  const missingProviderKey = movieSort === 'home' && preferredPlatforms.length ? orderedMovies.filter(show => show.tmdbId && !tmdb.peekWatchProviders(show.tmdbId, 'movie') && !readWatchProviderCache(show.tmdbId, 'movie')).map(show => show.tmdbId).join(',') : '';
+  // Revue Codex #943 : la note de chaque film est lue (cache disque puis TMDB, deux à la fois) avant de classer
+  // « Mieux notés » ou de tirer « À l'affiche », même sur un appareil sans cache.
+  const missingDetailsKey = orderedMovies.filter(show => show.tmdbId && !movieDetails(show)).map(show => show.tmdbId).join(',');
+  useEffect(() => {
+    if (!missingDetailsKey || !active) return;
+    let current = true;
+    const queue = missingDetailsKey.split(',').map(Number);
+    const worker = async () => {
+      for (let id = queue.shift(); current && id !== undefined; id = queue.shift()) {
+        if (!(await tmdb.primeMediaRenderSnapshotFromPersistentCache(id, 'movie')) && current) await tmdb.getMovieDetails(id);
+      }
+    };
+    void Promise.allSettled([worker(), worker()]).then(() => { if (current) setDetailsRevision(value => value + 1); });
+    return () => { current = false; };
+  }, [missingDetailsKey, active]);
   useEffect(() => {
     if (!missingProviderKey || !active) return;
     let current = true;
@@ -333,7 +352,7 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
         {([['recent', 'Récents'], ['rated', 'Mieux notés'], ['home', 'Chez moi']] as const).map(([value, label]) => <button key={value} type="button" aria-pressed={movieSort === value} onClick={() => setMovieSort(value)}>{label}</button>)}
       </div>
       {featuredShow && <FeaturedMovieCard show={featuredShow} facts={movieFacts(featuredShow)} runtime={movieRuntime(featuredShow, movieDetails(featuredShow))} onOpen={ticketOpen} onShuffle={shuffleFeatured} canShuffle={featuredPool.length > 1} />}
-      {visibleMovies.length === 0 && <p className="home-movie-empty">Aucun de tes films à voir n’est disponible sur tes plateformes ou ton Plex pour l’instant.</p>}
+      {visibleMovies.length === 0 && <p className="home-movie-empty">{preferredPlatforms.length ? 'Aucun de tes films à voir n’est disponible sur tes plateformes ou ton Plex pour l’instant.' : 'Choisis tes plateformes dans les Réglages : « Chez moi » ne montre pour l’instant que ton Plex.'}</p>}
       <div className={movieList ? 'home-movie-list' : 'movie-ticket-rail'} id="films-a-voir-18c">
         {visibleMovies.slice(0, movieList ? movieCount : movieRailLimit).map(show => <MovieTicketCard key={show.id} show={show} layout={movieList ? 'horizontal' : 'poster'} start={start} onOpen={ticketOpen} onToggle={ticketToggle} onRuntime={onRuntime} actor={ticketActor(show)} onActor={openActorSheet} />)}
         {!movieList && <HomeLoadMore tile items={visibleMovies.slice(movieRailLimit)} onLoad={() => { rememberReveal('films-a-voir-18c'); setMovieRailLimit(count => count + HOME_PAGE_SIZE); }} />}
