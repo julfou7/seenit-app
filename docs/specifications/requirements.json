@@ -4012,6 +4012,10 @@
       "tests": [
         {
           "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-002 #945 #946 : Reprendre ouvre la fiche par TMDB, les séries presque finies restent accessibles"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-002 en pause = 60 jours sans épisode vu, avec la même fonction que l’accueil"
         },
         {

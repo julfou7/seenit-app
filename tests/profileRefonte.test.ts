@@ -342,3 +342,12 @@ test('SEENIT-PROFILE-006 retour terrain v1.4.294 : les rendez-vous réguliers re
   assert.equal((read('src/components/CsvImporter.tsx').match(/source: VIEWING_SOURCE_TVTIME/g) || []).length, 3);
   assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /<Head title="Tes rendez-vous" note="semaine après semaine" \/>/);
 });
+
+test('SEENIT-PROFILE-002 #945 #946 : Reprendre ouvre la fiche par TMDB, les séries presque finies restent accessibles', () => {
+  const screen = read('src/screens/ProfileScreen.tsx');
+  assert.match(screen, /onOpen=\{show => \{ if \(show\.tmdbId\) onShowClick\?\.\(String\(show\.tmdbId\), 'tv'\); \}\}/);
+  assert.doesNotMatch(screen, /onShowClick\?\.\(show\.id, 'tv'\)/);
+  assert.match(read('src/components/profile/MoiYearCard.tsx'), /if \(left <= 0 && nearlyDone <= 0\) return null;/);
+  assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /\(fateSummary\.left\.length > 0 \|\| fateSummary\.nearlyDone\.length > 0\) && <Reveal/);
+  assert.match(read('src/components/ProfileYearStory.tsx'), /fates\.paused > 0 \|\| fates\.dropped > 0 \|\| nearlyDoneCount > 0/);
+});

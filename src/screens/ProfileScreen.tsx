@@ -51,7 +51,8 @@ const ProfileYearContent = React.memo(function ProfileYearContent({ onFate }: { 
 
 const ProfileFateContent = React.memo(function ProfileFateContent({ onShowClick }: { onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void }) {
   const { entries } = useSeriesFate();
-  return <SeriesFateScreen entries={entries} onOpen={show => onShowClick?.(show.id, 'tv')} />;
+  // #945 : l'ouverture de fiche attend l'identifiant TMDB (openTmdbMedia), jamais l'identifiant du document.
+  return <SeriesFateScreen entries={entries} onOpen={show => { if (show.tmdbId) onShowClick?.(String(show.tmdbId), 'tv'); }} />;
 });
 
 const MoiHome = React.memo(function MoiHome({ onPage, onShowClick }: { onPage: (page: ProfilePage) => void; onShowClick: (id: string, mediaType?: 'tv' | 'movie') => void }) {
