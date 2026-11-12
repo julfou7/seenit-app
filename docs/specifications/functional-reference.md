@@ -598,6 +598,9 @@ a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un
 or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, genres et thèmes sont sous le synopsis, tout est
 traduit (genres, « Self »), Où regarder n'affiche qu'un Netflix, la barre de navigation reste visible sur la
 fiche et une seule fiche acteur est utilisée partout (fiches, Explorer, Moi, À voir).
+La fiche acteur laisse la barre de navigation visible (changer d'onglet la ferme) ; « Vus ensemble » et sa
+filmographie prennent la carte habituelle de Ma liste et d'Explorer, et ses filtres Tout · Films · Séries · Non vus
+les pastilles de l'accueil.
 Depuis les retours de la v1.4.251 (#857) :
 - la note TMDB, l'âge et le bouton entier **Bande-annonce** sont en tête de fiche, au-dessus de
   **Marquer vu** (film) ou de la carte de progression (série) ;

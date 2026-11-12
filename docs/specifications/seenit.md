@@ -685,6 +685,10 @@ n'est rouverte que par une nouvelle décision produit explicite.
     font qu'un), sur la fiche comme sur l'épisode ;
   - la fiche média garde la barre de navigation ; seuls les dialogues plein écran la masquent ;
   - une seule fiche acteur dans toute l'app : fiches, Explorer, Moi et À voir ouvrent celle des billets ;
+    retour v1.4.295 : comme les fiches média et épisode, elle laisse la barre de navigation au-dessus d'elle
+    (couche non bloquante) et changer d'onglet la ferme ; « Vus ensemble » et la filmographie utilisent la carte
+    habituelle d'Explorer (titre au jeton or, badge FILM/SÉRIE, état Vu actuel), avec le rôle dessous ;
+    les filtres Tout · Films · Séries · Non vus reprennent les pastilles de l'accueil (or quand elles sont actives) ;
   - le squelette de chargement reprend le gabarit des nouvelles fiches (même hero, mêmes cartes).
   Retours terrain v1.4.251 (04/11/2026, #857) :
   - la rangée note TMDB, âge et **Bande-annonce** passe au-dessus du bouton principal, au-dessus de

@@ -158,3 +158,4 @@ export function makePaginationBatch() {
 
 // SEENIT-UX-022 : le billet lit la preuve « au cinéma » ; les harnais n’en fournissent pas.
 export const isMovieAtCinema = (_media: unknown) => false;
+export const isMovieUpcoming = (media: { release_date?: string; first_air_date?: string } | null | undefined) => Boolean(media?.release_date && !media.first_air_date && media.release_date > new Date().toISOString().slice(0, 10));

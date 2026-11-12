@@ -8,7 +8,8 @@ import { useToastStore } from '../store/toastStore';
 import { useShowActions } from '../hooks/useShows';
 import { auth } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
-import { tmdb } from '../features/shows/tmdb';
+import { tmdb, type TMDBMedia } from '../features/shows/tmdb';
+import { GridMediaCard } from './GridMediaCard';
 import { cachedActorPerson, loadActorCredits, loadActorPerson, type ActorCredit } from '../features/people/actorCredits';
 import { actorAge, actorCreditKey, actorRole, partitionActorCredits } from '../features/people/actorProfile';
 import type { TicketActor } from '../features/people/movieActors';
@@ -29,7 +30,8 @@ interface Props {
   historyMode?: 'local' | 'external';
   onOpen: (id: number, type: 'tv' | 'movie') => void;
 }
-function SeenGlyph() { return <svg viewBox="0 0 100 74" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="6" y="4" width="88" height="56" rx="16" /><path d="M36 70H64M33 32 45 44 67 21" /></svg>; }
+// Retour terrain v1.4.295 : les titres de la fiche acteur prennent la carte habituelle (Ma liste, Explorer), avec son état Vu.
+const toMedia = (credit: ActorCredit): TMDBMedia => ({ id: credit.id, media_type: credit.media_type, title: credit.title, name: credit.name, poster_path: credit.poster_path || null, backdrop_path: credit.backdrop_path || null, release_date: credit.release_date, first_air_date: credit.first_air_date });
 const fromShow = (show: Show): ActorCredit => ({ id: show.tmdbId, media_type: show.mediaType, title: show.title, poster_path: show.posterPath, backdrop_path: show.backdropPath, release_date: show.firstAirDate });
 
 function Biography({ text }: { text: string }) {
@@ -57,7 +59,13 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
   const [adding, setAdding] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'movie' | 'tv'>('all');
   const [onlyUnseen, setOnlyUnseen] = useState(false), [limit, setLimit] = useState(9);
-  const filmographyReveal = useRevealFocus<HTMLElement>('.actor-profile__grid > button');
+  // Retour terrain v1.4.295 : la barre de navigation reste visible ; changer d'onglet ferme la fiche, comme les autres fiches.
+  useEffect(() => {
+    const close = () => onClose();
+    window.addEventListener('app-close-modals', close);
+    return () => window.removeEventListener('app-close-modals', close);
+  }, [onClose]);
+  const filmographyReveal = useRevealFocus<HTMLElement>('.actor-profile__grid > .actor-profile__card');
   const scroll = useRef<HTMLDivElement>(null), live = useRef(true), leaving = useRef(false);
   useEffect(() => {
     let current = true; live.current = true;
@@ -143,7 +151,7 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
     const logo = getFormattedProviderLogo(result.logo, result.name);
     return logo ? <img className="actor-profile__provider" src={logo} alt={result.name || 'Diffuseur'} /> : null;
   };
-  return <DialogLayer label={`Acteur : ${person?.name || actor.name}`} onDismiss={onClose} historyMode={historyMode} className="actor-profile-overlay">
+  return <DialogLayer label={`Acteur : ${person?.name || actor.name}`} onDismiss={onClose} historyMode={historyMode} blocking={false} className="actor-profile-overlay">
     <div className="actor-profile" ref={scroll} data-actor-profile>
       <header className="actor-profile__header">
         {backdrop && <img className="actor-profile__backdrop" src={imageUrl(backdrop, 'w780')!} alt="" />}
@@ -165,8 +173,8 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
           const end = credit.media_type === 'movie' ? movieEndTime(Date.now(), movieRuntime(show || {} as Show, details)) : null;
           return <div className="actor-profile__todo-row" data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)}><button type="button" className="actor-profile__todo-media" onClick={() => navigate(credit)}>{credit.poster_path && <img src={imageUrl(credit.poster_path)!} alt="" loading="lazy" />}<span><strong>{credit.title || credit.name}</strong><small>{provider(credit)}<span>{[actorRole(credit.character, person?.gender), credit.media_type === 'movie' ? end?.label ? end.label.replace(/^fin /, 'fin à ') : '' : details?.number_of_seasons ? `${details.number_of_seasons} saison${details.number_of_seasons > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</span></small></span></button>{show ? <span className="actor-profile__bookmark" aria-label="Dans ta liste"><Bookmark size={20} fill="currentColor" /></span> : <button type="button" className="actor-profile__add" disabled={adding !== null} onClick={() => void add(credit)}><Plus size={15} />{adding === actorCreditKey(credit) ? 'Ajout…' : 'À voir'}</button>}</div>;
         })}</div></section>}
-        {sections.seen.length > 0 && <section><h3>Vus ensemble</h3><div className="actor-profile__seen">{sections.seen.map(credit => <button data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)} type="button" onClick={() => navigate(credit)}><span className="actor-profile__seen-poster">{credit.poster_path && <img src={imageUrl(credit.poster_path)!} alt="" loading="lazy" />}<SeenGlyph /></span><strong>{credit.title || credit.name}</strong><small>{actorRole(credit.character, person?.gender)}</small></button>)}</div></section>}
-        {sections.rest.length > 0 && <section ref={filmographyReveal.containerRef} className="actor-profile__filmography"><h3>Sa filmographie</h3>{bothTypes && <div className="actor-profile__tabs" aria-label="Type de filmographie">{(['all', 'movie', 'tv'] as const).map(type => <button key={type} type="button" aria-pressed={filter === type} onClick={() => { setFilter(type); setLimit(9); }}>{type === 'all' ? 'Tout' : type === 'movie' ? 'Films' : 'Séries'}</button>)}</div>}{gridHasSeen && <label><input type="checkbox" checked={onlyUnseen} onChange={event => { setOnlyUnseen(event.target.checked); setLimit(9); }} /> Non vus</label>}<div className="actor-profile__grid">{grid.slice(0, limit).map(credit => <button data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)} type="button" onClick={() => navigate(credit)}><span>{credit.poster_path && <img src={imageUrl(credit.poster_path)!} alt="" loading="lazy" />}{seenKeys.has(actorCreditKey(credit)) ? <SeenGlyph /> : inList.has(actorCreditKey(credit)) ? <Bookmark size={18} /> : null}</span><strong>{credit.title || credit.name}</strong><small>{actorRole(credit.character, person?.gender)}</small><small>{(credit.release_date || credit.first_air_date || '').slice(0, 4)}</small></button>)}</div><LoadMore previews={grid.slice(limit, limit + 3).map(credit => ({ key: actorCreditKey(credit), initial: (credit.title || credit.name || '?')[0], imagePath: credit.poster_path }))} remainingCount={grid.length - limit} step={9} onLoad={() => { filmographyReveal.focusItem(limit); setLimit(value => value + 9); }} /></section>}
+        {sections.seen.length > 0 && <section><h3>Vus ensemble</h3><div className="actor-profile__seen">{sections.seen.map(credit => <div className="actor-profile__card" data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)}><GridMediaCard media={toMedia(credit)} show={inList.get(actorCreditKey(credit))} onShowClick={() => navigate(credit)} /><small>{actorRole(credit.character, person?.gender)}</small></div>)}</div></section>}
+        {sections.rest.length > 0 && <section ref={filmographyReveal.containerRef} className="actor-profile__filmography"><h3>Sa filmographie</h3>{(bothTypes || gridHasSeen) && <div className="actor-profile__tabs" role="group" aria-label="Filtrer la filmographie">{bothTypes && (['all', 'movie', 'tv'] as const).map(type => <button key={type} type="button" aria-pressed={filter === type} onClick={() => { setFilter(type); setLimit(9); }}>{type === 'all' ? 'Tout' : type === 'movie' ? 'Films' : 'Séries'}</button>)}{gridHasSeen && <button type="button" aria-pressed={onlyUnseen} onClick={() => { setOnlyUnseen(value => !value); setLimit(9); }}>Non vus</button>}</div>}<div className="actor-profile__grid">{grid.slice(0, limit).map(credit => <div className="actor-profile__card" data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)}><GridMediaCard media={toMedia(credit)} show={inList.get(actorCreditKey(credit))} onShowClick={() => navigate(credit)} /><small>{actorRole(credit.character, person?.gender)}</small></div>)}</div><LoadMore previews={grid.slice(limit, limit + 3).map(credit => ({ key: actorCreditKey(credit), initial: (credit.title || credit.name || '?')[0], imagePath: credit.poster_path }))} remainingCount={grid.length - limit} step={9} onLoad={() => { filmographyReveal.focusItem(limit); setLimit(value => value + 9); }} /></section>}
         {error && <p className="actor-profile__error">Certains détails sont indisponibles. <button type="button" onClick={() => { setError(false); setAttempt(value => value + 1); }}>Réessayer</button></p>}
         {person?.biography && <Biography text={person.biography} />}
       </div>

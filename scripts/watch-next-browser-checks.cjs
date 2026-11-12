@@ -97,8 +97,10 @@ async function testWatchNextHarness(client, root) {
     await evaluate(client, 'localStorage.removeItem("seenit_user:fixture-a:home_actor_credits_v4_fr_501")');
     await click(client, '[data-movie-ticket="movie-0"] .movie-actor-line');
     await check(client, 'document.querySelector(".actor-profile") && document.querySelector(".actor-profile h2").textContent==="Sean Astin" && window.__watch18c.telemetry.opens.length===window.__actorOpenBefore', 'acteur ouvre sa fiche complète sans ouvrir le film');
-    await check(client, 'window.__watch18c.telemetry.actorRequests===1 && document.querySelectorAll(".actor-profile__seen > button").length===8', 'filmographie à la demande et vrais titres vus');
-    await check(client, 'document.querySelector(".actor-profile__header").getBoundingClientRect().height===290 && document.querySelector(".actor-profile__portrait").getBoundingClientRect().width===96 && document.querySelectorAll(".actor-profile__upcoming .actor-upcoming").length===2 && document.querySelectorAll(".actor-profile__grid > button").length===9 && document.querySelectorAll(".actor-profile__tabs > button").length===3', 'fiche V4 complète : bandeau, portrait, Bientôt, grille et filtres conditionnels');
+    await check(client, 'window.__watch18c.telemetry.actorRequests===1 && document.querySelectorAll(".actor-profile__seen > .actor-profile__card").length===8 && document.querySelectorAll(".actor-profile__seen .seenit-media-title").length===8', 'filmographie à la demande et vrais titres vus');
+    await check(client, 'document.querySelector(".actor-profile__header").getBoundingClientRect().height===290 && document.querySelector(".actor-profile__portrait").getBoundingClientRect().width===96 && document.querySelectorAll(".actor-profile__upcoming .actor-upcoming").length===2 && document.querySelectorAll(".actor-profile__grid > .actor-profile__card").length===9 && document.querySelectorAll(".actor-profile__tabs > button").length>=3', 'fiche V4 complète : bandeau, portrait, Bientôt, grille et filtres conditionnels');
+    await check(client, 'getComputedStyle(document.querySelector(".actor-profile__tabs > button[aria-pressed=true]")).backgroundColor==="rgb(229, 169, 61)"', 'filtres de filmographie au style des filtres de l’accueil (retour v1.4.295)');
+    await check(client, 'Number(getComputedStyle(document.querySelector(".actor-profile-overlay")).zIndex)<160', 'barre de navigation au-dessus de la fiche acteur (retour v1.4.295)');
     await check(client, '(()=>{const keys=[...document.querySelectorAll("[data-actor-credit]")].map(el=>el.dataset.actorCredit);return keys.length===new Set(keys).size})() && !document.querySelector(".actor-profile__chips") && [...document.querySelectorAll(".actor-profile__grid small")].some(el=>el.textContent.includes("· voix"))', 'sections disjointes, rôles normalisés et compteurs concentrés dans Ton lien');
     await evaluate(client,'window.__watch18c.telemetry.holdAddNext=true');
     await click(client, '[data-actor-credit="movie:998"] .actor-upcoming__reminder');
@@ -112,7 +114,7 @@ async function testWatchNextHarness(client, root) {
     await check(client, 'document.querySelector(".actor-profile__bio button")', 'Lire la suite seulement pour une bio qui déborde');
     await check(client, '(()=>{const more=document.querySelector(".actor-profile__filmography [data-load-more]")?.textContent||"";return more.includes("Afficher les 9")&&!more.includes("en attente")})()', 'filmographie : le seul « Afficher plus » de l’app, sans compte répété (#873, 08/11)');
     await click(client, '.actor-profile__filmography [data-load-more]');
-    await check(client, 'document.querySelectorAll(".actor-profile__grid > button").length>9', 'filmographie neuf puis neuf');
+    await check(client, 'document.querySelectorAll(".actor-profile__grid > .actor-profile__card").length>9', 'filmographie neuf puis neuf');
     await click(client, '.actor-profile__heart');
     await check(client, 'document.querySelector(".actor-profile__heart").getAttribute("aria-pressed")==="true"', 'favori écrit dans le vrai store partagé');
     await click(client, '.actor-profile__add');
