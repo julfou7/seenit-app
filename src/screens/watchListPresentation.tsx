@@ -11,6 +11,7 @@ import { HistoryFeed } from '../components/HistoryFeed';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { tmdb } from '../features/shows/tmdb';
 import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
+import { OriginalBroadcasterLabel } from '../components/OriginalBroadcasterLabel';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { User, Circle, CheckCircle2, Trash2, Archive, X, Clock, Ban } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
@@ -252,7 +253,7 @@ function ExpandedLegacyItemCard({ show, sectionType, onShowClick, onEpisodeClick
   const singleGenre = movieGenres[0] || '';
 
   // 3 Acteurs principaux
-  const topCast: any[] = (movieDetails?.credits?.cast || []).slice(0, 3);
+  const topCast: Array<{ id: number; name: string }> = (movieDetails?.credits?.cast || []).slice(0, 3);
 
   return (
     <div
@@ -266,7 +267,8 @@ function ExpandedLegacyItemCard({ show, sectionType, onShowClick, onEpisodeClick
 
       {networkLogo && (
         <div className="absolute top-0 right-0 z-30 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-xl p-1 flex items-center justify-center shrink-0 shadow-sm pointer-events-none">
-          <img src={networkLogo} alt="" className="w-5 h-5 object-contain rounded-[3px]" />
+          <img src={networkLogo} alt={providerName || 'Diffuseur'} className="w-5 h-5 object-contain rounded-[3px]" />
+          <OriginalBroadcasterLabel name={providerName} />
         </div>
       )}
 
@@ -327,7 +329,7 @@ function ExpandedLegacyItemCard({ show, sectionType, onShowClick, onEpisodeClick
             {topCast.length > 0 && (
               <div className="text-[11px] text-zinc-400 font-medium line-clamp-2 mt-0.5 min-w-0 leading-snug" onClick={(e) => e.stopPropagation()}>
                 <span className="text-zinc-500 mr-1 font-normal">Avec</span>
-                {topCast.map((actor: any, idx: number) => (
+                {topCast.map((actor, idx) => (
                   <span key={`actor_${actor.id}_${idx}`}>
                     <button
                       type="button"

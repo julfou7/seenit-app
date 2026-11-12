@@ -4,6 +4,7 @@ import { Calendar } from 'lucide-react';
 import { SeenItCheckButton } from './SeenItCheckButton';
 import { cn, getCalendarDaysDiff, formatAirDateSafe } from '../lib/utils';
 import type { Show } from '../types';
+import { OriginalBroadcasterLabel } from './OriginalBroadcasterLabel';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
 
@@ -99,7 +100,8 @@ export function EpisodeCard({ show, type, onShowClick, onMarkAsSeen }: EpisodeCa
 
       {networkLogo && (
         <div className="absolute top-0 right-0 z-30 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-xl p-1 flex items-center justify-center shrink-0 shadow-sm pointer-events-none">
-          <img src={networkLogo} alt="" className="w-5 h-5 object-contain rounded-[3px]" />
+          <img src={networkLogo} alt={providerName || 'Diffuseur'} className="w-5 h-5 object-contain rounded-[3px]" />
+          <OriginalBroadcasterLabel name={providerName} />
         </div>
       )}
 

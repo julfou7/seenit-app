@@ -8,6 +8,7 @@ import {
 import { tmdb, isMovieAtCinema, isMovieUpcoming, type TMDBMedia } from '../features/shows/tmdb';
 import { cn, checkIsUpToDate, computeAutoArchiveStatus, getTodayStr, getCalendarDaysDiff, formatAirDateSafe } from '../lib/utils';
 import { useShowsStore } from '../store/showsStore';
+import { OriginalBroadcasterLabel } from './OriginalBroadcasterLabel';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { usePassiveWatchProvider } from '../hooks/usePassiveWatchProvider';
 import { appLogger } from '../store/logStore';
@@ -238,7 +239,8 @@ export const GridMediaCard = React.memo(function GridMediaCard({
 
           {networkLogo && (
             <div className="absolute top-0 right-0 z-30 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-lg flex items-center justify-center shrink-0 p-1 shadow-sm pointer-events-none">
-              <img src={networkLogo} alt="" className="w-5 h-5 object-contain rounded-[3px]" />
+              <img src={networkLogo} alt={providerName || 'Diffuseur'} className="w-5 h-5 object-contain rounded-[3px]" />
+              <OriginalBroadcasterLabel name={providerName} />
             </div>
           )}
 

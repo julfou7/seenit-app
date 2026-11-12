@@ -1,5 +1,7 @@
 export const PLEX_LOGO_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="20" fill="%231F2326"/><path d="M30 20 L56 50 L30 80 L46 80 L72 50 L46 20 Z" fill="%23E5A00D"/></svg>`;
 
+export const CANAL_ORIGINAL_BROADCASTER_NAME = 'Canal+ · diffuseur d’origine';
+
 export const PROVIDER_BRAND_LOGOS = {
   netflix: '/brand/providers/netflix.png',
   canal: '/brand/providers/canalplus.png',

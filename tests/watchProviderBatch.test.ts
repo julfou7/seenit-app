@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import express, { type RequestHandler } from 'express';
 import { resolvePassiveProviderState } from '../src/features/providers/passiveProviderState.ts';
+import { CANAL_ORIGINAL_BROADCASTER_NAME } from '../src/utils/providerLogos.ts';
 import {
   WATCH_PROVIDER_BATCH_ITEM_BUDGET_PER_MINUTE,
   WATCH_PROVIDER_BATCH_MAX_CONCURRENT,
@@ -119,6 +121,21 @@ test('SEENIT-PROVIDER-002 distingue la fiche Canal+ du streaming', async t => {
   assert.equal(resolvePassiveProviderState('tv:335510', null, null, true, [381], source).name, 'Canal+ · diffuseur d’origine');
   assert.equal(resolvePassiveProviderState('tv:335510', null, null, true, [8], source).name, null);
   assert.equal(resolvePassiveProviderState('tv:335510', null, { available: true }, true, [381], source).name, 'Plex');
+});
+
+test('SEENIT-PROVIDER-002 le badge d’origine expose un libellé visible distinct', async () => {
+  const bundle = await build({
+    entryPoints: ['src/components/OriginalBroadcasterLabel.tsx'],
+    bundle: true, write: false, platform: 'node', format: 'cjs', jsx: 'automatic',
+    external: ['react', 'react/jsx-runtime'],
+  });
+  const module = { exports: {} as { OriginalBroadcasterLabel: (props: { name: string }) => React.ReactElement | null } };
+  const require = createRequire(import.meta.url);
+  vm.runInNewContext(bundle.outputFiles[0].text, { module, require });
+  const { OriginalBroadcasterLabel } = module.exports;
+  const { renderToStaticMarkup } = require('react-dom/server') as typeof import('react-dom/server');
+  assert.match(renderToStaticMarkup(OriginalBroadcasterLabel({ name: CANAL_ORIGINAL_BROADCASTER_NAME })), />Origine<\/span>/);
+  assert.equal(OriginalBroadcasterLabel({ name: 'Canal+' }), null);
 });
 
 test('SEENIT-PROVIDER-002 #853 les cartes visibles ensemble partagent une requête, avec repli titre par titre', async () => {
