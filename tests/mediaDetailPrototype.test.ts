@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { averageRating, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
+import { averageRating, reliableEpisodeRatings, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
 import { buildVerifiedSimilar, directedMovies, movieIdsFromCredits, similarReasonFor } from '../src/features/shows/similarReasons.ts';
 
 test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée', () => {
@@ -34,6 +34,13 @@ test('SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules note
   assert.equal(ratingBarHeight(9.6, [8, 9.6]), 40);
   assert.equal(ratingBarHeight(8, [8, 9.6]), 6);
   assert.equal(ratingBarHeight(undefined, [8, 9.6]), 6, 'note absente : barre minimale, jamais inventée');
+  // Retour v1.4.300 (Le Gang des souris vertes) : deux épisodes notés 10 par une poignée de votes ne font pas une « moyenne 10,0 ».
+  assert.deepEqual(reliableEpisodeRatings([{ vote_average: 10, vote_count: 2 }, { vote_average: 10, vote_count: 1 }, { vote_average: 0, vote_count: 0 }]), [0, 0, 0]);
+  assert.equal(averageRating(reliableEpisodeRatings([{ vote_average: 10, vote_count: 2 }, { vote_average: 0, vote_count: 0 }])), null);
+  assert.deepEqual(reliableEpisodeRatings([{ vote_average: 8.4, vote_count: 12 }, { vote_average: 7 }, { vote_average: 9, vote_count: 2 }]), [8.4, 7, 0], 'sans vote_count connu, la note reste');
+  const seasonPanel = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
+  assert.match(seasonPanel, /const mean = episodes \? averageRating\(ratings\) : \(season\.vote_average/);
+  assert.match(seasonPanel, /ratingBarHeight\(ratings\[index\], ratings\)/);
 });
 
 const director = { name: 'Denis Villeneuve', movieIds: new Set([335984, 329865]) };

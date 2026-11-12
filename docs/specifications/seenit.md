@@ -656,7 +656,8 @@ n'est rouverte que par une nouvelle décision produit explicite.
     cerclée d'or sur fond sombre, « Bientôt » en bleu) ; carte de la saison (barres de notes,
     **Tout marquer vu / non vu**, bande-annonce de saison) et lignes d'épisode (vignette libre de tout
     repère, code « Sxx | Eyy » en or, bleu à venir, gris vu, puis durée ou date ; la note reste dans les
-    barres de la saison ; coche 44 px) ; **Où regarder** en lignes ; **Personnages** (personnage,
+    barres de la saison ; coche 44 px ; retour v1.4.300 : une note d'épisode portée par moins de 3 votes TMDB ne compte
+    ni dans la moyenne ni dans les barres, et sans note fiable aucune moyenne n'est affichée) ; **Où regarder** en lignes ; **Personnages** (personnage,
     épisodes, présence, interprète ; six, puis dix par dix) ; univers TVDB ; catégories et thèmes ; Reddit.
   - **Film** : **Marquer vu** (annulable), signet **À voir**, bande-annonce ; « Si tu lances maintenant ·
     Fin à HH:MM » tant que le film est sorti, non vu et hors salle ; chips ; synopsis ; Où regarder ;

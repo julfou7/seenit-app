@@ -44,7 +44,9 @@ test('SEENIT-RATING-001 affiche les notes de saison et d’épisode uniquement d
   // Moyenne par saison : seasons[].vote_average TMDB ; barres de saison : episode.vote_average TMDB.
   assert.match(core, /seasonAverages\(tmdbDetails\?\.seasons\)/);
   assert.match(planning, /vote_average/);
-  assert.match(seriesSections, /episode\.vote_average/);
+  // Retour v1.4.300 : les notes d'épisode passent par reliableEpisodeRatings (TMDB seul, minimum de votes).
+  assert.match(seriesSections, /const ratings = reliableEpisodeRatings\(episodes \|\| \[\]\);/);
+  assert.match(planning, /Number\(episode\.vote_average\)/);
   assert.match(core, /★ \{tmdbRating\} TMDB/);
   assert.match(episodeDetail, /currentEpisode\?\.vote_average/);
   for (const source of [core, seriesSections, episodeSections, episodeDetail, planning]) assert.doesNotMatch(source, /getSeasonImdbRatings|getEpisodeImdbVotes|omdbService|episodeImdbRating|episodeImdbVotes|imdbRating/);
