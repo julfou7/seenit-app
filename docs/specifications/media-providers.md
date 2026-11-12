@@ -70,6 +70,8 @@ programme Canal+ France dans la fiche TMDB du même identifiant. Elle respecte M
 crée aucune offre dans `watch/providers`.
 Retour v1.4.301 : le badge reste le seul logo Canal+, sans libellé visible « Origine » (demande explicite de l'utilisateur) ;
 seul le nom accessible précise « diffuseur d’origine ».
+Retour v1.4.302 : la fiche série affiche le même diffuseur d'origine dans « Où regarder » (ligne Canal+ « Diffuseur
+d’origine en France », ouvrant la fiche programme canalplus.com de TMDB) au lieu de « Pas encore disponible en streaming ».
 Retour v1.4.300 : la copie locale des diffuseurs change de clé (`seenit_watch_providers_v2`) ; une copie v1, écrite
 avant l'attribution d'origine, n'est plus servie et son espace est libéré, pour que la carte redemande le lot au lieu de
 rester sans badge jusqu'à expiration (6 h, 7 jours en repli).

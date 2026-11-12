@@ -207,3 +207,15 @@ test('SEENIT-PROVIDER-002 retour v1.4.300 : une copie de cache écrite avant l�
   assert.equal(readWatchProviderCache(335510, 'tv', { now: 2_000, allowStale: true, storage }), null, 'la carte redemande le lot');
   assert.equal(values.has('seenit_watch_providers_v1'), false, 'l’ancienne copie est libérée');
 });
+
+test('SEENIT-PROVIDER-002 retour v1.4.302 : la fiche montre le même diffuseur d’origine Canal+ que la carte', () => {
+  // Terrain du 12/11 : la carte du Gang des souris vertes affichait Canal+, la fiche « Pas encore disponible en streaming ».
+  const core = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
+  assert.match(core, /setProviders\(cachedProviders\?\.results\?\.FR \|\| null\); setOriginBroadcaster\(cachedProviders\?\.originalBroadcaster \?\? null\);/);
+  assert.match(core, /setProviders\(res\.value\.results\?\.FR \|\| \[\]\); setOriginBroadcaster\(res\.value\.originalBroadcaster \?\? null\);/);
+  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  assert.match(view, /origin=\{originBroadcaster === 'canal' \? \{ name: 'Canal\+', logo: PROVIDER_BRAND_LOGOS\.canal, link: \/\^https:/);
+  const card = readFileSync('src/screens/mediaDetail/detailUi.tsx', 'utf8');
+  assert.match(card, /Diffuseur d’origine en France/);
+  assert.match(card, /\{!loading && providers\.length === 0 && !origin && <p/, 'plus de « pas encore disponible » quand Canal+ diffuse');
+});

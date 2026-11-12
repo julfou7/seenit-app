@@ -34,7 +34,9 @@ test('SEENIT-PLEX-005 #954 : un Vu déjà connu sans date prouvée reçoit la da
   // Jamais : un Vu SeenIt, un Vu déjà Plex, un ancien Vu daté, ou sans date Plex prouvée.
   assert.equal(datePlexWatchedRecord({ watchedAt: 9, source: 'seenit' }, VIEWED), null);
   assert.equal(datePlexWatchedRecord({ watchedAt: 9, plexImported: true, watchedTimeKnown: true }, VIEWED), null, 'Vu Plex déjà daté à l’heure prouvée');
-  assert.equal(datePlexWatchedRecord({ watchedAt: 9 }, VIEWED), null);
+  // Retour v1.4.302 : un ancien Vu sans étiquette ni heure prouvée est daté ; seule une heure prouvée le protège.
+  assert.equal(datePlexWatchedRecord({ watchedAt: 9 }, VIEWED)?.watchedAt, VIEWED);
+  assert.equal(datePlexWatchedRecord({ watchedAt: 9, watchedTimeKnown: true }, VIEWED), null, 'heure prouvée sans étiquette : inchangé');
   assert.equal(datePlexWatchedRecord(undefined, null), null);
   assert.equal('plexImported' in (datePlexWatchedRecord(undefined, VIEWED) || {}), false, 'la date ne donne pas à Plex la propriété du Vu');
   const show = { episodeRecords: { movie: { watchedAt: 1, source: 'tvtime' } }, lastWatchedAt: 1 };
@@ -69,7 +71,8 @@ test('SEENIT-PLEX-005 retour v1.4.296 : la complète lit aussi l’historique de
   assert.equal(datePlexWatchedRecord({ watchedAt: 5, plexImported: true }, VIEWED)?.watchedAt, VIEWED);
   assert.equal(datePlexWatchedRecord({ watchedAt: 5, source: 'plex' }, VIEWED)?.watchedTimeKnown, true);
   assert.equal(datePlexWatchedRecord({ watchedAt: 5, plexImported: true, watchedTimeKnown: true }, VIEWED), null);
-  assert.equal(datePlexWatchedRecord({ watchedAt: 5 }, VIEWED), null, 'origine inconnue à l’heure connue : inchangé');
+  assert.equal(datePlexWatchedRecord({ watchedAt: 5 }, VIEWED)?.source, 'plex', 'origine inconnue sans heure prouvée : daté par Plex (journal v1.4.302)');
+  assert.equal(datePlexWatchedRecord({ watchedAt: 5, watchedTimeKnown: true, source: 'tvtime' }, VIEWED)?.watchedAt, VIEWED, 'un import TV Time est toujours daté');
 });
 
 test('SEENIT-PLEX-012 retour v1.4.297 : % de serveur stable (tailles de section connues d’emblée) et diagnostic de l’historique du compte', () => {
@@ -148,7 +151,7 @@ test('SEENIT-PLEX-005 retour v1.4.301 : un Vu Plex créé note si son heure est 
   const engine = read('src/features/plex/plexSyncEngine.ts');
   assert.equal((engine.match(/plexImported: true, watchedTimeKnown: provenViewedAt !== null,/g) || []).length, 4, 'les quatre créations de Vu Plex');
   assert.match(engine, /\$\{datedCount\} Vu daté\(s\) par Plex\.\$\{summarizePlexDatingSkips\(notDated\)\}/);
-  assert.equal(describePlexDatingSkip('Coco', { watchedAt: 9, watchedTimeKnown: true, plexImported: true }, VIEWED), 'Coco : déjà daté (plex)');
+  assert.equal(describePlexDatingSkip('Coco', { watchedAt: 9, watchedTimeKnown: true, plexImported: true }, VIEWED), 'Coco : heure déjà prouvée (plex)');
   assert.equal(describePlexDatingSkip('Le Robot sauvage', { watchedAt: 9, source: 'seenit' }, VIEWED), 'Le Robot sauvage : Vu SeenIt');
   assert.equal(describePlexDatingSkip('Mario', undefined, null), 'Mario : sans date Plex prouvée');
   assert.equal(summarizePlexDatingSkips([]), '');

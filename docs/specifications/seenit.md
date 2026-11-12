@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.302**
+Version applicative : **1.4.303**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -984,7 +984,11 @@ pour le cache des sagas et univers.
   Retour v1.4.301 : un Vu Plex d'une ancienne synchro, sans `watchedTimeKnown: true` (heure non prouvée, souvent l'instant de
   l'import), reçoit lui aussi la date prouvée de sa lecture ; une fois daté, il ne bouge plus. Chaque Vu créé par Plex
   enregistre si son heure est prouvée. Le bilan liste les Vus déjà connus restés sans date, avec la raison (sans date Plex
-  prouvée, Vu SeenIt, déjà daté et son origine).
+  prouvée, Vu SeenIt, heure déjà prouvée et son origine).
+  Retour v1.4.302 (journal terrain : « 75 déjà daté (origine inconnue) ») : seule une heure prouvée (`watchedTimeKnown: true`)
+  protège un Vu. Un ancien Vu sans étiquette ni heure prouvée reçoit la date prouvée de sa lecture Plex ; un import TV Time
+  l'est toujours ; un Vu marqué dans SeenIt jamais. Une ligne d'historique serveur sans identifiant (média supprimé, par
+  exemple Coco sur PC-JULIAN) reste impossible à dater sans titre.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite

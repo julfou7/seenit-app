@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.302",
+  "applicationVersion": "1.4.303",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -3595,6 +3595,10 @@
         {
           "file": "tests/watchProviderBatch.test.ts",
           "contains": "SEENIT-PROVIDER-002 retour v1.4.301 : le badge Canal+ d’origine ne porte plus de libellé « Origine »"
+        },
+        {
+          "file": "tests/watchProviderBatch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 retour v1.4.302 : la fiche montre le même diffuseur d’origine Canal+ que la carte"
         },
         {
           "file": "tests/watchProviderBatch.test.ts",

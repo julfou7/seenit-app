@@ -11,12 +11,11 @@ export function datePlexWatchedRecord(record: unknown, viewedAt: number | null):
   const current = record && typeof record === 'object' ? record as Record<string, unknown> : null;
   const source = viewingSourceOf(current);
   if (source === 'seenit') return null;
-  const watchedAt = Number(current?.watchedAt);
-  const dated = Number.isFinite(watchedAt) && watchedAt > 0 && current?.watchedTimeKnown !== false;
-  // Retour terrain v1.4.296 : un Vu Plex resté en « heure inconnue » reçoit lui aussi la date prouvée de sa lecture.
-  // Retour v1.4.301 : un Vu Plex d'une ancienne synchro (sans `watchedTimeKnown: true`, souvent daté de l'instant de
-  // l'import) n'a pas d'heure prouvée : la lecture Plex prouvée le date. Une fois daté, il ne bouge plus.
-  if (dated && source !== 'tvtime' && !(source === 'plex' && current?.watchedTimeKnown !== true)) return null;
+  // Retour v1.4.302 (journal terrain : « 75 déjà daté (origine inconnue) ») : seule une heure prouvée
+  // (`watchedTimeKnown: true`) protège un Vu. Un ancien Vu sans étiquette ni preuve d'heure — souvent l'instant de
+  // l'import ou du marquage — reçoit la date prouvée de sa lecture Plex, puis ne bouge plus. Un import TV Time est
+  // toujours daté par Plex ; un Vu marqué dans SeenIt ne l'est jamais.
+  if (current?.watchedTimeKnown === true && source !== 'tvtime') return null;
   return { ...(current || {}), watchedAt: viewedAt, watchedTimeKnown: true, source: VIEWING_SOURCE_PLEX };
 }
 
@@ -42,7 +41,7 @@ export function readPlexAccountProgress(stats: unknown): { history: number; unwa
 export function describePlexDatingSkip(title: unknown, record: unknown, viewedAt: number | null): string {
   const current = record && typeof record === 'object' ? record as Record<string, unknown> : null;
   const source = viewingSourceOf(current);
-  const reason = viewedAt === null ? 'sans date Plex prouvée' : source === 'seenit' ? 'Vu SeenIt' : `déjà daté (${source || 'origine inconnue'})`;
+  const reason = viewedAt === null ? 'sans date Plex prouvée' : source === 'seenit' ? 'Vu SeenIt' : `heure déjà prouvée (${source || 'origine inconnue'})`;
   return `${typeof title === 'string' && title ? title : 'Titre'} : ${reason}`;
 }
 

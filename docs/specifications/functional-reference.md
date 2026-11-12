@@ -445,7 +445,8 @@ ni journée record, ni heure de soirée. « Tes rendez-vous » met en valeur les
 TV Time reste hors des chiffres par période ; les anciens Vu sans origine ne sont pas réétiquetés. Le panneau de synchro Plex complète affiche « N vus sur M » médias lus par serveur, la ligne « Historique du compte »
 (visionnages lus dans le Watch History Plex) et le nombre de Vu datés par Plex. Un film regardé puis supprimé du serveur
 reste vu grâce à l'historique du compte, avec sa date de lecture. Un Vu Plex importé par une ancienne synchro sans heure prouvée reçoit
-la date prouvée de sa lecture Plex, puis ne bouge plus (`SEENIT-PLEX-005`). Les totaux
+la date prouvée de sa lecture Plex, puis ne bouge plus (`SEENIT-PLEX-005`) ; depuis la v1.4.303, il en va de même pour
+tout ancien Vu sans heure prouvée ni étiquette SeenIt. Les totaux
 (épisodes, films, séries terminées) comptent tout, et une note dit ce qui a été écarté (`SEENIT-PROFILE-006`).
 Une série finie compte comme terminée même archivée. Les badges
 ont des paliers : Centenaire (visionnages) 100, 500, 1 000, 2 500, 5 000, 7 500, 10 000 ; Oiseau de nuit
@@ -473,7 +474,9 @@ puis Plex disponible, puis un autre diffuseur public. Décocher/recocher une pla
 cartes déjà montées immédiatement. L'hydratation cloud démarre avec la session, préserve le miroir local
 pendant son attente et ne remplace pas une bascule faite entre-temps. Les anciens réseaux de production
 ne remplacent pas une preuve TMDB de streaming ; aucun passage par Réglages ni purge de cache n'est requis.
-Une série Canal+ sans offre de streaming TMDB affiche le seul logo Canal+, sans libellé « Origine » (v1.4.302).
+Une série Canal+ sans offre de streaming TMDB affiche le seul logo Canal+, sans libellé « Origine » (v1.4.302), et sa fiche
+liste Canal+ dans « Où regarder » (« Diffuseur d’origine en France », vers la fiche programme) au lieu de « Pas encore
+disponible en streaming » (v1.4.303).
 
 Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
 Le Profil n'expose pas d'action « Partager » : aucun profil public n'existe et aucune donnée de profil
