@@ -169,7 +169,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       }
       if (auth.currentUser?.uid !== user.uid) throw new Error('Compte SeenIt modifié pendant la synchronisation Plex');
     };
-    // // appLogger.info('plex', `Démarrage de la synchronisation Plex (${delta ? 'Mode Delta / Rapide' : 'Mode Complet'})...`);
     if (!silent) {
       publishStatus({
         message: delta
