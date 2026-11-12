@@ -299,6 +299,11 @@ test('SEENIT-PROFILE-003 retour terrain v1.4.294 : douze mois glissants par déf
   assert.equal(stats.months[11], 45, 'décembre 2025 reste à sa place de décembre');
   assert.equal(stats.months[10], 45, 'novembre 2026 seulement, pas novembre 2025');
   assert.equal(stats.minutes, 90);
+  // Revue Codex #953 : un visionnage d'aujourd'hui sans heure (midi par défaut) compte dès le matin ; demain, jamais.
+  const morning = at(2026, 10, 12, 8);
+  const noonUnknown = view('b', at(2026, 10, 12, 12), 100, 'movie', 'b', false);
+  const tomorrowUnknown = view('c', at(2026, 10, 13, 12), 100, 'movie', 'c', false);
+  assert.equal(buildProfileRollingStats([noonUnknown, tomorrowUnknown], morning).minutes, 100);
   const dashboard = read('src/components/ProAnalyticsDashboard.tsx');
   assert.match(dashboard, /const rolling = pickedYear === null \|\|/);
   assert.match(dashboard, /periodLabel=\{rolling \? 'sur 12 mois' : undefined\}/);

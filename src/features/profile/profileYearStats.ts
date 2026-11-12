@@ -347,7 +347,9 @@ export function profileRollingWindowStart(now = Date.now()): number {
 
 export function profileRollingViewings(viewings: readonly ProfileViewing[], now = Date.now()): ProfileViewing[] {
   const from = profileRollingWindowStart(now);
-  return viewings.filter(viewing => viewing.watchedAt >= from && viewing.watchedAt <= now);
+  // Revue Codex #953 : une heure inconnue vaut midi ; on borne alors au jour, sans jamais compter un jour futur.
+  const endOfToday = new Date(now).setHours(23, 59, 59, 999);
+  return viewings.filter(viewing => viewing.watchedAt >= from && viewing.watchedAt <= (viewing.timeKnown ? now : endOfToday));
 }
 
 export function profileRollingMonthYears(now = Date.now()): number[] {
