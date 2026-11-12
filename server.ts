@@ -1319,8 +1319,9 @@ async function startServer() {
           // #954 : le fil « Activité » de Plex (« Vous avez regardé … ») porte la date de chaque visionnage ; il date les
           // entrées du Watch History par GUID exact, jamais par titre.
           let activityError: string | undefined;
+          // Revue Codex #963 : les dates déjà lues restent appliquées même si une page suivante échoue.
+          const dates = new Map<string, number>();
           try {
-            const dates = new Map<string, number>();
             let after: string | null = null;
             for (let page = 0; page < 20; page++) {
               const response = await fetch('https://community.plex.tv/api', {
@@ -1337,10 +1338,10 @@ async function startServer() {
               if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break;
               after = String(pageInfo.endCursor);
             }
-            for (const item of rich.items) if (!item.viewedAt && typeof item.guid === 'string' && dates.has(item.guid)) item.viewedAt = dates.get(item.guid);
           } catch (activityCaught: unknown) {
             activityError = activityCaught instanceof Error ? activityCaught.message : String(activityCaught);
           }
+          for (const item of rich.items) if (!item.viewedAt && typeof item.guid === 'string' && dates.has(item.guid)) item.viewedAt = dates.get(item.guid);
           const datedCount = rich.items.filter(item => item.viewedAt).length;
           return { ...rich, queryMode: datedCount > 0 ? 'activity' : rich.queryMode, datedError, activityError };
         } catch (caught: unknown) {

@@ -90,6 +90,8 @@ test('SEENIT-PLEX-005 retour v1.4.298 : les dates du fil Activité de Plex daten
   assert.deepEqual(readPlexActivityDates(null), []);
   const server = read('server.ts');
   assert.match(server, /if \(!item\.viewedAt && typeof item\.guid === 'string' && dates\.has\(item\.guid\)\) item\.viewedAt = dates\.get\(item\.guid\);/);
+  // Revue Codex #963 : la datation s'applique après le bloc de pagination, même si une page suivante a échoué.
+  assert.match(server, /activityError = activityCaught instanceof Error \? activityCaught\.message : String\(activityCaught\);\n\s+\}\n\s+for \(const item of rich\.items\) if \(!item\.viewedAt/);
   assert.match(server, /sourceStats\.plexAccountHistoryDateError = \[accountHistory\.datedError, accountHistory\.activityError\]/);
   assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDated: 60, plexAccountHistoryMode: 'activity' }), { history: 75, unwatched: 0, dated: true });
   assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDateError: 'Cannot query field "date"' })?.dateError, 'Cannot query field "date"');
