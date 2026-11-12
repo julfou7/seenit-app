@@ -41,7 +41,7 @@ test('SEENIT-PLEX-005 #954 : un Vu déjà connu sans date prouvée reçoit la da
   const dated = withPlexDate(show, 'movie', VIEWED);
   assert.equal(dated?.lastWatchedAt, VIEWED);
   assert.equal(withPlexDate({ episodeRecords: { movie: { watchedAt: 9, source: 'seenit' } } }, 'movie', VIEWED), null);
-  assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 340, plexAccountCurrentUnwatched: 2 }), { history: 340, unwatched: 2, dated: false });
+  assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 340, plexAccountCurrentUnwatched: 2 }), { history: 340, unwatched: 2, dated: false, datedCount: 0, mode: 'inconnu' });
   assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryMode: 'dated' })?.dated, true);
   assert.equal(readPlexAccountProgress({}), undefined);
   const engine = read('src/features/plex/plexSyncEngine.ts');
@@ -93,7 +93,10 @@ test('SEENIT-PLEX-005 retour v1.4.298 : les dates du fil Activité de Plex daten
   // Revue Codex #963 : la datation s'applique après le bloc de pagination, même si une page suivante a échoué.
   assert.match(server, /activityError = activityCaught instanceof Error \? activityCaught\.message : String\(activityCaught\);\n\s+\}\n\s+for \(const item of rich\.items\) if \(!item\.viewedAt/);
   assert.match(server, /sourceStats\.plexAccountHistoryDateError = \[accountHistory\.datedError, accountHistory\.activityError\]/);
-  assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDated: 60, plexAccountHistoryMode: 'activity' }), { history: 75, unwatched: 0, dated: true });
+  assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDated: 60, plexAccountHistoryMode: 'activity' }), { history: 75, unwatched: 0, dated: true, datedCount: 60, mode: 'activity' });
   assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDateError: 'Cannot query field "date"' })?.dateError, 'Cannot query field "date"');
-  assert.match(read('src/features/plex/plexSyncEngine.ts'), /Historique du compte sans heure : \$\{progress\.account\.dateError \|\| 'aucune date fournie par Plex'\}/);
+  // Terrain v1.4.299 : le journal (150 lignes) perdait la ligne écrite au début ; elle suit désormais le bilan, et la raison s'affiche dans le panneau.
+  const engine = read('src/features/plex/plexSyncEngine.ts');
+  assert.ok(engine.indexOf('[Plex Sync] Historique du compte :') > engine.indexOf('[Plex Sync] Bilan :'));
+  assert.match(read('src/components/HomeSyncIndicator.tsx'), /Plex ne donne pas l’heure : \{progress\.account\.dateError\.slice\(0, 140\)\}/);
 });

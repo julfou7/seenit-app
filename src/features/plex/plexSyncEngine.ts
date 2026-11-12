@@ -204,7 +204,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       progress.historyTotal = history.length; progress.watchlistTotal = watchlist.length;
       progress.servers = [...(plexData?.integrity?.syncedServers || []), ...(plexData?.integrity?.skippedServers || [])];
       progress.complete = plexData?.integrity?.collectionComplete === true;
-      if (!delta) { progress.account = readPlexAccountProgress(plexData?.stats); if (progress.account && !progress.account.dated) appLogger.warn('plex', `[Plex Sync] Historique du compte sans heure : ${progress.account.dateError || 'aucune date fournie par Plex'}`); } // #954
+      if (!delta) progress.account = readPlexAccountProgress(plexData?.stats); // #954
       progress.phase = 'resolve';
       await waitForResume();
       const nextSyncCursor = Number(plexData?.cursor) || Date.now();
@@ -531,7 +531,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           }
 
           // 2. If not found locally, check resolution cache
-          let tmdbData: any = null;
+          let tmdbData: Awaited<ReturnType<typeof resolvePlexItem>> = null;
           if (!matchedShow && cacheKey && resolutionCache[cacheKey]) {
             tmdbData = resolutionCache[cacheKey];
             matchedShow = showsList.find(
@@ -1064,6 +1064,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         'plex',
         `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification, ${datedCount} Vu daté(s) par Plex.`
       );
+      if (progress.account) appLogger.warn('plex', `[Plex Sync] Historique du compte : ${progress.account.history} visionnage(s), ${progress.account.datedCount} daté(s), mode ${progress.account.mode}${progress.account.dateError ? ` — ${progress.account.dateError}` : ''}`); // #954 : écrit après le détail de résolution pour rester dans le journal (150 lignes)
       if (unresolvedItems.length > 0) {
         appLogger.warn(
           'plex',
