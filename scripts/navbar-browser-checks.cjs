@@ -96,7 +96,7 @@ async function testNavbarHarness(client, root) {
     if(width===412) {
       // SEENIT-UX-004 retour v1.4.300 : le toast Plex se ferme en glissant vers le bas ou vers la droite, jamais vers le haut ou la gauche.
       await client.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
-      for(const [dx,dy,closes] of [[0,90,true],[140,0,true],[0,-90,false],[-140,0,false]]) {
+      for(const [dx,dy,closes] of [[0,90,true],[140,0,true],[0,-90,false],[-140,0,false],[60,-150,false]]) {
         await evaluate(client,'window.__nav13j.clearToasts()');await delay(360);
         await evaluate(client,'window.__nav13j.plexToast()');
         await check(client,'document.querySelector("[data-toast-card]")','toast Plex affiché');await delay(450);
