@@ -700,7 +700,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.296',
+        'X-Plex-Version': '1.4.297',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
