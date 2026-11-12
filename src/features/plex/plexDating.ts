@@ -10,9 +10,10 @@ export function datePlexWatchedRecord(record: unknown, viewedAt: number | null):
   if (viewedAt === null || !Number.isFinite(viewedAt) || viewedAt <= 0) return null;
   const current = record && typeof record === 'object' ? record as Record<string, unknown> : null;
   const source = viewingSourceOf(current);
-  if (source === 'seenit' || source === 'plex') return null;
+  if (source === 'seenit') return null;
   const watchedAt = Number(current?.watchedAt);
   const dated = Number.isFinite(watchedAt) && watchedAt > 0 && current?.watchedTimeKnown !== false;
+  // Retour terrain v1.4.296 : un Vu Plex resté en « heure inconnue » reçoit lui aussi la date prouvée de sa lecture.
   if (dated && source !== 'tvtime') return null;
   return { ...(current || {}), watchedAt: viewedAt, watchedTimeKnown: true, source: VIEWING_SOURCE_PLEX };
 }

@@ -953,8 +953,12 @@ pour le cache des sagas et univers.
   `date`) est une date prouvée (`viewedAtKnown`), jamais `createdAt`, `addedAt` ou l'instant de synchro. Un
   film ou épisode déjà vu dans SeenIt sans date prouvée (import TV Time, film importé sans enregistrement,
   heure inconnue) reçoit la date prouvée de sa lecture Plex, `source: 'plex'`, sans `plexImported` ; un Vu
-  marqué dans SeenIt n'est jamais redaté. Le panneau affiche le nombre de visionnages de l'historique du
-  compte et de Vu datés par Plex.
+  marqué dans SeenIt n'est jamais redaté ; un Vu Plex resté sans heure connue l'est. Le panneau affiche le nombre de
+  visionnages de l'historique du compte et de Vu datés par Plex. Retour v1.4.296 : en full, l'historique
+  `/status/sessions/history/all` des serveurs **dont l'utilisateur est titulaire** est lu en complément de l'historique
+  du compte (il garde les médias supprimés après lecture, avec leur heure) ; son échec ne fait pas échouer le serveur.
+  Sur un serveur dont il est titulaire, seules les lectures du compte local 1 (le titulaire) sont retenues, en full
+  comme en delta : les lectures des amis qui partagent le serveur ne deviennent jamais des Vu.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite
