@@ -64,6 +64,10 @@ et préserve une modification locale survenue pendant la lecture cloud. Décoche
 plateforme recalcule la même carte sans nouvelle requête TMDB ni purge du cache public hérité.
 Les champs `networks`, `network` et `platform` historiques ne sont pas des preuves de streaming FR :
 ils ne court-circuitent pas le résolveur et ne servent pas de badge de disponibilité provisoire.
+Les cartes de série peuvent afficher une attribution « Canal+ · diffuseur d’origine » après résolution,
+en l'absence de badge de disponibilité. Cette attribution exige la chaîne Canal+ et un lien de fiche
+programme Canal+ France dans la fiche TMDB du même identifiant. Elle respecte Mes plateformes et ne
+crée aucune offre dans `watch/providers`.
 
 ## Réseau et sécurité
 
