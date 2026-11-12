@@ -151,7 +151,7 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
     const logo = getFormattedProviderLogo(result.logo, result.name);
     return logo ? <img className="actor-profile__provider" src={logo} alt={result.name || 'Diffuseur'} /> : null;
   };
-  return <DialogLayer label={`Acteur : ${person?.name || actor.name}`} onDismiss={onClose} historyMode={historyMode} blocking={false} className="actor-profile-overlay">
+  return <DialogLayer label={`Acteur : ${person?.name || actor.name}`} onDismiss={onClose} historyMode={historyMode} blocking={false} data-media-layer="" className="actor-profile-overlay">
     <div className="actor-profile" ref={scroll} data-actor-profile>
       <header className="actor-profile__header">
         {backdrop && <img className="actor-profile__backdrop" src={imageUrl(backdrop, 'w780')!} alt="" />}

@@ -30,7 +30,10 @@ function Reveal({ className = 'moi-card', label, children }: { className?: strin
 }
 
 /** SEENIT-PROFILE-004 : Mon année — calendrier, records, année en séries (jamais de film), films ou séries, top. */
-export function ProfileYearStory({ shows, fate, since = null, libraryReady = true, onFate }: { shows: Show[]; fate: readonly SeriesFateEntry[]; since?: number | null; libraryReady?: boolean; onFate?: () => void }) {
+export function ProfileYearStory({ shows, fate, since = null, libraryReady = true, onFate, onOpen }: { shows: Show[]; fate: readonly SeriesFateEntry[]; since?: number | null; libraryReady?: boolean; onFate?: () => void; onOpen?: (tmdbId: number, mediaType: 'tv' | 'movie') => void }) {
+  // Retour terrain v1.4.297 : toucher une série de Mon année ouvre sa fiche.
+  const showsById = useMemo(() => new Map(shows.map(show => [show.id, show])), [shows]);
+  const open = (showId: string) => { const show = showsById.get(showId); if (show?.tmdbId) onOpen?.(show.tmdbId, show.mediaType === 'movie' ? 'movie' : 'tv'); };
   const scope = useMemo(() => scopeProfileViewings(shows, since), [shows, since]);
   const { viewings, imports } = scope;
   const now = Date.now();
@@ -105,7 +108,7 @@ export function ProfileYearStory({ shows, fate, since = null, libraryReady = tru
         <div className="moi-card-head moi-card-head--stack"><h3>Ton année en séries</h3><small>Chaque mois, la série que tu as le plus regardée.</small></div>
         <div ref={monthsReveal.containerRef} className="moi-series-months">
         {visibleMonths.map((month, index) => (
-          <div key={month.month} className="moi-series-month">
+          <button type="button" key={month.month} className="moi-series-month" onClick={() => open(month.showId)} aria-label={`Ouvrir ${month.title}`}>
             <b data-current={year === new Date(now).getFullYear() && month.month === new Date(now).getMonth()}>{PROFILE_MONTH_SHORT[month.month]}</b>
             {imageUrl(month.posterPath, 'w92') ? <img src={imageUrl(month.posterPath, 'w92')!} alt="" loading="lazy" decoding="async" /> : <span className="moi-fate-poster" aria-hidden="true" />}
             <span className="moi-fate-text">
@@ -113,7 +116,7 @@ export function ProfileYearStory({ shows, fate, since = null, libraryReady = tru
               <span className="moi-meter"><span className="moi-track"><i className={`moi-grow-x${month.share === 1 ? ' moi-sweep' : ''}`} style={{ width: `${Math.round(month.share * 100)}%`, ...delay(150 + index * 90) }} /></span><small>{month.episodes} ép. · {formatProfileHours(month.minutes)}</small></span>
               {month.tag && <span className="moi-event" data-strong={month.tag.strong}>{month.tag.label}</span>}
             </span>
-          </div>
+          </button>
         ))}
         </div>
         {!allMonths && <LoadMore previews={hiddenMonths.slice(0, 3).map(month => ({ key: `series-month-${month.month}`, initial: month.title.charAt(0), imagePath: month.posterPath }))}
@@ -152,7 +155,7 @@ export function ProfileYearStory({ shows, fate, since = null, libraryReady = tru
       {top.length > 0 && <Reveal label="Ton top de l’année">
         <div className="moi-card-head"><h3>Ton top de l’année</h3><small>séries, au temps passé</small></div>
         {top.map((entry, index) => (
-          <div key={entry.showId} className="moi-top-row moi-pop" style={delay(100 + index * 90)}>
+          <button type="button" key={entry.showId} className="moi-top-row moi-pop" style={delay(100 + index * 90)} onClick={() => open(entry.showId)} aria-label={`Ouvrir ${entry.title}`}>
             <b className={index === 0 ? 'moi-glow-text' : undefined} data-podium={index < 3}>{index + 1}</b>
             {imageUrl(entry.posterPath, 'w92') ? <img src={imageUrl(entry.posterPath, 'w92')!} alt="" loading="lazy" decoding="async" /> : <span className="moi-fate-poster" aria-hidden="true" />}
             <span className="moi-fate-text">
@@ -160,7 +163,7 @@ export function ProfileYearStory({ shows, fate, since = null, libraryReady = tru
               <span className="moi-meter"><span className="moi-track"><i className="moi-grow-x" style={{ width: `${Math.round(entry.relative * 100)}%`, ...delay(150 + index * 90) }} /></span><small>{formatProfileHours(entry.minutes)}</small></span>
               <small>{entry.episodes} {entry.episodes > 1 ? 'épisodes' : 'épisode'} · {entry.share} % de ton temps séries</small>
             </span>
-          </div>
+          </button>
         ))}
       </Reveal>}
 

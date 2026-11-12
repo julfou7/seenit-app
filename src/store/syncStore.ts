@@ -5,7 +5,7 @@ export interface PlexSyncProgress {
   processed: number; total?: number; historyTotal?: number; watchlistTotal?: number;
   changed?: number; alreadyWatched?: number; unresolved?: number; complete?: boolean;
   /** #954 : Vu déjà connus datés par leur lecture Plex ; entrées de l'historique du compte (non vus explicites à part). */
-  dated?: number; account?: { history: number; unwatched: number };
+  dated?: number; account?: { history: number; unwatched: number; dated?: boolean };
   /** Avancement 0..100 de la collecte publié par le backend (SEENIT-PLEX-012). */
   collectPercent?: number;
   servers: Array<{ id?: string; name: string; watchedItems?: number; inventoryItems?: number; reason?: string; owned?: boolean; state?: 'pending' | 'scanning' | 'done' | 'skipped'; done?: number; total?: number; watched?: number }>;

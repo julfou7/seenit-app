@@ -41,7 +41,8 @@ test('SEENIT-PLEX-005 #954 : un Vu déjà connu sans date prouvée reçoit la da
   const dated = withPlexDate(show, 'movie', VIEWED);
   assert.equal(dated?.lastWatchedAt, VIEWED);
   assert.equal(withPlexDate({ episodeRecords: { movie: { watchedAt: 9, source: 'seenit' } } }, 'movie', VIEWED), null);
-  assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 340, plexAccountCurrentUnwatched: 2 }), { history: 340, unwatched: 2 });
+  assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 340, plexAccountCurrentUnwatched: 2 }), { history: 340, unwatched: 2, dated: false });
+  assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryMode: 'dated' })?.dated, true);
   assert.equal(readPlexAccountProgress({}), undefined);
   const engine = read('src/features/plex/plexSyncEngine.ts');
   assert.match(engine, /const provenViewedAt = rawViewed && item\.viewedAtKnown !== false \? viewedTimestamp : null;/);
@@ -64,4 +65,14 @@ test('SEENIT-PLEX-005 retour v1.4.296 : la complète lit aussi l’historique de
   // Un Vu Plex resté en « heure inconnue » est redaté par la lecture prouvée ; un Vu Plex à l'heure connue ne bouge pas.
   assert.equal(datePlexWatchedRecord({ watchedAt: 5, watchedTimeKnown: false, plexImported: true }, VIEWED)?.watchedAt, VIEWED);
   assert.equal(datePlexWatchedRecord({ watchedAt: 5, plexImported: true }, VIEWED), null);
+});
+
+test('SEENIT-PLEX-012 retour v1.4.297 : % de serveur stable (tailles de section connues d’emblée) et diagnostic de l’historique du compte', () => {
+  const server = read('server.ts');
+  assert.match(server, /X-Plex-Container-Start=0&X-Plex-Container-Size=0/);
+  assert.match(server, /if \(totalsKnown\) syncProgress\.serverItems\(serverId, 0, sizes\.flat\(\)\.reduce/);
+  assert.match(server, /syncProgress\.serverItems\(serverId, count, ctx\.totalsKnown \? undefined : totalSize\)/);
+  assert.match(server, /sourceStats\.plexAccountHistoryMode = accountHistory\.queryMode;/);
+  assert.match(read('src/components/HomeSyncIndicator.tsx'), /progress\.account\.dated === false \? ' · sans heure' : ''/);
+  assert.match(read('src/features/plex/plexSyncEngine.ts'), /appLogger\.info\('plex', `\[Plex Sync\] \$\{history\?\.length \|\| 0\} visionnage\(s\)/);
 });

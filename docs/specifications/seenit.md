@@ -689,6 +689,8 @@ n'est rouverte que par une nouvelle décision produit explicite.
     (couche non bloquante) et changer d'onglet la ferme ; « Vus ensemble » et la filmographie utilisent la carte
     habituelle d'Explorer (titre au jeton or, badge FILM/SÉRIE, état Vu actuel), avec le rôle dessous ;
     les filtres Tout · Films · Séries · Non vus reprennent les pastilles de l'accueil (or quand elles sont actives) ;
+    retour v1.4.297 : la couche porte `data-media-layer` (sans lui, la barre est masquée par toute couche de dialogue)
+    et seuls les titres de section sont grands, le titre des cartes garde la taille d'Explorer ;
   - le squelette de chargement reprend le gabarit des nouvelles fiches (même hero, mêmes cartes).
   Retours terrain v1.4.251 (04/11/2026, #857) :
   - la rangée note TMDB, âge et **Bande-annonce** passe au-dessus du bouton principal, au-dessus de
@@ -959,6 +961,9 @@ pour le cache des sagas et univers.
   du compte (il garde les médias supprimés après lecture, avec leur heure) ; son échec ne fait pas échouer le serveur.
   Sur un serveur dont il est titulaire, seules les lectures du compte local 1 (le titulaire) sont retenues, en full
   comme en delta : les lectures des amis qui partagent le serveur ne deviennent jamais des Vu.
+  Retour v1.4.297 : le panneau dit « N vus · M en bibliothèque » et signale un historique du compte « sans heure » quand
+  Plex ne donne pas la date ; la complète demande d'abord la taille de chaque section (page vide) pour que le % d'un
+  serveur ne redescende pas en découvrant une section.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite
@@ -1647,7 +1652,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   regardée de chaque mois avec affiche et étiquette tirée des données, jamais de film ni de note, six mois
   puis le reste à la demande), films ou séries mois par mois et un constat si la part des films bascule de
   dix points, devenir des séries de l'année, top cinq au temps (affiche, barre relative au premier, heures,
-  épisodes et part du temps séries) et « Et maintenant ».
+  épisodes et part du temps séries) et « Et maintenant ». Retour v1.4.297 : toucher une série de « Ton année en séries » ou du top, comme un rendez-vous
+  de Mes chiffres, ouvre sa fiche.
 - **SEENIT-PROFILE-005** — Mes chiffres et Mon année s'animent une seule fois à l'entrée de chaque bloc dans
   l'écran (IntersectionObserver, seuil 0,12) : apparition, barres et colonnes qui poussent, surgissement,
   secteurs du cadran depuis le centre et total compté par `requestAnimationFrame`, lueur douce ou reflet sur

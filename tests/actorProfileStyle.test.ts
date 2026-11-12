@@ -9,7 +9,12 @@ test('SEENIT-UX-019 fiche acteur : barre de navigation visible, cartes et filtre
   const css = read('src/components/movieActorProfile.css');
   const nav = read('src/components/bottomNav.css');
   // Couche non bloquante sous la barre (z-index 160), au-dessus de la fiche média (150) ; un changement d'onglet la ferme.
-  assert.match(profile, /blocking=\{false\} className="actor-profile-overlay"/);
+  assert.match(profile, /blocking=\{false\} data-media-layer="" className="actor-profile-overlay"/);
+  // Retour v1.4.297 : la barre n'est masquée que par une couche sans data-media-layer (bottomNav.css).
+  assert.match(nav, /body:has\(\[data-dialog-layer\]:not\(\[data-settings-layer\]\):not\(\[data-media-layer\]\)\) \.bottom-nav-shell\{display:none\}/);
+  // Les titres de section sont grands, le titre d'une carte (h3) garde la taille d'Explorer.
+  assert.match(css, /\.actor-profile section > h3 \{ font-size:18px;/);
+  assert.doesNotMatch(css, /\.actor-profile h3 \{/);
   assert.match(css, /\.actor-profile-overlay \{ z-index:155; \}/);
   assert.match(nav, /\.bottom-nav-shell\{[^}]*z-index:160/);
   assert.match(profile, /window\.addEventListener\('app-close-modals', close\)/);

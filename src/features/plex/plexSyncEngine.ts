@@ -282,7 +282,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       const totalItemsCount = (history?.length || 0) + (watchlist?.length || 0) + (libraryWatchStates?.length || 0);
       const sourcesSummary = visitedSources && visitedSources.length > 0 ? ` [Sources: ${visitedSources.join(', ')}]` : '';
-      // // appLogger.info('plex', `${history?.length || 0} historique(s) + ${watchlist?.length || 0} watchlist(s) récupéré(s) depuis Plex${sourcesSummary}`, { sample: (history || []).slice(0, 5) });
+      appLogger.info('plex', `[Plex Sync] ${history?.length || 0} visionnage(s) et ${watchlist?.length || 0} watchlist reçus${sourcesSummary}`); // #954 : diagnostic terrain
       if (!silent) {
         publishStatus({
           message: `Analyse Plex (${totalItemsCount} élément(s)...)`
@@ -310,7 +310,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       const resolveAndCachePlexItem = async (
         cacheKey: string | null,
-        item: any
+        item: ReturnType<typeof buildPlexParentShowIdentityItem>
       ): Promise<any> => {
         if (cacheKey && resolutionCache[cacheKey]) return resolutionCache[cacheKey];
         if (cacheKey && sessionResolutionPromises.has(cacheKey)) {

@@ -63,6 +63,7 @@ export function ProAnalyticsDashboard({
   libraryReady = true,
   onPersonClick,
   onFate,
+  onOpen,
 }: {
   shows: Show[];
   fate: readonly SeriesFateEntry[];
@@ -70,6 +71,7 @@ export function ProAnalyticsDashboard({
   libraryReady?: boolean;
   onPersonClick?: (personId: number) => void;
   onFate?: () => void;
+  onOpen?: (tmdbId: number, mediaType: 'tv' | 'movie') => void;
 }) {
   const { data, loading, contributions } = useProAnalytics(shows, libraryReady);
   const scope = useMemo(() => scopeProfileViewings(shows, since), [shows, since]);
@@ -213,11 +215,11 @@ export function ProAnalyticsDashboard({
         {() => <>
           <Head title="Tes rendez-vous" note="semaine après semaine" />
           {appointments.map((appointment, index) => (
-            <div key={appointment.showId} className="moi-appointment moi-pop" style={delay(100 + index * 90)}>
+            <button type="button" key={appointment.showId} className="moi-appointment moi-pop" style={delay(100 + index * 90)} aria-label={`Ouvrir ${appointment.title}`} onClick={() => { const show = showsById.get(appointment.showId); if (show?.tmdbId) onOpen?.(show.tmdbId, 'tv'); }}>
               {appointment.posterPath ? <img src={imageUrl(appointment.posterPath, 'w92') || undefined} alt="" loading="lazy" /> : <i aria-hidden="true" />}
               <span><strong>{appointment.title}</strong><small>{formatProfileAppointment(appointment)}</small></span>
               <b className={index === 0 ? 'moi-glow-text' : undefined}>{appointment.weeks}<small>sem.</small></b>
-            </div>
+            </button>
           ))}
         </>}
       </Reveal>}

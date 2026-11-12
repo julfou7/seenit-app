@@ -1638,6 +1638,10 @@
       ],
       "tests": [
         {
+          "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-012 retour v1.4.297 : % de serveur stable (tailles de section connues d’emblée) et diagnostic de l’historique du compte"
+        },
+        {
           "file": "tests/plexSyncProgress.test.ts",
           "contains": "SEENIT-PLEX-012 calcule un vrai pourcentage, jamais inventé, qui ne recule pas"
         },
@@ -4078,6 +4082,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-004 retour terrain v1.4.297 : toucher une série de Mon année ou un rendez-vous ouvre sa fiche"
+        },
         {
           "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-004 retour terrain v1.4.291 : top de l’année avec affiche, part du temps séries et écart au premier"
