@@ -1,5 +1,5 @@
 import { VIEWING_SOURCE_PLEX } from '../history/viewingSource';
-import { readPlexAccountProgress, withPlexDate } from './plexDating';
+import { describePlexDatingSkip, readPlexAccountProgress, summarizePlexDatingSkips, withPlexDate } from './plexDating';
 import { writeUserScopedJson } from '../../lib/userIsolation';
 import { loadPlexCloudState, persistPlexCloudState } from './plexCloudState';
 import { getPlexSyncRetryAt, PlexSyncHttpError } from './plexSyncRetry';
@@ -376,7 +376,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       let alreadyWatchedCount = 0;
       let unresolvedCount = 0;
       let retryableUnresolvedCount = 0;
-      let repairedCount = 0, datedCount = 0;
+      let repairedCount = 0, datedCount = 0; const notDated: string[] = [];
       let unwatchedCount = 0;
       let watchlistUnresolvedItemCount = 0;
       const syncedItems: PlexSyncResult['syncedItems'] = [];
@@ -452,8 +452,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       // #954 : un Vu déjà connu mais sans date prouvée reçoit la date réelle de la lecture Plex.
       const datePlexWatched = (candidate: Show, key: string, provenViewedAt: number | null) => {
-        const dated = withPlexDate(mutatedShows[candidate.id] || candidate, key, provenViewedAt);
-        if (dated) { mutatedShows[candidate.id] = dated; datedCount++; }
+        const current = mutatedShows[candidate.id] || candidate, dated = withPlexDate(current, key, provenViewedAt);
+        if (dated) { mutatedShows[candidate.id] = dated; datedCount++; } else notDated.push(describePlexDatingSkip(`${candidate.title}${key === 'movie' ? '' : ` ${key}`}`, current.episodeRecords?.[key], provenViewedAt));
       };
 
       const skipAlreadyWatchedMovie = (candidate: Show | undefined, provenViewedAt: number | null = null): boolean => {
@@ -578,7 +578,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                 watchedAt: viewedTimestamp,
                 episodeTitle: item.title || null,
                 ...(episodeRecords[epKey] || {}),
-                plexImported: true,
+                plexImported: true, watchedTimeKnown: provenViewedAt !== null,
                 source: VIEWING_SOURCE_PLEX
               };
 
@@ -632,7 +632,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               firstAirDate: tmdbData.first_air_date || '',
               networks: [],
               seenEpisodes: [epKey],
-              episodeRecords: { [epKey]: { watchedAt: viewedTimestamp, episodeTitle: item.title || null, plexImported: true, source: VIEWING_SOURCE_PLEX } },
+              episodeRecords: { [epKey]: { watchedAt: viewedTimestamp, episodeTitle: item.title || null, plexImported: true, watchedTimeKnown: provenViewedAt !== null, source: VIEWING_SOURCE_PLEX } },
               isArchived: false
             };
 
@@ -716,7 +716,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               episodeRecords['movie'] = {
                 watchedAt: viewedTimestamp,
                 ...(episodeRecords['movie'] || {}),
-                plexImported: true,
+                plexImported: true, watchedTimeKnown: provenViewedAt !== null,
                 source: VIEWING_SOURCE_PLEX
               };
 
@@ -766,7 +766,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               firstAirDate: tmdbData.release_date || '',
               networks: [],
               seenEpisodes: ['movie'],
-              episodeRecords: { movie: { watchedAt: viewedTimestamp, plexImported: true, source: VIEWING_SOURCE_PLEX } },
+              episodeRecords: { movie: { watchedAt: viewedTimestamp, plexImported: true, watchedTimeKnown: provenViewedAt !== null, source: VIEWING_SOURCE_PLEX } },
               isArchived: false
             };
 
@@ -1061,7 +1061,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       appLogger.success(
         'plex',
-        `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification, ${datedCount} Vu daté(s) par Plex.`
+        `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification, ${datedCount} Vu daté(s) par Plex.${summarizePlexDatingSkips(notDated)}`
       );
       if (progress.account) appLogger.warn('plex', `[Plex Sync] Historique du compte : ${progress.account.history} visionnage(s), ${progress.account.datedCount} daté(s), mode ${progress.account.mode}${progress.account.datingOnly ? `, ${progress.account.datingOnly} sur un serveur où le média n’est pas vu (datation seule)` : ''}${progress.account.dateError ? ` — ${progress.account.dateError}` : ''}`); // #954 : écrit après le détail de résolution pour rester dans le journal (150 lignes)
       if (unresolvedItems.length > 0) {

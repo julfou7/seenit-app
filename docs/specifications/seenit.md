@@ -657,7 +657,9 @@ n'est rouverte que par une nouvelle décision produit explicite.
     **Tout marquer vu / non vu**, bande-annonce de saison) et lignes d'épisode (vignette libre de tout
     repère, code « Sxx | Eyy » en or, bleu à venir, gris vu, puis durée ou date ; la note reste dans les
     barres de la saison ; coche 44 px ; retour v1.4.300 : une note d'épisode portée par moins de 3 votes TMDB ne compte
-    ni dans la moyenne ni dans les barres, et sans note fiable aucune moyenne n'est affichée) ; **Où regarder** en lignes ; **Personnages** (personnage,
+    ni dans la moyenne ni dans les barres ; sans note fiable, la carte dit « notes insuffisantes », et la note du titre en
+    haut de fiche suit la même règle (« Notes TMDB insuffisantes ») ; dans l'ordre de visionnage, un titre pas encore sorti
+    ou sans date est « À venir », jamais « À voir ») ; **Où regarder** en lignes ; **Personnages** (personnage,
     épisodes, présence, interprète ; six, puis dix par dix) ; univers TVDB ; catégories et thèmes ; Reddit.
   - **Film** : **Marquer vu** (annulable), signet **À voir**, bande-annonce ; « Si tu lances maintenant ·
     Fin à HH:MM » tant que le film est sorti, non vu et hors salle ; chips ; synopsis ; Où regarder ;
@@ -979,6 +981,10 @@ pour le cache des sagas et univers.
   serveurs —, l'événement reste la seule date de la lecture faite ailleurs : il est gardé en **datation seule**
   (`datingOnly`) et ne fait que dater un Vu déjà connu dans SeenIt ; il n'en crée jamais, pour qu'un état non vu de cette
   bibliothèque ne le retire pas aussitôt. Le journal donne le nombre de ces événements.
+  Retour v1.4.301 : un Vu Plex d'une ancienne synchro, sans `watchedTimeKnown: true` (heure non prouvée, souvent l'instant de
+  l'import), reçoit lui aussi la date prouvée de sa lecture ; une fois daté, il ne bouge plus. Chaque Vu créé par Plex
+  enregistre si son heure est prouvée. Le bilan liste les Vus déjà connus restés sans date, avec la raison (sans date Plex
+  prouvée, Vu SeenIt, déjà daté et son origine).
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite
@@ -1486,7 +1492,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   « Ignorer les suivants » sur un toast Plex en file. Un retrait qui vise un média (notification retirée)
   transmet ce média au toast pour que l'utilisateur voie ce qui a été retiré. Glisser vers le bas **ou vers
   la droite** ferme tout toast, Plex compris (retour v1.4.300) ; vers le haut ou la gauche, ou un simple effleurement, ne
-  ferme rien, et le toast sort dans le sens du geste. Aucun geste natif ne concurrence ce glisser (`touch-action: none`). Pendant une synchronisation longue, le bandeau Plex indique la phase réellement connue et
+  ferme rien, et le toast sort dans le sens du geste. Aucun geste natif ne concurrence ce glisser (`touch-action: none`).
+  Retour v1.4.301 : les toasts vivent dans leur propre couche, jamais rendue inerte par un dialogue ouvert ; la feuille de
+  synchronisation Plex se ferme d'un toucher à l'extérieur. Pendant une synchronisation longue, le bandeau Plex indique la phase réellement connue et
   la durée écoulée, sans inventer de pourcentage. Les toasts unitaires Plex d'un même lot peuvent être
   abandonnés via « Ignorer les suivants » : cette action purge uniquement les notifications Plex encore
   en file et conserve le bilan final ainsi que les notifications des autres fonctionnalités. Le bilan

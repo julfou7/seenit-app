@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { datePlexWatchedRecord, readPlexAccountProgress, withPlexDate } from '../src/features/plex/plexDating.ts';
+import { datePlexWatchedRecord, describePlexDatingSkip, readPlexAccountProgress, summarizePlexDatingSkips, withPlexDate } from '../src/features/plex/plexDating.ts';
 import { isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_QUERY } from '../src/features/plex/plexAccountHistory.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -33,7 +33,7 @@ test('SEENIT-PLEX-005 #954 : un Vu déjà connu sans date prouvée reçoit la da
   assert.equal(datePlexWatchedRecord({ watchedAt: 5, watchedTimeKnown: false }, VIEWED)?.watchedTimeKnown, true);
   // Jamais : un Vu SeenIt, un Vu déjà Plex, un ancien Vu daté, ou sans date Plex prouvée.
   assert.equal(datePlexWatchedRecord({ watchedAt: 9, source: 'seenit' }, VIEWED), null);
-  assert.equal(datePlexWatchedRecord({ watchedAt: 9, plexImported: true }, VIEWED), null, 'Vu Plex déjà daté à l’heure connue');
+  assert.equal(datePlexWatchedRecord({ watchedAt: 9, plexImported: true, watchedTimeKnown: true }, VIEWED), null, 'Vu Plex déjà daté à l’heure prouvée');
   assert.equal(datePlexWatchedRecord({ watchedAt: 9 }, VIEWED), null);
   assert.equal(datePlexWatchedRecord(undefined, null), null);
   assert.equal('plexImported' in (datePlexWatchedRecord(undefined, VIEWED) || {}), false, 'la date ne donne pas à Plex la propriété du Vu');
@@ -64,7 +64,12 @@ test('SEENIT-PLEX-005 retour v1.4.296 : la complète lit aussi l’historique de
   assert.equal(isOwnerPmsHistoryEntry({ accountID: 7 }, false), true, 'serveur partagé : Plex ne renvoie que l’historique du jeton');
   // Un Vu Plex resté en « heure inconnue » est redaté par la lecture prouvée ; un Vu Plex à l'heure connue ne bouge pas.
   assert.equal(datePlexWatchedRecord({ watchedAt: 5, watchedTimeKnown: false, plexImported: true }, VIEWED)?.watchedAt, VIEWED);
-  assert.equal(datePlexWatchedRecord({ watchedAt: 5, plexImported: true }, VIEWED), null);
+  // Retour v1.4.301 : un Vu Plex d'une ancienne synchro (heure non prouvée, souvent l'instant de l'import) est daté ;
+  // un Vu Plex à l'heure prouvée ne bouge plus.
+  assert.equal(datePlexWatchedRecord({ watchedAt: 5, plexImported: true }, VIEWED)?.watchedAt, VIEWED);
+  assert.equal(datePlexWatchedRecord({ watchedAt: 5, source: 'plex' }, VIEWED)?.watchedTimeKnown, true);
+  assert.equal(datePlexWatchedRecord({ watchedAt: 5, plexImported: true, watchedTimeKnown: true }, VIEWED), null);
+  assert.equal(datePlexWatchedRecord({ watchedAt: 5 }, VIEWED), null, 'origine inconnue à l’heure connue : inchangé');
 });
 
 test('SEENIT-PLEX-012 retour v1.4.297 : % de serveur stable (tailles de section connues d’emblée) et diagnostic de l’historique du compte', () => {
@@ -137,4 +142,15 @@ test('SEENIT-PLEX-005 retour v1.4.300 : un film présent mais non vu chez un ami
   assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDatingOnly: 40, plexAccountHistoryMode: 'dated' })?.datingOnly, 40);
   // Un Vu daté par Plex ne devient pas un Vu Plex : l'état non vu de la bibliothèque ne peut donc pas le retirer.
   assert.equal('plexImported' in (datePlexWatchedRecord({ watchedAt: 1, watchedTimeKnown: false }, VIEWED) || {}), false);
+});
+
+test('SEENIT-PLEX-005 retour v1.4.301 : un Vu Plex créé note si son heure est prouvée, et le bilan dit pourquoi un Vu reste sans date', () => {
+  const engine = read('src/features/plex/plexSyncEngine.ts');
+  assert.equal((engine.match(/plexImported: true, watchedTimeKnown: provenViewedAt !== null,/g) || []).length, 4, 'les quatre créations de Vu Plex');
+  assert.match(engine, /\$\{datedCount\} Vu daté\(s\) par Plex\.\$\{summarizePlexDatingSkips\(notDated\)\}/);
+  assert.equal(describePlexDatingSkip('Coco', { watchedAt: 9, watchedTimeKnown: true, plexImported: true }, VIEWED), 'Coco : déjà daté (plex)');
+  assert.equal(describePlexDatingSkip('Le Robot sauvage', { watchedAt: 9, source: 'seenit' }, VIEWED), 'Le Robot sauvage : Vu SeenIt');
+  assert.equal(describePlexDatingSkip('Mario', undefined, null), 'Mario : sans date Plex prouvée');
+  assert.equal(summarizePlexDatingSkips([]), '');
+  assert.equal(summarizePlexDatingSkips(['A : Vu SeenIt', 'B : Vu SeenIt', 'C : sans date Plex prouvée'], 2), ' Non datés : 2 Vu SeenIt, 1 sans date Plex prouvée — A : Vu SeenIt ; B : Vu SeenIt ; …');
 });

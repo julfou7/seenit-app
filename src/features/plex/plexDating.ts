@@ -14,7 +14,9 @@ export function datePlexWatchedRecord(record: unknown, viewedAt: number | null):
   const watchedAt = Number(current?.watchedAt);
   const dated = Number.isFinite(watchedAt) && watchedAt > 0 && current?.watchedTimeKnown !== false;
   // Retour terrain v1.4.296 : un Vu Plex resté en « heure inconnue » reçoit lui aussi la date prouvée de sa lecture.
-  if (dated && source !== 'tvtime') return null;
+  // Retour v1.4.301 : un Vu Plex d'une ancienne synchro (sans `watchedTimeKnown: true`, souvent daté de l'instant de
+  // l'import) n'a pas d'heure prouvée : la lecture Plex prouvée le date. Une fois daté, il ne bouge plus.
+  if (dated && source !== 'tvtime' && !(source === 'plex' && current?.watchedTimeKnown !== true)) return null;
   return { ...(current || {}), watchedAt: viewedAt, watchedTimeKnown: true, source: VIEWING_SOURCE_PLEX };
 }
 
@@ -34,4 +36,22 @@ export function readPlexAccountProgress(stats: unknown): { history: number; unwa
   const dateError = typeof value?.plexAccountHistoryDateError === 'string' && value.plexAccountHistoryDateError ? value.plexAccountHistoryDateError : undefined;
   const datingOnly = Number(value?.plexAccountHistoryDatingOnly) || 0;
   return { history, unwatched: Number(value?.plexAccountCurrentUnwatched) || 0, dated, datedCount: Number(value?.plexAccountHistoryDated) || 0, mode: typeof value?.plexAccountHistoryMode === 'string' ? value.plexAccountHistoryMode : 'inconnu', ...(datingOnly > 0 ? { datingOnly } : {}), ...(dateError ? { dateError } : {}) };
+}
+
+/** #954 diagnostic : pourquoi un Vu déjà connu n'a pas reçu de date Plex, pour la ligne de bilan. */
+export function describePlexDatingSkip(title: unknown, record: unknown, viewedAt: number | null): string {
+  const current = record && typeof record === 'object' ? record as Record<string, unknown> : null;
+  const source = viewingSourceOf(current);
+  const reason = viewedAt === null ? 'sans date Plex prouvée' : source === 'seenit' ? 'Vu SeenIt' : `déjà daté (${source || 'origine inconnue'})`;
+  return `${typeof title === 'string' && title ? title : 'Titre'} : ${reason}`;
+}
+
+/** Résumé compact des Vus non datés : compte par raison puis quelques titres, pour tenir dans une ligne de journal. */
+export function summarizePlexDatingSkips(skips: readonly string[], limit = 12): string {
+  if (!skips.length) return '';
+  const byReason = new Map<string, number>();
+  for (const skip of skips) { const reason = skip.slice(skip.lastIndexOf(' : ') + 3); byReason.set(reason, (byReason.get(reason) || 0) + 1); }
+  const counts = [...byReason].map(([reason, count]) => `${count} ${reason}`).join(', ');
+  const examples = [...new Set(skips)].slice(0, limit).join(' ; ');
+  return ` Non datés : ${counts} — ${examples}${skips.length > limit ? ' ; …' : ''}`;
 }
