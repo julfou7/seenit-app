@@ -68,7 +68,7 @@ export function HomeSyncIndicator() {
       onPointerDown={() => { longPressed.current = false; cancelPress(); if (!idle) return; pressTimer.current = setTimeout(() => { pressTimer.current = null; longPressed.current = true; quickSync(); }, LONG_PRESS_MS); }}
       onPointerUp={cancelPress} onPointerLeave={cancelPress} onPointerCancel={cancelPress}
       onContextMenu={event => { if (!idle) return; event.preventDefault(); cancelPress(); longPressed.current = true; quickSync(); }}>{ring}</button>
-    {open && <DialogLayer label={label} onDismiss={() => setOpen(false)} className="home-sync-dialog fixed inset-0 flex items-center justify-center bg-black/65 p-4">
+    {open && <DialogLayer label={label} onDismiss={() => setOpen(false)} onClick={event => { if (event.target === event.currentTarget) setOpen(false); }} className="home-sync-dialog fixed inset-0 flex items-center justify-center bg-black/65 p-4">
       <section className="home-sync-sheet">
         <header>{ring}<div><h2>{label}{percent !== undefined ? ` · ${percent} %` : ''}</h2></div><button type="button" data-dialog-initial-focus aria-label="Fermer la synchronisation" onClick={() => setOpen(false)}><X size={20} /></button></header>
         <p role="status" className="home-sync-sheet__status">{paused ? 'En pause · la collecte en cours termine avant la pause' : idle && !lastReport ? (lastSync ? `Dernière synchro ${new Intl.RelativeTimeFormat('fr-FR', { numeric: 'auto' }).format(-Math.max(1, Math.round((Date.now() - lastSync) / 3_600_000)), 'hour')}` : 'Aucune synchro Plex pour l’instant') : message}</p>

@@ -124,19 +124,12 @@ test('SEENIT-PROVIDER-002 distingue la fiche Canal+ du streaming', async t => {
   assert.equal(resolvePassiveProviderState('tv:335510', null, { available: true }, true, [381], source).name, 'Plex');
 });
 
-test('SEENIT-PROVIDER-002 le badge d’origine expose un libellé visible distinct', async () => {
-  const bundle = await build({
-    entryPoints: ['src/components/OriginalBroadcasterLabel.tsx'],
-    bundle: true, write: false, platform: 'node', format: 'cjs', jsx: 'automatic',
-    external: ['react', 'react/jsx-runtime'],
-  });
-  const module = { exports: {} as { OriginalBroadcasterLabel: (props: { name: string }) => React.ReactElement | null } };
-  const require = createRequire(import.meta.url);
-  vm.runInNewContext(bundle.outputFiles[0].text, { module, require });
-  const { OriginalBroadcasterLabel } = module.exports;
-  const { renderToStaticMarkup } = require('react-dom/server') as typeof import('react-dom/server');
-  assert.match(renderToStaticMarkup(OriginalBroadcasterLabel({ name: CANAL_ORIGINAL_BROADCASTER_NAME })), />Origine<\/span>/);
-  assert.equal(OriginalBroadcasterLabel({ name: 'Canal+' }), null);
+test('SEENIT-PROVIDER-002 retour v1.4.301 : le badge Canal+ d’origine ne porte plus de libellé « Origine »', () => {
+  // Demande du 12/11 : « Supprime moi ce label ». Le logo Canal+ reste ; aucune carte n'ajoute de mention visible.
+  for (const file of ['src/components/cards/SeriesEpisodeCard.tsx', 'src/components/cards/UpToDateShowCard.tsx', 'src/components/EpisodeCard.tsx', 'src/components/GridMediaCard.tsx', 'src/screens/watchListPresentation.tsx']) {
+    assert.doesNotMatch(readFileSync(file, 'utf8'), /OriginalBroadcasterLabel|>Origine</, file);
+  }
+  assert.doesNotMatch(readFileSync('src/components/cards/seriesEpisodeCard.css', 'utf8'), /series-8f__provider--origin/);
 });
 
 test('SEENIT-PROVIDER-002 #853 les cartes visibles ensemble partagent une requête, avec repli titre par titre', async () => {

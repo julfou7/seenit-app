@@ -265,6 +265,9 @@ exacte `mediaType + tmdbId`. Aucun titre, année ou texte du toast ne sert de fa
 (`unfollow`) reste non navigable ; ses actions internes comme **Annuler**, les actions Plex comme
 **Ignorer les suivants** et un swipe/drag de fermeture ne déclenchent pas la fiche. Le même contrat vaut
 en PWA et APK et un toast navigable s'active au clavier avec Entrée/Espace (`SEENIT-UX-006`).
+Un toast se ferme en glissant vers le bas ou vers la droite, jamais vers le haut ou la gauche. Depuis la v1.4.302, les
+toasts vivent dans leur propre couche : un dialogue ouvert (panneau de synchro Plex, feuille de réglages) ne les rend
+jamais inertes, et ils restent fermables pendant qu'il est ouvert (`SEENIT-UX-004`).
 
 ## 5. Écran « À Voir »
 
@@ -277,6 +280,8 @@ et **Complète** (full). Un appui long de 480 ms lance directement la synchro ra
 (`SEENIT-PLEX-012`), le panneau affiche un vrai pourcentage en delta comme en complète, une ligne par serveur
 (nom, « 1,2 k vus », « 42 % », « hors ligne ») et tient en un écran ; la synchro complète lit les serveurs et
 leurs bibliothèques en parallèle, ne se relance plus d'elle-même et s'arrête proprement au bout de 10 min.
+Un toucher en dehors du panneau le ferme (v1.4.302). Son bilan liste les Vus déjà connus restés sans date Plex, avec la
+raison (sans date Plex prouvée, Vu SeenIt, déjà daté).
 
 L’écran comporte trois panneaux indépendants **À regarder**, **À venir** et **Historique**. Le scroll
 ne change jamais d’onglet ; aucun swipe ne navigue entre panneaux. Le header `seenit●` conserve l’état
@@ -439,7 +444,8 @@ ni journée record, ni heure de soirée. « Tes rendez-vous » met en valeur les
 (« MobLand, chaque vendredi soir · 8 semaines d'affilée »). Chaque Vu porte son origine (TV Time, SeenIt ou Plex, `SEENIT-PROFILE-007`) : l'import
 TV Time reste hors des chiffres par période ; les anciens Vu sans origine ne sont pas réétiquetés. Le panneau de synchro Plex complète affiche « N vus sur M » médias lus par serveur, la ligne « Historique du compte »
 (visionnages lus dans le Watch History Plex) et le nombre de Vu datés par Plex. Un film regardé puis supprimé du serveur
-reste vu grâce à l'historique du compte, avec sa date de lecture. Les totaux
+reste vu grâce à l'historique du compte, avec sa date de lecture. Un Vu Plex importé par une ancienne synchro sans heure prouvée reçoit
+la date prouvée de sa lecture Plex, puis ne bouge plus (`SEENIT-PLEX-005`). Les totaux
 (épisodes, films, séries terminées) comptent tout, et une note dit ce qui a été écarté (`SEENIT-PROFILE-006`).
 Une série finie compte comme terminée même archivée. Les badges
 ont des paliers : Centenaire (visionnages) 100, 500, 1 000, 2 500, 5 000, 7 500, 10 000 ; Oiseau de nuit
@@ -467,6 +473,7 @@ puis Plex disponible, puis un autre diffuseur public. Décocher/recocher une pla
 cartes déjà montées immédiatement. L'hydratation cloud démarre avec la session, préserve le miroir local
 pendant son attente et ne remplace pas une bascule faite entre-temps. Les anciens réseaux de production
 ne remplacent pas une preuve TMDB de streaming ; aucun passage par Réglages ni purge de cache n'est requis.
+Une série Canal+ sans offre de streaming TMDB affiche le seul logo Canal+, sans libellé « Origine » (v1.4.302).
 
 Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
 Le Profil n'expose pas d'action « Partager » : aucun profil public n'existe et aucune donnée de profil
@@ -564,7 +571,8 @@ défilement sans onglets, hero titré en or, carte de progression avec **Marquer
 tuile diffuseur (ta plateforme choisie, sinon Plex), **Moyenne par saison**, pastilles de saison (anneau
 Vu pour une saison finie, saison choisie cerclée d'or), barres de notes et lignes d'épisode (code
 « Sxx | Eyy » coloré, durée ou date, sans note ni repère sur l'image), **Où regarder** en lignes,
-**Personnages** (six, puis dix par dix). Le film affiche « Si tu lances maintenant · Fin à HH:MM »,
+**Personnages** (six, puis dix par dix). Une note TMDB portée par moins de 3 votes n'est pas affichée : la carte de saison dit « notes
+insuffisantes » et le haut de fiche « Notes TMDB insuffisantes » (v1.4.302). Le film affiche « Si tu lances maintenant · Fin à HH:MM »,
 sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L'épisode ajoute la soirée de
 trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
 et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮,
@@ -766,7 +774,8 @@ sur les affiches, film affiché encadré d'or avec « TU ES ICI », tampon VU su
 « À voir » sinon. L'or est réservé au film affiché (repère, segment, titre) ; les autres titres sont clairs,
 gris s'ils sont vus, et les repères et traits des films vus sont neutres.
 
-Pour un film, « Ordre de visionnage » provient exclusivement de sa collection TMDB explicite. Aucune
+Pour un film, « Ordre de visionnage » provient exclusivement de sa collection TMDB explicite. Un film de la collection pas encore sorti, ou sans date, y est
+« À venir », jamais « À voir » (v1.4.302). Aucune
 série, liste TVDB, entrée SeenIt ou source secondaire ne complète cette section lorsqu'une collection
 TMDB est absente.
 

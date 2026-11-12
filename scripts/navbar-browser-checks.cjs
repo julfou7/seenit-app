@@ -88,11 +88,13 @@ async function testNavbarHarness(client, root) {
     await tap(client,selector('profile'),'right');
     await check(client,'document.querySelector(".nav-quick-account") && getComputedStyle(document.querySelector(".bottom-nav-shell")).display==="none"','clic droit ouvre réglages et masque barre');
     await evaluate(client,'window.__nav13j.toast()');
-    await check(client,'document.getElementById("toast-notification-wrapper") && parseFloat(getComputedStyle(document.getElementById("toast-notification-wrapper")).bottom)===24','toast sans barre');
+    await check(client,'document.getElementById("toast-notification-wrapper") && parseFloat(getComputedStyle(document.getElementById("toast-notification-wrapper")).bottom)===24 && !document.getElementById("toast-notification-wrapper").closest("[inert]")','toast sans barre et jamais inerte sous une feuille bloquante');
     await client.send('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape'});
     await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});
     await check(client,'!document.querySelector("[data-dialog-layer]")','Escape ferme un seul niveau');
     await evaluate(client,'window.__nav13j.clearToasts()');
+    // Le toast n'est plus inerte sous une feuille : il ne doit pas rester devant les gestes suivants.
+    await check(client,'!document.getElementById("toast-notification-wrapper")','toast retiré avant la suite');
     if(width===412) {
       // SEENIT-UX-004 retour v1.4.300 : le toast Plex se ferme en glissant vers le bas ou vers la droite, jamais vers le haut ou la gauche.
       await client.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
@@ -109,6 +111,7 @@ async function testNavbarHarness(client, root) {
         if(gone!==closes)throw new Error(`#954 glisser ${dx},${dy} : toast ${gone?'fermé':'resté'} (attendu ${closes?'fermé':'resté'})`);
       }
       await evaluate(client,'window.__nav13j.clearToasts()');
+      await check(client,'!document.getElementById("toast-notification-wrapper")','toast retiré après la série de gestes');
       await client.send('Emulation.setTouchEmulationEnabled',{enabled:false});
     }
     if(width===360) {

@@ -20,7 +20,7 @@ export interface ShowDetailTmdb {
   id: number;
   name?: string; title?: string; original_title?: string; original_name?: string; overview?: string;
   first_air_date?: string; release_date?: string; last_air_date?: string; status?: string;
-  number_of_seasons?: number; number_of_episodes?: number; vote_average?: number; runtime?: number; episode_run_time?: number[];
+  number_of_seasons?: number; number_of_episodes?: number; vote_average?: number; vote_count?: number; runtime?: number; episode_run_time?: number[];
   genres?: Array<{ id: number; name: string }>; seasons?: Season[]; imdb_id?: string; poster_path?: string | null;
   credits?: { cast?: CastMember[]; crew?: Array<{ id: number; name: string; job?: string }> };
   aggregate_credits?: { cast?: CastMember[] };

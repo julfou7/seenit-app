@@ -34,6 +34,8 @@ function syncBackground() {
   if (!active) return;
   for (const child of Array.from(document.body.children)) {
     if (!(child instanceof HTMLElement) || child === active || child.contains(active)) continue;
+    // Les toasts ne sont jamais modaux : un dialogue ouvert ne les rend pas inertes (retour v1.4.301).
+    if (child.hasAttribute('data-toast-layer')) continue;
     if (active.dataset.dialogBlocking === 'false' && !child.hasAttribute('data-dialog-layer')) continue;
     inertBefore.set(child, child.inert);
     child.inert = true;

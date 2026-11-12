@@ -19,7 +19,7 @@ import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditMovieSearchQuery } from '../components/community/redditEpisodeSearch';
 import { getProviderLinkPresentation } from '../features/providers/providerLink';
 import { pickHeroProvider } from '../features/providers/heroProvider';
-import { seasonAverages, formatRating } from '../features/shows/detailPlanning';
+import { seasonAverages, formatRating, reliableTitleRating } from '../features/shows/detailPlanning';
 import { frenchGenres } from '../features/shows/frenchLabels';
 import { DetailChip, DetailHero, DetailSynopsis, GoldCta, RoundHeaderButton, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
 import { CastRows, RelationList, RelationsLoading, ThemesCard } from './mediaDetail/detailSections';
@@ -90,7 +90,9 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const meta = isSeries
     ? [years, seasonCount ? `${seasonCount} saison${seasonCount > 1 ? 's' : ''}` : '', genres.slice(0, 2).map(genre => genre.name).join(', ')].filter(Boolean).join(' · ')
     : [year, formatDuration(tmdbDetails?.runtime), genres.slice(0, 2).map(genre => genre.name).join(', ')].filter(Boolean).join(' · ');
-  const tmdbRating = Number(tmdbDetails?.vote_average) > 0 ? formatRating(Number(tmdbDetails.vote_average)) : null;
+  // Retour v1.4.301 : une note TMDB sur une poignée de votes n'est pas affichée (« notes insuffisantes »).
+  const titleRating = reliableTitleRating(tmdbDetails?.vote_average, tmdbDetails?.vote_count);
+  const tmdbRating = titleRating.value !== null ? formatRating(titleRating.value) : null;
 
   const openPlex = () => { void openPlexWatchUrl(show || { id: show?.id, tmdbId: effectiveTmdbId, imdbId: tmdbDetails?.external_ids?.imdb_id || tmdbDetails?.imdb_id || show?.imdbId, title: (title !== 'Chargement...' ? title : '') || tmdbDetails?.title || tmdbDetails?.name, originalTitle: tmdbDetails?.original_title || tmdbDetails?.original_name || show?.originalTitle, year: releaseYear, mediaType: isSeries ? 'tv' : 'movie' }); };
   const openProvider = (provider: WhereToWatchProvider) => {
@@ -413,6 +415,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
             {isUpcomingMovie && <DetailChip className="text-[#F2C36B]">À venir</DetailChip>}
             {airStatus && <DetailChip className={AIR_TONE_CLASS[airStatus.tone]} aria-label={`Série ${airStatus.label.toLowerCase()}${airStatus.detail ? `, ${airStatus.detail}` : ''}`}><strong>{airStatus.label}</strong>{airStatus.detail && <small className="text-[11px] font-semibold opacity-75">· {airStatus.detail}</small>}</DetailChip>}
             {tmdbRating && <DetailChip>★ {tmdbRating} TMDB</DetailChip>}
+            {titleRating.insufficient && <DetailChip className="text-zinc-400">Notes TMDB insuffisantes</DetailChip>}
             <DetailChip className={ratingInfo.colorClass} aria-label={ratingInfo.provenance ? `${ratingInfo.label}, classification ${ratingInfo.provenance}` : ratingInfo.label} title={ratingInfo.provenance ? `${ratingInfo.provenance} · ${ratingInfo.label}` : ratingInfo.label}><strong>{ratingInfo.label}</strong>{ratingInfo.provenance && <small className="text-[9px] font-semibold opacity-65">{ratingInfo.provenance}</small>}</DetailChip>
             {hasTrailer && <button type="button" onClick={() => setTrailerModalVideos(ytVideos)} className="inline-flex h-7 min-h-7 items-center gap-1 rounded-lg bg-[#18181b] px-2.5 text-[12px] font-bold text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]"><Play size={12} className="fill-current" />Bande-annonce</button>}
           </>}
