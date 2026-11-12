@@ -26,8 +26,11 @@ export function withPlexDate<T extends { episodeRecords?: Record<string, unknown
 }
 
 /** #954 : visionnages lus dans l'historique du compte Plex et non vus explicites, pour le panneau de synchro. */
-export function readPlexAccountProgress(stats: unknown): { history: number; unwatched: number; dated: boolean } | undefined {
-  const value = stats && typeof stats === 'object' ? stats as { plexAccountHistoryItems?: unknown; plexAccountCurrentUnwatched?: unknown; plexAccountHistoryMode?: unknown } : null;
+export function readPlexAccountProgress(stats: unknown): { history: number; unwatched: number; dated: boolean; dateError?: string } | undefined {
+  const value = stats && typeof stats === 'object' ? stats as { plexAccountHistoryItems?: unknown; plexAccountCurrentUnwatched?: unknown; plexAccountHistoryMode?: unknown; plexAccountHistoryDated?: unknown; plexAccountHistoryDateError?: unknown } : null;
   const history = Number(value?.plexAccountHistoryItems) || 0;
-  return history > 0 ? { history, unwatched: Number(value?.plexAccountCurrentUnwatched) || 0, dated: value?.plexAccountHistoryMode === 'dated' } : undefined;
+  if (history <= 0) return undefined;
+  const dated = Number(value?.plexAccountHistoryDated) > 0 || value?.plexAccountHistoryMode === 'dated' || value?.plexAccountHistoryMode === 'activity';
+  const dateError = typeof value?.plexAccountHistoryDateError === 'string' && value.plexAccountHistoryDateError ? value.plexAccountHistoryDateError : undefined;
+  return { history, unwatched: Number(value?.plexAccountCurrentUnwatched) || 0, dated, ...(dateError ? { dateError } : {}) };
 }

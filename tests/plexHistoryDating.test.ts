@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { datePlexWatchedRecord, readPlexAccountProgress, withPlexDate } from '../src/features/plex/plexDating.ts';
-import { isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, readPlexAccountHistoryDate, PLEX_ACCOUNT_HISTORY_DATED_QUERY } from '../src/features/plex/plexAccountHistory.ts';
+import { isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_QUERY } from '../src/features/plex/plexAccountHistory.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const VIEWED = Date.UTC(2026, 9, 28, 20, 15);
@@ -75,4 +75,23 @@ test('SEENIT-PLEX-012 retour v1.4.297 : % de serveur stable (tailles de section 
   assert.match(server, /sourceStats\.plexAccountHistoryMode = accountHistory\.queryMode;/);
   assert.match(read('src/components/HomeSyncIndicator.tsx'), /progress\.account\.dated === false \? ' · sans heure' : ''/);
   assert.match(read('src/features/plex/plexSyncEngine.ts'), /appLogger\.info\('plex', `\[Plex Sync\] \$\{history\?\.length \|\| 0\} visionnage\(s\)/);
+});
+
+test('SEENIT-PLEX-005 retour v1.4.298 : les dates du fil Activité de Plex datent l’historique du compte par GUID exact', () => {
+  // Journal terrain du 12/11 : 27 lignes d'historique serveur sans identité (médias supprimés), historique du compte sans heure.
+  assert.match(PLEX_ACTIVITY_FEED_QUERY, /activityFeed\(first: \$first, after: \$after, types: \[WATCH_HISTORY\]\)/);
+  assert.match(PLEX_ACTIVITY_FEED_QUERY, /\.\.\. on ActivityWatchHistory \{\n\s+id\n\s+date\n\s+metadataItem \{ id guid type \}/);
+  const payload = { data: { activityFeed: { nodes: [
+    { __typename: 'ActivityWatchHistory', date: '2026-10-28T20:15:00.000Z', metadataItem: { guid: 'plex://movie/spider' } },
+    { __typename: 'ActivityWatchHistory', date: null, metadataItem: { guid: 'plex://movie/sans-date' } },
+    { __typename: 'ActivityRating', metadataItem: { guid: 'plex://movie/note' } },
+  ] } } };
+  assert.deepEqual(readPlexActivityDates(payload), [{ guid: 'plex://movie/spider', viewedAt: VIEWED }]);
+  assert.deepEqual(readPlexActivityDates(null), []);
+  const server = read('server.ts');
+  assert.match(server, /if \(!item\.viewedAt && typeof item\.guid === 'string' && dates\.has\(item\.guid\)\) item\.viewedAt = dates\.get\(item\.guid\);/);
+  assert.match(server, /sourceStats\.plexAccountHistoryDateError = \[accountHistory\.datedError, accountHistory\.activityError\]/);
+  assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDated: 60, plexAccountHistoryMode: 'activity' }), { history: 75, unwatched: 0, dated: true });
+  assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDateError: 'Cannot query field "date"' })?.dateError, 'Cannot query field "date"');
+  assert.match(read('src/features/plex/plexSyncEngine.ts'), /Historique du compte sans heure : \$\{progress\.account\.dateError \|\| 'aucune date fournie par Plex'\}/);
 });

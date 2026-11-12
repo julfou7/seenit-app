@@ -204,7 +204,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       progress.historyTotal = history.length; progress.watchlistTotal = watchlist.length;
       progress.servers = [...(plexData?.integrity?.syncedServers || []), ...(plexData?.integrity?.skippedServers || [])];
       progress.complete = plexData?.integrity?.collectionComplete === true;
-      if (!delta) progress.account = readPlexAccountProgress(plexData?.stats); // #954
+      if (!delta) { progress.account = readPlexAccountProgress(plexData?.stats); if (progress.account && !progress.account.dated) appLogger.warn('plex', `[Plex Sync] Historique du compte sans heure : ${progress.account.dateError || 'aucune date fournie par Plex'}`); } // #954
       progress.phase = 'resolve';
       await waitForResume();
       const nextSyncCursor = Number(plexData?.cursor) || Date.now();
@@ -311,7 +311,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       const resolveAndCachePlexItem = async (
         cacheKey: string | null,
         item: ReturnType<typeof buildPlexParentShowIdentityItem>
-      ): Promise<any> => {
+      ): ReturnType<typeof resolvePlexItem> => {
         if (cacheKey && resolutionCache[cacheKey]) return resolutionCache[cacheKey];
         if (cacheKey && sessionResolutionPromises.has(cacheKey)) {
           return sessionResolutionPromises.get(cacheKey)!;
