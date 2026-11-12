@@ -3,7 +3,7 @@ import { emitOperationalEvent } from '../runtime/operationalEvent.ts';
 
 /**
  * #853 — Diffuseurs groupés : une requête authentifiée par écran d'Explorer au lieu d'une par carte.
- * Chaque titre est lu sur `{type}/{id}/watch/providers` de TMDB (concurrence bornée), réduit à la région FR
+ * Chaque titre est lu en un appel TMDB (concurrence bornée), réduit à la région FR
  * (seule lue par l'app) et mis en cache 6 h par instance. Une erreur fournisseur n'est jamais mise en cache :
  * l'entrée revient `null` et le client la redemande seule.
  */
@@ -54,6 +54,23 @@ export function compactWatchProviders(item: BatchItem, payload: unknown): Unknow
   const results = asRecord(asRecord(payload)?.results);
   const fr = asRecord(results?.FR);
   return { id: item.id, results: fr ? { FR: fr } : {} };
+}
+
+function compactTvWatchProviders(item: BatchItem, payload: UnknownRecord): UnknownRecord | null {
+  const providers = asRecord(payload['watch/providers']);
+  if (payload.id !== item.id || !asRecord(providers?.results)) return null;
+  const snapshot = compactWatchProviders(item, providers);
+  if (!Array.isArray(payload.networks) || !payload.networks.some(network => asRecord(network)?.id === 285)) return snapshot;
+  if (typeof payload.homepage !== 'string') return snapshot;
+  try {
+    const url = new URL(payload.homepage);
+    if (url.protocol === 'https:' && ['canalplus.com', 'www.canalplus.com'].includes(url.host)
+      && !url.username && !url.password
+      && /^\/(?:series|decouverte|divertissement|jeunesse|actualites|sport|documentaires)\/[a-z0-9-]+\/h\/\d+_500\d{2}\/?$/i.test(url.pathname)) {
+      return { ...snapshot, originalBroadcaster: 'canal' };
+    }
+  } catch { /* La fiche n'indique pas de lien programme exploitable. */ }
+  return snapshot;
 }
 
 async function readJson(response: Response): Promise<unknown> {
@@ -119,15 +136,22 @@ export function registerWatchProviderBatchRoute(app: Application, dependencies: 
     let failures = 0;
     let next = 0;
     const fetchOne = async (item: BatchItem): Promise<void> => {
-      const target = new URL(`${item.mediaType}/${item.id}/watch/providers`, TMDB_ORIGIN);
+      const target = new URL(item.mediaType === 'tv' ? `tv/${item.id}` : `movie/${item.id}/watch/providers`, TMDB_ORIGIN);
       target.searchParams.set('api_key', credential || '');
+      if (item.mediaType === 'tv') {
+        target.searchParams.set('append_to_response', 'watch/providers');
+        target.searchParams.set('language', 'fr-FR');
+      }
       try {
         const response = await request(target, {
           method: 'GET', headers: { Accept: 'application/json' }, redirect: 'error',
           signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), clientAbort.signal]),
         });
-        const payload = await readJson(response);
-        if (asRecord(payload)) writeCache(item.key, compactWatchProviders(item, payload));
+        const payload = asRecord(await readJson(response));
+        const snapshot = payload && (item.mediaType === 'tv'
+          ? compactTvWatchProviders(item, payload)
+          : compactWatchProviders(item, payload));
+        if (snapshot) writeCache(item.key, snapshot);
         else failures += 1;
       } catch {
         if (!clientAbort.signal.aborted) failures += 1;

@@ -3582,6 +3582,10 @@
         },
         {
           "file": "tests/watchProviderBatch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 distingue la fiche Canal+ du streaming"
+        },
+        {
+          "file": "tests/watchProviderBatch.test.ts",
           "contains": "SEENIT-PROVIDER-002 #853 les cartes visibles ensemble partagent une requête, avec repli titre par titre"
         },
         {

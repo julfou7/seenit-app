@@ -819,7 +819,7 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   carte (#853) :
   - **Requête groupée.** Les cartes devenues visibles ensemble partagent une requête authentifiée
     `/api/media/watch-providers` de 40 titres au plus, regroupée en 24 ms. Le backend lit
-    `watch/providers` de TMDB (8 appels simultanés, quota de 600 titres manquants par compte et par
+    `watch/providers` de TMDB, inclus dans la fiche des séries (8 appels simultanés, quota de 600 titres manquants par compte et par
     minute), ne renvoie que la région FR et met le résultat en cache 6 h. Une erreur fournisseur n'est
     jamais mise en cache : la carte concernée redemande seule, comme avant. Un backend sans cette route
     garde le même repli.
@@ -833,6 +833,10 @@ Les grandes bibliothèques de l’accueil sont aussi couvertes : Historique clas
   sans Réglages, déco/reco, requête TMDB répétée ou purge du cache hérité. Un réseau de production
   historique n'est pas une preuve de streaming. Une lecture cloud ne remplace pas une modification
   locale faite pendant son attente ; la synchronisation simultanée est dédupliquée par UID.
+  Si aucun badge de disponibilité ne s'applique, les cartes de série peuvent indiquer Canal+ comme
+  diffuseur d’origine. La fiche TMDB exacte doit associer la chaîne Canal+ et une fiche programme
+  officielle Canal+ France. Cette attribution respecte Mes plateformes et reste distincte de l'offre
+  de streaming et des actions de lecture.
 - **SEENIT-PROVIDER-003** — Un seul diffuseur à côté du bouton principal des fiches série et film
   (retour terrain du 08/11, `USR-2026-11-08-003`) : la plateforme choisie dans Mes plateformes et
   disponible pour ce titre, sinon Plex quand le titre y est ; un diffuseur public non choisi n'y apparaît
