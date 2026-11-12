@@ -60,11 +60,12 @@ test('SEENIT-UX-006 le conteneur protège navigation clavier, actions secondaire
   assert.match(toastSource, /e\.target !== e\.currentTarget/);
   assert.match(toastSource, /didDragRef\.current = true/);
   assert.match(toastSource, /e\.stopPropagation\(\)/);
-  assert.match(toastSource, /drag="y"/);
-  assert.match(toastSource, /info\.offset\.y > 20 \|\| info\.velocity\.y > 200/);
-  assert.match(toastSource, /touch-pan-x/);
-  assert.doesNotMatch(toastSource, /touch-pan-y/);
-  assert.match(toastSource, /if \(diff > 25\)/);
+  // Retour v1.4.300 : glisser vers le bas ou vers la droite ferme (règle unique, voir tests/toastSwipe.test.ts).
+  assert.match(toastSource, /\n\s+drag\n\s+dragDirectionLock\n/);
+  assert.match(toastSource, /toastSwipeDismissDirection\(info\.offset\.x, info\.offset\.y, info\.velocity\.x, info\.velocity\.y\)/);
+  assert.match(toastSource, /touch-none/);
+  assert.doesNotMatch(toastSource, /touch-pan-y|touch-pan-x/);
+  assert.match(toastSource, /const direction = toastSwipeDismissDirection\(dx, dy\);/);
   assert.match(toastSource, /flex items-center gap-1\.5 shrink-0 ml-auto/);
 });
 

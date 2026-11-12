@@ -24,3 +24,16 @@ export function toastDetailLine({ subtitle, action }: { subtitle?: string; actio
   ].filter(Boolean).join(' · ').replace(/\s*\n+\s*/g, ' · ');
   return { episodeLabel, detail };
 }
+
+export type ToastSwipeDirection = 'down' | 'right';
+
+/**
+ * SEENIT-UX-004 (retour v1.4.300) : tout toast, Plex compris, se ferme en glissant vers le bas ou vers la droite.
+ * Un geste vers le haut ou la gauche, ou trop court et lent, ne ferme rien ; l'axe dominant l'emporte.
+ */
+export function toastSwipeDismissDirection(offsetX: number, offsetY: number, velocityX = 0, velocityY = 0): ToastSwipeDirection | null {
+  const down = offsetY > 24 || velocityY > 250;
+  const right = offsetX > 48 || velocityX > 300;
+  if (down && right) return Math.abs(offsetX) > Math.abs(offsetY) ? 'right' : 'down';
+  return down ? 'down' : right ? 'right' : null;
+}
