@@ -11,7 +11,6 @@ import { HistoryFeed } from '../components/HistoryFeed';
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { tmdb } from '../features/shows/tmdb';
 import { markEpisodeWatched } from '../features/shows/markEpisodeWatched';
-import { OriginalBroadcasterLabel } from '../components/OriginalBroadcasterLabel';
 import { getFormattedProviderLogo } from '../utils/providerLogos';
 import { User, Circle, CheckCircle2, Trash2, Archive, X, Clock, Ban } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
@@ -59,13 +58,15 @@ export function ExpandedItemCard({ show, sectionType, onShowClick, onEpisodeClic
   return <ExpandedLegacyItemCard show={show} sectionType={sectionType} onShowClick={onShowClick} onEpisodeClick={onEpisodeClick} onMarkAsSeen={onMarkAsSeen} onPersonClick={onPersonClick} />;
 }
 
+type LegacyMovieDetails = { runtime?: number | null; release_date?: string; genres?: Array<{ name?: string } | null>; credits?: { cast?: Array<{ id: number; name: string }> } };
+
 function ExpandedLegacyItemCard({ show, sectionType, onShowClick, onEpisodeClick, onMarkAsSeen, onPersonClick }: ExpandedItemCardProps) {
   const isMovie = show.mediaType === 'movie';
   const cachedMovieDetails = isMovie && show.tmdbId
     ? tmdb.peekMediaDetails(show.tmdbId, 'movie')
     : null;
   const [movieRuntime, setMovieRuntime] = useState<number | null>((show as Show & { runtime?: number }).runtime || cachedMovieDetails?.runtime || null);
-  const [movieDetails, setMovieDetails] = useState<any>(cachedMovieDetails);
+  const [movieDetails, setMovieDetails] = useState<LegacyMovieDetails | null>(cachedMovieDetails);
   const isMountedRef = useRef(true);
   const requestedMovieDetailsRef = useRef<number | null>(cachedMovieDetails ? show.tmdbId : null);
 
@@ -268,7 +269,6 @@ function ExpandedLegacyItemCard({ show, sectionType, onShowClick, onEpisodeClick
       {networkLogo && (
         <div className="absolute top-0 right-0 z-30 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-xl p-1 flex items-center justify-center shrink-0 shadow-sm pointer-events-none">
           <img src={networkLogo} alt={providerName || 'Diffuseur'} className="w-5 h-5 object-contain rounded-[3px]" />
-          <OriginalBroadcasterLabel name={providerName} />
         </div>
       )}
 

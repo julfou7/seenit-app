@@ -3,7 +3,6 @@ import { Capacitor } from '@capacitor/core';
 import { Bell, X } from 'lucide-react';
 import type { Show } from '../../types';
 import { SeenItCheckButton } from '../SeenItCheckButton';
-import { OriginalBroadcasterLabel } from '../OriginalBroadcasterLabel';
 import { CANAL_ORIGINAL_BROADCASTER_NAME } from '../../utils/providerLogos';
 import { DialogLayer } from '../ui/DialogLayer';
 import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeriesSeasonProgress, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
@@ -225,12 +224,11 @@ export function SeriesEpisodeCard({ show, today: day, episode, context, detail, 
         {providerLogo && (
           <button
             type="button"
-            className={providerName === CANAL_ORIGINAL_BROADCASTER_NAME ? 'series-8f__provider series-8f__provider--origin' : 'series-8f__provider'}
+            className="series-8f__provider"
             aria-label={providerName === CANAL_ORIGINAL_BROADCASTER_NAME ? `${show.title} · ${providerName}` : `Où regarder ${show.title} : ${providerName || 'diffuseur'}`}
             onClick={() => { void (onProviderOpen ? onProviderOpen() : (onOpenSeries || onOpen)()); }}
           >
             <img src={providerLogo} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />
-            <OriginalBroadcasterLabel name={providerName} overlay={false} />
           </button>
         )}
       </div>

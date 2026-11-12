@@ -3,7 +3,6 @@ import { Circle, CheckCircle2, Sparkles, Tv, Calendar } from 'lucide-react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { getNextEpisodeNumber, getAiredProgress, cn, getTodayStr } from '../../lib/utils';
-import { OriginalBroadcasterLabel } from '../OriginalBroadcasterLabel';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 
@@ -168,7 +167,6 @@ export const UpToDateShowCard = React.memo(function UpToDateShowCard({ show, onS
               alt={providerName || 'Diffuseur'}
               className="w-5 h-5 object-contain rounded-[3px]" 
             />
-            <OriginalBroadcasterLabel name={providerName} />
           </div>
         )}
 
@@ -183,7 +181,7 @@ export const UpToDateShowCard = React.memo(function UpToDateShowCard({ show, onS
 
             let airedInSeason = totalSeasonEps;
 
-            const nextEpToAir = show.nextEpisodeToAir || (show as any).next_episode_to_air || categoryInfo.nextEpisodeToAir;
+            const nextEpToAir = show.nextEpisodeToAir || (show as Show & { next_episode_to_air?: Show['nextEpisodeToAir'] }).next_episode_to_air || categoryInfo.nextEpisodeToAir;
             const currentSeason = show.nextEpisodeToWatch?.season_number || categoryInfo.seasonNumber;
 
             let isAiring = false;
