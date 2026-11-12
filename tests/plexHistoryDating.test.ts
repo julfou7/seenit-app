@@ -124,8 +124,12 @@ test('SEENIT-PLEX-005 retour v1.4.300 : un film présent mais non vu chez un ami
   assert.equal(reconcileAccountHistoryWithLibraries(entries, new Set()).entries.length, entries.length);
   // Côté client, datingOnly date un Vu connu et n'en crée jamais (sinon l'état non vu de la bibliothèque le retirerait).
   const engine = read('src/features/plex/plexSyncEngine.ts');
-  assert.match(engine, /if \(skipAlreadyWatchedMovie\(matchedMovie, provenViewedAt\) \|\| item\.datingOnly === true\) \{/);
-  assert.match(engine, /if \(skipAlreadyWatchedEpisode\(matchedShow, seasonNum, episodeNum, provenViewedAt\) \|\| item\.datingOnly === true\) \{/);
+  // Revue Codex #969 : l'entrée passe d'abord par le cache de résolution et TMDB (GUID Plex/IMDb seul), puis s'arrête
+  // juste avant toute création de Vu, une fois pour les épisodes et une fois pour les films.
+  const guard = /\n\s+if \(item\.datingOnly === true\) continue;[^\n]*\n\s+if \((matchedShow|matchedMovie)\) \{/g;
+  assert.deepEqual([...engine.matchAll(guard)].map(match => match[1]), ['matchedShow', 'matchedMovie']);
+  assert.ok(engine.indexOf('if (item.datingOnly === true) continue;') > engine.indexOf('tmdbData = await resolveAndCachePlexItem(cacheKey, item);'));
+  assert.doesNotMatch(engine, /provenViewedAt\) \|\| item\.datingOnly/);
   const server = read('server.ts');
   assert.match(server, /reconcileAccountHistoryWithLibraries\(allRawItems, currentLibraryGuids\)/);
   assert.match(server, /\.\.\.\(entry\.datingOnly === true \? \{ datingOnly: true \} : \{\}\)/);

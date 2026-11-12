@@ -525,8 +525,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, 'tv');
 
           // Fast skip check: if already in library and episode is already seen, skip immediately
-          if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum, provenViewedAt) || item.datingOnly === true) {
-            continue; // Déjà vu : aucune notification. #954 : datingOnly date un Vu connu, n'en crée jamais.
+          if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum, provenViewedAt)) {
+            continue; // Déjà vu dans seenEpisodes ou episodeRecords : aucune notification.
           }
 
           // 2. If not found locally, check resolution cache
@@ -561,6 +561,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
+          if (item.datingOnly === true) continue; // #954 revue Codex #969 : résolu et daté s’il était déjà vu, jamais créé.
           if (matchedShow) {
             const showId = matchedShow.id;
             if (!mutatedShows[showId]) {
@@ -663,8 +664,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let matchedMovie = findShowInLocalLibrary(showsList, guidTmdbId, 'movie');
 
           // Fast skip check: if already in library and movie is already marked as seen, skip immediately
-          if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt) || item.datingOnly === true) {
-            continue; // #954 : datingOnly date un Vu connu, n'en crée jamais.
+          if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt)) {
+            continue;
           }
 
           // 2. If not found locally, check resolution cache
@@ -699,6 +700,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
+          if (item.datingOnly === true) continue; // #954 revue Codex #969 : résolu et daté s’il était déjà vu, jamais créé.
           if (matchedMovie) {
             const showId = matchedMovie.id;
             if (!mutatedShows[showId]) {
@@ -784,7 +786,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           }
         }
       }
-
 
       // Un FULL Plex contient l'état courant explicite viewCount de la bibliothèque.
       // On applique les non-vu APRÈS les ajouts d'historique afin qu'un viewCount=0
@@ -1052,7 +1053,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         await useShowsStore.getState().fetchShows();
 
         announcePlexSyncedItems(syncedItems); // au-delà de 3 titres : un seul toast de bilan (SEENIT-PLEX-012)
-
 
       } else {
         // // appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
