@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Archive, Trash2, Ban, Info, Clock, AlertCircle, RotateCcw, Bell, BellOff, Heart, HeartOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { createPortal } from 'react-dom';
 import { useToastStore, ToastMessageObj } from '../store/toastStore';
 import { useShowActions } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
@@ -312,7 +313,9 @@ export function ToastContainer() {
   // Retour terrain du 07/11 : un toast d'épisode porte plus d'informations, il a sa propre taille fixe, plus haute.
   const isEpisodeToast = Boolean(episodeLabel);
 
-  return (
+  // Retour v1.4.301 : couche propre sous <body>, que l'inertie d'un dialogue ouvert (synchro Plex) n'atteint pas ;
+  // le toast reste donc fermable par glissement pendant que la feuille est ouverte.
+  return createPortal(<div data-toast-layer="">
     <AnimatePresence>
       {visible && (
         <motion.div
@@ -438,5 +441,5 @@ export function ToastContainer() {
         </motion.div>
       )}
     </AnimatePresence>
-  );
+  </div>, document.body);
 }
