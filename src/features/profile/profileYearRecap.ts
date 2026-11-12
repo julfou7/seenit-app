@@ -32,7 +32,8 @@ export interface ProfileCalendarMonth { month: number; offset: number; days: { d
 
 /** Douze mois, une case par jour : 1 jusqu'à 45 min, 2 jusqu'à 2 h, 3 au-delà, 4 pour la journée record. */
 export function buildProfileCalendar(viewings: readonly ProfileViewing[], year: number, now: number): { months: ProfileCalendarMonth[]; record: { date: Date; minutes: number; films: number; episodes: number } | null } {
-  const days = dayBuckets(inYear(viewings, year));
+  // Retour terrain v1.4.294 : un rattrapage marqué d'un coup n'allume pas le calendrier comme une journée de visionnage.
+  const days = dayBuckets(inYear(viewings, year).filter(viewing => !viewing.catchUp));
   const byKey = new Map(days.map(day => [day.key, day]));
   const best = days.reduce<DayBucket | null>((current, day) => !current || day.minutes > current.minutes ? day : current, null);
   const today = historyLocalDayKey(now);
@@ -66,7 +67,8 @@ export function buildProfileYearRecords(viewings: readonly ProfileViewing[], yea
     months.set(month, entry);
   }
   const bestMonth = [...months.entries()].sort((a, b) => b[1].minutes - a[1].minutes || a[0] - b[0])[0];
-  const days = dayBuckets(list);
+  // Retour terrain v1.4.294 : un rattrapage marqué d'un coup ne fait ni suite de jours, ni pause, ni marathon.
+  const days = dayBuckets(list.filter(viewing => !viewing.catchUp));
   let streak: ProfileYearRecords['streak'] = null, runStart = 0;
   let pause: ProfileYearRecords['pause'] = null;
   days.forEach((day, index) => {
@@ -99,6 +101,7 @@ export function buildYearInSeries(viewings: readonly ProfileViewing[], shows: re
   }
   const allByShow = new Map<string, number[]>();
   for (const viewing of viewings) if (viewing.mediaType === 'tv') (allByShow.get(viewing.showId) || allByShow.set(viewing.showId, []).get(viewing.showId)!).push(viewing.watchedAt);
+  const caughtUp = new Set(viewings.filter(viewing => viewing.catchUp).map(viewing => `${viewing.showId}@${viewing.watchedAt}`));
   const showsById = new Map(shows.map(show => [show.id, show]));
   const current = new Date(now);
   const tops = [...months.entries()].map(([month, bucket]) => {
@@ -111,7 +114,7 @@ export function buildYearInSeries(viewings: readonly ProfileViewing[], shows: re
     const monthStart = new Date(year, top.month, 1).getTime(), monthEnd = new Date(year, top.month + 1, 1).getTime();
     const inMonth = times.filter(time => time >= monthStart && time < monthEnd);
     const perDay = new Map<string, number>();
-    inMonth.forEach(time => perDay.set(historyLocalDayKey(time), (perDay.get(historyLocalDayKey(time)) || 0) + 1));
+    inMonth.filter(time => !caughtUp.has(`${top.showId}@${time}`)).forEach(time => perDay.set(historyLocalDayKey(time), (perDay.get(historyLocalDayKey(time)) || 0) + 1));
     const maxDay = Math.max(0, ...perDay.values());
     const before = times.filter(time => time < monthStart).pop();
     const gap = before !== undefined && inMonth.length ? Math.floor((inMonth[0] - before) / DAY_MS) : 0;

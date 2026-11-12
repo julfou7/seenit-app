@@ -245,3 +245,63 @@ export function buildTieredBadges(values: Record<ProfileBadgeId, number>): Profi
     return { id, title, level, value, next, progress, detail };
   });
 }
+
+// Retour terrain v1.4.294 : « MobLand, un épisode chaque vendredi soir » montre ce que l'on aime, bien plus qu'un
+// rattrapage marqué d'un coup. Un rendez-vous = au moins quatre semaines d'affilée, à petite dose, jusqu'à cette semaine
+// ou la précédente.
+export const PROFILE_APPOINTMENT_MIN_WEEKS = 4;
+const APPOINTMENT_MAX_PER_WEEK = 3;
+const APPOINTMENT_LOOKBACK_WEEKS = 26;
+const APPOINTMENT_LIMIT = 3;
+const WEEKDAYS_FR = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+
+export interface ProfileAppointment {
+  showId: string;
+  title: string;
+  posterPath: string | null;
+  weeks: number;
+  episodes: number;
+  /** 0 = lundi ; null si aucun jour ne domine. */
+  weekday: number | null;
+  evening: boolean;
+}
+
+const mondayOf = (time: number) => { const date = new Date(time); date.setHours(0, 0, 0, 0); date.setDate(date.getDate() - (date.getDay() + 6) % 7); return date.getTime(); };
+const weekIndex = (time: number, thisMonday: number) => Math.round((thisMonday - mondayOf(time)) / (7 * DAY_MS));
+
+export function buildProfileAppointments(viewings: readonly ProfileViewing[], now: number): ProfileAppointment[] {
+  const thisMonday = mondayOf(now);
+  const byShow = new Map<string, ProfileViewing[]>();
+  for (const viewing of viewings) {
+    if (viewing.mediaType !== 'tv' || viewing.catchUp || viewing.watchedAt > now) continue;
+    if (weekIndex(viewing.watchedAt, thisMonday) >= APPOINTMENT_LOOKBACK_WEEKS) continue;
+    const list = byShow.get(viewing.showId);
+    if (list) list.push(viewing); else byShow.set(viewing.showId, [viewing]);
+  }
+  const appointments: ProfileAppointment[] = [];
+  for (const [showId, list] of byShow) {
+    const perWeek = new Map<number, ProfileViewing[]>();
+    for (const viewing of list) { const week = weekIndex(viewing.watchedAt, thisMonday); (perWeek.get(week) || perWeek.set(week, []).get(week)!).push(viewing); }
+    // La série doit se poursuivre jusqu'à cette semaine ou la précédente.
+    let week = perWeek.has(0) ? 0 : perWeek.has(1) ? 1 : -1;
+    if (week < 0) continue;
+    const run: ProfileViewing[] = [];
+    let weeks = 0;
+    // Revue Codex #955 : la limite vaut pour chaque semaine ; une semaine de binge arrête la suite.
+    while (perWeek.has(week) && perWeek.get(week)!.length <= APPOINTMENT_MAX_PER_WEEK) { run.push(...perWeek.get(week)!); weeks++; week++; }
+    if (weeks < PROFILE_APPOINTMENT_MIN_WEEKS) continue;
+    const days = new Array<number>(7).fill(0);
+    for (const viewing of run) days[(new Date(viewing.watchedAt).getDay() + 6) % 7]++;
+    const topDay = days.indexOf(Math.max(...days));
+    const timed = run.filter(viewing => viewing.timeKnown);
+    const evening = timed.length >= 2 && timed.filter(viewing => { const hour = new Date(viewing.watchedAt).getHours(); return hour >= 18 || hour < 2; }).length / timed.length >= 0.6;
+    appointments.push({ showId, title: list[0].title, posterPath: list[0].posterPath, weeks, episodes: run.length, weekday: days[topDay] / run.length >= 0.6 ? topDay : null, evening });
+  }
+  return appointments.sort((left, right) => right.weeks - left.weeks || right.episodes - left.episodes || left.title.localeCompare(right.title)).slice(0, APPOINTMENT_LIMIT);
+}
+
+/** « chaque vendredi soir · 8 semaines d'affilée » */
+export function formatProfileAppointment(appointment: Pick<ProfileAppointment, 'weekday' | 'evening' | 'weeks'>): string {
+  const when = appointment.weekday !== null ? `chaque ${WEEKDAYS_FR[appointment.weekday]}${appointment.evening ? ' soir' : ''}` : appointment.evening ? 'chaque semaine, le soir' : 'chaque semaine';
+  return `${when} · ${appointment.weeks} semaines d’affilée`;
+}

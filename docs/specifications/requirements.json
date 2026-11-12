@@ -4082,6 +4082,10 @@
       "tests": [
         {
           "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-006 retour terrain v1.4.294 : les rendez-vous réguliers ressortent, un rattrapage ne compte que comme vu"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-006 retour terrain v1.4.293 : les chiffres partent du premier import quand il suit la création du compte"
         },
         {

@@ -7,6 +7,9 @@ import { useSyncStore } from '../store/syncStore';
 import { tmdb, type TMDBMedia } from '../features/shows/tmdb';
 import { type Show } from '../types';
 
+// SEENIT-PROFILE-006 : chaque visionnage importé depuis TV Time est étiqueté, pour l'exclure des chiffres par période.
+const TV_TIME_IMPORT = 'tvtime' as const;
+
 interface LocalTask {
   id: string;
   rawTitle: string;
@@ -112,7 +115,7 @@ export function CsvImporter() {
             const mergedRecords = { ...(showData.episodeRecords || {}) };
             taskSeenEpisodes.forEach(ep => {
               if (!mergedRecords[ep]) {
-                mergedRecords[ep] = { watchedAt: Date.now() };
+                mergedRecords[ep] = { watchedAt: Date.now(), importedFrom: TV_TIME_IMPORT };
               }
             });
 
@@ -144,15 +147,15 @@ export function CsvImporter() {
               updatedAt: Date.now(),
               createdAt: Date.now(),
               seenEpisodes: ['1x1'],
-              episodeRecords: { '1x1': { watchedAt: Date.now() } },
+              episodeRecords: { '1x1': { watchedAt: Date.now(), importedFrom: TV_TIME_IMPORT } },
               firstAirDate: bestMatch.release_date || bestMatch.first_air_date || null,
               networks: null,
             };
             await setDoc(doc(showsRef), newShowData);
           } else {
-            const episodeRecordsObj: Record<string, { watchedAt: number }> = {};
+            const episodeRecordsObj: Record<string, { watchedAt: number; importedFrom: typeof TV_TIME_IMPORT }> = {};
             taskSeenEpisodes.forEach(ep => {
-              episodeRecordsObj[ep] = { watchedAt: Date.now() };
+              episodeRecordsObj[ep] = { watchedAt: Date.now(), importedFrom: TV_TIME_IMPORT };
             });
 
             const newShowData = {
@@ -179,9 +182,8 @@ export function CsvImporter() {
         setTasks([...updatedTasks]);
 
         await new Promise(resolve => setTimeout(resolve, 300));
-      } catch (err: any) {
-        console.error("Error processing task:", err);
-        updatedTasks[i] = { ...task, status: 'failed', error: err.message || 'Erreur inattendue' };
+      } catch (err: unknown) {
+        updatedTasks[i] = { ...task, status: 'failed', error: err instanceof Error && err.message ? err.message : 'Erreur inattendue' };
         setTasks([...updatedTasks]);
       }
     }
@@ -311,8 +313,8 @@ export function CsvImporter() {
             setIsUploading(false);
             event.target.value = '';
             processQueue(tasksToCreate);
-          } catch (innerErr: any) {
-            setError(innerErr.message || "Erreur lors du traitement du CSV");
+          } catch (innerErr: unknown) {
+            setError(innerErr instanceof Error && innerErr.message ? innerErr.message : "Erreur lors du traitement du CSV");
             setIsUploading(false);
           }
         },
@@ -321,8 +323,8 @@ export function CsvImporter() {
           setIsUploading(false);
         }
       });
-    } catch (err: any) {
-      setError(err.message || "Erreur lors du chargement du fichier");
+    } catch (err: unknown) {
+      setError(err instanceof Error && err.message ? err.message : "Erreur lors du chargement du fichier");
       setIsUploading(false);
     }
   };
