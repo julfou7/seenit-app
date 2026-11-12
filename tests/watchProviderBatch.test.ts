@@ -4,6 +4,7 @@ import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import express, { type RequestHandler } from 'express';
+import { resolvePassiveProviderState } from '../src/features/providers/passiveProviderState.ts';
 import {
   WATCH_PROVIDER_BATCH_ITEM_BUDGET_PER_MINUTE,
   WATCH_PROVIDER_BATCH_MAX_CONCURRENT,
@@ -36,9 +37,11 @@ test('SEENIT-PROVIDER-002 #853 une requête groupée par écran, réduite à la 
       active += 1; maxActive = Math.max(maxActive, active);
       await sleep(5);
       active -= 1;
-      const id = Number(url.pathname.split('/').at(-3));
+      const isTv = url.pathname.startsWith('/3/tv/');
+      const id = Number(url.pathname.split('/')[3]);
       if (id === 13) return json({ status_code: 34 }, 404);
-      return json({ id, results: { FR: { link: `https://www.themoviedb.org/${id}`, flatrate: [offer(8, 'netflix')] }, US: { flatrate: [offer(15, 'hulu')] } } });
+      const providers = { id, results: { FR: { link: `https://www.themoviedb.org/${id}`, flatrate: [offer(8, 'netflix')] }, US: { flatrate: [offer(15, 'hulu')] } } };
+      return json(isTv ? { id, 'watch/providers': providers } : providers);
     },
   });
   const server = app.listen(0, '127.0.0.1');
@@ -56,7 +59,9 @@ test('SEENIT-PROVIDER-002 #853 une requête groupée par écran, réduite à la 
   assert.deepEqual(Object.keys(body.results[0].providers!.results), ['FR'], 'seule la région française voyage');
   assert.equal(body.results.find(entry => entry.key === 'movie:13')!.providers, null, 'une panne fournisseur reste nulle');
   assert.ok(maxActive <= WATCH_PROVIDER_BATCH_MAX_CONCURRENT, 'concurrence fournisseur bornée');
-  assert.ok(calls.every(url => url.searchParams.get('api_key') === 'private-tmdb-key' && /\/(movie|tv)\/\d+\/watch\/providers$/.test(url.pathname)));
+  assert.ok(calls.every(url => url.searchParams.get('api_key') === 'private-tmdb-key'
+    && (/\/movie\/\d+\/watch\/providers$/.test(url.pathname)
+      || (/\/tv\/\d+$/.test(url.pathname) && url.searchParams.get('append_to_response') === 'watch/providers'))));
   assert.doesNotMatch(JSON.stringify(body), /private-tmdb-key/, 'la clé ne sort jamais');
 
   const callsAfterFirst = calls.length;
@@ -78,6 +83,42 @@ test('SEENIT-PROVIDER-002 #853 parse et compacte sans jamais inventer d’offre'
   assert.equal(parseWatchProviderBatchItems(''), null);
   const item = { mediaType: 'tv' as const, id: 7, key: 'tv:7' };
   assert.deepEqual(compactWatchProviders(item, { results: { US: {} } }), { id: 7, results: {} }, 'sans offre française : rien');
+});
+
+test('SEENIT-PROVIDER-002 distingue la fiche Canal+ du streaming', async t => {
+  const app = express();
+  const programme = 'https://www.canalplus.com/decouverte/le-gang-des-souris-vertes/h/31946070_50001';
+  registerWatchProviderBatchRoute(app, {
+    authenticate: (req, _res, next) => { Object.assign(req, { user: { uid: 'fixture' } }); next(); },
+    secrets: () => ({ TMDB_API_KEY: 'fixture' }),
+    fetch: async input => {
+      const url = new URL(String(input));
+      assert.equal(url.searchParams.get('append_to_response'), 'watch/providers');
+      const id = Number(url.pathname.split('/').at(-1));
+      const homepage = id === 2 ? 'https://www.canalplus.com/'
+        : id === 4 ? 'https://www.canalplus.com/series/autre-serie/h/7654321_50001'
+          : programme;
+      const networks = id === 3 ? [{ id: 999 }] : [{ id: 285 }];
+      return json({ id, homepage, networks, 'watch/providers': { results: {} } });
+    },
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise<void>(resolve => server.once('listening', resolve));
+  t.after(() => new Promise<void>(resolve => { server.closeAllConnections(); server.close(() => resolve()); }));
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/media/watch-providers?items=tv:335510,tv:2,tv:3,tv:4`);
+  const { results } = await response.json();
+  assert.deepEqual(results.map(({ providers }: { providers: unknown }) => providers), [
+    { id: 335510, results: {}, originalBroadcaster: 'canal' },
+    { id: 2, results: {} },
+    { id: 3, results: {} },
+    { id: 4, results: {}, originalBroadcaster: 'canal' },
+  ]);
+  const source = results[0].providers.originalBroadcaster;
+  assert.equal(resolvePassiveProviderState('tv:335510', null, null, true, [381], source).name, 'Canal+ · diffuseur d’origine');
+  assert.equal(resolvePassiveProviderState('tv:335510', null, null, true, [8], source).name, null);
+  assert.equal(resolvePassiveProviderState('tv:335510', null, { available: true }, true, [381], source).name, 'Plex');
 });
 
 test('SEENIT-PROVIDER-002 #853 les cartes visibles ensemble partagent une requête, avec repli titre par titre', async () => {

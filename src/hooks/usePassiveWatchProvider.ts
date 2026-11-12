@@ -34,7 +34,7 @@ interface PassiveWatchProviderParams {
 type OfficialProvider = ReturnType<typeof extractOfficialStreamingProvider>;
 
 type CachedProviderSnapshot = {
-  data: { results?: WatchProviderResults };
+  data: { results?: WatchProviderResults; originalBroadcaster?: unknown };
   fresh: boolean;
   provider: OfficialProvider;
 };
@@ -125,6 +125,7 @@ export function usePassiveWatchProvider({
     cachedPlexInfo,
     Boolean(renderSnapshot?.fresh),
     preferredProviderIds,
+    renderSnapshot?.data.originalBroadcaster,
   );
   const [providerState, setProviderState] = useState<PassiveProviderState>(() => renderProviderState);
   const [loadingState, setLoadingState] = useState<ProviderLoadingState>(() => ({
@@ -202,10 +203,11 @@ export function usePassiveWatchProvider({
       usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
       Boolean(initialSnapshot?.fresh),
       preferredProviderIds,
+      initialSnapshot?.data.originalBroadcaster,
     ));
     finishLoading();
 
-    const applyAuthoritativeTmdbPayload = (payload: { results?: WatchProviderResults }) => {
+    const applyAuthoritativeTmdbPayload = (payload: { results?: WatchProviderResults; originalBroadcaster?: unknown }) => {
       if (!isMounted) return;
       const stream = payload?.results
         ? extractOfficialStreamingProvider(payload.results, preferredProviderIds)
@@ -216,6 +218,7 @@ export function usePassiveWatchProvider({
         usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
         true,
         preferredProviderIds,
+        payload.originalBroadcaster,
       ));
       finishLoading();
     };
@@ -236,6 +239,7 @@ export function usePassiveWatchProvider({
           latestPlexInfo,
           true,
           preferredProviderIds,
+          latestSnapshot?.data.originalBroadcaster,
         ));
         finishLoading();
         return;
@@ -271,6 +275,7 @@ export function usePassiveWatchProvider({
           usePlexAvailabilityStore.getState().getMediaAvailability(plexMediaKey),
           true,
           preferredProviderIds,
+          latestSnapshot?.data.originalBroadcaster,
         ));
         finishLoading();
         return;
