@@ -288,3 +288,21 @@ test('SEENIT-PROFILE-001 retour terrain v1.4.293 : trois sections ou moins défi
   assert.match(library, /\{shelfSections\.map\(section => \(/);
   assert.match(read('src/screens/moi.css'), /\.moi-shelf-rail\{[^}]*padding:4px 16px 2px;scroll-padding-inline:16px;scroll-snap-type:x proximity/);
 });
+
+test('SEENIT-PROFILE-003 retour terrain v1.4.294 : douze mois glissants par défaut et mois sous les tendances', async () => {
+  const { buildProfileRollingStats, profileRollingMonthYears, profileRollingWindowStart } = await import('../src/features/profile/profileYearStats.ts');
+  const now = at(2026, 10, 12, 8);
+  assert.equal(profileRollingWindowStart(now), new Date(2025, 11, 1).getTime(), 'de décembre 2025 à novembre 2026');
+  assert.deepEqual(profileRollingMonthYears(now), [2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2026, 2025]);
+  const stats = buildProfileRollingStats([view('a', at(2025, 11, 20)), view('a', at(2026, 10, 2)), view('a', at(2025, 10, 20))], now);
+  assert.equal(stats.months.length, 12);
+  assert.equal(stats.months[11], 45, 'décembre 2025 reste à sa place de décembre');
+  assert.equal(stats.months[10], 45, 'novembre 2026 seulement, pas novembre 2025');
+  assert.equal(stats.minutes, 90);
+  const dashboard = read('src/components/ProAnalyticsDashboard.tsx');
+  assert.match(dashboard, /const rolling = pickedYear === null \|\|/);
+  assert.match(dashboard, /periodLabel=\{rolling \? 'sur 12 mois' : undefined\}/);
+  assert.match(dashboard, /<span>12 derniers mois<\/span>/);
+  assert.match(dashboard, /className="moi-week-months"/);
+  assert.match(read('src/components/profile/MonthDial.tsx'), /monthYears && monthYears\[month\] !== year/);
+});

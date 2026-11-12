@@ -336,10 +336,35 @@ export function formatProfilePunchSlot(slot: NonNullable<ProfilePunchCard['slot'
   return `le ${WEEKDAY_NAMES[slot.day]}, de ${hourLabel(slot.fromHour)} à ${hourLabel(slot.toHour)}`;
 }
 
+/**
+ * Retour terrain v1.4.294 : par défaut, les douze derniers mois glissants (le mois en cours et les onze précédents).
+ * Chaque mois garde sa place calendaire sur le cadran ; `monthYears` dit de quelle année il vient.
+ */
+export function profileRollingWindowStart(now = Date.now()): number {
+  const current = new Date(now);
+  return new Date(current.getFullYear(), current.getMonth() - 11, 1).getTime();
+}
+
+export function profileRollingViewings(viewings: readonly ProfileViewing[], now = Date.now()): ProfileViewing[] {
+  const from = profileRollingWindowStart(now);
+  return viewings.filter(viewing => viewing.watchedAt >= from && viewing.watchedAt <= now);
+}
+
+export function profileRollingMonthYears(now = Date.now()): number[] {
+  const current = new Date(now);
+  return Array.from({ length: 12 }, (_, month) => month <= current.getMonth() ? current.getFullYear() : current.getFullYear() - 1);
+}
+
+export function buildProfileRollingStats(viewings: readonly ProfileViewing[], now = Date.now()): ProfileYearStats {
+  return buildPeriodStats(profileRollingViewings(viewings, now), 12, new Date(now).getFullYear());
+}
+
 export function buildProfileYearStats(viewings: readonly ProfileViewing[], year: number, now = Date.now()): ProfileYearStats {
   const current = new Date(now);
-  const inYear = yearViewings(viewings, year);
-  const monthCount = year === current.getFullYear() ? current.getMonth() + 1 : 12;
+  return buildPeriodStats(yearViewings(viewings, year), year === current.getFullYear() ? current.getMonth() + 1 : 12, year);
+}
+
+function buildPeriodStats(inYear: readonly ProfileViewing[], monthCount: number, year: number): ProfileYearStats {
   const months = new Array<number>(monthCount).fill(0);
   const monthEpisodes = new Array<number>(monthCount).fill(0);
   const monthFilms = new Array<number>(monthCount).fill(0);
