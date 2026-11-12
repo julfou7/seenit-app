@@ -233,5 +233,5 @@ test('Moi · Mes chiffres et Mon année gardent un seul or, les données réelle
   assert.match(dashboardSource, /onPersonClick\?\.\(person\.id\)/);
   assert.doesNotMatch(dashboardSource, /indigo|rose-|emerald|cinephileArchetype/);
   for (const title of ['jour par jour', 'Ton année en séries', 'Films ou séries, mois par mois', 'Ton top de l’année', 'Et maintenant']) assert.ok(storySource.includes(title), title);
-  assert.match(storySource, /buildProfileProjection\(shows, viewings, now\)/);
+  assert.match(storySource, /buildProfileProjection\(shows, viewings\.filter\(viewing => !viewing\.catchUp\), now\)/);
 });

@@ -23,6 +23,8 @@ import {
 } from '../features/profile/profileYearStats';
 import {
   PROFILE_REACTIONS,
+  buildProfileAppointments,
+  formatProfileAppointment,
   buildGenreShares,
   buildLeadActors,
   buildProfileInsights,
@@ -98,8 +100,11 @@ export function ProAnalyticsDashboard({
     return actors?.length ? actors.slice(0, 3).map(actor => ({ id: actor.id, name: actor.name, profile_path: actor.profile_path })) : leadCastFromDetails(details(show), show.mediaType);
   };
   const rhythm = useMemo(() => buildProfileRhythm(viewings, now), [viewings]);
-  const typicalDay = useMemo(() => buildTypicalDay(yearViewings), [yearViewings]);
-  const streaks = useMemo(() => buildProfileStreaks(viewings, now), [viewings]);
+  // Retour terrain v1.4.294 : journée type, jours d'affilée et nuits ignorent les rattrapages marqués d'un coup.
+  const liveViewings = useMemo(() => viewings.filter(viewing => !viewing.catchUp), [viewings]);
+  const typicalDay = useMemo(() => buildTypicalDay(yearViewings.filter(viewing => !viewing.catchUp)), [yearViewings]);
+  const streaks = useMemo(() => buildProfileStreaks(liveViewings, now), [liveViewings]);
+  const appointments = useMemo(() => buildProfileAppointments(liveViewings, now), [liveViewings]);
   const weeks = useMemo(() => buildWeeklyTrend(viewings, now), [viewings]);
   const insights = buildProfileInsights(viewings, now, genreOf);
   const genres = buildGenreShares(yearViewings, now, genreOf);
@@ -108,10 +113,10 @@ export function ProAnalyticsDashboard({
   const fallbackLeads = data?.topActors.slice(0, 3) ?? [];
   const badges = useMemo(() => data ? buildTieredBadges({
     centenaire: data.totalEpisodesSeen + data.totalMoviesSeen,
-    night_owl: countNightViewings(viewings),
+    night_owl: countNightViewings(liveViewings),
     big_screen: data.totalMoviesSeen,
     binge_master: data.completedTvCount,
-  }) : [], [data, viewings]);
+  }) : [], [data, liveViewings]);
   const fateSummary = useMemo(() => summarizeSeriesFate(fate), [fate]);
   const importNote = formatProfileImportNote(imports, year);
   const scopeNote = formatProfileScopeNote(scope, year);
@@ -200,6 +205,20 @@ export function ProAnalyticsDashboard({
           })}</div>
           <div className="moi-axis"><span>semaines depuis le {dayMonth.format(new Date(weeks[0].start))}</span><span>en or : 28 derniers jours</span></div>
           {insights.map(insight => <div key={insight.id} className="moi-insight"><span><strong>{insight.title}</strong><small>{insight.detail}</small></span><b className={insight.id === 'rhythm' ? 'moi-glow-text' : undefined}>{insight.value}</b></div>)}
+        </>}
+      </Reveal>}
+
+      {/* 3 bis. Retour terrain v1.4.294 : les séries suivies semaine après semaine, ce que l'on aime vraiment. */}
+      {appointments.length > 0 && <Reveal label="Tes rendez-vous">
+        {() => <>
+          <Head title="Tes rendez-vous" note="semaine après semaine" />
+          {appointments.map((appointment, index) => (
+            <div key={appointment.showId} className="moi-appointment moi-pop" style={delay(100 + index * 90)}>
+              {appointment.posterPath ? <img src={imageUrl(appointment.posterPath, 'w92') || undefined} alt="" loading="lazy" /> : <i aria-hidden="true" />}
+              <span><strong>{appointment.title}</strong><small>{formatProfileAppointment(appointment)}</small></span>
+              <b className={index === 0 ? 'moi-glow-text' : undefined}>{appointment.weeks}<small>sem.</small></b>
+            </div>
+          ))}
         </>}
       </Reveal>}
 

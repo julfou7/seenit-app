@@ -42,7 +42,7 @@ export function ProfileYearStory({ shows, fate, since = null, libraryReady = tru
   const media = useMemo(() => buildMediaMonths(viewings, year, now), [viewings, year]);
   const top = useMemo(() => buildTopSeries(viewings, year), [viewings, year]);
   const fates = useMemo(() => countSeriesFatesInYear(fate, viewings, year), [fate, viewings, year]);
-  const projection = useMemo(() => buildProfileProjection(shows, viewings, now), [shows, viewings]);
+  const projection = useMemo(() => buildProfileProjection(shows, viewings.filter(viewing => !viewing.catchUp), now), [shows, viewings]);
   const [allMonths, setAllMonths] = useState(false);
   const monthsReveal = useRevealFocus<HTMLDivElement>('.moi-series-month');
   const importNote = formatProfileImportNote(imports, year);

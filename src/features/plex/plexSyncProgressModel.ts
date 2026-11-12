@@ -13,6 +13,8 @@ export interface PlexServerProgress {
   done: number;
   total: number;
   watched?: number;
+  /** #954 : médias de la bibliothèque lus pendant une complète, pour distinguer « peu de vus » et « bibliothèque non lue ». */
+  inventory?: number;
   reason?: string;
 }
 
@@ -80,10 +82,12 @@ export function formatCompactCount(value: number): string {
 }
 
 /** État court d'un serveur pour une ligne du panneau : jamais d'URL ni de jeton. */
-export function serverStatusLabel(server: { state?: PlexServerProgressState; done?: number; total?: number; watched?: number; watchedItems?: number; reason?: string }): string {
+export function serverStatusLabel(server: { state?: PlexServerProgressState; done?: number; total?: number; watched?: number; watchedItems?: number; inventory?: number; inventoryItems?: number; reason?: string }): string {
   if (server.reason) return /délai|hors ligne|timeout/i.test(server.reason) ? 'hors ligne' : 'inaccessible';
   if (server.state === 'skipped') return 'inaccessible';
   if (server.state === 'pending') return 'en attente';
   if (server.state === 'scanning') return server.total && server.total > 0 ? `${Math.round(serverFraction({ state: 'scanning', done: server.done || 0, total: server.total }) * 100)} %` : 'en cours';
-  return `${formatCompactCount(server.watched ?? server.watchedItems ?? 0)} vus`;
+  const inventory = server.inventory ?? server.inventoryItems;
+  const watched = `${formatCompactCount(server.watched ?? server.watchedItems ?? 0)} vus`;
+  return inventory && inventory > 0 ? `${watched} sur ${formatCompactCount(inventory)}` : watched;
 }

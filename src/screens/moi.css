@@ -215,3 +215,8 @@ i[data-level="1"]{background:rgba(229,169,61,.3)}i[data-level="2"]{background:rg
 /* Retour terrain v1.4.291 : pas de grand vide en bas des pages de Moi. */
 .moi-root .moi-panel:last-child,.moi-root .moi-library{padding-bottom:0}
 .moi-root .home-load-more:last-child{margin-bottom:8px}
+/* Retour terrain v1.4.294 : rendez-vous réguliers (affiche, série, cadence, semaines d'affilée). */
+.moi-appointment{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:12px;padding:8px 0}
+.moi-appointment>img,.moi-appointment>i{width:40px;height:60px;border-radius:8px;object-fit:cover;background:#1C1C1F}
+.moi-appointment>span{display:flex;flex-direction:column;gap:3px;min-width:0}.moi-appointment strong{font-size:14.5px;font-weight:800;color:#fff}
+.moi-appointment small{font-size:12.5px;color:#a1a1aa}.moi-appointment>b{font-size:20px;font-weight:800;color:#F2C36B;display:flex;align-items:baseline;gap:3px}.moi-appointment>b>small{font-size:11px;font-weight:700}

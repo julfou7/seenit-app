@@ -1642,9 +1642,14 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   chiffres, Mon année et la carte « Ton année » de Moi lisent une seule portée de visionnages réels : rien avant
   le jour de création du compte (ou le jour du premier import s'il est postérieur et qu'aucun Vu marqué dans l'app ne le
   précède : bibliothèque chargée, l'historique Plex daté d'avant n'est pas de la vie SeenIt ; sinon c'est un
-  rattrapage tardif et l'historique antérieur reste compté), aucun rattrapage (trois épisodes ou plus d'une même série marqués à moins de
-  cinq minutes d'écart, jamais les films) et aucune journée d'import de plus de 24 h. Le rattrapage n'est donc
-  jamais un marathon ni une journée record. Les totaux (épisodes, films, badges de volume) comptent tout ; une
+  rattrapage tardif et l'historique antérieur reste compté) et aucune journée d'import de plus de 24 h ni aucun
+  visionnage étiqueté `importedFrom: 'tvtime'` (posé par l'import CSV TV Time). Retour v1.4.294 : un rattrapage
+  (trois épisodes ou plus d'une même série marqués à moins de cinq minutes d'écart, jamais les films) reste un
+  visionnage compté dans les heures, mois, tendances, top et genres ; il ne fait jamais de marathon, de journée
+  record, de case de calendrier, de jour d'affilée, de journée type ni d'heure de « Quand tu regardes ». « Tes
+  rendez-vous » met en valeur au plus trois séries suivies au moins quatre semaines d'affilée jusqu'à cette semaine
+  ou la précédente, à trois épisodes par semaine au plus, avec le jour dominant (60 %) et « soir » si les heures
+  connues tombent entre 18 h et 2 h. Les totaux (épisodes, films, badges de volume) comptent tout ; une
   note indique la date d'inscription et le nombre d'épisodes marqués d'un coup écartés. Une série finie compte
   comme terminée même archivée, et la fin d'une série se lit aussi dans son statut TMDB.
 - **SEENIT-UX-023** — Statut de diffusion de la fiche série (régression de la refonte des fiches, #942). La

@@ -60,7 +60,7 @@ export function createPlexSyncProgressReporter(options: PlexSyncProgressReporter
     serverScanning: (id: string) => { const entry = server(id); if (entry && entry.state === 'pending') { entry.state = 'scanning'; touch(); } },
     serverItems: (id: string, items: number, total?: number) => { const entry = server(id); if (!entry) return; entry.done += Math.max(0, items); if (total !== undefined && total > 0) entry.total += total; touch(); },
     serverRestart: (id: string) => { const entry = server(id); if (entry) { entry.done = 0; entry.total = 0; touch(); } },
-    serverDone: (id: string, watched: number) => { const entry = server(id); if (entry) { entry.state = 'done'; entry.watched = watched; touch(); } },
+    serverDone: (id: string, watched: number, inventory?: number) => { const entry = server(id); if (entry) { entry.state = 'done'; entry.watched = watched; if (inventory !== undefined && inventory > 0) entry.inventory = inventory; touch(); } },
     serverSkipped: (id: string, reason: string) => { const entry = server(id); if (entry) { entry.state = 'skipped'; entry.reason = reason; touch(); } },
     setEnrich: (done: number, total: number) => { progress.enrichDone = done; progress.enrichTotal = total; touch(); },
     finish: () => {

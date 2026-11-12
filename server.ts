@@ -1157,7 +1157,7 @@ async function startServer() {
 
           const fingerprint = items
             .slice(0, 5)
-            .map((item: any) => item.ratingKey || item.key || item.guid || '')
+            .map((item: { ratingKey?: unknown; key?: unknown; guid?: unknown }) => item.ratingKey || item.key || item.guid || '')
             .filter(Boolean)
             .join('|');
           if (page > 0 && fingerprint && fingerprint === previousFingerprint) {
@@ -1667,7 +1667,7 @@ async function startServer() {
         if (serverSucceeded) {
           const watchedItems = result.historyItems.length + result.libraryItems.length;
           result.synced = { id: serverId, name: serverName, owned, watchedItems, inventoryItems: result.inventoryCount };
-          syncProgress.serverDone(serverId, watchedItems);
+          syncProgress.serverDone(serverId, watchedItems, delta ? undefined : result.inventoryCount);
         } else {
           result.skipped = { id: serverId, name: serverName, owned, reason: describeServerFailure(lastFailure) };
           syncProgress.serverSkipped(serverId, result.skipped.reason);

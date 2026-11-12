@@ -35,6 +35,10 @@ export interface ProfileViewing {
   /** L'heure vient d'une lecture Plex (heure réelle), pas d'un Vu marqué dans l'app (heure du geste). */
   plexTime?: boolean;
   minutes: number;
+  /** Retour v1.4.294 : marqué d'un coup avec d'autres épisodes de la série ; compté comme vu, jamais comme soirée. */
+  catchUp?: boolean;
+  /** Épisode ou film étiqueté à l'import TV Time : compté dans les totaux, pas dans les chiffres par période. */
+  imported?: boolean;
 }
 
 export function formatProfileHours(minutes: number): string {
@@ -99,6 +103,7 @@ export function collectProfileViewings(shows: readonly Show[]): ProfileViewing[]
         platform: record?.plexImported === true ? 'Plex' : platform,
         ...timing,
         plexTime: record?.plexImported === true,
+        ...(record?.importedFrom === 'tvtime' ? { imported: true } : {}),
         minutes: asPositiveNumber(record?.runtime) || MOVIE_MINUTES,
       });
       continue;
@@ -114,6 +119,7 @@ export function collectProfileViewings(shows: readonly Show[]): ProfileViewing[]
         platform: record?.plexImported === true ? 'Plex' : platform,
         ...timing,
         plexTime: record?.plexImported === true,
+        ...(record?.importedFrom === 'tvtime' ? { imported: true } : {}),
         minutes: asPositiveNumber(record?.runtime) || EPISODE_MINUTES,
       });
     }
@@ -177,7 +183,7 @@ export function findProfileCatchUps(viewings: readonly ProfileViewing[]): Set<Pr
 }
 
 export interface ProfileViewingScope {
-  /** Visionnages réels : depuis l'inscription, hors rattrapages et journées d'import. */
+  /** Visionnages depuis le démarrage, hors journées d'import ; les rattrapages y sont, étiquetés `catchUp`. */
   viewings: ProfileViewing[];
   imports: ProfileImportDay[];
   catchUp: { count: number; minutes: number };
@@ -186,6 +192,8 @@ export interface ProfileViewingScope {
   /** `import` : la première journée d'import (chargement de la bibliothèque) est postérieure à la création du compte. */
   sinceSource: 'signup' | 'import' | null;
   beforeSince: number;
+  /** Visionnages étiquetés à l'import TV Time, hors chiffres par période. */
+  imported: number;
 }
 
 /**
@@ -205,17 +213,21 @@ export function scopeProfileViewings(shows: readonly Show[], since: number | nul
   const firstImport = imports.length > 0 ? new Date(imports[0].watchedAt).setHours(0, 0, 0, 0) : null;
   // Revue Codex #952 : ce n'est un démarrage que si aucun Vu marqué dans l'app ne le précède (seules des lectures
   // Plex datées peuvent exister avant) ; sinon c'est un rattrapage tardif et l'historique d'avant reste compté.
-  const usedBefore = firstImport !== null && dated.some(viewing => !viewing.plexTime && viewing.watchedAt < firstImport && (signupDay === null || viewing.watchedAt >= signupDay));
+  const usedBefore = firstImport !== null && dated.some(viewing => !viewing.plexTime && !viewing.imported && viewing.watchedAt < firstImport && (signupDay === null || viewing.watchedAt >= signupDay));
   const importDay = usedBefore ? null : firstImport;
   const sinceSource = importDay !== null && (signupDay === null || importDay > signupDay) ? 'import' : signupDay !== null ? 'signup' : null;
   const sinceDay = sinceSource === 'import' ? importDay : signupDay;
   let beforeSince = 0;
-  const viewings = dated.filter(viewing => {
-    if (catchUps.has(viewing)) return false;
-    if (sinceDay !== null && viewing.watchedAt < sinceDay) { beforeSince++; return false; }
-    return true;
-  });
-  return { viewings, imports, catchUp: { count: catchUps.size, minutes }, since: sinceDay, sinceSource, beforeSince };
+  // Retour terrain v1.4.294 : un rattrapage marqué d'un coup reste un visionnage (heures, mois, top, genres) ;
+  // il est seulement étiqueté pour ne jamais faire un marathon, une journée record ni une heure de soirée.
+  let imported = 0;
+  const viewings: ProfileViewing[] = [];
+  for (const viewing of dated) {
+    if (viewing.imported) { imported++; continue; }
+    if (sinceDay !== null && viewing.watchedAt < sinceDay) { beforeSince++; continue; }
+    viewings.push(catchUps.has(viewing) ? { ...viewing, catchUp: true } : viewing);
+  }
+  return { viewings, imports, catchUp: { count: catchUps.size, minutes }, since: sinceDay, sinceSource, beforeSince, imported };
 }
 
 const sinceDate = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -227,7 +239,7 @@ export function formatProfileScopeNote(scope: Pick<ProfileViewingScope, 'since' 
     const date = sinceDate.format(new Date(scope.since));
     parts.push(scope.sinceSource === 'import' ? `Depuis ton arrivée sur SeenIt le ${date} (premier import)` : `Depuis ton inscription le ${date}`);
   }
-  if (scope.catchUp.count > 0) parts.push(`sans ${scope.catchUp.count.toLocaleString('fr-FR')} ${scope.catchUp.count > 1 ? 'épisodes marqués' : 'épisode marqué'} d’un coup`);
+  if (scope.catchUp.count > 0) parts.push(`${scope.catchUp.count.toLocaleString('fr-FR')} ${scope.catchUp.count > 1 ? 'épisodes marqués' : 'épisode marqué'} d’un coup, comptés sans faire de marathon`);
   if (parts.length === 0) return null;
   const text = parts.join(' · ');
   return text[0].toUpperCase() + text.slice(1);
@@ -402,7 +414,7 @@ function buildPeriodStats(inYear: readonly ProfileViewing[], monthCount: number,
     seriesMinutes,
     filmMinutes,
     recordMonth: recordValue > 0 ? months.indexOf(recordValue) : null,
-    punch: buildPunchCard(inYear),
+    punch: buildPunchCard(inYear.filter(viewing => !viewing.catchUp)),
     platforms,
     unknownPlatformShare: share(platformMinutes.get(PROFILE_UNKNOWN_PLATFORM) || 0),
     days: dayKeys.size,

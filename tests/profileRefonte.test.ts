@@ -215,12 +215,14 @@ test('SEENIT-PROFILE-006 chiffres depuis l’inscription, sans rattrapage marqu�
   const scope = scopeProfileViewings([bulk, binge, before], since);
   assert.equal(scope.catchUp.count, 16);
   assert.equal(scope.beforeSince, 1);
-  assert.deepEqual([...new Set(scope.viewings.map(viewing => viewing.showId))], ['soiree']);
+  // Retour terrain v1.4.294 : le rattrapage reste compté (ce sont des épisodes vus), étiqueté pour ne pas faire de marathon.
+  assert.deepEqual([...new Set(scope.viewings.map(viewing => viewing.showId))].sort(), ['passe', 'soiree']);
+  assert.equal(scope.viewings.filter(viewing => viewing.catchUp).length, 16);
   assert.equal(scope.since, new Date(since).setHours(0, 0, 0, 0), 'le jour de l’inscription compte en entier');
   const records = buildProfileYearRecords(scope.viewings, 2026);
   assert.equal(records.marathon?.title, 'soiree', 'le rattrapage n’est jamais un marathon');
   assert.equal(records.marathon?.episodes, 3);
-  assert.equal(formatProfileScopeNote(scope, 2026), 'Depuis ton inscription le 3 juillet 2026 · sans 16 épisodes marqués d’un coup');
+  assert.equal(formatProfileScopeNote(scope, 2026), 'Depuis ton inscription le 3 juillet 2026 · 16 épisodes marqués d’un coup, comptés sans faire de marathon');
   assert.equal(formatProfileScopeNote({ ...scope, catchUp: { count: 0, minutes: 0 } }, 2025), null);
   // Deux épisodes rapprochés ne suffisent pas, les films ne sont jamais groupés.
   const pair = [view('a', bulkAt), view('a', bulkAt + 1_000), view('m1', bulkAt, 110, 'movie'), view('m2', bulkAt, 110, 'movie'), view('m3', bulkAt, 110, 'movie')];
@@ -310,4 +312,31 @@ test('SEENIT-PROFILE-003 retour terrain v1.4.294 : douze mois glissants par déf
   assert.match(dashboard, /<span>12 derniers mois<\/span>/);
   assert.match(dashboard, /className="moi-week-months"/);
   assert.match(read('src/components/profile/MonthDial.tsx'), /monthYears && monthYears\[month\] !== year/);
+});
+
+test('SEENIT-PROFILE-006 retour terrain v1.4.294 : les rendez-vous réguliers ressortent, un rattrapage ne compte que comme vu', async () => {
+  const { buildProfileAppointments, formatProfileAppointment } = await import('../src/features/profile/profileDashboard.ts');
+  const { scopeProfileViewings } = await import('../src/features/profile/profileYearStats.ts');
+  const now = at(2026, 10, 14, 23); // samedi 14 novembre
+  // MobLand : un épisode chaque vendredi soir pendant huit semaines (le dernier hier).
+  const fridays = Array.from({ length: 8 }, (_, index) => view('mobland', at(2026, 10, 13, 21) - index * 7 * DAY, 50, 'tv', 'MobLand'));
+  // Rattrapage : seize épisodes marqués d'un coup, jamais un rendez-vous.
+  const bulk = Array.from({ length: 16 }, (_, index) => ({ ...view('passe', at(2026, 10, 10, 9) + index * 1_000), catchUp: true }));
+  // Binge : dix épisodes par semaine pendant cinq semaines, pas un rendez-vous à petite dose.
+  const binge = Array.from({ length: 50 }, (_, index) => view('binge', at(2026, 10, 13, 20) - Math.floor(index / 10) * 7 * DAY - (index % 10) * 3_600_000));
+  const appointments = buildProfileAppointments([...fridays, ...bulk, ...binge], now);
+  assert.deepEqual(appointments.map(appointment => appointment.showId), ['mobland']);
+  assert.equal(appointments[0].weeks, 8);
+  assert.equal(formatProfileAppointment(appointments[0]), 'chaque vendredi soir · 8 semaines d’affilée');
+  // Une interruption de plus d'une semaine casse le rendez-vous en cours.
+  assert.equal(buildProfileAppointments(fridays.slice(2).map(viewing => ({ ...viewing, watchedAt: viewing.watchedAt })), now + 21 * DAY).length, 0);
+  // Les épisodes importés depuis TV Time sont étiquetés et restent hors des chiffres par période.
+  const tagged = series('tvtime', {}, [['1x1', at(2026, 7, 1)], ['1x2', at(2026, 7, 1)]]);
+  for (const record of Object.values(tagged.episodeRecords || {})) (record as { importedFrom?: string }).importedFrom = 'tvtime';
+  const scope = scopeProfileViewings([tagged], null);
+  assert.equal(scope.viewings.length, 0);
+  assert.equal(scope.imported, 2);
+  assert.match(read('src/components/CsvImporter.tsx'), /const TV_TIME_IMPORT = 'tvtime' as const;/);
+  assert.equal((read('src/components/CsvImporter.tsx').match(/importedFrom: TV_TIME_IMPORT/g) || []).length, 3);
+  assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /<Head title="Tes rendez-vous" note="semaine après semaine" \/>/);
 });
