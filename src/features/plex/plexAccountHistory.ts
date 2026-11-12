@@ -2,8 +2,11 @@ export interface PlexAccountHistoryNode {
   id?: string | null;
   /** #954 : date du visionnage dans le Watch History du compte (ISO ou secondes), si Plex la fournit. */
   date?: string | number | null;
-  metadataItem?: any;
+  metadataItem?: PlexAccountMetadataItem | null;
 }
+
+interface PlexAccountMetadataRef { id?: unknown; guid?: string | null; key?: string | null; type?: string | null; title?: string | null; index?: number | null }
+interface PlexAccountMetadataItem extends PlexAccountMetadataRef { parent?: PlexAccountMetadataRef | null; grandparent?: PlexAccountMetadataRef | null }
 
 /** #954 : millisecondes du visionnage d'un nœud Watch History, ou null si Plex n'en fournit pas. */
 export function readPlexAccountHistoryDate(value: unknown): number | null {
@@ -173,4 +176,16 @@ export function normalizePlexAccountHistoryNode(node: PlexAccountHistoryNode): a
 export function isPlexLibraryItemWatched(item: { viewCount?: unknown; view_count?: unknown; [key: string]: unknown } | null | undefined): boolean {
   const viewCount = Number(item?.viewCount ?? item?.view_count ?? 0);
   return Number.isFinite(viewCount) && viewCount > 0;
+}
+
+/**
+ * #954 : l'historique `/status/sessions/history/all` d'un serveur dont on est titulaire contient les lectures de
+ * tous ses utilisateurs. Seul le compte local 1 (le titulaire) est le sien ; sans `accountID`, l'entrée est gardée.
+ * Sur un serveur partagé, Plex ne renvoie que l'historique du jeton utilisé.
+ */
+export function isOwnerPmsHistoryEntry(item: { accountID?: unknown } | null | undefined, owned: boolean): boolean {
+  if (!owned) return true;
+  const raw = item?.accountID;
+  if (raw === undefined || raw === null || raw === '') return true;
+  return Number(raw) === 1;
 }

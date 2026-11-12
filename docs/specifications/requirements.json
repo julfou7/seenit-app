@@ -1361,6 +1361,10 @@
       "tests": [
         {
           "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.296 : la complète lit aussi l’historique de ses serveurs, filtré sur le titulaire"
+        },
+        {
+          "file": "tests/plexHistoryDating.test.ts",
           "contains": "SEENIT-PLEX-005 #954 : le Watch History du compte apporte la date de lecture, même d’un film supprimé du serveur"
         },
         {

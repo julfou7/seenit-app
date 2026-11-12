@@ -72,6 +72,7 @@ import {
   isPlexLibraryItemWatched,
   normalizePlexAccountHistoryNode,
   PLEX_ACCOUNT_HISTORY_DATED_QUERY,
+  isOwnerPmsHistoryEntry,
   PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY,
   PLEX_ACCOUNT_HISTORY_QUERY
 } from "./src/features/plex/plexAccountHistory.ts";
@@ -955,7 +956,7 @@ async function startServer() {
         return res.json({ available: false });
       }
 
-      const extractTmdbId = (item: any): number | null =>
+      const extractTmdbId = (item: Parameters<typeof extractPlexExternalIds>[0]): number | null =>
         extractPlexExternalIds(item).tmdbId;
 
       const isMatch = (item: any): boolean => {
@@ -1603,12 +1604,16 @@ async function startServer() {
           // aux pages réellement lues ; en delta, son totalSize couvre tout l'historique et fausserait le %.
           const onHistoryPage = (count: number, totalSize?: number) => syncProgress.serverItems(serverId, count, delta || totalSize === undefined ? undefined : Math.min(totalSize, PMS_HISTORY_MAX_PAGES * 100));
 
-          if (delta || usePmsHistoryInFull) {
+          // #954 : en complète, l'historique de lecture de SES serveurs reste lu même avec l'historique du compte : il garde
+          // les films vus puis supprimés, avec leur heure réelle. Il n'est alors qu'un complément (échec non bloquant).
+          if (delta || usePmsHistoryInFull || owned) {
             try {
               const items = await fetchPlexPages(`${uri}/status/sessions/history/all?sort=viewedAt:desc`, historyHeaders, serverTimeout, PMS_HISTORY_MAX_PAGES, delta ? Number(since) || undefined : undefined, undefined, { onPage: onHistoryPage });
               connectionHistoryComplete = true;
-              for (const it of items) connectionRawItems.push({ raw: it, source: serverName, sourceKind: 'pms-history', serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
-              historyFoundOnConnection = items.length;
+              // #954 : sur son propre serveur, seules les lectures du titulaire (compte local 1) sont les siennes.
+              const ownItems = items.filter(item => isOwnerPmsHistoryEntry(item, owned));
+              for (const it of ownItems) connectionRawItems.push({ raw: it, source: serverName, sourceKind: 'pms-history', serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
+              historyFoundOnConnection = ownItems.length;
             } catch (error: unknown) {
               // La cause remonte dans la raison du serveur ignoré (log « Serveurs synchronisés … ignorés »).
               lastFailure = error instanceof Error ? error.message : error;
