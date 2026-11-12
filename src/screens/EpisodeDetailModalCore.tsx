@@ -1,3 +1,4 @@
+import { VIEWING_SOURCE_SEENIT } from '../features/history/viewingSource';
 import { DialogLayer, isTopDialogElement } from '../components/ui/DialogLayer';
 import { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, animate, useDragControls } from 'motion/react';
@@ -631,7 +632,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
       newSeen.add(epKey);
       newRecords[epKey] = {
         watchedAt: Date.now(),
-        episodeTitle: currentEpisode?.name || null
+        episodeTitle: currentEpisode?.name || null,
+        source: VIEWING_SOURCE_SEENIT
       };
     }
 
@@ -766,7 +768,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const updateRecord = async (updates: { rating?: number, emotion?: string }) => {
      if (!activeShow?.id || !isSeen) return;
      const newRecords = { ...(activeShow.episodeRecords || {}) };
-     if (!newRecords[epKey]) newRecords[epKey] = { watchedAt: Date.now() };
+     if (!newRecords[epKey]) newRecords[epKey] = { watchedAt: Date.now(), source: VIEWING_SOURCE_SEENIT };
 
      newRecords[epKey] = { ...newRecords[epKey], ...updates };
 

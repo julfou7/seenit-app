@@ -436,8 +436,8 @@ période (mois, semaines, rythme, jours d'affilée, records, marathons, année e
 les visionnages depuis le jour de l'inscription à SeenIt (ou du premier import, s'il est postérieur), sans les rattrapages : trois épisodes ou plus d'une
 même série marqués à moins de cinq minutes d'écart) : ceux-là restent comptés comme vus mais ne font ni marathon,
 ni journée record, ni heure de soirée. « Tes rendez-vous » met en valeur les séries suivies semaine après semaine
-(« MobLand, chaque vendredi soir · 8 semaines d'affilée »). L'import TV Time étiquette ses visionnages pour les
-tenir hors des chiffres par période. Le panneau de synchro Plex complète affiche « N vus sur M » médias lus. Les totaux
+(« MobLand, chaque vendredi soir · 8 semaines d'affilée »). Chaque Vu porte son origine (TV Time, SeenIt ou Plex, `SEENIT-PROFILE-007`) : l'import
+TV Time reste hors des chiffres par période ; les anciens Vu sans origine ne sont pas réétiquetés. Le panneau de synchro Plex complète affiche « N vus sur M » médias lus. Les totaux
 (épisodes, films, séries terminées) comptent tout, et une note dit ce qui a été écarté (`SEENIT-PROFILE-006`).
 Une série finie compte comme terminée même archivée. Les badges
 ont des paliers : Centenaire (visionnages) 100, 500, 1 000, 2 500, 5 000, 7 500, 10 000 ; Oiseau de nuit

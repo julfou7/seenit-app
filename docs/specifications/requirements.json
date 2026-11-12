@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.295",
+  "applicationVersion": "1.4.296",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -4091,6 +4091,24 @@
         {
           "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-006 chiffres depuis l’inscription, sans rattrapage marqué d’un coup ni faux marathon"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-PROFILE-007",
+      "title": "Origine de chaque visionnage : TV Time, SeenIt ou Plex",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/viewingSource.test.ts",
+          "contains": "SEENIT-PROFILE-007 trois origines de visionnage : TV Time, SeenIt, Plex, anciennes étiquettes comprises"
+        },
+        {
+          "file": "tests/viewingSource.test.ts",
+          "contains": "SEENIT-PROFILE-007 chaque écriture de Vu pose son origine"
         }
       ]
     },

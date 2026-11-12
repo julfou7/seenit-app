@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.295**
+Version applicative : **1.4.296**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1652,6 +1652,12 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   connues tombent entre 18 h et 2 h. Les totaux (épisodes, films, badges de volume) comptent tout ; une
   note indique la date d'inscription et le nombre d'épisodes marqués d'un coup écartés. Une série finie compte
   comme terminée même archivée, et la fin d'une série se lit aussi dans son statut TMDB.
+- **SEENIT-PROFILE-007** — Origine de chaque visionnage (retour terrain v1.4.294, #942). Toute écriture d'un
+  `episodeRecords[clé]` vu pose `source` : `tvtime` (import CSV TV Time), `seenit` (Vu marqué dans l'app :
+  bouton, fiche, épisode, saison ou série) ou `plex` (lecture synchronisée, avec `plexImported` conservé). Les
+  anciens enregistrements restent lus : `plexImported` vaut Plex, `importedFrom: 'tvtime'` vaut TV Time, sans
+  étiquette l'origine est inconnue ; aucune migration n'étiquette l'historique. Les chiffres par période excluent
+  `tvtime`, et « Quand tu regardes » prend l'heure réelle de `plex`.
 - **SEENIT-UX-023** — Statut de diffusion de la fiche série (régression de la refonte des fiches, #942). La
   pastille de statut ouvre la rangée de pastilles : En diffusion et la date du prochain épisode quand il appartient
   à la saison en cours, Renouvelée et la saison suivante datée (ou annoncée), En cours sans date annoncée, En
