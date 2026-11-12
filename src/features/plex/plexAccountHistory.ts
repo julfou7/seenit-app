@@ -1,6 +1,20 @@
 export interface PlexAccountHistoryNode {
   id?: string | null;
+  /** #954 : date du visionnage dans le Watch History du compte (ISO ou secondes), si Plex la fournit. */
+  date?: string | number | null;
   metadataItem?: any;
+}
+
+/** #954 : millisecondes du visionnage d'un nœud Watch History, ou null si Plex n'en fournit pas. */
+export function readPlexAccountHistoryDate(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value < 10_000_000_000 ? value * 1000 : value;
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number(value);
+    if (Number.isFinite(numeric) && numeric > 0) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
 }
 
 export const PLEX_ACCOUNT_HISTORY_QUERY = `
@@ -9,6 +23,46 @@ query GetWatchHistoryHub($uuid: ID = "", $first: PaginationInt!, $after: String)
     watchHistory(first: $first, after: $after) {
       nodes {
         id
+        metadataItem {
+          id
+          guid
+          key
+          type
+          title
+          index
+          parent {
+            id
+            guid
+            key
+            type
+            title
+            index
+          }
+          grandparent {
+            id
+            guid
+            key
+            type
+            title
+          }
+        }
+      }
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+    }
+  }
+}`;
+
+// #954 : même requête avec la date de chaque visionnage ; repli sur la requête riche si le schéma la refuse.
+export const PLEX_ACCOUNT_HISTORY_DATED_QUERY = `
+query GetWatchHistoryHub($uuid: ID = "", $first: PaginationInt!, $after: String) {
+  user(id: $uuid) {
+    watchHistory(first: $first, after: $after) {
+      nodes {
+        id
+        date
         metadataItem {
           id
           guid
@@ -111,11 +165,12 @@ export function normalizePlexAccountHistoryNode(node: PlexAccountHistoryNode): a
     grandparentKey: grandparent?.key || null,
     grandparentAccountMetadataId: grandparent?.id ? String(grandparent.id) : null,
     historyKey: historyId ? `community:${historyId}` : null,
-    accountHistoryId: historyId
+    accountHistoryId: historyId,
+    ...(readPlexAccountHistoryDate(node?.date) !== null ? { viewedAt: readPlexAccountHistoryDate(node?.date) } : {})
   };
 }
 
-export function isPlexLibraryItemWatched(item: any): boolean {
+export function isPlexLibraryItemWatched(item: { viewCount?: unknown; view_count?: unknown; [key: string]: unknown } | null | undefined): boolean {
   const viewCount = Number(item?.viewCount ?? item?.view_count ?? 0);
   return Number.isFinite(viewCount) && viewCount > 0;
 }

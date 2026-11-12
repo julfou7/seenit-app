@@ -220,3 +220,5 @@ i[data-level="1"]{background:rgba(229,169,61,.3)}i[data-level="2"]{background:rg
 .moi-appointment>img,.moi-appointment>i{width:40px;height:60px;border-radius:8px;object-fit:cover;background:#1C1C1F}
 .moi-appointment>span{display:flex;flex-direction:column;gap:3px;min-width:0}.moi-appointment strong{font-size:14.5px;font-weight:800;color:#fff}
 .moi-appointment small{font-size:12.5px;color:#a1a1aa}.moi-appointment>b{font-size:20px;font-weight:800;color:#F2C36B;display:flex;align-items:baseline;gap:3px}.moi-appointment>b>small{font-size:11px;font-weight:700}
+/* Retour terrain v1.4.295 : les options du sélecteur de période tiennent sur une ligne. */
+.moi-year-menu button>span,.moi-year-menu button>small{white-space:nowrap}

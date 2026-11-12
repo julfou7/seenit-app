@@ -941,9 +941,16 @@ pour le cache des sagas et univers.
   Une activité `cloud` qui porte exactement la même identité technique qu'un film de la watchlist
   reste ambiguë. L'appartenance au **Watch History du compte Plex est elle aussi historique et ne
   représente jamais, à elle seule, l'état courant** : en full scan, chaque entrée `account-history`
-  doit être validée par le `userState` provider de la même identité Plex. Seul un `viewCount > 0`
-  explicite permet son import comme vu ; un état courant non vu explicitement retourné par le provider
-  alimente la réconciliation non vue, et un état courant indisponible n'ajoute aucune progression.
+  est confrontée au `userState` provider de la même identité Plex. Décision du propriétaire du 12/11/2026
+  (#954) : un événement du Watch History prouve un visionnage, y compris d'un média supprimé du serveur
+  après lecture ; il est importé comme vu sauf si le provider renvoie un état courant **explicitement non
+  vu**, qui alimente la réconciliation non vue. La requête demande la date de chaque visionnage (`date`,
+  repli sans date si le schéma la refuse) ; seule une date de lecture Plex (`viewedAt`, `lastViewedAt`,
+  `date`) est une date prouvée (`viewedAtKnown`), jamais `createdAt`, `addedAt` ou l'instant de synchro. Un
+  film ou épisode déjà vu dans SeenIt sans date prouvée (import TV Time, film importé sans enregistrement,
+  heure inconnue) reçoit la date prouvée de sa lecture Plex, `source: 'plex'`, sans `plexImported` ; un Vu
+  marqué dans SeenIt n'est jamais redaté. Le panneau affiche le nombre de visionnages de l'historique du
+  compte et de Vu datés par Plex.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite
