@@ -72,6 +72,8 @@ import {
   isPlexLibraryItemWatched,
   normalizePlexAccountHistoryNode,
   PLEX_ACCOUNT_HISTORY_DATED_QUERY,
+  PLEX_ACTIVITY_FEED_QUERY,
+  readPlexActivityDates,
   isOwnerPmsHistoryEntry,
   PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY,
   PLEX_ACCOUNT_HISTORY_QUERY
@@ -701,7 +703,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.298',
+        'X-Plex-Version': '1.4.299',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -1201,6 +1203,8 @@ async function startServer() {
         cloudItems: 0,
         plexAccountHistoryItems: 0,
         plexAccountHistoryMode: 'none',
+        plexAccountHistoryDated: 0,
+        plexAccountHistoryDateError: '',
         plexAccountHistoryRetained: 0,
         plexAccountCurrentStateResolved: 0,
         plexAccountCurrentWatched: 0,
@@ -1240,9 +1244,10 @@ async function startServer() {
         }
       };
 
-      const fetchPlexAccountWatchHistory = async (): Promise<{ available: boolean; items: any[]; queryMode: string }> => {
+      const fetchPlexAccountWatchHistory = async (): Promise<{ available: boolean; items: PlexRawItem[]; queryMode: string; datedError?: string; activityError?: string }> => {
         const uuid = await getPlexAccountUuid();
         if (!uuid) return { available: false, items: [], queryMode: 'none' };
+        let datedError: string | undefined;
 
         const runQuery = async (query: string, queryMode: string) => {
           const collected: any[] = [];
@@ -1305,11 +1310,40 @@ async function startServer() {
 
         try {
           return await runQuery(PLEX_ACCOUNT_HISTORY_DATED_QUERY, 'dated');
-        } catch {
-          // Schéma sans `date` : la requête riche reste la référence, les dates viennent alors du provider.
+        } catch (datedCaught: unknown) {
+          // Schéma sans `date` : la requête riche reste la référence ; la raison remonte dans le journal de l'app (#954).
+          datedError = datedCaught instanceof Error ? datedCaught.message : String(datedCaught);
         }
         try {
-          return await runQuery(PLEX_ACCOUNT_HISTORY_QUERY, 'rich');
+          const rich = await runQuery(PLEX_ACCOUNT_HISTORY_QUERY, 'rich');
+          // #954 : le fil « Activité » de Plex (« Vous avez regardé … ») porte la date de chaque visionnage ; il date les
+          // entrées du Watch History par GUID exact, jamais par titre.
+          let activityError: string | undefined;
+          // Revue Codex #963 : les dates déjà lues restent appliquées même si une page suivante échoue.
+          const dates = new Map<string, number>();
+          try {
+            let after: string | null = null;
+            for (let page = 0; page < 20; page++) {
+              const response = await fetch('https://community.plex.tv/api', {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Plex-Token': token, 'X-Plex-Client-Identifier': plexClientIdentifier, 'X-Plex-Product': 'SeenIt' },
+                body: JSON.stringify({ query: PLEX_ACTIVITY_FEED_QUERY, operationName: 'GetActivityFeed', variables: { first: 100, ...(after ? { after } : {}) } }),
+                signal: routeSignal(10000)
+              });
+              if (!response.ok) throw new Error(`HTTP ${response.status}`);
+              const payload = await response.json() as { errors?: Array<{ message?: unknown }>; data?: { activityFeed?: { pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } } } };
+              if (Array.isArray(payload?.errors) && payload.errors.length > 0) throw new Error(payload.errors.map(error => String(error?.message || 'GraphQL error')).join(' | '));
+              for (const entry of readPlexActivityDates(payload)) if (!dates.has(entry.guid)) dates.set(entry.guid, entry.viewedAt);
+              const pageInfo = payload?.data?.activityFeed?.pageInfo;
+              if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break;
+              after = String(pageInfo.endCursor);
+            }
+          } catch (activityCaught: unknown) {
+            activityError = activityCaught instanceof Error ? activityCaught.message : String(activityCaught);
+          }
+          for (const item of rich.items) if (!item.viewedAt && typeof item.guid === 'string' && dates.has(item.guid)) item.viewedAt = dates.get(item.guid);
+          const datedCount = rich.items.filter(item => item.viewedAt).length;
+          return { ...rich, queryMode: datedCount > 0 ? 'activity' : rich.queryMode, datedError, activityError };
         } catch (caught: unknown) {
           const richError = caught as { message?: unknown } | null;
           console.log(`[Plex Sync] Watch History GraphQL rich query unavailable, fallback minimal: ${richError?.message || richError}`);
@@ -1338,7 +1372,7 @@ async function startServer() {
       serversTask.catch(() => undefined); // l'erreur est relevée par l'await plus bas, pas en rejet orphelin
       // L'historique du compte (full) ne dépend ni de la Watchlist ni du cloud : il part avec eux (SEENIT-PLEX-012).
       const accountHistoryTask = delta ? null : fetchPlexAccountWatchHistory()
-        .catch(() => ({ available: false, items: [] as PlexRawItem[], queryMode: 'none' }))
+        .catch((error: unknown) => ({ available: false, items: [] as PlexRawItem[], queryMode: 'none', datedError: error instanceof Error ? error.message : String(error), activityError: undefined as string | undefined }))
         .finally(() => syncProgress.accountStep());
       let watchlistCollectionSucceeded = false;
       let watchlistCollectionComplete = false;
@@ -1421,7 +1455,9 @@ async function startServer() {
             });
           }
           sourceStats.plexAccountHistoryItems = accountHistory.items.length;
-          sourceStats.plexAccountHistoryMode = accountHistory.queryMode; // #954 : « dated » seulement si Plex donne l'heure
+          sourceStats.plexAccountHistoryMode = accountHistory.queryMode; // #954 : « dated »/« activity » seulement si Plex donne l'heure
+          sourceStats.plexAccountHistoryDated = accountHistory.items.filter(item => item?.viewedAt).length;
+          sourceStats.plexAccountHistoryDateError = [accountHistory.datedError, accountHistory.activityError].filter(Boolean).join(' / ').slice(0, 300);
           visitedSources.push(`Plex Account History (${accountHistory.items.length} GUID, mode ${accountHistory.queryMode})`);
           console.log(`[Plex Sync] Plex Account Watch History: ${accountHistory.items.length} identité(s) globale(s) récupérée(s) (${accountHistory.queryMode}).`);
         }

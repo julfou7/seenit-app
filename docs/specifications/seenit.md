@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.298**
+Version applicative : **1.4.299**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -964,6 +964,10 @@ pour le cache des sagas et univers.
   Retour v1.4.297 : le panneau dit « N vus · M en bibliothèque » et signale un historique du compte « sans heure » quand
   Plex ne donne pas la date ; la complète demande d'abord la taille de chaque section (page vide) pour que le % d'un
   serveur ne redescende pas en découvrant une section.
+  Retour v1.4.298 (journal terrain) : quand la requête Watch History ne fournit pas la date, la complète lit le fil
+  « Activité » du compte (`activityFeed`, visionnages `ActivityWatchHistory` et leur `date`) et date chaque entrée du
+  Watch History par **GUID global exact**, jamais par titre ; la raison d'un historique sans heure est écrite dans le
+  journal de diagnostic. Une ligne d'historique serveur sans aucun identifiant (média supprimé) reste non résolue.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite

@@ -136,7 +136,7 @@ query GetWatchHistoryHub($uuid: ID = "", $first: PaginationInt!, $after: String)
   }
 }`;
 
-export function normalizePlexAccountHistoryNode(node: PlexAccountHistoryNode): any | null {
+export function normalizePlexAccountHistoryNode(node: PlexAccountHistoryNode): Record<string, unknown> & { guid?: string | null; viewedAt?: number } | null {
   const metadata = node?.metadataItem;
   if (!metadata || typeof metadata !== 'object') return null;
 
@@ -188,4 +188,39 @@ export function isOwnerPmsHistoryEntry(item: { accountID?: unknown } | null | un
   const raw = item?.accountID;
   if (raw === undefined || raw === null || raw === '') return true;
   return Number(raw) === 1;
+}
+
+/**
+ * #954 : fil « Activité » du compte Plex (celui de « Vous avez regardé … » sur le site Plex). Chaque visionnage y porte
+ * sa date ; le rapprochement avec le Watch History se fait par GUID global exact.
+ */
+export const PLEX_ACTIVITY_FEED_QUERY = `
+query GetActivityFeed($first: PaginationInt!, $after: String) {
+  activityFeed(first: $first, after: $after, types: [WATCH_HISTORY]) {
+    nodes {
+      __typename
+      ... on ActivityWatchHistory {
+        id
+        date
+        metadataItem { id guid type }
+      }
+    }
+    pageInfo {
+      hasNextPage
+      endCursor
+    }
+  }
+}`;
+
+export function readPlexActivityDates(payload: unknown): Array<{ guid: string; viewedAt: number }> {
+  const nodes = (payload as { data?: { activityFeed?: { nodes?: unknown } } } | null)?.data?.activityFeed?.nodes;
+  if (!Array.isArray(nodes)) return [];
+  const out: Array<{ guid: string; viewedAt: number }> = [];
+  for (const node of nodes) {
+    const value = node as { date?: unknown; metadataItem?: { guid?: unknown } | null } | null;
+    const guid = typeof value?.metadataItem?.guid === 'string' ? value.metadataItem.guid.trim() : '';
+    const viewedAt = readPlexAccountHistoryDate(value?.date);
+    if (guid && viewedAt !== null) out.push({ guid, viewedAt });
+  }
+  return out;
 }

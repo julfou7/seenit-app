@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.298",
+  "applicationVersion": "1.4.299",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -1359,6 +1359,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.298 : les dates du fil Activité de Plex datent l’historique du compte par GUID exact"
+        },
         {
           "file": "tests/plexHistoryDating.test.ts",
           "contains": "SEENIT-PLEX-005 retour v1.4.296 : la complète lit aussi l’historique de ses serveurs, filtré sur le titulaire"
