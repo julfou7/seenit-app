@@ -1356,6 +1356,14 @@
       ],
       "tests": [
         {
+          "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 #954 : le Watch History du compte apporte la date de lecture, même d’un film supprimé du serveur"
+        },
+        {
+          "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 #954 : un Vu déjà connu sans date prouvée reçoit la date Plex, jamais un Vu SeenIt"
+        },
+        {
           "file": "tests/plexWatchEvidence.test.ts",
           "contains": "SEENIT-PLEX-005 une activité Cloud identique à la watchlist ne devient jamais un visionnage"
         },
@@ -1377,11 +1385,11 @@
         },
         {
           "file": "tests/plexAccountHistory.test.ts",
-          "contains": "SEENIT-PLEX-005 le Watch History du compte exige un userState courant explicite"
+          "contains": "SEENIT-PLEX-005 le Watch History du compte lit l’état courant explicite du provider"
         },
         {
           "file": "tests/plexAccountHistory.test.ts",
-          "contains": "SEENIT-PLEX-005 le backend refuse un historique compte sans état courant vu"
+          "contains": "SEENIT-PLEX-005 le backend écarte un historique compte seulement s’il est explicitement non vu"
         },
         {
           "file": "tests/plexDeltaWatchSnapshot.test.ts",

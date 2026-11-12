@@ -71,6 +71,7 @@ import {
 import {
   isPlexLibraryItemWatched,
   normalizePlexAccountHistoryNode,
+  PLEX_ACCOUNT_HISTORY_DATED_QUERY,
   PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY,
   PLEX_ACCOUNT_HISTORY_QUERY
 } from "./src/features/plex/plexAccountHistory.ts";
@@ -996,7 +997,8 @@ async function startServer() {
         const serverAccessToken = server.accessToken || token;
         const rawConnections = server.connections || [];
 
-        const sortedConnections = [...rawConnections].sort((a: any, b: any) => {
+        type ConnectionOrder = { local?: boolean; relay?: boolean; uri?: string };
+        const sortedConnections = [...rawConnections].sort((a: ConnectionOrder, b: ConnectionOrder) => {
           const aIsRemoteHttps = !a.local && (a.uri || '').startsWith('https://');
           const bIsRemoteHttps = !b.local && (b.uri || '').startsWith('https://');
           if (aIsRemoteHttps && !bIsRemoteHttps) return -1;
@@ -1299,6 +1301,11 @@ async function startServer() {
           return { available: true, items: collected, queryMode };
         };
 
+        try {
+          return await runQuery(PLEX_ACCOUNT_HISTORY_DATED_QUERY, 'dated');
+        } catch {
+          // Schéma sans `date` : la requête riche reste la référence, les dates viennent alors du provider.
+        }
         try {
           return await runQuery(PLEX_ACCOUNT_HISTORY_QUERY, 'rich');
         } catch (caught: unknown) {
@@ -2026,9 +2033,9 @@ async function startServer() {
       const normalizedSince = Number.isFinite(Number(since)) ? Number(since) : undefined;
 
       for (const entry of enrichedEntries) {
-        // Le Watch History est un journal d'événements, pas l'état courant.
-        // Sans confirmation viewCount > 0, il ne peut jamais créer un « vu ».
-        if (entry?.sourceKind === 'account-history' && entry?.accountCurrentWatched !== true) continue;
+        // SEENIT-PLEX-005 (décision du 12/11/2026, #954) : un événement du Watch History du compte prouve un
+        // visionnage, même si le média a été supprimé du serveur. Seul un état courant explicitement non vu l'écarte.
+        if (entry?.sourceKind === 'account-history' && entry?.accountCurrentWatched === false) continue;
 
         const raw = entry.raw || {};
         const meta = unwrapPlexMediaItem(raw);
@@ -2044,7 +2051,9 @@ async function startServer() {
         const parentIndex = meta.parentIndex ?? raw.parentIndex ?? meta.seasonNumber ?? raw.seasonNumber;
         const index = meta.index ?? raw.index ?? meta.episodeNumber ?? raw.episodeNumber;
 
-        const rawViewed = meta.lastViewedAt || meta.viewedAt || raw.viewedAt || raw.lastViewedAt || raw.date || raw.createdAt || raw.updatedAt || meta.updatedAt || meta.addedAt || Date.now();
+        // #954 : seule une date de lecture prouve l'heure ; createdAt/updatedAt/addedAt ou « maintenant » ne sont qu'un repli.
+        const provenViewed = meta.lastViewedAt || meta.viewedAt || raw.viewedAt || raw.lastViewedAt || raw.date;
+        const rawViewed = provenViewed || raw.createdAt || raw.updatedAt || meta.updatedAt || meta.addedAt || Date.now();
         const viewedTimestamp = rawViewed ? (Number(rawViewed) < 10000000000 ? Number(rawViewed) * 1000 : Number(rawViewed)) : Date.now();
         const sourceIdentity = getStrongPlexSourceIdentity({ ...meta, serverId: entry.serverId });
 
@@ -2072,6 +2081,7 @@ async function startServer() {
           parentIndex: parentIndex !== undefined ? Number(parentIndex) : undefined,
           index: index !== undefined ? Number(index) : undefined,
           viewedAt: viewedTimestamp,
+          viewedAtKnown: Boolean(provenViewed),
           year: itemYear,
           guid: meta.guid || raw.guid,
           grandparentGuid: meta.grandparentGuid || raw.grandparentGuid,

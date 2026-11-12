@@ -148,7 +148,7 @@ export function ProAnalyticsDashboard({
             <button type="button" className="moi-year-backdrop" aria-label="Fermer la liste des années" onClick={() => setYearMenuOpen(false)} />
             <ul className="moi-year-menu" role="listbox" aria-label="Années" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setYearMenuOpen(false); } }}>
               <li><button type="button" role="option" aria-selected={rolling} onClick={() => pickYear(null)} ref={rolling ? element => element?.focus() : undefined}>
-                <span>12 derniers mois</span><small>{stats.minutes > 0 && rolling ? formatProfileHours(stats.minutes) : ''}</small>
+                <span>12 mois</span><small>{stats.minutes > 0 && rolling ? formatProfileHours(stats.minutes) : ''}</small>
               </button></li>
               {yearTotals.map(entry => <li key={entry.year}>
                 <button type="button" role="option" aria-selected={!rolling && entry.year === year} onClick={() => pickYear(entry.year)} ref={!rolling && entry.year === year ? element => element?.focus() : undefined}>

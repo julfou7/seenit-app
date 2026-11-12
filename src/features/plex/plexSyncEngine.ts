@@ -1,4 +1,5 @@
 import { VIEWING_SOURCE_PLEX } from '../history/viewingSource';
+import { readPlexAccountProgress, withPlexDate } from './plexDating';
 import { writeUserScopedJson } from '../../lib/userIsolation';
 import { loadPlexCloudState, persistPlexCloudState } from './plexCloudState';
 import { getPlexSyncRetryAt, PlexSyncHttpError } from './plexSyncRetry';
@@ -203,6 +204,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       progress.historyTotal = history.length; progress.watchlistTotal = watchlist.length;
       progress.servers = [...(plexData?.integrity?.syncedServers || []), ...(plexData?.integrity?.skippedServers || [])];
       progress.complete = plexData?.integrity?.collectionComplete === true;
+      if (!delta) progress.account = readPlexAccountProgress(plexData?.stats); // #954
       progress.phase = 'resolve';
       await waitForResume();
       const nextSyncCursor = Number(plexData?.cursor) || Date.now();
@@ -329,7 +331,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       // Le premier full scan peut contenir des milliers d'événements mais beaucoup
       // moins d'identités uniques. On préchauffe uniquement ces identités, avec une
       // concurrence bornée pour accélérer sans saturer TMDB ni Plex.
-      const resolutionCandidates = new Map<string, { cacheKey: string; item: any }>();
+      const resolutionCandidates = new Map<string, { cacheKey: string; item: ReturnType<typeof buildPlexParentShowIdentityItem> }>();
       for (const rawItem of history) { await yieldToFrame();
         const item = unwrapPlexMediaItem(rawItem);
         const isEpisode = item?.type === 'episode' || !!item?.grandparentTitle || !!item?.parentTitle;
@@ -375,7 +377,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       let alreadyWatchedCount = 0;
       let unresolvedCount = 0;
       let retryableUnresolvedCount = 0;
-      let repairedCount = 0;
+      let repairedCount = 0, datedCount = 0;
       let unwatchedCount = 0;
       let watchlistUnresolvedItemCount = 0;
       const syncedItems: PlexSyncResult['syncedItems'] = [];
@@ -428,7 +430,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       const skipAlreadyWatchedEpisode = (
         candidate: Show | undefined,
         seasonNumber: number,
-        episodeNumber: number
+        episodeNumber: number,
+        provenViewedAt: number | null = null
       ): boolean => {
         if (!candidate) return false;
 
@@ -444,10 +447,17 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           mutatedShows[candidate.id] = repairedShow;
           repairedCount++;
         }
+        datePlexWatched(candidate, canonicalKey, provenViewedAt);
         return true;
       };
 
-      const skipAlreadyWatchedMovie = (candidate: Show | undefined): boolean => {
+      // #954 : un Vu déjà connu mais sans date prouvée reçoit la date réelle de la lecture Plex.
+      const datePlexWatched = (candidate: Show, key: string, provenViewedAt: number | null) => {
+        const dated = withPlexDate(mutatedShows[candidate.id] || candidate, key, provenViewedAt);
+        if (dated) { mutatedShows[candidate.id] = dated; datedCount++; }
+      };
+
+      const skipAlreadyWatchedMovie = (candidate: Show | undefined, provenViewedAt: number | null = null): boolean => {
         if (!candidate) return false;
 
         const current = mutatedShows[candidate.id] || candidate;
@@ -461,6 +471,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           mutatedShows[candidate.id] = repairedMovie;
           repairedCount++;
         }
+        datePlexWatched(candidate, 'movie', provenViewedAt);
         return true;
       };
 
@@ -483,6 +494,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const pGuidStr = getPlexGuid(item) || '';
         const rawViewed = item.viewedAt;
         const viewedTimestamp = rawViewed ? (Number(rawViewed) < 10000000000 ? Number(rawViewed) * 1000 : Number(rawViewed)) : Date.now();
+        // #954 : seule une date de lecture renvoyée par Plex date un Vu déjà connu ; jamais « maintenant ».
+        const provenViewedAt = rawViewed && item.viewedAtKnown !== false ? viewedTimestamp : null;
         const isEpisode = type === 'episode' || !!item.grandparentTitle || !!item.parentTitle || pGuidStr.includes('/episode/');
         const resolutionIdentityItem = isEpisode ? buildPlexParentShowIdentityItem(item) : item;
         const guidTmdbId = extractTmdbIdFromPlex(resolutionIdentityItem);
@@ -513,7 +526,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, 'tv');
 
           // Fast skip check: if already in library and episode is already seen, skip immediately
-          if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum)) {
+          if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum, provenViewedAt)) {
             continue; // Déjà vu dans seenEpisodes ou episodeRecords : aucune notification.
           }
 
@@ -524,7 +537,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedShow = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === 'tv' || !s.mediaType)
             );
-            if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum)) {
+            if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum, provenViewedAt)) {
               continue;
             }
           }
@@ -544,7 +557,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedShow = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && (s.mediaType === 'tv' || !s.mediaType)
             );
-            if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum)) {
+            if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum, provenViewedAt)) {
               continue;
             }
           }
@@ -651,7 +664,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let matchedMovie = findShowInLocalLibrary(showsList, guidTmdbId, 'movie');
 
           // Fast skip check: if already in library and movie is already marked as seen, skip immediately
-          if (skipAlreadyWatchedMovie(matchedMovie)) {
+          if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt)) {
             continue;
           }
 
@@ -662,7 +675,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedMovie = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && s.mediaType === 'movie'
             );
-            if (skipAlreadyWatchedMovie(matchedMovie)) {
+            if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt)) {
               continue;
             }
           }
@@ -682,7 +695,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedMovie = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && s.mediaType === 'movie'
             );
-            if (skipAlreadyWatchedMovie(matchedMovie)) {
+            if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt)) {
               continue;
             }
           }
@@ -958,7 +971,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       await waitForResume();
       progress.phase = 'save';
-      progress.changed = syncCount; progress.alreadyWatched = alreadyWatchedCount; progress.unresolved = unresolvedCount;
+      progress.changed = syncCount; progress.alreadyWatched = alreadyWatchedCount; progress.unresolved = unresolvedCount; progress.dated = datedCount;
       if (!silent) publishStatus({ message: 'Enregistrement des changements Plex…' });
       if (syncCount > 0 || Object.keys(mutatedShows).length > 0 || watchlistRemovalCandidates.length > 0) {
         // 2. Save all mutated and new shows to Firestore in safe chunks of 250
@@ -1049,7 +1062,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       appLogger.success(
         'plex',
-        `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification.`
+        `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification, ${datedCount} Vu daté(s) par Plex.`
       );
       if (unresolvedItems.length > 0) {
         appLogger.warn(

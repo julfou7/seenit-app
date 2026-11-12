@@ -68,18 +68,19 @@ test('le full scan ne retient comme vus que les items dont viewCount est positif
 });
 
 
-test('SEENIT-PLEX-005 le Watch History du compte exige un userState courant explicite', () => {
+test('SEENIT-PLEX-005 le Watch History du compte lit l’état courant explicite du provider', () => {
   assert.equal(readExplicitPlexCurrentWatchState({ guid: 'plex://movie/history-only' }), null);
   assert.equal(readExplicitPlexCurrentWatchState({ MediaContainer: { Metadata: [{ viewCount: 0 }] } }), false);
   assert.equal(readExplicitPlexCurrentWatchState({ MediaContainer: { Metadata: [{ viewCount: 2 }] } }), true);
   assert.equal(readExplicitPlexCurrentWatchState({ view_count: '0' }), false);
 });
 
-test('SEENIT-PLEX-005 le backend refuse un historique compte sans état courant vu', () => {
+test('SEENIT-PLEX-005 le backend écarte un historique compte seulement s’il est explicitement non vu', () => {
   const serverSource = readFileSync(new URL('../server.ts', import.meta.url), 'utf8');
   assert.ok(serverSource.includes('metadata.provider.plex.tv/library/metadata/'));
   assert.ok(serverSource.includes('/userState'));
   assert.ok(serverSource.includes("sourceKind === 'account-history'"));
-  assert.ok(serverSource.includes('accountCurrentWatched !== true'));
+  // Décision du 12/11/2026 (#954) : seul un état courant explicitement non vu écarte un événement du Watch History.
+  assert.ok(serverSource.includes('accountCurrentWatched === false) continue'));
   assert.ok(serverSource.includes('plexAccountCurrentUnwatched'));
 });

@@ -309,7 +309,7 @@ test('SEENIT-PROFILE-003 retour terrain v1.4.294 : douze mois glissants par déf
   const dashboard = read('src/components/ProAnalyticsDashboard.tsx');
   assert.match(dashboard, /const rolling = pickedYear === null \|\|/);
   assert.match(dashboard, /periodLabel=\{rolling \? 'sur 12 mois' : undefined\}/);
-  assert.match(dashboard, /<span>12 derniers mois<\/span>/);
+  assert.match(dashboard, /<span>12 mois<\/span>/, 'retour v1.4.295 : libellé court dans le menu');
   assert.match(dashboard, /className="moi-week-months"/);
   assert.match(read('src/components/profile/MonthDial.tsx'), /monthYears && monthYears\[month\] !== year/);
 });
