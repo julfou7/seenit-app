@@ -111,6 +111,9 @@ export function SagaTimeline({ title, parts, currentKey, shows, onOpen }: { titl
         const previousSeen = index > 0 && rows[index - 1].seen;
         const nextSeen = index < rows.length - 1 && rows[index + 1].seen;
         const year = (part.release_date || part.first_air_date || '').slice(0, 4);
+        // Retour v1.4.301 (Coco 2, 2029) : un titre pas encore sorti, ou sans date, est « À venir », jamais « À voir ».
+        const releaseDate = part.release_date || part.first_air_date || '';
+        const upcoming = !releaseDate || releaseDate > getTodayStr();
         const meta = [year, formatRuntime(part.runtime)].filter(Boolean).join(' · ');
         return <li key={`saga-${part.media_type || 'media'}-${part.id}-${index}`} className="relative">
           <button type="button" onClick={() => { if (!here) onOpen(part); }} aria-current={here ? 'page' : undefined} data-saga-row={index + 1}
@@ -126,7 +129,7 @@ export function SagaTimeline({ title, parts, currentKey, shows, onOpen }: { titl
               {here && <span className="mb-1 inline-flex h-5 items-center rounded-md bg-[#E5A93D] px-[7px] text-[10.5px] font-extrabold tracking-[0.04em] text-[#1A1206]">TU ES ICI</span>}
               {/* Saga v3 (07/11, « beaucoup de jaune ») : l'or ne sert qu'au film affiché ; le tampon VU reste sur l'affiche. */}
               <strong className={cn('block text-[15px] font-extrabold leading-[1.28]', here ? 'seenit-media-title' : seen ? 'text-zinc-400' : 'text-zinc-100')}>{part.title || part.name}</strong>
-              <small className="mt-1 flex items-center gap-1.5 text-[12.5px] text-zinc-400">{meta}{seen ? <span className="sr-only">, vu</span> : <>{meta && ' · '}<span className="font-extrabold text-zinc-300">À voir</span></>}</small>
+              <small className="mt-1 flex items-center gap-1.5 text-[12.5px] text-zinc-400">{meta}{seen ? <span className="sr-only">, vu</span> : <>{meta && ' · '}{upcoming ? <span className="font-extrabold text-sky-300">À venir</span> : <span className="font-extrabold text-zinc-300">À voir</span>}</>}</small>
             </span>
           </button>
         </li>;

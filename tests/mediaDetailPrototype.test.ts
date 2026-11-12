@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { averageRating, reliableEpisodeRatings, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
+import { averageRating, reliableEpisodeRatings, reliableTitleRating, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
 import { buildVerifiedSimilar, directedMovies, movieIdsFromCredits, similarReasonFor } from '../src/features/shows/similarReasons.ts';
 
 test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée', () => {
@@ -41,6 +41,15 @@ test('SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules note
   const seasonPanel = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
   assert.match(seasonPanel, /const mean = episodes \? averageRating\(ratings\) : \(season\.vote_average/);
   assert.match(seasonPanel, /ratingBarHeight\(ratings\[index\], ratings\)/);
+  // Retour v1.4.301 : « notes insuffisantes » à la place de la moyenne, et la note du titre en haut de fiche suit la même règle.
+  assert.match(seasonPanel, /<span className="text-\[13px\] text-zinc-500">notes insuffisantes<\/span>/);
+  assert.deepEqual(reliableTitleRating(10, 2), { value: null, insufficient: true });
+  assert.deepEqual(reliableTitleRating(7.8, 1200), { value: 7.8, insufficient: false });
+  assert.deepEqual(reliableTitleRating(7.8, undefined), { value: 7.8, insufficient: false }, 'sans nombre de votes connu, la note reste');
+  assert.deepEqual(reliableTitleRating(0, 0), { value: null, insufficient: false }, 'sans note, rien');
+  const view = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
+  assert.match(view, /reliableTitleRating\(tmdbDetails\?\.vote_average, tmdbDetails\?\.vote_count\)/);
+  assert.match(view, /\{titleRating\.insufficient && <DetailChip className="text-zinc-400">Notes TMDB insuffisantes<\/DetailChip>\}/);
 });
 
 const director = { name: 'Denis Villeneuve', movieIds: new Set([335984, 329865]) };

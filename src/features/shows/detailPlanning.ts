@@ -90,6 +90,18 @@ export function reliableEpisodeRatings(episodes: ReadonlyArray<{ vote_average?: 
   });
 }
 
+/**
+ * SEENIT-UX-019 (retour v1.4.301) : note TMDB d'un titre. Avec moins de MIN_EPISODE_RATING_VOTES votes, la note n'est
+ * pas affichée et la fiche dit « notes insuffisantes » ; sans note du tout, rien n'est affiché.
+ */
+export function reliableTitleRating(voteAverage: unknown, voteCount: unknown): { value: number | null; insufficient: boolean } {
+  const rating = Number(voteAverage);
+  if (!Number.isFinite(rating) || rating <= 0) return { value: null, insufficient: false };
+  const votes = Number(voteCount);
+  if (voteCount !== undefined && voteCount !== null && (!Number.isFinite(votes) || votes < MIN_EPISODE_RATING_VOTES)) return { value: null, insufficient: true };
+  return { value: rating, insufficient: false };
+}
+
 export function averageRating(values: readonly unknown[]): number | null {
   const ratings = values.map(Number).filter(value => Number.isFinite(value) && value > 0);
   return ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : null;

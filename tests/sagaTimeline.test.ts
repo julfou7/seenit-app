@@ -27,6 +27,9 @@ test('SEENIT-UX-019 #871 la saga v2 numérote l’ordre TMDB, situe le film affi
   assert.match(saga, /\{seen && <><span aria-hidden="true" className="absolute inset-0 bg-\[rgba\(9,9,11,0\.35\)\]" \/><SeenItWatchedStamp className="seenit-watched-stamp--mini" \/><\/>\}/);
   assert.match(saga, /<span className="sr-only">, vu<\/span>/);
   assert.match(saga, /<span className="font-extrabold text-zinc-300">À voir<\/span>/);
+  // Retour v1.4.301 (Coco 2, sortie en 2029) : un titre pas encore sorti, ou sans date, est « À venir », jamais « À voir ».
+  assert.match(saga, /const upcoming = !releaseDate \|\| releaseDate > getTodayStr\(\);/);
+  assert.match(saga, /\{upcoming \? <span className="font-extrabold text-sky-300">À venir<\/span> : <span className="font-extrabold text-zinc-300">À voir<\/span>\}/);
   // Repère, trait et affiche sur le même axe : traits ancrés au centre du repère, ligne centrée verticalement.
   assert.match(sections, /const SAGA_AXIS = 20;/);
   assert.match(saga, /style=\{\{ left: SAGA_AXIS, height: 'calc\(50% \+ 2px\)'/);
