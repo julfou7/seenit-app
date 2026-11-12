@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.300",
+  "applicationVersion": "1.4.301",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -1359,6 +1359,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.300 : un film présent mais non vu chez un ami garde la date de sa lecture faite ailleurs"
+        },
         {
           "file": "tests/plexHistoryDating.test.ts",
           "contains": "SEENIT-PLEX-005 retour v1.4.298 : les dates du fil Activité de Plex datent l’historique du compte par GUID exact"
@@ -2780,6 +2784,10 @@
       ],
       "tests": [
         {
+          "file": "tests/toastSwipe.test.ts",
+          "contains": "SEENIT-UX-004 retour v1.4.300 : tout toast, Plex compris, se ferme en glissant vers le bas ou vers la droite"
+        },
+        {
           "file": "tests/toastLayout.test.ts",
           "contains": "SEENIT-UX-004 #878 tous les toasts ont la même taille et coupent le texte au lieu de grandir"
         },
@@ -3575,6 +3583,10 @@
         {
           "file": "tests/watchProviderBatch.test.ts",
           "contains": "SEENIT-PROVIDER-002 #853 une requête groupée par écran, réduite à la France et mise en cache"
+        },
+        {
+          "file": "tests/watchProviderBatch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 retour v1.4.300 : une copie de cache écrite avant l’attribution d’origine n’est plus servie"
         },
         {
           "file": "tests/watchProviderBatch.test.ts",

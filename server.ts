@@ -18,7 +18,7 @@ type PlexRawItem = Record<string, unknown>;
 interface PlexConnectionResource { uri?: string; local?: boolean; relay?: boolean }
 interface PlexServerResource { name?: string; clientIdentifier?: string; accessToken?: string; owned?: unknown; connections?: PlexConnectionResource[] }
 interface PlexSectionResource { key?: string; type?: string; title?: string }
-interface PlexSyncEntry { raw: PlexRawItem; source: string; sourceKind: string; availableOnServer?: boolean; serverName?: string; serverId?: string; serverUri?: string; serverToken?: string }
+interface PlexSyncEntry { raw: PlexRawItem; source: string; sourceKind: string; availableOnServer?: boolean; datingOnly?: boolean; serverName?: string; serverId?: string; serverUri?: string; serverToken?: string }
 const plexGuidValues = (value: unknown): string[] => Array.isArray(value) ? value.map((entry: unknown) => typeof entry === 'string' ? entry : String((entry as { id?: unknown } | null)?.id || '')).filter(Boolean) : [];
 const isPlexOwned = (owned: unknown) => owned === true || owned === 1 || owned === '1';
 const PLEX_DELTA_COLLECT_DEADLINE_MS = 40_000;
@@ -74,6 +74,7 @@ import {
   PLEX_ACCOUNT_HISTORY_DATED_QUERY,
   PLEX_ACTIVITY_FEED_QUERY,
   readPlexActivityDates,
+  reconcileAccountHistoryWithLibraries,
   isOwnerPmsHistoryEntry,
   PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY,
   PLEX_ACCOUNT_HISTORY_QUERY
@@ -703,7 +704,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.300',
+        'X-Plex-Version': '1.4.301',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -1110,7 +1111,7 @@ async function startServer() {
       res.once('close', () => syncProgress.finish());
       console.log(`[Plex Sync] Starting sync for user (${delta ? 'DELTA MODE' : 'FULL SCAN'})...`);
 
-      const allRawItems: any[] = [];
+      const allRawItems: PlexSyncEntry[] = [];
       const visitedSources: string[] = [];
 
       // Helper function to extract items array from various Plex response formats
@@ -1206,6 +1207,7 @@ async function startServer() {
         plexAccountHistoryDated: 0,
         plexAccountHistoryDateError: '',
         plexAccountHistoryRetained: 0,
+        plexAccountHistoryDatingOnly: 0,
         plexAccountCurrentStateResolved: 0,
         plexAccountCurrentWatched: 0,
         plexAccountCurrentUnwatched: 0,
@@ -1779,20 +1781,15 @@ async function startServer() {
         incompleteSources.add(delta ? 'historique récent Plex' : 'historique complet Plex');
       }
 
-      // Les médias toujours présents dans une bibliothèque actuelle sont gouvernés par
-      // leur viewCount actuel. On retire donc leurs anciens événements Account History
-      // par GUID exact. Les événements orphelins (GUID absent des bibliothèques) restent.
+      // #954 : un événement Account History en double d'un média VU dans une bibliothèque actuelle est retiré ; présent
+      // mais non vu (serveur d'un ami), il reste la seule date de la lecture et ne sert qu'à dater un Vu connu.
       let removedAccountDuplicates = 0;
       if (!delta && currentLibraryGuids.size > 0) {
-        for (let index = allRawItems.length - 1; index >= 0; index--) {
-          const entry = allRawItems[index];
-          if (entry?.sourceKind !== 'account-history') continue;
-          const guid = typeof entry?.raw?.guid === 'string' ? entry.raw.guid : '';
-          if (guid && currentLibraryGuids.has(guid)) {
-            allRawItems.splice(index, 1);
-            removedAccountDuplicates++;
-          }
-        }
+        const reconciled = reconcileAccountHistoryWithLibraries(allRawItems, currentLibraryGuids);
+        allRawItems.length = 0;
+        for (const entry of reconciled.entries) allRawItems.push(entry);
+        removedAccountDuplicates = reconciled.removed;
+        sourceStats.plexAccountHistoryDatingOnly = reconciled.datingOnly;
       }
       sourceStats.plexAccountHistoryRetained = Math.max(0, sourceStats.plexAccountHistoryItems - removedAccountDuplicates);
 
@@ -2165,6 +2162,7 @@ async function startServer() {
           serverId: entry.serverId,
           serverName: entry.serverName || source,
           sourceKind: entry.sourceKind || 'unknown',
+          ...(entry.datingOnly === true ? { datingOnly: true } : {}),
           availableOnServer: entry.availableOnServer === true,
           sourceIdentity,
           source

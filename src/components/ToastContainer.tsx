@@ -1,11 +1,11 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Archive, Trash2, Ban, Info, Clock, AlertCircle, RotateCcw, Bell, BellOff, Heart, HeartOff } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToastStore, ToastMessageObj } from '../store/toastStore';
 import { useShowActions } from '../hooks/useShows';
 import { cn, scrollAllCarouselsToStart } from '../lib/utils';
 import { SeenItGlyph } from './SeenItLogo';
-import { isDownloadToastPresentation, toastDetailLine } from '../features/toasts/toastPresentation';
+import { isDownloadToastPresentation, toastDetailLine, toastSwipeDismissDirection, type ToastSwipeDirection } from '../features/toasts/toastPresentation';
 import { useLogStore } from '../store/logStore';
 import {
   dispatchToastMediaNavigation,
@@ -21,11 +21,15 @@ const PlexLogo = ({ className = "w-4 h-4" }: { className?: string }) => (
 export function ToastContainer() {
   const { currentToast, queue, message, type, show, visible, onUndo, hideToast, clearQueuedScope } = useToastStore();
   const { updateShow } = useShowActions();
-  const touchStartY = useRef<number | null>(null);
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
   const didDragRef = useRef(false);
+  // Sens du dernier glissement : le toast sort par là où il a été poussé.
+  const [exitDirection, setExitDirection] = useState<ToastSwipeDirection>('down');
+  const dismissBySwipe = (direction: ToastSwipeDirection) => { setExitDirection(direction); hideToast(); };
 
   useEffect(() => {
     if (visible) {
+      setExitDirection('down');
       const duration = currentToast?.duration || 5000;
       const timer = setTimeout(() => {
         hideToast();
@@ -61,21 +65,19 @@ export function ToastContainer() {
 
   const handleTouchStart = (e: React.TouchEvent) => {
     didDragRef.current = false;
-    touchStartY.current = e.touches[0].clientY;
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
 
+  // Repli tactile si le glisser de motion ne se déclenche pas (WebView) : même règle, bas ou droite.
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartY.current !== null) {
-      const diff = e.changedTouches[0].clientY - touchStartY.current;
-      if (Math.abs(diff) > 5) {
-        didDragRef.current = true;
-      }
-      // If swiped downwards by 25px or more, dismiss the toast
-      if (diff > 25) {
-        hideToast();
-      }
-      touchStartY.current = null;
-    }
+    const start = touchStart.current;
+    touchStart.current = null;
+    if (!start) return;
+    const dx = e.changedTouches[0].clientX - start.x;
+    const dy = e.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) didDragRef.current = true;
+    const direction = toastSwipeDismissDirection(dx, dy);
+    if (direction) dismissBySwipe(direction);
   };
 
   const hasUndoAction = Boolean(onUndo || (type === 'archive' && show));
@@ -317,11 +319,14 @@ export function ToastContainer() {
           id="toast-notification-wrapper"
           initial={{ opacity: 0, y: 20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 20, scale: 0.92, transition: { duration: 0.2 } }}
+          exit={exitDirection === 'right'
+            ? { opacity: 0, x: 160, transition: { duration: 0.2 } }
+            : { opacity: 0, y: 40, scale: 0.92, transition: { duration: 0.2 } }}
           transition={{ type: 'spring', damping: 26, stiffness: 380 }}
-          drag="y"
-          dragConstraints={{ top: 0, bottom: 0 }}
-          dragElastic={{ top: 0.05, bottom: 0.8 }}
+          drag
+          dragDirectionLock
+          dragConstraints={{ top: 0, bottom: 0, left: 0, right: 0 }}
+          dragElastic={{ top: 0.05, bottom: 0.8, left: 0.05, right: 0.8 }}
           onPointerDown={() => {
             didDragRef.current = false;
           }}
@@ -329,9 +334,8 @@ export function ToastContainer() {
             didDragRef.current = true;
           }}
           onDragEnd={(_e, info) => {
-            if (info.offset.y > 20 || info.velocity.y > 200) {
-              hideToast();
-            }
+            const direction = toastSwipeDismissDirection(info.offset.x, info.offset.y, info.velocity.x, info.velocity.y);
+            if (direction) dismissBySwipe(direction);
           }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
@@ -341,7 +345,7 @@ export function ToastContainer() {
           tabIndex={navigationTarget ? 0 : undefined}
           aria-label={navigationTarget ? `Ouvrir la fiche ${parsed.title || show?.title || ''}`.trim() : undefined}
           className={cn(
-            "fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-pan-x select-none active:cursor-grabbing flex justify-center",
+            "fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom,0px))] left-1/2 -translate-x-1/2 z-[99999] w-full max-w-md px-3 pointer-events-auto touch-none select-none active:cursor-grabbing flex justify-center",
             navigationTarget ? "cursor-pointer" : "cursor-grab",
           )}
         >

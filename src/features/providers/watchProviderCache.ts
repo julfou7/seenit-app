@@ -1,4 +1,7 @@
-export const WATCH_PROVIDER_CACHE_STORAGE_KEY = 'seenit_watch_providers_v1';
+// #965 retour v1.4.300 : v2 porte l'attribution d'origine (Canal+) des séries. Une copie v1, écrite avant, en est
+// dépourvue et restait « fraîche » 6 h (utilisable 7 jours) : la carte n'affichait alors aucun diffuseur.
+export const WATCH_PROVIDER_CACHE_STORAGE_KEY = 'seenit_watch_providers_v2';
+export const WATCH_PROVIDER_CACHE_LEGACY_STORAGE_KEYS = ['seenit_watch_providers_v1'] as const;
 export const WATCH_PROVIDER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 export const WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 // #853 : ~10 pages d'Explorer (entrées réduites à la région FR, 1 à 2 Ko chacune).
@@ -15,10 +18,11 @@ export interface WatchProviderCacheEntry {
 interface StorageLike {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
+  removeItem?(key: string): void;
 }
 
 type StoredWatchProviderEntry = {
-  data: any;
+  data: WatchProviderCacheEntry['data'];
   timestamp: number;
   retention?: 'library';
 };
@@ -57,6 +61,7 @@ export function getWatchProviderCacheKey(id: number, type: 'tv' | 'movie'): stri
 
 function parseStore(storage: StorageLike): StoredWatchProviderCache {
   try {
+    for (const legacyKey of WATCH_PROVIDER_CACHE_LEGACY_STORAGE_KEYS) storage.removeItem?.(legacyKey);
     const raw = storage.getItem(WATCH_PROVIDER_CACHE_STORAGE_KEY);
     if (!raw) return {};
     const parsed = JSON.parse(raw);
@@ -175,7 +180,7 @@ export function readWatchProviderCache(
 export function writeWatchProviderCache(
   id: number,
   type: 'tv' | 'movie',
-  data: any,
+  data: unknown,
   options: {
     now?: number;
     storage?: StorageLike | null;

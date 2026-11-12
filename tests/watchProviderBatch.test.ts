@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import express, { type RequestHandler } from 'express';
 import { resolvePassiveProviderState } from '../src/features/providers/passiveProviderState.ts';
+import { readWatchProviderCache, WATCH_PROVIDER_CACHE_STORAGE_KEY } from '../src/features/providers/watchProviderCache.ts';
 import { CANAL_ORIGINAL_BROADCASTER_NAME } from '../src/utils/providerLogos.ts';
 import {
   WATCH_PROVIDER_BATCH_ITEM_BUDGET_PER_MINUTE,
@@ -202,4 +203,14 @@ test('SEENIT-PROVIDER-002 #853 la marge de préchargement des logos agit dans la
   release();
   assert.equal(observers[0].disconnected, false, 'reste actif tant qu’une carte de la liste est observée');
   assert.match(readFileSync('src/screens/DiscoverViewCore.tsx', 'utf8'), /<div ref=\{containerRef\} data-watch-provider-root="" className="explorer-scroll/, 'Explorer déclare son conteneur qui défile');
+});
+
+test('SEENIT-PROVIDER-002 retour v1.4.300 : une copie de cache écrite avant l’attribution d’origine n’est plus servie', () => {
+  // Terrain du 12/11 : Le Gang des souris vertes restait sans diffuseur après la 1.4.300 ; sa copie v1, sans
+  // originalBroadcaster, était encore fraîche (6 h) et empêchait la carte de redemander le lot.
+  const values = new Map<string, string>([['seenit_watch_providers_v1', JSON.stringify({ 'tv:335510': { data: { id: 335510, results: {} }, timestamp: 1_000 } })]]);
+  const storage = { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => { values.set(key, value); }, removeItem: (key: string) => { values.delete(key); } };
+  assert.equal(WATCH_PROVIDER_CACHE_STORAGE_KEY, 'seenit_watch_providers_v2');
+  assert.equal(readWatchProviderCache(335510, 'tv', { now: 2_000, allowStale: true, storage }), null, 'la carte redemande le lot');
+  assert.equal(values.has('seenit_watch_providers_v1'), false, 'l’ancienne copie est libérée');
 });

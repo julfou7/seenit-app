@@ -31,7 +31,7 @@ const staleShow: Show = { ...show, lastWatchedAt: Date.now() - 90 * 86_400_000,
   episodeRecords: { '1x1': { watchedAt: Date.now() - 90 * 86_400_000 } },
 };
 localStorage.clear();
-localStorage.setItem('seenit_watch_providers_v1', JSON.stringify({
+localStorage.setItem('seenit_watch_providers_v2', JSON.stringify({
   'tv:125359': { data: { results }, timestamp: Date.now(), retention: 'library' },
   'movie:42': { data: { results }, timestamp: Date.now(), retention: 'library' },
   'movie:84': { data: { results: { FR: { flatrate: [results.FR.flatrate[0]], buy: [results.FR.flatrate[1]] } } }, timestamp: Date.now() },

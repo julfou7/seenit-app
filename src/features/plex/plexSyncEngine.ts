@@ -561,6 +561,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
+          if (item.datingOnly === true) continue; // #954 revue Codex #969 : résolu et daté s’il était déjà vu, jamais créé.
           if (matchedShow) {
             const showId = matchedShow.id;
             if (!mutatedShows[showId]) {
@@ -668,7 +669,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           }
 
           // 2. If not found locally, check resolution cache
-          let tmdbData: any = null;
+          let tmdbData: Awaited<ReturnType<typeof resolvePlexItem>> = null;
           if (!matchedMovie && cacheKey && resolutionCache[cacheKey]) {
             tmdbData = resolutionCache[cacheKey];
             matchedMovie = showsList.find(
@@ -699,6 +700,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             }
           }
 
+          if (item.datingOnly === true) continue; // #954 revue Codex #969 : résolu et daté s’il était déjà vu, jamais créé.
           if (matchedMovie) {
             const showId = matchedMovie.id;
             if (!mutatedShows[showId]) {
@@ -785,7 +787,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         }
       }
 
-
       // Un FULL Plex contient l'état courant explicite viewCount de la bibliothèque.
       // On applique les non-vu APRÈS les ajouts d'historique afin qu'un viewCount=0
       // courant gagne sur un événement historique plus ancien. Une absence seule ne
@@ -854,7 +855,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           }
 
           // 2. Check resolution cache
-          let tmdbData: any = null;
+          let tmdbData: Awaited<ReturnType<typeof resolvePlexItem>> = null;
           if (cacheKey && resolutionCache[cacheKey]) {
             tmdbData = resolutionCache[cacheKey];
             const cachedIdentity = getPlexWatchlistMediaIdentity(mediaType, tmdbData.id);
@@ -1053,7 +1054,6 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
         announcePlexSyncedItems(syncedItems); // au-delà de 3 titres : un seul toast de bilan (SEENIT-PLEX-012)
 
-
       } else {
         // // appLogger.info('plex', 'Synchronisation terminée : 0 nouveau média (votre bibliothèque est déjà à jour)');
 
@@ -1063,7 +1063,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         'plex',
         `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification, ${datedCount} Vu daté(s) par Plex.`
       );
-      if (progress.account) appLogger.warn('plex', `[Plex Sync] Historique du compte : ${progress.account.history} visionnage(s), ${progress.account.datedCount} daté(s), mode ${progress.account.mode}${progress.account.dateError ? ` — ${progress.account.dateError}` : ''}`); // #954 : écrit après le détail de résolution pour rester dans le journal (150 lignes)
+      if (progress.account) appLogger.warn('plex', `[Plex Sync] Historique du compte : ${progress.account.history} visionnage(s), ${progress.account.datedCount} daté(s), mode ${progress.account.mode}${progress.account.datingOnly ? `, ${progress.account.datingOnly} sur un serveur où le média n’est pas vu (datation seule)` : ''}${progress.account.dateError ? ` — ${progress.account.dateError}` : ''}`); // #954 : écrit après le détail de résolution pour rester dans le journal (150 lignes)
       if (unresolvedItems.length > 0) {
         appLogger.warn(
           'plex',

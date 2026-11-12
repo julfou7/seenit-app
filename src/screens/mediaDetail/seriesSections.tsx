@@ -4,7 +4,7 @@ import { episodeDownloadPresentation } from '../../features/downloads/episodeDow
 import type { LiveDownloadItem } from '../../services/sonarrRadarr';
 import { type Show } from '../../types';
 import { cn, formatAirDateSafe, getTodayStr } from '../../lib/utils';
-import { averageRating, formatRating, ratingBarHeight, settleSeenToggle, upcomingEpisodeLabel, type SeasonAverage } from '../../features/shows/detailPlanning';
+import { averageRating, formatRating, ratingBarHeight, reliableEpisodeRatings, settleSeenToggle, upcomingEpisodeLabel, type SeasonAverage } from '../../features/shows/detailPlanning';
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
@@ -13,7 +13,7 @@ import { EpisodeReminderBell } from '../../components/EpisodeReminderBell';
 import { EpisodeModeControl, EpisodePassiveChip, EpisodeProgramControl, isEpisodePickable, type EpisodeModeState } from './downloadMode';
 
 type SeasonMeta = { season_number: number; episode_count?: number; air_date?: string | null; vote_average?: number; name?: string };
-type EpisodeData = { id?: number; episode_number: number; name?: string; still_path?: string | null; air_date?: string | null; runtime?: number | null; vote_average?: number };
+type EpisodeData = { id?: number; episode_number: number; name?: string; still_path?: string | null; air_date?: string | null; runtime?: number | null; vote_average?: number; vote_count?: number };
 
 export const seasonsOf = (tmdbDetails: { seasons?: SeasonMeta[] } | null | undefined): SeasonMeta[] => (tmdbDetails?.seasons || []).filter(season => season.season_number > 0);
 export const seenInSeason = (show: Show | null | undefined, season: number) => (show?.seenEpisodes || []).filter(key => key.startsWith(`${season}x`)).length;
@@ -89,15 +89,17 @@ export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, 
   const number = season.season_number, count = season.episode_count || 0, today = getTodayStr();
   const seen = seenInSeason(show, number);
   const future = count === 0 || Boolean(season.air_date && season.air_date > today) || (episodes ? episodes.length > 0 && episodes.every(episode => episode.air_date && episode.air_date > today) : false);
-  const ratings = (episodes || []).map(episode => episode.vote_average);
-  const mean = averageRating(ratings) ?? (season.vote_average && season.vote_average > 0 ? season.vote_average : null);
+  // Retour v1.4.300 : une note sur une poignée de votes ne fait ni moyenne ni barre ; la note de saison TMDB (sans
+  // nombre de votes) ne sert que tant que les épisodes ne sont pas chargés.
+  const ratings = reliableEpisodeRatings(episodes || []);
+  const mean = episodes ? averageRating(ratings) : (season.vote_average && season.vote_average > 0 ? season.vote_average : null);
   const fullyWatched = count > 0 && seen >= count;
   const isSeen = (episode: number) => Boolean(show?.seenEpisodes?.includes(`${number}x${episode}`));
   return <section id={`season-panel-${number}`} className="flex flex-col gap-1" aria-label={`Saison ${number}`}>
     <DetailCard className="px-3.5 py-3 flex flex-col gap-2.5">
       <div className="flex justify-between items-center gap-2"><span className="text-[16px] font-bold text-white">Saison {number}{count > 0 ? ` · ${seen}/${count}` : ''}</span><div className="flex items-center gap-1">{mean !== null && <span className="text-[13px] text-zinc-400">moyenne <b className="text-white">{formatRating(mean)}</b></span>}</div></div>
       {future ? <p className="text-[13px] text-zinc-400">Saison annoncée{season.air_date ? ` · prochainement, le ${formatAirDateSafe(season.air_date, 'long')}` : ' · les épisodes arrivent bientôt'}</p>
-        : episodes ? <div className="h-10 flex items-end gap-0.5" aria-hidden="true">{episodes.map(episode => { const key = `${number}x${episode.episode_number}`; const watched = isSeen(episode.episode_number); const aired = !episode.air_date || episode.air_date <= today; return <span key={`bar-${key}`} className="flex-1 rounded-[2px]" style={{ height: `${ratingBarHeight(episode.vote_average, ratings)}px`, background: watched ? '#E5A93D' : 'transparent', boxShadow: key === nextKey ? 'inset 0 0 0 2px #fff' : watched ? 'none' : `inset 0 0 0 1.5px ${aired ? '#a1a1aa' : '#3f3f46'}` }} />; })}</div>
+        : episodes ? <div className="h-10 flex items-end gap-0.5" aria-hidden="true">{episodes.map((episode, index) => { const key = `${number}x${episode.episode_number}`; const watched = isSeen(episode.episode_number); const aired = !episode.air_date || episode.air_date <= today; return <span key={`bar-${key}`} className="flex-1 rounded-[2px]" style={{ height: `${ratingBarHeight(ratings[index], ratings)}px`, background: watched ? '#E5A93D' : 'transparent', boxShadow: key === nextKey ? 'inset 0 0 0 2px #fff' : watched ? 'none' : `inset 0 0 0 1.5px ${aired ? '#a1a1aa' : '#3f3f46'}` }} />; })}</div>
         : <div className="h-10 rounded bg-zinc-800/60 animate-pulse" aria-hidden="true" />}
       {!future && <div className="flex gap-2">
         {count > 0 && <button type="button" onClick={onToggleSeason} className="flex-1 min-h-11 rounded-[11px] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.5)] text-[13px] font-bold text-[#F2C36B] active:scale-[0.98]" aria-label={fullyWatched ? 'Marquer toute la saison comme non vue' : 'Marquer toute la saison comme vue'}>{fullyWatched ? 'Tout marquer non vu' : 'Tout marquer vu'}</button>}

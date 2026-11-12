@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { datePlexWatchedRecord, readPlexAccountProgress, withPlexDate } from '../src/features/plex/plexDating.ts';
-import { isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_QUERY } from '../src/features/plex/plexAccountHistory.ts';
+import { isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_QUERY } from '../src/features/plex/plexAccountHistory.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const VIEWED = Date.UTC(2026, 9, 28, 20, 15);
@@ -99,4 +99,42 @@ test('SEENIT-PLEX-005 retour v1.4.298 : les dates du fil Activité de Plex daten
   const engine = read('src/features/plex/plexSyncEngine.ts');
   assert.ok(engine.indexOf('[Plex Sync] Historique du compte :') > engine.indexOf('[Plex Sync] Bilan :'));
   assert.match(read('src/components/HomeSyncIndicator.tsx'), /Plex ne donne pas l’heure : \{progress\.account\.dateError\.slice\(0, 140\)\}/);
+});
+
+test('SEENIT-PLEX-005 retour v1.4.300 : un film présent mais non vu chez un ami garde la date de sa lecture faite ailleurs', () => {
+  // Terrain du 12/11 : « 75 daté(s) » dans l'historique du compte, mais « 0 Vu daté(s) » : Coco, vu sur PC-JULIAN puis
+  // supprimé, existe encore (non vu) dans la bibliothèque d'Émile ; son événement daté était retiré comme doublon.
+  const entries: Array<{ sourceKind: string; raw: { guid: string; viewedAt?: number; lastViewedAt?: number }; datingOnly?: boolean }> = [
+    { sourceKind: 'account-history', raw: { guid: 'plex://movie/coco', viewedAt: VIEWED } },
+    { sourceKind: 'account-history', raw: { guid: 'plex://movie/vu-ailleurs', viewedAt: VIEWED } },
+    { sourceKind: 'account-history', raw: { guid: 'plex://movie/supprime', viewedAt: VIEWED } },
+    { sourceKind: 'library-watched', raw: { guid: 'plex://movie/vu-ailleurs', lastViewedAt: VIEWED / 1000 } },
+    { sourceKind: 'pms-history', raw: { guid: 'plex://movie/coco' } },
+  ];
+  const libraries = new Set(['plex://movie/coco', 'plex://movie/vu-ailleurs']);
+  const result = reconcileAccountHistoryWithLibraries(entries, libraries);
+  assert.equal(result.removed, 1, 'vu dans une bibliothèque : la bibliothèque porte déjà la date');
+  assert.equal(result.datingOnly, 1);
+  assert.deepEqual(result.entries.map(entry => [entry.raw.guid, entry.sourceKind, entry.datingOnly === true]), [
+    ['plex://movie/coco', 'account-history', true],
+    ['plex://movie/supprime', 'account-history', false],
+    ['plex://movie/vu-ailleurs', 'library-watched', false],
+    ['plex://movie/coco', 'pms-history', false],
+  ]);
+  assert.equal(reconcileAccountHistoryWithLibraries(entries, new Set()).entries.length, entries.length);
+  // Côté client, datingOnly date un Vu connu et n'en crée jamais (sinon l'état non vu de la bibliothèque le retirerait).
+  const engine = read('src/features/plex/plexSyncEngine.ts');
+  // Revue Codex #969 : l'entrée passe d'abord par le cache de résolution et TMDB (GUID Plex/IMDb seul), puis s'arrête
+  // juste avant toute création de Vu, une fois pour les épisodes et une fois pour les films.
+  const guard = /\n\s+if \(item\.datingOnly === true\) continue;[^\n]*\n\s+if \((matchedShow|matchedMovie)\) \{/g;
+  assert.deepEqual([...engine.matchAll(guard)].map(match => match[1]), ['matchedShow', 'matchedMovie']);
+  assert.ok(engine.indexOf('if (item.datingOnly === true) continue;') > engine.indexOf('tmdbData = await resolveAndCachePlexItem(cacheKey, item);'));
+  assert.doesNotMatch(engine, /provenViewedAt\) \|\| item\.datingOnly/);
+  const server = read('server.ts');
+  assert.match(server, /reconcileAccountHistoryWithLibraries\(allRawItems, currentLibraryGuids\)/);
+  assert.match(server, /\.\.\.\(entry\.datingOnly === true \? \{ datingOnly: true \} : \{\}\)/);
+  assert.doesNotMatch(server, /if \(guid && currentLibraryGuids\.has\(guid\)\) \{\n\s+allRawItems\.splice/);
+  assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDatingOnly: 40, plexAccountHistoryMode: 'dated' })?.datingOnly, 40);
+  // Un Vu daté par Plex ne devient pas un Vu Plex : l'état non vu de la bibliothèque ne peut donc pas le retirer.
+  assert.equal('plexImported' in (datePlexWatchedRecord({ watchedAt: 1, watchedTimeKnown: false }, VIEWED) || {}), false);
 });

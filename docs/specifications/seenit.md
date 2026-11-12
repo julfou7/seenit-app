@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.300**
+Version applicative : **1.4.301**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -656,7 +656,8 @@ n'est rouverte que par une nouvelle décision produit explicite.
     cerclée d'or sur fond sombre, « Bientôt » en bleu) ; carte de la saison (barres de notes,
     **Tout marquer vu / non vu**, bande-annonce de saison) et lignes d'épisode (vignette libre de tout
     repère, code « Sxx | Eyy » en or, bleu à venir, gris vu, puis durée ou date ; la note reste dans les
-    barres de la saison ; coche 44 px) ; **Où regarder** en lignes ; **Personnages** (personnage,
+    barres de la saison ; coche 44 px ; retour v1.4.300 : une note d'épisode portée par moins de 3 votes TMDB ne compte
+    ni dans la moyenne ni dans les barres, et sans note fiable aucune moyenne n'est affichée) ; **Où regarder** en lignes ; **Personnages** (personnage,
     épisodes, présence, interprète ; six, puis dix par dix) ; univers TVDB ; catégories et thèmes ; Reddit.
   - **Film** : **Marquer vu** (annulable), signet **À voir**, bande-annonce ; « Si tu lances maintenant ·
     Fin à HH:MM » tant que le film est sorti, non vu et hors salle ; chips ; synopsis ; Où regarder ;
@@ -972,6 +973,12 @@ pour le cache des sagas et univers.
   « Activité » du compte (`activityFeed`, visionnages `ActivityWatchHistory` et leur `date`) et date chaque entrée du
   Watch History par **GUID global exact**, jamais par titre ; la raison d'un historique sans heure est écrite dans le
   journal de diagnostic. Une ligne d'historique serveur sans aucun identifiant (média supprimé) reste non résolue.
+  Retour v1.4.300 (journal terrain : « 75 daté(s) » mais « 0 Vu daté(s) ») : un événement du Watch History n'est retiré
+  comme doublon que si son GUID exact est **vu** dans une bibliothèque actuelle (la bibliothèque porte alors sa propre date).
+  Présent mais non vu dans une bibliothèque — le serveur d'un ami, l'état de lecture n'étant pas synchronisé entre
+  serveurs —, l'événement reste la seule date de la lecture faite ailleurs : il est gardé en **datation seule**
+  (`datingOnly`) et ne fait que dater un Vu déjà connu dans SeenIt ; il n'en crée jamais, pour qu'un état non vu de cette
+  bibliothèque ne le retire pas aussitôt. Le journal donne le nombre de ces événements.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite
@@ -1477,8 +1484,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   l'action. Le titre d'un média reste en or (`SEENIT-UX-020`) ; la couleur de l'action passe par
   l'icône et la barre de temps, jamais par le titre. Un seul bouton de 104 px : « Annuler », sinon
   « Ignorer les suivants » sur un toast Plex en file. Un retrait qui vise un média (notification retirée)
-  transmet ce média au toast pour que l'utilisateur voie ce qui a été retiré. Glisser vers le bas ferme
-  le toast. Pendant une synchronisation longue, le bandeau Plex indique la phase réellement connue et
+  transmet ce média au toast pour que l'utilisateur voie ce qui a été retiré. Glisser vers le bas **ou vers
+  la droite** ferme tout toast, Plex compris (retour v1.4.300) ; vers le haut ou la gauche, ou un simple effleurement, ne
+  ferme rien, et le toast sort dans le sens du geste. Aucun geste natif ne concurrence ce glisser (`touch-action: none`). Pendant une synchronisation longue, le bandeau Plex indique la phase réellement connue et
   la durée écoulée, sans inventer de pourcentage. Les toasts unitaires Plex d'un même lot peuvent être
   abandonnés via « Ignorer les suivants » : cette action purge uniquement les notifications Plex encore
   en file et conserve le bilan final ainsi que les notifications des autres fonctionnalités. Le bilan

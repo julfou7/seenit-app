@@ -93,6 +93,24 @@ async function testNavbarHarness(client, root) {
     await client.send('Input.dispatchKeyEvent',{type:'keyUp',key:'Escape',code:'Escape'});
     await check(client,'!document.querySelector("[data-dialog-layer]")','Escape ferme un seul niveau');
     await evaluate(client,'window.__nav13j.clearToasts()');
+    if(width===412) {
+      // SEENIT-UX-004 retour v1.4.300 : le toast Plex se ferme en glissant vers le bas ou vers la droite, jamais vers le haut ou la gauche.
+      await client.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+      for(const [dx,dy,closes] of [[0,90,true],[140,0,true],[0,-90,false],[-140,0,false],[60,-150,false]]) {
+        await evaluate(client,'window.__nav13j.clearToasts()');await delay(360);
+        await evaluate(client,'window.__nav13j.plexToast()');
+        await check(client,'document.querySelector("[data-toast-card]")','toast Plex affiché');await delay(450);
+        const p=await point(client,'[data-toast-card]');
+        await client.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[p]});
+        for(let i=1;i<=8;i++){await client.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:p.x+dx*i/8,y:p.y+dy*i/8}]});await delay(16);}
+        await client.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+        await delay(650);
+        const gone=!(await evaluate(client,'Boolean(document.getElementById("toast-notification-wrapper"))'));
+        if(gone!==closes)throw new Error(`#954 glisser ${dx},${dy} : toast ${gone?'fermé':'resté'} (attendu ${closes?'fermé':'resté'})`);
+      }
+      await evaluate(client,'window.__nav13j.clearToasts()');
+      await client.send('Emulation.setTouchEmulationEnabled',{enabled:false});
+    }
     if(width===360) {
       const p=await point(client,selector('watchlist'));
       const shortcutCount=await evaluate(client,'window.__nav13j.telemetry.shortcuts.length');

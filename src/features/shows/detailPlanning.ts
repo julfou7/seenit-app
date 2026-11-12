@@ -74,6 +74,22 @@ export function seasonAverages(seasons: ReadonlyArray<{ season_number?: unknown;
     .sort((a, b) => a.season - b.season);
 }
 
+/** Minimum de votes TMDB pour qu'une note d'épisode compte (retour v1.4.300 : « moyenne 10,0 » sur deux votes). */
+export const MIN_EPISODE_RATING_VOTES = 3;
+
+/**
+ * SEENIT-UX-019 : notes d'épisode retenues pour la moyenne et les barres. Une note portée par moins de
+ * MIN_EPISODE_RATING_VOTES votes vaut « inconnue » (0) ; sans `vote_count` connu, la note est gardée.
+ */
+export function reliableEpisodeRatings(episodes: ReadonlyArray<{ vote_average?: unknown; vote_count?: unknown }>): number[] {
+  return episodes.map(episode => {
+    const votes = Number(episode.vote_count);
+    if (episode.vote_count !== undefined && episode.vote_count !== null && (!Number.isFinite(votes) || votes < MIN_EPISODE_RATING_VOTES)) return 0;
+    const rating = Number(episode.vote_average);
+    return Number.isFinite(rating) && rating > 0 ? rating : 0;
+  });
+}
+
 export function averageRating(values: readonly unknown[]): number | null {
   const ratings = values.map(Number).filter(value => Number.isFinite(value) && value > 0);
   return ratings.length ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length : null;

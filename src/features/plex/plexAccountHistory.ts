@@ -224,3 +224,24 @@ export function readPlexActivityDates(payload: unknown): Array<{ guid: string; v
   }
   return out;
 }
+
+/**
+ * SEENIT-PLEX-005 (#954, retour v1.4.300) : en synchro complète, un événement du Watch History du compte dont le GUID
+ * est VU dans une bibliothèque actuelle fait double emploi (la bibliothèque porte sa date `lastViewedAt`) : il est retiré.
+ * Présent mais non vu dans une bibliothèque — typiquement le serveur d'un ami, l'état de lecture n'étant pas synchronisé
+ * entre serveurs —, l'événement reste la seule date de la lecture faite ailleurs : il est gardé en `datingOnly`, pour
+ * dater un Vu déjà connu sans jamais en créer un que l'état non vu de cette bibliothèque retirerait.
+ */
+export function reconcileAccountHistoryWithLibraries<T extends { sourceKind?: string; raw?: { guid?: unknown } | null; datingOnly?: boolean }>(entries: readonly T[], libraryGuids: ReadonlySet<string>): { entries: T[]; removed: number; datingOnly: number } {
+  const guidOf = (entry: T) => typeof entry?.raw?.guid === 'string' ? entry.raw.guid : '';
+  const watched = new Set(entries.filter(entry => entry?.sourceKind === 'library-watched').map(guidOf).filter(Boolean));
+  let removed = 0, datingOnly = 0;
+  const out: T[] = [];
+  for (const entry of entries) {
+    const guid = entry?.sourceKind === 'account-history' ? guidOf(entry) : '';
+    if (!guid || !libraryGuids.has(guid)) out.push(entry);
+    else if (watched.has(guid)) removed++;
+    else { datingOnly++; out.push({ ...entry, datingOnly: true }); }
+  }
+  return { entries: out, removed, datingOnly };
+}
