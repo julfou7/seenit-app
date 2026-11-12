@@ -7,15 +7,18 @@ import { getProfileAnalyticsMediaKey } from '../features/profile/profileAnalytic
 import {
   PROFILE_MONTH_LABELS,
   PROFILE_WEEKDAY_LABELS,
+  buildProfileRollingStats,
   buildProfileYearStats,
   countUndatedProfileViewings,
-  defaultProfileYear,
   formatProfileHours,
   formatProfileImportNote,
   formatProfileScopeNote,
   formatProfilePunchSlot,
   formatProfileUndatedNote,
   listProfileYearTotals,
+  profileRollingMonthYears,
+  profileRollingViewings,
+  profileRollingWindowStart,
   scopeProfileViewings,
 } from '../features/profile/profileYearStats';
 import {
@@ -37,6 +40,7 @@ import { imageUrl } from '../features/watchlist/seriesCardPresentation';
 import { MonthDial } from './profile/MonthDial';
 import { useReveal } from './profile/useReveal';
 
+const PROFILE_MONTH_SHORT_LOWER = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
 const delay = (ms: number) => ({ '--delay': `${ms}ms` }) as CSSProperties;
 const dayMonth = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
 
@@ -72,9 +76,11 @@ export function ProAnalyticsDashboard({
   const [pickedYear, setPickedYear] = useState<number | null>(null);
   const [yearMenuOpen, setYearMenuOpen] = useState(false);
   const now = Date.now();
-  const year = pickedYear !== null && yearTotals.some(entry => entry.year === pickedYear) ? pickedYear : defaultProfileYear(viewings);
-  const stats = useMemo(() => buildProfileYearStats(viewings, year), [viewings, year]);
-  const yearViewings = useMemo(() => viewings.filter(viewing => new Date(viewing.watchedAt).getFullYear() === year), [viewings, year]);
+  // Retour terrain v1.4.294 : par défaut les douze derniers mois glissants ; une année reste choisissable.
+  const rolling = pickedYear === null || !yearTotals.some(entry => entry.year === pickedYear);
+  const year = rolling ? new Date(now).getFullYear() : pickedYear!;
+  const stats = useMemo(() => rolling ? buildProfileRollingStats(viewings, now) : buildProfileYearStats(viewings, year), [viewings, year, rolling]);
+  const yearViewings = useMemo(() => rolling ? profileRollingViewings(viewings, now) : viewings.filter(viewing => new Date(viewing.watchedAt).getFullYear() === year), [viewings, year, rolling]);
   const showsById = useMemo(() => new Map(shows.map(show => [show.id, show])), [shows]);
   // Revue Codex #944 : genres et rôles principaux viennent des contributions persistées des statistiques (tous les
   // titres vus) ; les caches de détails ne servent qu'en repli pour un titre pas encore réconcilié.
@@ -111,32 +117,36 @@ export function ProAnalyticsDashboard({
   const scopeNote = formatProfileScopeNote(scope, year);
   const undatedNote = useMemo(() => formatProfileUndatedNote(countUndatedProfileViewings(shows)), [shows]);
 
-  const isCurrentYear = year === new Date(now).getFullYear();
-  // SEENIT-PROFILE-006 : l'année de l'inscription commence le jour de l'inscription.
-  const sinceLabel = scope.since !== null && scope.beforeSince > 0 && new Date(scope.since).getFullYear() === year
-    ? `Depuis le ${new Date(scope.since).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : null;
+  const isCurrentYear = rolling || year === new Date(now).getFullYear();
+  // SEENIT-PROFILE-006 : la période commence au plus tôt le jour où SeenIt a commencé à suivre les visionnages.
+  const sinceInPeriod = scope.since !== null && scope.beforeSince > 0 && (rolling ? scope.since > profileRollingWindowStart(now) : new Date(scope.since).getFullYear() === year);
+  const sinceLabel = sinceInPeriod ? `Depuis le ${new Date(scope.since!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : null;
+  const currentMonth = new Date(now).getMonth();
   const fullDays = Math.floor(stats.minutes / 1440);
   const maxWeek = Math.max(1, ...weeks.map(week => week.minutes));
   const seriesShare = stats.minutes > 0 ? Math.round(stats.seriesMinutes / stats.minutes * 100) : 0;
   const maxGenre = Math.max(1, ...genres.map(genre => genre.share));
   const maxShare = Math.max(1, ...stats.platforms.map(platform => platform.share));
   const topBucket = fateSummary.buckets.reduce((best, bucket) => bucket.count > best.count ? bucket : best, fateSummary.buckets[0]);
-  const pickYear = (next: number) => { setPickedYear(next); setYearMenuOpen(false); };
+  const pickYear = (next: number | null) => { setPickedYear(next); setYearMenuOpen(false); };
 
   return (
     <div className="moi-stats">
       <div className="moi-stats-top">
-        <span>{sinceLabel ?? (isCurrentYear ? 'Depuis le 1er janvier' : `En ${year}`)}</span>
+        <span>{sinceLabel ?? (rolling ? '12 derniers mois' : isCurrentYear ? 'Depuis le 1er janvier' : `En ${year}`)}</span>
         <div className="moi-year-picker">
-          <button type="button" className="moi-year" onClick={() => setYearMenuOpen(open => !open)} disabled={yearTotals.length < 2}
-            aria-haspopup="listbox" aria-expanded={yearMenuOpen} aria-label={yearTotals.length < 2 ? `Année ${year}` : `Année ${year}, choisir une autre année`}>
-            {year}{yearTotals.length > 1 && <ChevronDown size={13} strokeWidth={2.4} aria-hidden="true" />}
+          <button type="button" className="moi-year" onClick={() => setYearMenuOpen(open => !open)}
+            aria-haspopup="listbox" aria-expanded={yearMenuOpen} aria-label={`${rolling ? '12 derniers mois' : `Année ${year}`}, choisir une autre période`}>
+            {rolling ? '12 mois' : year}<ChevronDown size={13} strokeWidth={2.4} aria-hidden="true" />
           </button>
           {yearMenuOpen && <>
             <button type="button" className="moi-year-backdrop" aria-label="Fermer la liste des années" onClick={() => setYearMenuOpen(false)} />
             <ul className="moi-year-menu" role="listbox" aria-label="Années" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setYearMenuOpen(false); } }}>
+              <li><button type="button" role="option" aria-selected={rolling} onClick={() => pickYear(null)} ref={rolling ? element => element?.focus() : undefined}>
+                <span>12 derniers mois</span><small>{stats.minutes > 0 && rolling ? formatProfileHours(stats.minutes) : ''}</small>
+              </button></li>
               {yearTotals.map(entry => <li key={entry.year}>
-                <button type="button" role="option" aria-selected={entry.year === year} onClick={() => pickYear(entry.year)} ref={entry.year === year ? element => element?.focus() : undefined}>
+                <button type="button" role="option" aria-selected={!rolling && entry.year === year} onClick={() => pickYear(entry.year)} ref={!rolling && entry.year === year ? element => element?.focus() : undefined}>
                   <span>{entry.year}</span><small>{entry.minutes > 0 ? formatProfileHours(entry.minutes) : '—'}</small>
                 </button>
               </li>)}
@@ -149,14 +159,15 @@ export function ProAnalyticsDashboard({
       <Reveal className="moi-card moi-card--gold moi-dial-card" label="Heures par mois">
         {seen => <>
           <span className="moi-eyebrow">Heures par mois</span>
-          <MonthDial key={year} year={year} minutes={stats.months} episodes={stats.monthEpisodes} films={stats.monthFilms} recordMonth={stats.recordMonth}
-            currentMonth={isCurrentYear ? new Date(now).getMonth() : -1} totalMinutes={stats.minutes} play={seen} />
+          <MonthDial key={rolling ? 'rolling' : year} year={year} minutes={stats.months} episodes={stats.monthEpisodes} films={stats.monthFilms} recordMonth={stats.recordMonth}
+            currentMonth={isCurrentYear ? currentMonth : -1} totalMinutes={stats.minutes} play={seen}
+            periodLabel={rolling ? 'sur 12 mois' : undefined} monthYears={rolling ? profileRollingMonthYears(now) : undefined} />
           <div className="moi-dial-facts">
             <span><b>{stats.episodes.toLocaleString('fr-FR')}</b><small>{stats.episodes > 1 ? 'épisodes' : 'épisode'}</small></span>
             <span><b>{stats.films.toLocaleString('fr-FR')}</b><small>{stats.films > 1 ? 'films' : 'film'}</small></span>
             <span><b>{fullDays} {fullDays > 1 ? 'jours' : 'jour'}</b><small>pleins</small></span>
           </div>
-          {isCurrentYear && stats.months.length > 0 && <p className="moi-note moi-center">{`${PROFILE_MONTH_LABELS[new Date(now).getMonth()]} en cours : `}<b>{formatProfileHours(stats.months[stats.months.length - 1])}</b>. Touche un mois pour voir son détail.</p>}
+          {isCurrentYear && stats.months.length > 0 && <p className="moi-note moi-center">{`${PROFILE_MONTH_LABELS[new Date(now).getMonth()]} en cours : `}<b>{formatProfileHours(stats.months[currentMonth] || 0)}</b>. Touche un mois pour voir son détail.</p>}
         </>}
       </Reveal>
 
@@ -182,7 +193,12 @@ export function ProAnalyticsDashboard({
               </span>
             ))}
           </div>
-          <div className="moi-axis"><span>depuis le {dayMonth.format(new Date(weeks[0].start))}</span><span>28 derniers jours</span></div>
+          {/* Retour terrain v1.4.294 : le mois s'affiche sous la première semaine qui y commence. */}
+          <div className="moi-week-months" aria-hidden="true">{weeks.map((week, index) => {
+            const month = new Date(week.start).getMonth();
+            return <span key={week.start}>{index === 0 || new Date(weeks[index - 1].start).getMonth() !== month ? PROFILE_MONTH_SHORT_LOWER[month] : ''}</span>;
+          })}</div>
+          <div className="moi-axis"><span>semaines depuis le {dayMonth.format(new Date(weeks[0].start))}</span><span>en or : 28 derniers jours</span></div>
           {insights.map(insight => <div key={insight.id} className="moi-insight"><span><strong>{insight.title}</strong><small>{insight.detail}</small></span><b className={insight.id === 'rhythm' ? 'moi-glow-text' : undefined}>{insight.value}</b></div>)}
         </>}
       </Reveal>}

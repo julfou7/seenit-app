@@ -26,6 +26,10 @@ export interface MonthDialProps {
   currentMonth: number;
   totalMinutes: number;
   play: boolean;
+  /** Retour v1.4.294 : « sur 12 mois » en vue glissante, sinon « en 2026 ». */
+  periodLabel?: string;
+  /** Année de chaque mois en vue glissante (les mois après le mois en cours viennent de l'année précédente). */
+  monthYears?: number[];
 }
 
 const hours = (minutes: number) => Math.round(minutes / 60);
@@ -41,7 +45,9 @@ export function MonthDial(props: MonthDialProps) {
   return <DialBody key={replay} {...props} onReplay={() => setReplay(value => value + 1)} />;
 }
 
-function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, totalMinutes, play, onReplay }: MonthDialProps & { onReplay: () => void }) {
+function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, totalMinutes, play, periodLabel, monthYears, onReplay }: MonthDialProps & { onReplay: () => void }) {
+  const monthName = (month: number) => `${PROFILE_MONTH_LABELS[month]}${monthYears && monthYears[month] !== year ? ` ${monthYears[month]}` : ''}`;
+  const period = periodLabel ?? `en ${year}`;
   const [picked, setPicked] = useState<number | null>(null);
   const max = Math.max(1, ...minutes);
   const pickedKnown = picked !== null && picked < minutes.length;
@@ -51,7 +57,7 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
     : !pickedKnown ? 'à venir'
     : minutes[picked] <= 0 ? 'rien regardé'
     : [films[picked] ? plural(films[picked], 'film') : null, episodes[picked] ? `${episodes[picked]} ép.` : null].filter(Boolean).join(' · ');
-  const summary = PROFILE_MONTH_LABELS.map((label, month) => month < minutes.length ? `${label.toLowerCase()} ${hours(minutes[month])}` : null).filter(Boolean).join(', ');
+  const summary = PROFILE_MONTH_LABELS.map((_, month) => month < minutes.length ? `${monthName(month).toLowerCase()} ${hours(minutes[month])}` : null).filter(Boolean).join(', ');
   return (
     <div className="moi-dial" data-play={play} data-picked={picked !== null}>
       <svg viewBox="0 0 322 322" aria-hidden="true">
@@ -74,8 +80,8 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
         {MONTH_SHORT.map((label, month) => <path key={label} className="moi-dial-hit" data-month={month} d={sectorPath(month, MONTH_DIAL.hitRadius)} onClick={() => setPicked(current => current === month ? null : month)} />)}
       </svg>
       <button type="button" className="moi-dial-center" onClick={() => { if (picked === null) onReplay(); else setPicked(null); }}
-        aria-label={picked === null ? `${year} : ${hours(totalMinutes)} heures. Rejouer l’animation` : 'Revenir au total de l’année'}>
-        <span>{picked === null ? `en ${year}` : PROFILE_MONTH_LABELS[picked].toLowerCase()}</span>
+        aria-label={picked === null ? `${period} : ${hours(totalMinutes)} heures. Rejouer l’animation` : 'Revenir au total'}>
+        <span>{picked === null ? period : monthName(picked).toLowerCase()}</span>
         <strong>{pickedKnown || picked === null ? `${shown} h` : '–'}</strong>
         <small>{detail}</small>
       </button>
@@ -86,13 +92,13 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
           // Revue Codex #944 : position en pourcentage du cadran, qui peut rétrécir sous 322 px (écran de 360 px).
           <button key={label} type="button" className="moi-dial-month" style={{ left: `${(x / 322 * 100).toFixed(2)}%`, top: `${(y / 322 * 100).toFixed(2)}%` }}
             data-state={!known ? 'future' : month === recordMonth ? 'record' : month === currentMonth ? 'current' : minutes[month] <= 0 ? 'empty' : 'past'}
-            aria-pressed={picked === month} aria-label={`${PROFILE_MONTH_LABELS[month]} : ${known ? `${hours(minutes[month])} heures` : 'à venir'}`}
+            aria-pressed={picked === month} aria-label={`${monthName(month)} : ${known ? `${hours(minutes[month])} heures` : 'à venir'}`}
             onClick={() => setPicked(current => current === month ? null : month)}>
             <span>{label}</span><b>{known ? hours(minutes[month]) : '–'}</b>
           </button>
         );
       })}
-      <span className="sr-only">Heures par mois en {year} : {summary}.</span>
+      <span className="sr-only">Heures par mois {period} : {summary}.</span>
     </div>
   );
 }

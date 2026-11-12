@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.294**
+Version applicative : **1.4.295**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1621,6 +1621,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   s'animent pas ; une étiquette de plateforme ne se coupe qu'entre deux mots. Retour v1.4.293 : toucher un
   secteur du cadran ouvre son mois comme son étiquette ; le secteur choisi, détaché et en plein rebond, ne passe
   jamais sous l'étiquette de son mois, qui ne grossit pas.
+  Retour v1.4.294 : par défaut le cadran couvre les douze derniers mois glissants (chaque mois à sa place
+  calendaire, le détail nomme l'année d'un mois de l'an passé) et le sélecteur propose « 12 derniers mois » puis
+  les années ; sous les douze semaines des tendances, le mois apparaît sous la première semaine qui y commence.
 - **SEENIT-PROFILE-004** — Mon année : titre « L'année X, puis Y » d'après les séries les plus regardées,
   calendrier jour par jour (quatre niveaux, journée record), mois record, plus longue suite de jours, plus
   gros marathon d'une série en un jour et plus longue pause, « Ton année en séries » (série la plus

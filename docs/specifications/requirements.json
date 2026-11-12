@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.294",
+  "applicationVersion": "1.4.295",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -4016,6 +4016,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 retour terrain v1.4.294 : douze mois glissants par défaut et mois sous les tendances"
+        },
         {
           "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-003 retour terrain v1.4.293 : cadran sans chevauchement, secteurs touchables"

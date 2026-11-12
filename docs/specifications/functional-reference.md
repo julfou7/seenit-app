@@ -421,6 +421,9 @@ Réglages et porte un point or lorsqu'une mise à jour de l'application est disp
   (la série la plus regardée de chaque mois, jamais de film), films ou séries mois par mois, devenir des
   séries de l'année, top cinq (affiche, heures, épisodes, part du temps séries) et « Et maintenant ».
 
+Mes chiffres s'ouvre sur les douze derniers mois glissants ; le sélecteur propose aussi chaque année. Sous les
+barres des tendances, le mois s'affiche sous la première semaine qui y commence.
+
 Mes chiffres et Mon année s'animent une fois à l'entrée de chaque bloc dans l'écran, en mouvement réduit
 tout s'affiche directement (`SEENIT-PROFILE-005`) ; Séries laissées en route ne s'anime pas.
 
