@@ -12,7 +12,7 @@ import {
   scopeProfileViewings,
 } from '../features/profile/profileYearStats';
 import { buildMediaMonths, buildProfileCalendar, buildProfileYearRecords, buildTopSeries, buildYearHeadline, buildYearInSeries } from '../features/profile/profileYearRecap';
-import { countSeriesFatesInYear, type SeriesFateEntry } from '../features/profile/profileSeriesFate';
+import { countSeriesFatesInYear, summarizeSeriesFate, type SeriesFateEntry } from '../features/profile/profileSeriesFate';
 import { imageUrl } from '../features/watchlist/seriesCardPresentation';
 import { useReveal } from './profile/useReveal';
 import { LoadMore, useRevealFocus } from './cards/HomeLoadMore';
@@ -42,6 +42,8 @@ export function ProfileYearStory({ shows, fate, since = null, libraryReady = tru
   const media = useMemo(() => buildMediaMonths(viewings, year, now), [viewings, year]);
   const top = useMemo(() => buildTopSeries(viewings, year), [viewings, year]);
   const fates = useMemo(() => countSeriesFatesInYear(fate, viewings, year), [fate, viewings, year]);
+  // #946 : les séries presque finies gardent un accès même sans pause ni abandon dans l'année.
+  const nearlyDoneCount = useMemo(() => summarizeSeriesFate(fate).nearlyDone.length, [fate]);
   const projection = useMemo(() => buildProfileProjection(shows, viewings.filter(viewing => !viewing.catchUp), now), [shows, viewings]);
   const [allMonths, setAllMonths] = useState(false);
   const monthsReveal = useRevealFocus<HTMLDivElement>('.moi-series-month');
@@ -143,7 +145,7 @@ export function ProfileYearStory({ shows, fate, since = null, libraryReady = tru
           {fateParts.map(([key]) => fates[key] > 0 && <i key={key} data-fate={key} style={{ flexGrow: fates[key] }} />)}
         </div>
         <div className="moi-fate-legend">{fateParts.map(([key, label]) => <span key={key} data-fate={key}>{fates[key]} {label}</span>)}</div>
-        {(fates.paused > 0 || fates.dropped > 0) && <button type="button" className="moi-secondary" onClick={onFate}>Voir les séries laissées en route</button>}
+        {(fates.paused > 0 || fates.dropped > 0 || nearlyDoneCount > 0) && <button type="button" className="moi-secondary" onClick={onFate}>{fates.paused > 0 || fates.dropped > 0 ? 'Voir les séries laissées en route' : 'Voir les séries presque finies'}</button>}
       </Reveal>}
 
       {/* 6. Ton top de l'année */}

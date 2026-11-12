@@ -46,13 +46,14 @@ export function MoiYearCard({ viewings, onStats, onYear }: { viewings: readonly 
 }
 
 export function MoiFateRow({ left, nearlyDone, onOpen }: { left: number; nearlyDone: number; onOpen: () => void }) {
-  if (left <= 0) return null;
+  // #946 : sans série laissée en route, les séries presque finies gardent leur accès.
+  if (left <= 0 && nearlyDone <= 0) return null;
   return (
     <button type="button" className="moi-fate-row" onClick={onOpen}>
       <i aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" /><path d="M10 8v8M14 8v8" /></svg></i>
       <span>
-        <strong>{left} {left > 1 ? 'séries laissées en route' : 'série laissée en route'}</strong>
-        {nearlyDone > 0 && <small>{nearlyDone} {nearlyDone > 1 ? 'presque finies à reprendre' : 'presque finie à reprendre'}</small>}
+        <strong>{left > 0 ? `${left} ${left > 1 ? 'séries laissées en route' : 'série laissée en route'}` : `${nearlyDone} ${nearlyDone > 1 ? 'séries presque finies' : 'série presque finie'}`}</strong>
+        {left > 0 && nearlyDone > 0 && <small>{nearlyDone} {nearlyDone > 1 ? 'presque finies à reprendre' : 'presque finie à reprendre'}</small>}
       </span>
       <svg className="moi-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
     </button>

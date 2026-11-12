@@ -278,7 +278,7 @@ export function ProAnalyticsDashboard({
       </Reveal>}
 
       {/* 7. Séries laissées en route */}
-      {fateSummary.left.length > 0 && <Reveal className="moi-card moi-card--gold" label="Séries laissées en route">
+      {(fateSummary.left.length > 0 || fateSummary.nearlyDone.length > 0) && <Reveal className="moi-card moi-card--gold" label="Séries laissées en route">
         {() => <>
           <div className="moi-card-head moi-card-head--stack"><h3>Séries laissées en route</h3><small>Sur {fateSummary.inProgress} en cours, <b>{fateSummary.paused.length} n’ont plus bougé depuis 2 mois</b> · {fateSummary.dropped.length} {fateSummary.dropped.length > 1 ? 'abandonnées' : 'abandonnée'}</small></div>
           {fateSummary.left.slice(0, 2).map((entry, index) => (
@@ -289,7 +289,7 @@ export function ProAnalyticsDashboard({
             </div>
           ))}
           {topBucket && topBucket.count > 0 && <p className="moi-note">Tu décroches le plus souvent <b>{topBucket.label.toLowerCase()}</b>.</p>}
-          <button type="button" className="moi-primary" onClick={onFate}>Voir les {fateSummary.left.length} séries</button>
+          <button type="button" className="moi-primary" onClick={onFate}>{fateSummary.left.length > 0 ? `Voir les ${fateSummary.left.length} séries` : `Voir les ${fateSummary.nearlyDone.length} presque finies`}</button>
         </>}
       </Reveal>}
 

@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.296**
+Version applicative : **1.4.297**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1615,6 +1615,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   décrochage), « Où tu décroches » (avant l'épisode 3, en saison 1, en saison 2, saison 3 et après), les
   séries à trois épisodes ou moins de la fin, celles en pause puis abandonnées ; la phrase de survie au-delà
   de la saison 1 n'apparaît qu'à partir de dix séries comparables. Aucun bloc vide, aucune animation.
+  Toucher une série ouvre sa fiche par son identifiant TMDB ; sans série en pause ni abandonnée, l'accès reste
+  ouvert dès qu'une série est presque finie (Moi, Mes chiffres, Mon année).
 - **SEENIT-PROFILE-003** — Mes chiffres : cadran des douze mois (valeur et mois en trois ou quatre lettres,
   détail du mois au toucher, retour au total), rythme hebdomadaire sur 28 jours et sa variation quand chaque
   fenêtre compte dix visionnages, journée type médiane, jours d'affilée (en cours et record), douze semaines
