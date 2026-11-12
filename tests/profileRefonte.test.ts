@@ -328,6 +328,9 @@ test('SEENIT-PROFILE-006 retour terrain v1.4.294 : les rendez-vous réguliers re
   assert.deepEqual(appointments.map(appointment => appointment.showId), ['mobland']);
   assert.equal(appointments[0].weeks, 8);
   assert.equal(formatProfileAppointment(appointments[0]), 'chaque vendredi soir · 8 semaines d’affilée');
+  // Revue Codex #955 : neuf épisodes une semaine puis un par semaine pendant trois semaines → pas un rendez-vous.
+  const spike = [...Array.from({ length: 9 }, (_, index) => view('pic', at(2026, 10, 13, 20) - 21 * DAY + index * 3_600_000)), ...[0, 1, 2].map(index => view('pic', at(2026, 10, 13, 21) - index * 7 * DAY))];
+  assert.equal(buildProfileAppointments(spike, now).length, 0);
   // Une interruption de plus d'une semaine casse le rendez-vous en cours.
   assert.equal(buildProfileAppointments(fridays.slice(2).map(viewing => ({ ...viewing, watchedAt: viewing.watchedAt })), now + 21 * DAY).length, 0);
   // Les épisodes importés depuis TV Time sont étiquetés et restent hors des chiffres par période.

@@ -287,8 +287,9 @@ export function buildProfileAppointments(viewings: readonly ProfileViewing[], no
     if (week < 0) continue;
     const run: ProfileViewing[] = [];
     let weeks = 0;
-    while (perWeek.has(week)) { run.push(...perWeek.get(week)!); weeks++; week++; }
-    if (weeks < PROFILE_APPOINTMENT_MIN_WEEKS || run.length / weeks > APPOINTMENT_MAX_PER_WEEK) continue;
+    // Revue Codex #955 : la limite vaut pour chaque semaine ; une semaine de binge arrête la suite.
+    while (perWeek.has(week) && perWeek.get(week)!.length <= APPOINTMENT_MAX_PER_WEEK) { run.push(...perWeek.get(week)!); weeks++; week++; }
+    if (weeks < PROFILE_APPOINTMENT_MIN_WEEKS) continue;
     const days = new Array<number>(7).fill(0);
     for (const viewing of run) days[(new Date(viewing.watchedAt).getDay() + 6) % 7]++;
     const topDay = days.indexOf(Math.max(...days));
