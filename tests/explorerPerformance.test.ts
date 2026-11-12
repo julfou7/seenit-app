@@ -98,7 +98,7 @@ test('SEENIT-PERF-001 regroupe la persistance des diffuseurs hors du scroll', ()
   const persisted = JSON.parse(storage.snapshot() || '{}');
   assert.equal(Object.keys(persisted).length, WATCH_PROVIDER_CACHE_MAX_ENTRIES);
   assert.ok(persisted['movie:1059']);
-  assert.equal(WATCH_PROVIDER_CACHE_STORAGE_KEY, 'seenit_watch_providers_v1');
+  assert.equal(WATCH_PROVIDER_CACHE_STORAGE_KEY, 'seenit_watch_providers_v2');
 });
 
 test('SEENIT-PERF-001 réhydrate un diffuseur quand une carte virtualisée est remontée', () => {
