@@ -1,3 +1,4 @@
+import { VIEWING_SOURCE_SEENIT } from '../features/history/viewingSource';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { type Show } from '../types';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
@@ -617,10 +618,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     else {
       newSeen.add(epKey);
       const epObj = seasonsCache[season]?.episodes?.find((x: { episode_number: number }) => x.episode_number === episode);
-      newRecords[epKey] = { watchedAt: Date.now(), episodeTitle: epObj?.name || null };
+      newRecords[epKey] = { watchedAt: Date.now(), episodeTitle: epObj?.name || null, source: VIEWING_SOURCE_SEENIT };
     }
     const computeOptimisticNextEp = async (seenSet: Set<string>) => {
-      const allSeasons = tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0)?.sort((a: any, b: any) => a.season_number - b.season_number) || [];
+      type SeasonSummary = { season_number: number; episode_count?: number };
+      const allSeasons = (tmdbDetails?.seasons as SeasonSummary[] | undefined)?.filter(s => s.season_number > 0)?.sort((a, b) => a.season_number - b.season_number) || [];
       for (const s of allSeasons) {
         for (let ep = 1; ep <= (s.episode_count || 0); ep++) {
           if (!seenSet.has(`${s.season_number}x${ep}`)) {
@@ -695,9 +697,10 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const allSeen = epKeys.length > 0 && epKeys.every(k => existingSeen.has(k));
     const now = Date.now();
     if (allSeen) epKeys.forEach(k => { existingSeen.delete(k); delete existingRecords[k]; });
-    else epKeys.forEach(k => { existingSeen.add(k); existingRecords[k] = { watchedAt: now }; });
+    else epKeys.forEach(k => { existingSeen.add(k); existingRecords[k] = { watchedAt: now, source: VIEWING_SOURCE_SEENIT }; });
     const computeOptimisticNextEp = async (seenSet: Set<string>) => {
-      const allSeasons = tmdbDetails?.seasons?.filter((s: any) => s.season_number > 0)?.sort((a: any, b: any) => a.season_number - b.season_number) || [];
+      type SeasonSummary = { season_number: number; episode_count?: number };
+      const allSeasons = (tmdbDetails?.seasons as SeasonSummary[] | undefined)?.filter(s => s.season_number > 0)?.sort((a, b) => a.season_number - b.season_number) || [];
       for (const s of allSeasons) {
         for (let ep = 1; ep <= (s.episode_count || 0); ep++) {
           if (!seenSet.has(`${s.season_number}x${ep}`)) {
@@ -831,7 +834,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       const titleToUse = tmdbDetails?.name || tmdbDetails?.title || 'Chargement...';
       const posterToUse = tmdbDetails?.poster_path ? `https://image.tmdb.org/t/p/w342${tmdbDetails.poster_path}` : undefined;
       const backdropToUse = tmdbDetails?.backdrop_path ? `https://image.tmdb.org/t/p/w780${tmdbDetails.backdrop_path}` : undefined;
-      const newShowData = { tmdbId: effectiveTmdbId, title: titleToUse, mediaType: 'movie' as const, status: 'completed' as const, createdAt: Date.now(), updatedAt: Date.now(), posterPath: posterToUse || null, backdropPath: backdropToUse || null, firstAirDate: tmdbDetails?.first_air_date || tmdbDetails?.release_date, networks: tmdbDetails?.networks, seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: Date.now() } }, isArchived: false, isFavorite: false };
+      const newShowData = { tmdbId: effectiveTmdbId, title: titleToUse, mediaType: 'movie' as const, status: 'completed' as const, createdAt: Date.now(), updatedAt: Date.now(), posterPath: posterToUse || null, backdropPath: backdropToUse || null, firstAirDate: tmdbDetails?.first_air_date || tmdbDetails?.release_date, networks: tmdbDetails?.networks, seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: Date.now(), source: VIEWING_SOURCE_SEENIT } }, isArchived: false, isFavorite: false };
       const newId = await addShow(newShowData);
       const savedShow = { ...newShowData, id: newId, userId: '' };
       showToast(`« ${titleToUse} » marqué comme vu !`, 'success', savedShow, async () => { if (newId) await deleteShow(newId); });
@@ -842,7 +845,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const newSeen = seen ? [] : ['movie'];
     const newStatus = seen ? 'plan_to_watch' : 'completed';
     const newRecords = { ...(currentShow.episodeRecords || {}) };
-    if (!seen) newRecords['movie'] = { watchedAt: Date.now(), episodeTitle: currentShow.title || 'Film' };
+    if (!seen) newRecords['movie'] = { watchedAt: Date.now(), episodeTitle: currentShow.title || 'Film', source: VIEWING_SOURCE_SEENIT };
     else delete newRecords['movie'];
     await updateShow(currentShow.id, { seenEpisodes: newSeen, episodeRecords: newRecords, status: newStatus, isFavorite: seen ? false : currentShow.isFavorite, lastWatchedAt: seen ? null : Date.now(), updatedAt: Date.now(), isSynced: false });
     showToast(`« ${currentShow.title} » marqué comme ${seen ? 'non vu' : 'vu !'}`, seen ? 'info' : 'success', savedShow, async () => {

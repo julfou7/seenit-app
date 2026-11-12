@@ -1,3 +1,4 @@
+import { VIEWING_SOURCE_SEENIT } from '../history/viewingSource';
 import { useShowsStore } from '../../store/showsStore';
 import { tmdb } from './tmdb';
 import { useToastStore } from '../../store/toastStore';
@@ -64,7 +65,7 @@ export async function markEpisodeWatched(
         if (totalEps > 0 && newSeenArray.length >= totalEps) {
           optimisticNextEp = null;
         } else {
-          const nextInSeason = seasonRes.value.episodes.find((x: any) => x.episode_number > eNum && !newSeenSet.has(`${sNum}x${x.episode_number}`));
+          const nextInSeason = seasonRes.value.episodes.find((x: { episode_number: number }) => x.episode_number > eNum && !newSeenSet.has(`${sNum}x${x.episode_number}`));
           if (nextInSeason) {
             const evidence = targetShow.seasonProgress?.[String(sNum)];
             const previous = targetShow.nextEpisodeToWatch?.season_number === sNum ? targetShow.nextEpisodeToWatch : null;
@@ -127,6 +128,7 @@ export async function markEpisodeWatched(
         ...prevEpisodeRecords[epKey],
         watchedAt: Date.now(),
         watchedTimeKnown: true,
+        source: VIEWING_SOURCE_SEENIT,
         episodeTitle,
         ...(fetchedRuntime ? { runtime: fetchedRuntime } : {})
       }
@@ -158,6 +160,7 @@ export async function markEpisodeWatched(
         ...prevEpisodeRecords[epKey],
         watchedAt: Date.now(),
         watchedTimeKnown: true,
+        source: VIEWING_SOURCE_SEENIT,
         episodeTitle: fetchedEpTitle || optimisticNextEp?.name || null,
         ...(fetchedRuntime ? { runtime: fetchedRuntime } : {})
       };

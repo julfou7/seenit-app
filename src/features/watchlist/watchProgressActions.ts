@@ -1,3 +1,4 @@
+import { VIEWING_SOURCE_SEENIT } from '../history/viewingSource';
 import type { Show } from '../../types';
 import type { SeriesCardEpisode } from './seriesCardPresentation';
 import { removeWatchRecord } from './watchNext18c';
@@ -16,7 +17,7 @@ export async function markMovieWatched(requested: Show, updateShow: UpdateTracke
     const now = Date.now();
     const previous: Partial<Show> = { seenEpisodes: show.seenEpisodes || [], status: show.status,
       lastWatchedAt: show.lastWatchedAt || null, episodeRecords: show.episodeRecords || {}, updatedAt: now, isSynced: false };
-    const movieRecord = { ...show.episodeRecords?.movie, watchedAt: now, watchedTimeKnown: true, episodeTitle: show.title };
+    const movieRecord = { ...show.episodeRecords?.movie, watchedAt: now, watchedTimeKnown: true, episodeTitle: show.title, source: VIEWING_SOURCE_SEENIT };
     useShowsStore.getState().updateShowOptimistic(show.id, {
       seenEpisodes: [...(show.seenEpisodes || []), 'movie'], status: 'completed',
       episodeRecords: { ...show.episodeRecords, movie: movieRecord }, lastWatchedAt: now, updatedAt: now, isSynced: false,

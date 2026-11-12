@@ -2,6 +2,7 @@ import type { Show } from '../../types.ts';
 import { historyEpisodeEntries } from '../history/historyRecords.ts';
 import { historyLocalDayKey, resolveHistoryTimestamp } from '../history/historyPresentation.ts';
 import { getProfilePlatformName } from './profileAnalyticsSnapshot.ts';
+import { viewingSourceOf } from '../history/viewingSource.ts';
 
 // Mêmes estimations que les compteurs du Profil lorsque la durée réelle manque.
 const EPISODE_MINUTES = 45;
@@ -100,10 +101,10 @@ export function collectProfileViewings(shows: readonly Show[]): ProfileViewing[]
         ...base,
         mediaType: 'movie',
         season: 0,
-        platform: record?.plexImported === true ? 'Plex' : platform,
+        platform: viewingSourceOf(record) === 'plex' ? 'Plex' : platform,
         ...timing,
-        plexTime: record?.plexImported === true,
-        ...(record?.importedFrom === 'tvtime' ? { imported: true } : {}),
+        plexTime: viewingSourceOf(record) === 'plex',
+        ...(viewingSourceOf(record) === 'tvtime' ? { imported: true } : {}),
         minutes: asPositiveNumber(record?.runtime) || MOVIE_MINUTES,
       });
       continue;
@@ -116,10 +117,10 @@ export function collectProfileViewings(shows: readonly Show[]): ProfileViewing[]
         ...base,
         mediaType: 'tv',
         season,
-        platform: record?.plexImported === true ? 'Plex' : platform,
+        platform: viewingSourceOf(record) === 'plex' ? 'Plex' : platform,
         ...timing,
-        plexTime: record?.plexImported === true,
-        ...(record?.importedFrom === 'tvtime' ? { imported: true } : {}),
+        plexTime: viewingSourceOf(record) === 'plex',
+        ...(viewingSourceOf(record) === 'tvtime' ? { imported: true } : {}),
         minutes: asPositiveNumber(record?.runtime) || EPISODE_MINUTES,
       });
     }

@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-12-003 | 2026-11-12 | Trois étiquettes d'origine sur chaque visionnage : TV Time (données historiques), SeenIt, Plex ; pas de réimport TV Time, l'historique non étiqueté reste tel quel. | `SEENIT-PROFILE-007`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
 | USR-2026-11-12-002 | 2026-11-12 | Retour v1.4.294 : un épisode marqué d'un coup reste un épisode vu et compte dans les chiffres ; seul le faux marathon disparaît ; mettre en valeur la régularité (une série chaque vendredi soir) ; étiqueter l'import TV Time pour l'exclure facilement. | `SEENIT-PROFILE-006`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
 | USR-2026-11-12-001 | 2026-11-12 | Retour v1.4.294 : Mes chiffres sur douze mois glissants plutôt que par année civile ; le mois visible sous les barres des tendances. | `SEENIT-PROFILE-003`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
 | USR-2026-11-11-008 | 2026-11-11 | Retour v1.4.293 : le cadran de Mes chiffres ne se chevauche plus et ses secteurs se touchent comme les mois ; les chiffres partent du vrai démarrage (premier import) plutôt que de la création du compte ; Ma liste aligne la première carte sur la marge et, avec peu de sections (Films), tout défile en étagère. | `SEENIT-PROFILE-001`, `SEENIT-PROFILE-003`, `SEENIT-PROFILE-006`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |

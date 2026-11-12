@@ -4095,6 +4095,24 @@
       ]
     },
     {
+      "id": "SEENIT-PROFILE-007",
+      "title": "Origine de chaque visionnage : TV Time, SeenIt ou Plex",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/viewingSource.test.ts",
+          "contains": "SEENIT-PROFILE-007 trois origines de visionnage : TV Time, SeenIt, Plex, anciennes étiquettes comprises"
+        },
+        {
+          "file": "tests/viewingSource.test.ts",
+          "contains": "SEENIT-PROFILE-007 chaque écriture de Vu pose son origine"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-UX-023",
       "title": "Statut de diffusion de la fiche série en pastille, conservé par le cache des fiches",
       "targets": [

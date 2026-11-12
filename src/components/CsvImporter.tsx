@@ -1,3 +1,4 @@
+import { VIEWING_SOURCE_TVTIME } from '../features/history/viewingSource';
 import React, { useState, useRef } from 'react';
 import { Upload, AlertCircle, Loader2, Trash2, RefreshCw, RotateCcw, Search, Edit2, Check, X, Film, Tv } from 'lucide-react';
 import Papa from 'papaparse';
@@ -6,9 +7,6 @@ import { collection, query, getDocs, doc, setDoc, updateDoc, where } from 'fireb
 import { useSyncStore } from '../store/syncStore';
 import { tmdb, type TMDBMedia } from '../features/shows/tmdb';
 import { type Show } from '../types';
-
-// SEENIT-PROFILE-006 : chaque visionnage importé depuis TV Time est étiqueté, pour l'exclure des chiffres par période.
-const TV_TIME_IMPORT = 'tvtime' as const;
 
 interface LocalTask {
   id: string;
@@ -115,7 +113,7 @@ export function CsvImporter() {
             const mergedRecords = { ...(showData.episodeRecords || {}) };
             taskSeenEpisodes.forEach(ep => {
               if (!mergedRecords[ep]) {
-                mergedRecords[ep] = { watchedAt: Date.now(), importedFrom: TV_TIME_IMPORT };
+                mergedRecords[ep] = { watchedAt: Date.now(), source: VIEWING_SOURCE_TVTIME };
               }
             });
 
@@ -147,15 +145,15 @@ export function CsvImporter() {
               updatedAt: Date.now(),
               createdAt: Date.now(),
               seenEpisodes: ['1x1'],
-              episodeRecords: { '1x1': { watchedAt: Date.now(), importedFrom: TV_TIME_IMPORT } },
+              episodeRecords: { '1x1': { watchedAt: Date.now(), source: VIEWING_SOURCE_TVTIME } },
               firstAirDate: bestMatch.release_date || bestMatch.first_air_date || null,
               networks: null,
             };
             await setDoc(doc(showsRef), newShowData);
           } else {
-            const episodeRecordsObj: Record<string, { watchedAt: number; importedFrom: typeof TV_TIME_IMPORT }> = {};
+            const episodeRecordsObj: Record<string, { watchedAt: number; source: typeof VIEWING_SOURCE_TVTIME }> = {};
             taskSeenEpisodes.forEach(ep => {
-              episodeRecordsObj[ep] = { watchedAt: Date.now(), importedFrom: TV_TIME_IMPORT };
+              episodeRecordsObj[ep] = { watchedAt: Date.now(), source: VIEWING_SOURCE_TVTIME };
             });
 
             const newShowData = {
@@ -262,7 +260,7 @@ export function CsvImporter() {
             const showMap = new Map<string, { rawTitle: string; seenEpisodes: Set<string> }>();
             const movieMap = new Map<string, { rawTitle: string }>();
 
-            results.data.forEach((row: any) => {
+            results.data.forEach((row: Record<string, unknown> | null) => {
               if (!row || typeof row !== 'object') return;
 
               const movieTitle = (row.movie_name || row['Movie Name'] || row.movie_title || row['Movie Title'])?.toString()?.trim();

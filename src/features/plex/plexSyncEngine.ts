@@ -1,3 +1,4 @@
+import { VIEWING_SOURCE_PLEX } from '../history/viewingSource';
 import { writeUserScopedJson } from '../../lib/userIsolation';
 import { loadPlexCloudState, persistPlexCloudState } from './plexCloudState';
 import { getPlexSyncRetryAt, PlexSyncHttpError } from './plexSyncRetry';
@@ -393,7 +394,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         syncedItems.push(syncedItem);
       };
 
-      const recordUnresolvedItem = (item: any, mediaType: 'movie' | 'episode' | 'watchlist') => {
+      type UnresolvedPlexItem = { parentIndex?: unknown; index?: unknown; grandparentTitle?: string; parentTitle?: string; title?: string; year?: unknown; source?: string; sourceIdentity?: string; [key: string]: unknown };
+      const recordUnresolvedItem = (item: UnresolvedPlexItem, mediaType: 'movie' | 'episode' | 'watchlist') => {
         const seasonNumber = item.parentIndex !== undefined ? Number(item.parentIndex) : undefined;
         const episodeNumber = item.index !== undefined ? Number(item.index) : undefined;
         const title = mediaType === 'episode'
@@ -563,7 +565,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
                 watchedAt: viewedTimestamp,
                 episodeTitle: item.title || null,
                 ...(episodeRecords[epKey] || {}),
-                plexImported: true
+                plexImported: true,
+                source: VIEWING_SOURCE_PLEX
               };
 
               showData.seenEpisodes = seenEpisodes;
@@ -616,7 +619,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               firstAirDate: tmdbData.first_air_date || '',
               networks: [],
               seenEpisodes: [epKey],
-              episodeRecords: { [epKey]: { watchedAt: viewedTimestamp, episodeTitle: item.title || null, plexImported: true } },
+              episodeRecords: { [epKey]: { watchedAt: viewedTimestamp, episodeTitle: item.title || null, plexImported: true, source: VIEWING_SOURCE_PLEX } },
               isArchived: false
             };
 
@@ -699,7 +702,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               episodeRecords['movie'] = {
                 watchedAt: viewedTimestamp,
                 ...(episodeRecords['movie'] || {}),
-                plexImported: true
+                plexImported: true,
+                source: VIEWING_SOURCE_PLEX
               };
 
               showData.seenEpisodes = seenEpisodes;
@@ -748,7 +752,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
               firstAirDate: tmdbData.release_date || '',
               networks: [],
               seenEpisodes: ['movie'],
-              episodeRecords: { movie: { watchedAt: viewedTimestamp, plexImported: true } },
+              episodeRecords: { movie: { watchedAt: viewedTimestamp, plexImported: true, source: VIEWING_SOURCE_PLEX } },
               isArchived: false
             };
 
