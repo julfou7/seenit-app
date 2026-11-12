@@ -3,6 +3,8 @@ import { Capacitor } from '@capacitor/core';
 import { Bell, X } from 'lucide-react';
 import type { Show } from '../../types';
 import { SeenItCheckButton } from '../SeenItCheckButton';
+import { OriginalBroadcasterLabel } from '../OriginalBroadcasterLabel';
+import { CANAL_ORIGINAL_BROADCASTER_NAME } from '../../utils/providerLogos';
 import { DialogLayer } from '../ui/DialogLayer';
 import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeriesSeasonProgress, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../../features/watchlist/posterHue';
@@ -220,7 +222,17 @@ export function SeriesEpisodeCard({ show, today: day, episode, context, detail, 
           {visibleProgress.segments.map((segment, index) => <span key={`${index}-${feedback?.sequence || 0}`} className={`series-8f__segment series-8f__segment--${segment.state}${feedback && feedback.season === episode?.season_number && (segment.episode === feedback.episode || visibleProgress.continuous && segment.state === 'seen') ? ' series-8f__segment--pop' : ''}`} style={{ flexGrow: segment.count }} title={`${segment.episode ? `Épisode ${segment.episode} : ` : ''}${segmentNames[segment.state]}`} />)}
           {visibleProgress.unknownTail && <><span className="series-8f__unknown-tail" aria-hidden="true" /><span className="series-8f__unknown-mark" aria-hidden="true" title="Nombre d'épisodes encore inconnu">?</span></>}
         </div>
-        {providerLogo && <button type="button" className="series-8f__provider" aria-label={`Où regarder ${show.title} : ${providerName || 'diffuseur'}`} onClick={() => { void (onProviderOpen ? onProviderOpen() : (onOpenSeries || onOpen)()); }}><img src={providerLogo} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} /></button>}
+        {providerLogo && (
+          <button
+            type="button"
+            className={providerName === CANAL_ORIGINAL_BROADCASTER_NAME ? 'series-8f__provider series-8f__provider--origin' : 'series-8f__provider'}
+            aria-label={providerName === CANAL_ORIGINAL_BROADCASTER_NAME ? `${show.title} · ${providerName}` : `Où regarder ${show.title} : ${providerName || 'diffuseur'}`}
+            onClick={() => { void (onProviderOpen ? onProviderOpen() : (onOpenSeries || onOpen)()); }}
+          >
+            <img src={providerLogo} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }} />
+            <OriginalBroadcasterLabel name={providerName} overlay={false} />
+          </button>
+        )}
       </div>
       <div className="series-8f__action">
         {context.kind === 'watch' && ((!context.upToDate && context.onMarkSeen) || reversibleComplete) && <SeenItCheckButton glyph="screen" size={34} error={markError} celebrating={Boolean(feedback && markingSnapshot)} isWatched={markingSnapshot ? false : reversibleComplete} className={`series-8f__check${reversibleComplete ? ' series-8f__check--watched' : ''}`} title={reversibleComplete ? `Marquer le dernier épisode de ${show.title} comme non vu` : `Marquer ${show.title} ${code} comme vu`} onClick={handleSeen} />}

@@ -68,6 +68,7 @@ Les cartes de série peuvent afficher une attribution « Canal+ · diffuseur d�
 en l'absence de badge de disponibilité. Cette attribution exige la chaîne Canal+ et un lien de fiche
 programme Canal+ France dans la fiche TMDB du même identifiant. Elle respecte Mes plateformes et ne
 crée aucune offre dans `watch/providers`.
+Le libellé visible « Origine » distingue ce badge dans les cartes qui affichent un logo.
 
 ## Réseau et sécurité
 

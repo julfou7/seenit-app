@@ -1,4 +1,4 @@
-import { PLEX_LOGO_SVG, PROVIDER_BRAND_LOGOS } from '../../utils/providerLogos.ts';
+import { CANAL_ORIGINAL_BROADCASTER_NAME, PLEX_LOGO_SVG, PROVIDER_BRAND_LOGOS } from '../../utils/providerLogos.ts';
 import { SEENIT_PLATFORM_BY_KEY } from './platformIdentity.ts';
 
 export interface PassiveProviderState {
@@ -49,7 +49,7 @@ export function resolvePassiveProviderState(
 
   if (publicResolutionSettled && originalBroadcaster === 'canal'
     && (preferredProviderIds.length === 0 || preferredProviderIds.includes(SEENIT_PLATFORM_BY_KEY.canal.preferenceId))) {
-    return { key, logo: PROVIDER_BRAND_LOGOS.canal, name: 'Canal+ · diffuseur d’origine' };
+    return { key, logo: PROVIDER_BRAND_LOGOS.canal, name: CANAL_ORIGINAL_BROADCASTER_NAME };
   }
 
   return { key, logo: null, name: null };

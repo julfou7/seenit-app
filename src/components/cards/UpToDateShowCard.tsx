@@ -3,6 +3,7 @@ import { Circle, CheckCircle2, Sparkles, Tv, Calendar } from 'lucide-react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { type Show } from '../../types';
 import { getNextEpisodeNumber, getAiredProgress, cn, getTodayStr } from '../../lib/utils';
+import { OriginalBroadcasterLabel } from '../OriginalBroadcasterLabel';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
 
@@ -112,7 +113,7 @@ export const UpToDateShowCard = React.memo(function UpToDateShowCard({ show, onS
 
   const seenCount = show.seenEpisodes ? show.seenEpisodes.length : 0;
   const progressPercent = getAiredProgress(show);
-  const totalCount = show.totalAiredEpisodes || show.totalEpisodes || (show.seasonsCache ? show.seasonsCache.flatMap((s: any) => s.episodes || []).length : 0);
+  const totalCount = show.totalAiredEpisodes || show.totalEpisodes || (show.seasonsCache ? show.seasonsCache.flatMap(season => season.episodes || []).length : 0);
   const isFullyWatched = progressPercent >= 100 || (seenCount > 0 && totalCount > 0 && seenCount >= totalCount);
 
   const formattedSeasonNum = categoryInfo.seasonNumber 
@@ -164,9 +165,10 @@ export const UpToDateShowCard = React.memo(function UpToDateShowCard({ show, onS
           <div className="absolute top-0 right-0 bg-white/95 backdrop-blur-md w-7 h-7 rounded-bl-xl p-1 shadow-sm flex items-center justify-center z-20 pointer-events-none">
             <img loading="lazy" decoding="async" 
               src={networkLogo} 
-              alt="" 
+              alt={providerName || 'Diffuseur'}
               className="w-5 h-5 object-contain rounded-[3px]" 
             />
+            <OriginalBroadcasterLabel name={providerName} />
           </div>
         )}
 
