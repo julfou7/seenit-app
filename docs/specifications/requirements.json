@@ -520,6 +520,10 @@
       ],
       "tests": [
         {
+          "file": "tests/actorProfileStyle.test.ts",
+          "contains": "SEENIT-UX-019 fiche acteur : barre de navigation visible, cartes et filtres habituels"
+        },
+        {
           "file": "tests/terrain282.test.ts",
           "contains": "SEENIT-UX-019 la fiche épisode garde la barre de navigation, comme la fiche média"
         },

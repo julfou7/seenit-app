@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-12-005 | 2026-11-12 | Fiche acteur : barre de navigation visible, cartes habituelles (plus l'ancien logo Vu) dans « Vus ensemble » et la filmographie, filtres au style de l'accueil ; frise chronologique des films clés reportée (#958). | `SEENIT-UX-019`, [#958](https://github.com/julfou7/seenit-app/issues/958) | active |
 | USR-2026-11-12-004 | 2026-11-12 | Plex : un film regardé puis supprimé du serveur reste vu ; l'historique du compte Plex suffit comme preuve sauf état explicitement non vu (accord explicite pour modifier `SEENIT-PLEX-005`) ; les Vu sans date reçoivent la date de lecture Plex ; filtre « 12 mois » court. | `SEENIT-PLEX-005`, `SEENIT-PROFILE-003`, [#954](https://github.com/julfou7/seenit-app/issues/954) | active |
 | USR-2026-11-12-003 | 2026-11-12 | Trois étiquettes d'origine sur chaque visionnage : TV Time (données historiques), SeenIt, Plex ; pas de réimport TV Time, l'historique non étiqueté reste tel quel. | `SEENIT-PROFILE-007`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
 | USR-2026-11-12-002 | 2026-11-12 | Retour v1.4.294 : un épisode marqué d'un coup reste un épisode vu et compte dans les chiffres ; seul le faux marathon disparaît ; mettre en valeur la régularité (une série chaque vendredi soir) ; étiqueter l'import TV Time pour l'exclure facilement. | `SEENIT-PROFILE-006`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |

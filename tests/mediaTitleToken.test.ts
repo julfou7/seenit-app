@@ -22,9 +22,9 @@ test('SEENIT-UX-020 #874 un seul jeton « titre média » en or, utilisé par to
   assert.match(explorer, /\.explorer-row-text mark\{color:#F2C36B;font-weight:800;background:transparent\}/);
   // Fiche personnage (Son parcours), fiche acteur (Vus ensemble, filmographie), saga et franchise, fiche épisode, Télécharger.
   assert.match(explorer, /\.character-works strong\{[^}]*color:var\(--seenit-media-title\)/);
-  const actor = read('src/components/movieActorProfile.css');
-  assert.match(actor, /\.actor-profile__seen strong \{ color:var\(--seenit-media-title\);/);
-  assert.match(actor, /\.actor-profile__grid strong \{ color:var\(--seenit-media-title\);/);
+  // Retour v1.4.295 : la fiche acteur reprend la carte d'Explorer (GridMediaCard), donc le même jeton or.
+  assert.equal((read('src/components/MovieActorProfile.tsx').match(/<GridMediaCard media=\{toMedia\(credit\)\}/g) || []).length, 2);
+  assert.doesNotMatch(read('src/components/movieActorProfile.css'), /--seenit-media-title:#fff/);
   assert.match(read('src/screens/mediaDetail/detailSections.tsx'), /<span className="seenit-media-title text-\[15px\] font-bold line-clamp-2">\{part\.title \|\| part\.name\}<\/span>/);
   assert.equal((read('src/screens/EpisodeDetailModalCore.tsx').match(/<span className="seenit-media-title text-\[13px\] font-bold truncate">\{show\?\.title \|\| tmdbShowTitle \|\| 'Retour'\}<\/span>/g) || []).length, 2, 'pastille de retour « SÉRIE · … »');
   assert.match(read('src/screens/downloads.css'), /\.download-card__title \{ color:var\(--seenit-media-title\);/);
