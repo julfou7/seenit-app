@@ -3598,6 +3598,10 @@
         },
         {
           "file": "tests/watchProviderBatch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 retour v1.4.302 : la fiche montre le même diffuseur d’origine Canal+ que la carte"
+        },
+        {
+          "file": "tests/watchProviderBatch.test.ts",
           "contains": "SEENIT-PROVIDER-002 #853 parse et compacte sans jamais inventer d’offre"
         },
         {

@@ -473,7 +473,9 @@ puis Plex disponible, puis un autre diffuseur public. Décocher/recocher une pla
 cartes déjà montées immédiatement. L'hydratation cloud démarre avec la session, préserve le miroir local
 pendant son attente et ne remplace pas une bascule faite entre-temps. Les anciens réseaux de production
 ne remplacent pas une preuve TMDB de streaming ; aucun passage par Réglages ni purge de cache n'est requis.
-Une série Canal+ sans offre de streaming TMDB affiche le seul logo Canal+, sans libellé « Origine » (v1.4.302).
+Une série Canal+ sans offre de streaming TMDB affiche le seul logo Canal+, sans libellé « Origine » (v1.4.302), et sa fiche
+liste Canal+ dans « Où regarder » (« Diffuseur d’origine en France », vers la fiche programme) au lieu de « Pas encore
+disponible en streaming » (v1.4.303).
 
 Le bouton Réglages ouvre un écran superposé refermable par Retour ou swipe depuis le bord gauche.
 Le Profil n'expose pas d'action « Partager » : aucun profil public n'existe et aucune donnée de profil

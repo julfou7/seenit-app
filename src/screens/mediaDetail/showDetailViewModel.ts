@@ -26,6 +26,7 @@ export interface ShowDetailTmdb {
   aggregate_credits?: { cast?: CastMember[] };
   external_ids?: { tvdb_id?: number | string; imdb_id?: string };
   belongs_to_collection?: { id?: number; name?: string } | null;
+  homepage?: string | null;
 }
 
 export interface ShowDetailViewModel {
@@ -58,7 +59,7 @@ export interface ShowDetailViewModel {
   keywords: string[]; mainScrollRef: React.RefObject<HTMLDivElement | null>;
   onShowClick?: (tmdbId: number, mediaType: 'tv' | 'movie') => void;
   openEpisodeModal: (season: number, episode: Episode) => void; openPersonModal: (personId: number) => void;
-  plexMediaInfo: unknown; providers: { link?: string } | null; sortedProviders: WhereToWatchProvider[]; userPlatforms: number[];
+  plexMediaInfo: unknown; originBroadcaster?: unknown; providers: { link?: string } | null; sortedProviders: WhereToWatchProvider[]; userPlatforms: number[];
   ratingInfo: { label: string; provenance: string | null; colorClass: string };
   refreshPlexAvailability: () => unknown;
   remainingTimeMinutes: number; seenCount: number; totalEpisodes: number;

@@ -77,7 +77,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [tmdbDetails, setTmdbDetails] = useState<any>(cachedInitialDetails);
   const title = show?.title || tmdbDetails?.name || tmdbDetails?.title || 'Chargement...';
   const isSeries = requestedMediaType === 'tv';
-  const releaseDateStr = isSeries ? (tmdbDetails?.first_air_date || (show as any)?.first_air_date) : (tmdbDetails?.release_date || (show as any)?.release_date);
+  const legacyShow = show as (Show & { first_air_date?: string; release_date?: string; network?: string; platform?: string }) | null | undefined;
+  const releaseDateStr = isSeries ? (tmdbDetails?.first_air_date || legacyShow?.first_air_date) : (tmdbDetails?.release_date || legacyShow?.release_date);
   const releaseYear = releaseDateStr ? releaseDateStr.slice(0, 4) : undefined;
   const isUnreleased = releaseDateStr ? new Date(releaseDateStr).getTime() > Date.now() : false;
 
@@ -89,6 +90,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       ? tmdb.shouldLoadUniverseAndCollection({ ...(cachedInitialDetails || {}), id: Number(effectiveTmdbId), media_type: requestedMediaType })
       : false
   );
+  const [originBroadcaster, setOriginBroadcaster] = useState<unknown>(null); // #965 : diffuseur d'origine (Canal+) du lot, comme les cartes
   const [providers, setProviders] = useState<any>(() => {
     if (!effectiveTmdbId) return null;
     return tmdb.peekWatchProviders(Number(effectiveTmdbId), requestedMediaType)?.results?.FR || null;
@@ -433,7 +435,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setCollectionData(cachedRelations?.collection?.length ? { parts: cachedRelations.collection } : null);
     setUniverseData(cachedRelations?.universe?.length ? { parts: cachedRelations.universe } : null);
     setCollectionLoading(tmdb.shouldLoadUniverseAndCollection({ ...(cachedDetails || {}), id: Number(effectiveTmdbId), media_type: requestedMediaType }));
-    setProviders(cachedProviders?.results?.FR || null);
+    setProviders(cachedProviders?.results?.FR || null); setOriginBroadcaster(cachedProviders?.originalBroadcaster ?? null);
     setKeywords(getKeywordsFromDetails(cachedDetails, requestedMediaType));
     setSeasonsCache({});
     setExpandedSeason(null);
@@ -475,7 +477,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     };
     fetchDetails();
     tmdb.getWatchProviders(Number(effectiveTmdbId), targetMediaType).then(res => {
-      if (res.ok && isCurrentRequest()) setProviders(res.value.results?.FR || []);
+      if (res.ok && isCurrentRequest()) { setProviders(res.value.results?.FR || []); setOriginBroadcaster(res.value.originalBroadcaster ?? null); }
     });
     return () => { isMounted = false; };
   }, [effectiveTmdbId, requestedMediaKey, requestedMediaType, detailsRevalidation]);
@@ -967,7 +969,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const watchLink = providers?.link;
   const mainProvider = firstSubscribedProvider || sortedProviders[0];
   const isMainProviderSubscribed = mainProvider ? (mainProvider.isPlex || userPlatforms.includes(mainProvider.provider_id)) : false;
-  const mainProviderName = mainProvider ? mainProvider.provider_name : (tmdbDetails?.networks?.[0]?.name || (show as any)?.network || (show as any)?.platform);
+  const mainProviderName = mainProvider ? mainProvider.provider_name : (tmdbDetails?.networks?.[0]?.name || legacyShow?.network || legacyShow?.platform);
   const mainProviderLogo = mainProvider ? (mainProvider.isPlex ? PLEX_LOGO_SVG : getFormattedProviderLogo(mainProvider.logo_path, mainProvider.provider_name)) : (tmdbDetails?.networks?.[0]?.logo_path ? getFormattedProviderLogo(tmdbDetails.networks[0].logo_path, tmdbDetails.networks[0].name) : null);
   const mainProviderLink = mainProvider ? (mainProvider.isPlex ? (mainProvider.plexUrl || 'https://app.plex.tv/desktop') : getProviderDirectLink(mainProvider.provider_id, title, watchLink)) : (watchLink || `https://www.google.com/search?q=${encodeURIComponent(title + ' ' + (mainProviderName || ''))}`);
 
@@ -989,5 +991,5 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const ratingInfo = getRatingInfo();
   const mediaTarget = tmdbDetails || show || (effectiveTmdbId ? { id: effectiveTmdbId } : null);
 
-  return <ShowDetailView model={{ removeMovieDownload: item => useLiveDownloadStore.getState().removeDownload(item), movieDownload: isSeries ? null : mediaDownloads[0] || null, hasActiveDownloadInScope: scope => hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, scope), nextEp, handleShare, activeTab, areThemesExpanded, backdropUrl, collectionData, collectionLoading, downloadTargetEpisode, downloadTargetSeason, dragX, dropShow, effectiveTmdbId, epStatus, expandedSeason, followShow, formatRemainingTime, formatRuntime, getEpisodeDownload, presence, handle1ClickDownloadEpisode, handle1ClickDownloadMovie, handle1ClickDownloadSeason, handleAnimatedBack, handleDeleteShow, handleSyncSingle, handleTabChange, handleTouchEnd, handleTouchMove, handleTouchStart, handleWatchNextEpisode, hasActiveDownload, hasCancelledDownload, hasCompletedDownload, hasDownloadError, hasSeenMedia, hasTrailer, initialEpisode, initialSeason, is1ClickDownloading, isDownloadModalOpen, isDownloadMode, isDragging, isExiting, isRefreshingPlex, isSeries, isSyncingSingle, isSynopsisExpanded, isUnreleased, keywords, loadSeason, logoPath, mainScrollRef, onShowClick, openEpisodeModal, openPersonModal, plexMediaInfo, posterError, posterPath, progressPercentage, providers, ratingInfo, refreshPlexAvailability, releaseYear, remainingTimeMinutes, requestedMediaKey, resumeShow, rewatchShow, seasonObserverRef, seasonsCache, seenCount, selectedEpisode, selectedPersonId, setAreThemesExpanded, setDownloadTargetEpisode, setDownloadTargetSeason, setIsDownloadModalOpen, setIsDownloadMode, setIsSynopsisExpanded, setLogoError, setPosterError, setSeasonsCache, setSelectedEpisode, setSelectedPersonId, setShowAllCast, setShowMenu, setTrailerModalVideos, show, showDownloadSummary, showMenu, showToast, sortedProviders, tabsRef, title, tmdbDetails, toggleEpisodeSeen, toggleFavorite, toggleMovieSeen, togglePlanToWatchMovie, toggleSeasonSeen, totalEpisodes, trailerModalVideos, universeData, userPlatforms, visibleSeasons, ytVideos }} />;
+  return <ShowDetailView model={{ originBroadcaster, removeMovieDownload: item => useLiveDownloadStore.getState().removeDownload(item), movieDownload: isSeries ? null : mediaDownloads[0] || null, hasActiveDownloadInScope: scope => hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, scope), nextEp, handleShare, activeTab, areThemesExpanded, backdropUrl, collectionData, collectionLoading, downloadTargetEpisode, downloadTargetSeason, dragX, dropShow, effectiveTmdbId, epStatus, expandedSeason, followShow, formatRemainingTime, formatRuntime, getEpisodeDownload, presence, handle1ClickDownloadEpisode, handle1ClickDownloadMovie, handle1ClickDownloadSeason, handleAnimatedBack, handleDeleteShow, handleSyncSingle, handleTabChange, handleTouchEnd, handleTouchMove, handleTouchStart, handleWatchNextEpisode, hasActiveDownload, hasCancelledDownload, hasCompletedDownload, hasDownloadError, hasSeenMedia, hasTrailer, initialEpisode, initialSeason, is1ClickDownloading, isDownloadModalOpen, isDownloadMode, isDragging, isExiting, isRefreshingPlex, isSeries, isSyncingSingle, isSynopsisExpanded, isUnreleased, keywords, loadSeason, logoPath, mainScrollRef, onShowClick, openEpisodeModal, openPersonModal, plexMediaInfo, posterError, posterPath, progressPercentage, providers, ratingInfo, refreshPlexAvailability, releaseYear, remainingTimeMinutes, requestedMediaKey, resumeShow, rewatchShow, seasonObserverRef, seasonsCache, seenCount, selectedEpisode, selectedPersonId, setAreThemesExpanded, setDownloadTargetEpisode, setDownloadTargetSeason, setIsDownloadModalOpen, setIsDownloadMode, setIsSynopsisExpanded, setLogoError, setPosterError, setSeasonsCache, setSelectedEpisode, setSelectedPersonId, setShowAllCast, setShowMenu, setTrailerModalVideos, show, showDownloadSummary, showMenu, showToast, sortedProviders, tabsRef, title, tmdbDetails, toggleEpisodeSeen, toggleFavorite, toggleMovieSeen, togglePlanToWatchMovie, toggleSeasonSeen, totalEpisodes, trailerModalVideos, universeData, userPlatforms, visibleSeasons, ytVideos }} />;
 }

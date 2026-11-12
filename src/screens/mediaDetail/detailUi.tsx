@@ -68,7 +68,7 @@ export interface WhereToWatchProvider {
  * « Où regarder » en lignes du prototype (logo 44 px, nom, mention, action). Le titre reste affiché
  * pendant le chargement et l'actualisation Plex garde sa cible de 44 px (SEENIT-PERF-001).
  */
-export function WhereToWatchCard({ providers, loading, userPlatforms, title, fallbackLink, onOpenPlex, onRefreshPlex, refreshing, canRefresh, emptyLabel }: { providers: readonly WhereToWatchProvider[]; loading: boolean; userPlatforms: readonly number[]; title: string; fallbackLink?: string; onOpenPlex: (provider: WhereToWatchProvider) => void; onRefreshPlex?: () => void; refreshing?: boolean; canRefresh?: boolean; emptyLabel: string }) {
+export function WhereToWatchCard({ providers, loading, userPlatforms, title, fallbackLink, onOpenPlex, onRefreshPlex, refreshing, canRefresh, emptyLabel, origin }: { providers: readonly WhereToWatchProvider[]; loading: boolean; userPlatforms: readonly number[]; title: string; fallbackLink?: string; onOpenPlex: (provider: WhereToWatchProvider) => void; onRefreshPlex?: () => void; refreshing?: boolean; canRefresh?: boolean; emptyLabel: string; origin?: { name: string; logo: string; link?: string } | null }) {
   return <DetailCard className="flex flex-col">
     <div className="flex items-center justify-between pl-3.5 pr-1 pt-1.5"><h3 className="text-[15px] font-bold text-white">Où regarder</h3>{onRefreshPlex && <button type="button" onClick={onRefreshPlex} disabled={!canRefresh || refreshing} aria-label="Actualiser Plex" title="Actualiser Plex" className="w-11 h-11 inline-flex items-center justify-center rounded-full text-zinc-500 hover:text-white disabled:opacity-60 active:scale-95"><RefreshCw size={16} className={cn(refreshing && 'animate-spin')} /></button>}</div>
     {providers.map((provider, index) => {
@@ -90,7 +90,13 @@ export function WhereToWatchCard({ providers, loading, userPlatforms, title, fal
       return <a key={`provider-${provider.provider_id}-${index}`} href={directLink} target="_blank" rel="noopener noreferrer" title={link.title} onClick={event => { if (directLink !== '#') { event.preventDefault(); openExternalUrl(directLink); } }} className="flex items-center gap-3 min-h-[60px] pl-2.5 pr-3.5 py-2 border-t border-white/[0.06] active:bg-white/5">{body}</a>;
     })}
     {loading && <div className="flex items-center gap-3 min-h-[60px] pl-2.5 pr-3.5 py-2 border-t border-white/[0.06] text-zinc-400 text-[13px] animate-pulse"><span className="w-11 h-11 rounded-[11px] bg-[#1F2326] flex items-center justify-center"><img src={PLEX_LOGO_SVG} alt="" className="w-6 h-6" /></span><span>Recherche Plex & streaming…</span></div>}
-    {!loading && providers.length === 0 && <p className="px-3.5 py-3 border-t border-white/[0.06] text-[13px] text-zinc-400">{emptyLabel}</p>}
+    {/* #965 retour v1.4.302 : la fiche montre le même diffuseur d'origine que la carte (Canal+), avec sa fiche programme. */}
+    {origin && <button type="button" data-origin-broadcaster="" disabled={!origin.link} onClick={() => { if (origin.link) openExternalUrl(origin.link); }} className="flex items-center gap-3 min-h-[60px] pl-2.5 pr-3.5 py-2 border-t border-white/[0.06] text-left active:bg-white/5">
+      <span className="w-11 h-11 rounded-[11px] overflow-hidden bg-zinc-800 shrink-0 flex items-center justify-center"><img src={origin.logo} alt="" className="w-full h-full object-cover" /></span>
+      <span className="flex-1 min-w-0 flex flex-col gap-0.5"><span className="text-[15px] font-bold text-white">{origin.name}</span><span className="text-[12px] text-zinc-400 truncate">Diffuseur d’origine en France</span></span>
+      {origin.link && <span className="text-[12px] font-bold text-[#E5A93D]">Ouvrir</span>}
+    </button>}
+    {!loading && providers.length === 0 && !origin && <p className="px-3.5 py-3 border-t border-white/[0.06] text-[13px] text-zinc-400">{emptyLabel}</p>}
   </DetailCard>;
 }
 
