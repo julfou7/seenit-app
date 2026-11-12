@@ -351,3 +351,14 @@ test('SEENIT-PROFILE-002 #945 #946 : Reprendre ouvre la fiche par TMDB, les sér
   assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /\(fateSummary\.left\.length > 0 \|\| fateSummary\.nearlyDone\.length > 0\) && <Reveal/);
   assert.match(read('src/components/ProfileYearStory.tsx'), /fates\.paused > 0 \|\| fates\.dropped > 0 \|\| nearlyDoneCount > 0/);
 });
+
+test('SEENIT-PROFILE-004 retour terrain v1.4.297 : toucher une série de Mon année ou un rendez-vous ouvre sa fiche', () => {
+  const story = read('src/components/ProfileYearStory.tsx');
+  assert.match(story, /<button type="button" key=\{month\.month\} className="moi-series-month" onClick=\{\(\) => open\(month\.showId\)\}/);
+  assert.match(story, /<button type="button" key=\{entry\.showId\} className="moi-top-row moi-pop"[^>]*onClick=\{\(\) => open\(entry\.showId\)\}/);
+  assert.match(story, /if \(show\?\.tmdbId\) onOpen\?\.\(show\.tmdbId, show\.mediaType === 'movie' \? 'movie' : 'tv'\)/);
+  assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /<button type="button" key=\{appointment\.showId\} className="moi-appointment moi-pop"/);
+  const screen = read('src/screens/ProfileScreen.tsx');
+  assert.match(screen, /<ProfileYearContent onFate=\{openFate\} onOpen=\{openMediaFromStats\} \/>/);
+  assert.match(screen, /if \(tmdbId > 0\) onShowClick\?\.\(String\(tmdbId\), mediaType\);/);
+});

@@ -89,5 +89,6 @@ export function serverStatusLabel(server: { state?: PlexServerProgressState; don
   if (server.state === 'scanning') return server.total && server.total > 0 ? `${Math.round(serverFraction({ state: 'scanning', done: server.done || 0, total: server.total }) * 100)} %` : 'en cours';
   const inventory = server.inventory ?? server.inventoryItems;
   const watched = `${formatCompactCount(server.watched ?? server.watchedItems ?? 0)} vus`;
-  return inventory && inventory > 0 ? `${watched} sur ${formatCompactCount(inventory)}` : watched;
+  // Retour terrain v1.4.297 : « 31 vus sur 14 » se lisait comme une fraction ; les vus comptent aussi l'historique de lecture.
+  return inventory && inventory > 0 ? `${watched} · ${formatCompactCount(inventory)} en bibliothèque` : watched;
 }

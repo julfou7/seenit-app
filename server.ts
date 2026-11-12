@@ -701,7 +701,7 @@ async function startServer() {
 
       const headers: Record<string, string> = {
         'X-Plex-Product': 'SeenIt',
-        'X-Plex-Version': '1.4.297',
+        'X-Plex-Version': '1.4.298',
         'X-Plex-Client-Identifier': plexClientId,
         'Accept': 'application/json'
       };
@@ -959,7 +959,7 @@ async function startServer() {
       const extractTmdbId = (item: Parameters<typeof extractPlexExternalIds>[0]): number | null =>
         extractPlexExternalIds(item).tmdbId;
 
-      const isMatch = (item: any): boolean => {
+      const isMatch = (item: Parameters<typeof extractPlexExternalIds>[0]): boolean => {
         if (!item) return false;
 
         const itType = (item.type || '').toLowerCase();
@@ -1200,6 +1200,7 @@ async function startServer() {
       const sourceStats = {
         cloudItems: 0,
         plexAccountHistoryItems: 0,
+        plexAccountHistoryMode: 'none',
         plexAccountHistoryRetained: 0,
         plexAccountCurrentStateResolved: 0,
         plexAccountCurrentWatched: 0,
@@ -1420,6 +1421,7 @@ async function startServer() {
             });
           }
           sourceStats.plexAccountHistoryItems = accountHistory.items.length;
+          sourceStats.plexAccountHistoryMode = accountHistory.queryMode; // #954 : « dated » seulement si Plex donne l'heure
           visitedSources.push(`Plex Account History (${accountHistory.items.length} GUID, mode ${accountHistory.queryMode})`);
           console.log(`[Plex Sync] Plex Account Watch History: ${accountHistory.items.length} identité(s) globale(s) récupérée(s) (${accountHistory.queryMode}).`);
         }
@@ -1478,7 +1480,7 @@ async function startServer() {
       };
 
       interface SectionScan { guids: string[]; availability: Array<{ raw: PlexRawItem; serverName: string; serverId: string }>; watchStates: PlexLibraryWatchState[]; rawItems: PlexSyncEntry[]; count: number; ok: boolean; failure?: unknown }
-      const scanSection = async (sec: PlexSectionResource, ctx: { uri: string; serverName: string; serverId: string; serverAccessToken: string }): Promise<SectionScan> => {
+      const scanSection = async (sec: PlexSectionResource, ctx: { uri: string; serverName: string; serverId: string; serverAccessToken: string; totalsKnown?: boolean }): Promise<SectionScan> => {
         const out: SectionScan = { guids: [], availability: [], watchStates: [], rawItems: [], count: 0, ok: true };
         const { uri, serverName, serverId, serverAccessToken } = ctx;
         const secKey = sec.key;
@@ -1486,7 +1488,7 @@ async function startServer() {
         if (!secKey || !['movie', 'show'].includes(secType)) return out;
         const sourceName = `${serverName} - ${sec.title || 'Section'}`;
         const headers = { 'Accept': 'application/json', 'X-Plex-Token': serverAccessToken };
-        const onPage = (count: number, totalSize?: number) => syncProgress.serverItems(serverId, count, totalSize);
+        const onPage = (count: number, totalSize?: number) => syncProgress.serverItems(serverId, count, ctx.totalsKnown ? undefined : totalSize);
 
         if (secType === 'movie') {
           try {
@@ -1639,7 +1641,24 @@ async function startServer() {
               if (!sectionsRes.ok) throw new Error(`HTTP ${sectionsRes.status}`);
               const sectionsData = await sectionsRes.json();
               const sections = (sectionsData.MediaContainer && sectionsData.MediaContainer.Directory) || [];
-              const sectionScans = await mapOrderedWithConcurrency(sections, 3, sec => scanSection(sec, { uri, serverName, serverId, serverAccessToken }));
+              // Retour terrain v1.4.297 : la taille de chaque section est demandée d'emblée (page vide) pour que le % d'un
+              // serveur ne redescende plus quand une nouvelle section est découverte ; à défaut, totaux page par page.
+              const sizeOf = async (path: string): Promise<number> => {
+                try {
+                  const response = await fetch(`${uri}${path}?X-Plex-Container-Start=0&X-Plex-Container-Size=0`, { headers: historyHeaders, signal: routeSignal(serverTimeout) });
+                  if (!response.ok) return 0;
+                  const payload = await response.json() as { MediaContainer?: { totalSize?: unknown } };
+                  return Number(payload?.MediaContainer?.totalSize) || 0;
+                } catch { return 0; }
+              };
+              const sizes = await Promise.all((sections as PlexSectionResource[]).map(sec => {
+                const type = String(sec.type || '').toLowerCase();
+                if (!sec.key || !['movie', 'show'].includes(type)) return Promise.resolve([] as number[]);
+                return Promise.all(type === 'movie' ? [sizeOf(`/library/sections/${sec.key}/all`)] : [sizeOf(`/library/sections/${sec.key}/all`), sizeOf(`/library/sections/${sec.key}/allLeaves`)]);
+              }));
+              const totalsKnown = sizes.every(list => list.every(size => size > 0));
+              if (totalsKnown) syncProgress.serverItems(serverId, 0, sizes.flat().reduce((sum, size) => sum + size, 0));
+              const sectionScans = await mapOrderedWithConcurrency(sections, 3, sec => scanSection(sec, { uri, serverName, serverId, serverAccessToken, totalsKnown }));
               for (const scan of sectionScans) {
                 scan.guids.forEach(guid => connectionLibraryGuids.add(guid));
                 connectionAvailabilityItems.push(...scan.availability);

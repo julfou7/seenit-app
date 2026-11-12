@@ -26,8 +26,8 @@ export function withPlexDate<T extends { episodeRecords?: Record<string, unknown
 }
 
 /** #954 : visionnages lus dans l'historique du compte Plex et non vus explicites, pour le panneau de synchro. */
-export function readPlexAccountProgress(stats: unknown): { history: number; unwatched: number } | undefined {
-  const value = stats && typeof stats === 'object' ? stats as { plexAccountHistoryItems?: unknown; plexAccountCurrentUnwatched?: unknown } : null;
+export function readPlexAccountProgress(stats: unknown): { history: number; unwatched: number; dated: boolean } | undefined {
+  const value = stats && typeof stats === 'object' ? stats as { plexAccountHistoryItems?: unknown; plexAccountCurrentUnwatched?: unknown; plexAccountHistoryMode?: unknown } : null;
   const history = Number(value?.plexAccountHistoryItems) || 0;
-  return history > 0 ? { history, unwatched: Number(value?.plexAccountCurrentUnwatched) || 0 } : undefined;
+  return history > 0 ? { history, unwatched: Number(value?.plexAccountCurrentUnwatched) || 0, dated: value?.plexAccountHistoryMode === 'dated' } : undefined;
 }

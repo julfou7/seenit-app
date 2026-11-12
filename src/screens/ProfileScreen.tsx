@@ -39,14 +39,14 @@ function profileSince(): number | null {
   return Number.isFinite(created) ? created : null;
 }
 
-const ProfileStatsContent = React.memo(function ProfileStatsContent({ onPersonClick, onFate }: { onPersonClick: (personId: number) => void; onFate: () => void }) {
+const ProfileStatsContent = React.memo(function ProfileStatsContent({ onPersonClick, onFate, onOpen }: { onPersonClick: (personId: number) => void; onFate: () => void; onOpen: (tmdbId: number, mediaType: 'tv' | 'movie') => void }) {
   const { shows, loading, entries } = useSeriesFate();
-  return <ProAnalyticsDashboard shows={shows} fate={entries} since={profileSince()} libraryReady={!loading} onPersonClick={onPersonClick} onFate={onFate} />;
+  return <ProAnalyticsDashboard shows={shows} fate={entries} since={profileSince()} libraryReady={!loading} onPersonClick={onPersonClick} onFate={onFate} onOpen={onOpen} />;
 });
 
-const ProfileYearContent = React.memo(function ProfileYearContent({ onFate }: { onFate: () => void }) {
+const ProfileYearContent = React.memo(function ProfileYearContent({ onFate, onOpen }: { onFate: () => void; onOpen: (tmdbId: number, mediaType: 'tv' | 'movie') => void }) {
   const { shows, loading, entries } = useSeriesFate();
-  return <ProfileYearStory shows={shows} fate={entries} since={profileSince()} libraryReady={!loading} onFate={onFate} />;
+  return <ProfileYearStory shows={shows} fate={entries} since={profileSince()} libraryReady={!loading} onFate={onFate} onOpen={onOpen} />;
 });
 
 const ProfileFateContent = React.memo(function ProfileFateContent({ onShowClick }: { onShowClick?: (id: string, mediaType?: 'tv' | 'movie') => void }) {
@@ -133,6 +133,10 @@ export const ProfileScreen = React.memo(function ProfileScreen({
 
   const handleLibraryShowClick = useCallback((id: string, mediaType?: 'tv' | 'movie') => {
     onShowClick?.(id, mediaType);
+  }, [onShowClick]);
+  // Retour terrain v1.4.297 : toucher une série ou un film de Mes chiffres ou Mon année ouvre sa fiche (identifiant TMDB).
+  const openMediaFromStats = useCallback((tmdbId: number, mediaType: 'tv' | 'movie') => {
+    if (tmdbId > 0) onShowClick?.(String(tmdbId), mediaType);
   }, [onShowClick]);
 
   useEffect(() => {
@@ -317,8 +321,8 @@ export const ProfileScreen = React.memo(function ProfileScreen({
             <h2>{page.kind === 'section' ? page.title : PAGE_TITLES[page.kind]}</h2>
           </div>
           <Suspense fallback={<div className="moi-empty"><strong>Chargement…</strong></div>}>
-            {page.kind === 'stats' && <ProfileStatsContent onPersonClick={openPersonModal} onFate={openFate} />}
-            {page.kind === 'year' && <ProfileYearContent onFate={openFate} />}
+            {page.kind === 'stats' && <ProfileStatsContent onPersonClick={openPersonModal} onFate={openFate} onOpen={openMediaFromStats} />}
+            {page.kind === 'year' && <ProfileYearContent onFate={openFate} onOpen={openMediaFromStats} />}
             {page.kind === 'fate' && <ProfileFateContent onShowClick={handleLibraryShowClick} />}
             {page.kind === 'section' && <LibraryScreen onShowClick={handleLibraryShowClick} isEmbedded={true} view={{ kind: 'section', id: page.id, type: page.type }} />}
           </Suspense>

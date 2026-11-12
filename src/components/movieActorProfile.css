@@ -13,7 +13,8 @@
 .actor-profile__header p { font-size:13px; color:#a1a1aa; margin:0; line-height:1.4; }
 .actor-profile__content { padding:8px 16px max(32px,env(safe-area-inset-bottom)); }
 .actor-profile__content>section { margin-bottom:28px; }
-.actor-profile h3 { font-size:18px; font-weight:800; margin:0 0 12px; }
+/* Retour terrain v1.4.297 : seuls les titres de section sont grands ; le titre d'une carte (h3) garde la taille d'Explorer. */
+.actor-profile section > h3 { font-size:18px; font-weight:800; margin:0 0 12px; }
 .actor-profile__link { display:flex; align-items:center; gap:14px; border:1px solid #f7c65e2e; background:#f7c65e08; border-radius:20px; padding:16px 12px; }
 .actor-profile__link h3 { font-size:14px; margin:0 0 5px; }
 .actor-profile__link strong { font-size:13px; color:#f7c65e; }

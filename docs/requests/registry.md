@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-12-007 | 2026-11-12 | Retour v1.4.297 : barre de navigation sur la fiche acteur et titres à la taille d'Explorer ; « 31 vus sur 14 » incompréhensible ; % de synchro d'un serveur qui redescend ; toucher une série dans Mon année ouvre sa fiche. | `SEENIT-UX-019`, `SEENIT-PROFILE-004`, `SEENIT-PLEX-005`, `SEENIT-PLEX-012` | active |
 | USR-2026-11-12-006 | 2026-11-12 | Plex : la synchro complète doit voir au moins ce que voit la rapide (historique de lecture du serveur, films supprimés compris) et dater les Vu Plex restés sans heure. | `SEENIT-PLEX-005`, [#954](https://github.com/julfou7/seenit-app/issues/954) | active |
 | USR-2026-11-12-005 | 2026-11-12 | Fiche acteur : barre de navigation visible, cartes habituelles (plus l'ancien logo Vu) dans « Vus ensemble » et la filmographie, filtres au style de l'accueil ; frise chronologique des films clés reportée (#958). | `SEENIT-UX-019`, [#958](https://github.com/julfou7/seenit-app/issues/958) | active |
 | USR-2026-11-12-004 | 2026-11-12 | Plex : un film regardé puis supprimé du serveur reste vu ; l'historique du compte Plex suffit comme preuve sauf état explicitement non vu (accord explicite pour modifier `SEENIT-PLEX-005`) ; les Vu sans date reçoivent la date de lecture Plex ; filtre « 12 mois » court. | `SEENIT-PLEX-005`, `SEENIT-PROFILE-003`, [#954](https://github.com/julfou7/seenit-app/issues/954) | active |
