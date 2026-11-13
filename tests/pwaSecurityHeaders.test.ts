@@ -56,5 +56,5 @@ test('SEENIT-SECURITY-004 est réellement branché sur le serveur canonique', ()
   const server = readFileSync('server.ts', 'utf8');
   assert.match(server, /createSeenItSecurityHeadersMiddleware/);
   assert.match(server, /applySeenItServiceWorkerHeaders/);
-  assert.match(server, /Cache-Control', 'no-cache'/);
+  assert.match(server, /createSeenItFrontendRouter\(/);
 });

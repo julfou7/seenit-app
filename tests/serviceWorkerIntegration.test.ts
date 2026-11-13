@@ -142,15 +142,72 @@ test('SEENIT-QUALITY-001 installe et active le service worker en remplaçant le 
   harness.listeners.get('install')!(install);
   await install.promise;
   assert.equal(harness.skipped(), 1);
-  assert.ok(harness.cacheEntries.has('seenit-static-v3.0.0'));
-  assert.ok(harness.cacheEntries.get('seenit-static-v3.0.0')?.has('/'));
+  assert.ok(harness.cacheEntries.has('seenit-static-v3.0.1'));
+  assert.ok(harness.cacheEntries.get('seenit-static-v3.0.1')?.has('/'));
 
   const activate = waitEvent();
   harness.listeners.get('activate')!(activate);
   await activate.promise;
   assert.equal(harness.claimed(), 1);
   assert.equal(harness.cacheEntries.has('seenit-static-v2.9.0'), false);
-  assert.equal(harness.cacheEntries.has('seenit-static-v3.0.0'), true);
+  assert.equal(harness.cacheEntries.has('seenit-static-v3.0.1'), true);
+});
+
+function fakeResponse(contentType: string, body: string) {
+  return {
+    ok: true,
+    body,
+    headers: { get: (name: string) => (name.toLowerCase() === 'content-type' ? contentType : null) },
+    clone() { return this; },
+  };
+}
+
+async function flushCacheWrites() {
+  for (let i = 0; i < 5; i += 1) await Promise.resolve();
+}
+
+test('SEENIT-QUALITY-001 ne met jamais en cache une page HTML reçue à la place d’un script', async () => {
+  const harness = createHarness();
+  harness.setFetch(async () => fakeResponse('text/html; charset=UTF-8', '<!doctype html>'));
+  let served: any;
+  harness.listeners.get('fetch')!({
+    request: { method: 'GET', url: 'https://seenit.test/assets/index-OLD12345.js', mode: 'cors' },
+    respondWith: (value: Promise<any>) => { served = awaitable(value); },
+  });
+  await served;
+  await flushCacheWrites();
+  assert.equal(harness.cacheEntries.get('seenit-static-v3.0.1')?.has('https://seenit.test/assets/index-OLD12345.js') ?? false, false);
+
+  harness.setFetch(async () => fakeResponse('application/javascript; charset=UTF-8', 'export {}'));
+  harness.listeners.get('fetch')!({
+    request: { method: 'GET', url: 'https://seenit.test/assets/index-NEW12345.js', mode: 'cors' },
+    respondWith: (value: Promise<any>) => { served = awaitable(value); },
+  });
+  await served;
+  await flushCacheWrites();
+  assert.equal(harness.cacheEntries.get('seenit-static-v3.0.1')?.has('https://seenit.test/assets/index-NEW12345.js'), true);
+});
+
+test('SEENIT-QUALITY-001 ne remplace le shell hors-ligne que par une vraie page HTML', async () => {
+  const harness = createHarness();
+  harness.setFetch(async () => fakeResponse('application/json', '{}'));
+  let served: any;
+  harness.listeners.get('fetch')!({
+    request: { method: 'GET', url: 'https://seenit.test/', mode: 'navigate' },
+    respondWith: (value: Promise<any>) => { served = awaitable(value); },
+  });
+  await served;
+  await flushCacheWrites();
+  assert.equal(harness.cacheEntries.get('seenit-static-v3.0.1')?.has('/') ?? false, false);
+
+  harness.setFetch(async () => fakeResponse('text/html; charset=UTF-8', '<!doctype html>'));
+  harness.listeners.get('fetch')!({
+    request: { method: 'GET', url: 'https://seenit.test/', mode: 'navigate' },
+    respondWith: (value: Promise<any>) => { served = awaitable(value); },
+  });
+  await served;
+  await flushCacheWrites();
+  assert.equal(harness.cacheEntries.get('seenit-static-v3.0.1')?.get('/')?.body, '<!doctype html>');
 });
 
 test('SEENIT-QUALITY-001 ne met jamais une route API en cache et sert le shell hors-ligne', async () => {

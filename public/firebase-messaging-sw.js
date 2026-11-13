@@ -13,7 +13,8 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // Service Worker - Gestionnaire de Notifications & Clics Natifs
-const SW_VERSION = 'v3.0.0';
+// v3.0.1 purge les caches v3.0.0 qui ont pu stocker index.html sous une URL de script.
+const SW_VERSION = 'v3.0.1';
 const STATIC_CACHE = `seenit-static-${SW_VERSION}`;
 
 self.addEventListener('install', (event) => {
@@ -35,6 +36,13 @@ self.addEventListener('activate', (event) => {
 // Un seul service worker gère la PWA et FCM. Les API et données utilisateur ne
 // sont jamais mises en cache. Les navigations utilisent le réseau en priorité ;
 // les assets statiques déjà vus restent disponibles lors d'une coupure brève.
+// Une réponse n'est mise en cache que si son type correspond à la requête : une page
+// HTML reçue à la place d'un script ou d'une image n'est jamais conservée.
+function isHtmlResponse(response) {
+  const contentType = (response.headers && response.headers.get && response.headers.get('content-type')) || '';
+  return contentType.toLowerCase().includes('text/html');
+}
+
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
@@ -45,7 +53,7 @@ self.addEventListener('fetch', event => {
     event.respondWith(
       fetch(request)
         .then(response => {
-          if (response.ok) caches.open(STATIC_CACHE).then(cache => cache.put('/', response.clone()));
+          if (response.ok && isHtmlResponse(response)) caches.open(STATIC_CACHE).then(cache => cache.put('/', response.clone()));
           return response;
         })
         .catch(() => caches.match('/') )
@@ -57,7 +65,7 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(request).then(cached => {
       const fresh = fetch(request).then(response => {
-        if (response.ok) caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()));
+        if (response.ok && !isHtmlResponse(response)) caches.open(STATIC_CACHE).then(cache => cache.put(request, response.clone()));
         return response;
       });
       return cached || fresh;
