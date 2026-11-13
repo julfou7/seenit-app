@@ -1113,6 +1113,10 @@ pour le cache des sagas et univers.
   Côté backend, la Watchlist, l'activité cloud et la découverte des serveurs partent ensemble ; leurs
   résultats sont fusionnés dans l'ordre d'origine.
 - **SEENIT-PLEX-012** — Une synchro Plex est bornée, unique et observable :
+  - **Synchro automatique toutes les 6 h au plus** (décision du propriétaire du 13/11, remplace le seuil de 30 min) :
+    à l'ouverture, au retour sur l'app ou au minuteur, la synchro rapide automatique ne part que si la dernière synchro
+    réussie date de plus de 6 h, et un essai automatique sans succès attend 1 h (le délai de reprise du backend prime).
+    Les boutons « Synchro rapide » et « Complète » restent immédiats.
   - **Une seule collecte par demande.** L'app ne relance jamais automatiquement une collecte expirée
     (seules une panne DNS ou une connexion refusée essaient l'origine ou le transport suivant). Si l'app
     se déconnecte, le backend arrête la collecte en cours. La collecte complète dispose de 12 min côté

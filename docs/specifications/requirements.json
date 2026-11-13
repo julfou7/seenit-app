@@ -1674,6 +1674,10 @@
       ],
       "tests": [
         {
+          "file": "tests/plexSyncProgress.test.ts",
+          "contains": "SEENIT-PLEX-012 la synchro automatique part au plus toutes les 6 h, les boutons restent immédiats"
+        },
+        {
           "file": "tests/plexHistoryDating.test.ts",
           "contains": "SEENIT-PLEX-012 retour v1.4.297 : % de serveur stable (tailles de section connues d’emblée) et diagnostic de l’historique du compte"
         },
