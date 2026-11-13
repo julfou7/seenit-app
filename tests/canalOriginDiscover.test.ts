@@ -25,6 +25,14 @@ test('SEENIT-PROVIDER-002 retour v1.4.303 : la puce Canal+ d’Explorer inclut l
   );
   assert.deepEqual(merged.results?.map(item => item.id), [1, 335510, 2], 'union sans doublon, dans l’ordre de tri');
   assert.equal(merged.total_pages, 5);
+  // Revue Codex #973 : champ et sens de tri respectés (dates, titres, ordre croissant), valeur absente en fin de liste.
+  const primary = { results: [{ id: 1, first_air_date: '2020-01-01', name: 'Bravo', vote_average: 8 }, { id: 2, first_air_date: '', name: 'Alpha', vote_average: 6 }] };
+  const origin = { results: [{ id: 3, first_air_date: '2026-09-23', name: 'Le Gang des souris vertes', vote_average: 7 }] };
+  assert.deepEqual(mergeCanalOriginDiscover(primary, origin, 'first_air_date.desc').results?.map(item => item.id), [3, 1, 2]);
+  assert.deepEqual(mergeCanalOriginDiscover(primary, origin, 'first_air_date.asc').results?.map(item => item.id), [1, 3, 2]);
+  assert.deepEqual(mergeCanalOriginDiscover(primary, origin, 'vote_average.asc').results?.map(item => item.id), [2, 3, 1]);
+  assert.deepEqual(mergeCanalOriginDiscover(primary, origin, 'name.asc').results?.map(item => item.id), [2, 1, 3]);
+  assert.deepEqual(mergeCanalOriginDiscover(primary, origin, null).results?.map(item => item.id), [1, 2, 3], 'défaut popularity.desc, sans popularité : ordre stable');
 
   const client = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
   assert.match(client, /const originUrl = canalOriginDiscoverVariant\(requestUrl\);/);
