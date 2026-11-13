@@ -76,7 +76,9 @@ import {
   PLEX_ACTIVITY_FEED_MAX_PAGES,
   PLEX_ACTIVITY_FEED_QUERY,
   buildPlexActivityDatingItems,
+  buildPlexLibraryIdentity,
   collectPlexActivityDates,
+  hydratePlexActivityEntry,
   isExcludedAccountHistoryEntry,
   pickPlexProvenViewedAt,
   type PlexActivityDate,
@@ -1229,6 +1231,9 @@ async function startServer() {
       };
       const libraryAvailabilityItems: any[] = [];
       const currentLibraryGuids = new Set<string>();
+      // Retour v1.4.305 : identité exacte (GUID, identifiants externes, S/E) de chaque film ou épisode lu dans une
+      // bibliothèque. Une entrée du seul fil Activité la reprend par GUID exact au lieu d'un appel provider par entrée.
+      const libraryIdentityByGuid = new Map<string, PlexRawItem>();
       const incompleteSources = new Set<string>();
 
       const getPlexAccountUuid = async (): Promise<string | null> => {
@@ -1560,7 +1565,10 @@ async function startServer() {
           try {
             const movies = await fetchPlexPages(`${uri}/library/sections/${secKey}/all?sort=lastViewedAt:desc&includeGuids=1`, headers, fullInventoryPageTimeout, 100, undefined, undefined, { pageSize: 300, onPage });
             for (const movie of movies) {
-              if (typeof movie?.guid === 'string' && movie.guid) out.guids.push(movie.guid);
+              if (typeof movie?.guid === 'string' && movie.guid) {
+                out.guids.push(movie.guid);
+                if (!libraryIdentityByGuid.has(movie.guid)) libraryIdentityByGuid.set(movie.guid, buildPlexLibraryIdentity(movie, 'movie'));
+              }
               out.availability.push({ raw: movie, serverName, serverId });
               const watchState = buildPlexLibraryWatchState(movie, { mediaType: 'movie', serverName, serverId });
               if (watchState) out.watchStates.push(watchState);
@@ -1621,6 +1629,9 @@ async function startServer() {
               }
               const watchState = buildPlexLibraryWatchState(episode, { mediaType: 'episode', parentTmdbId, serverName, serverId });
               if (watchState) out.watchStates.push(watchState);
+              if (typeof episode?.guid === 'string' && episode.guid && !libraryIdentityByGuid.has(episode.guid)) {
+                libraryIdentityByGuid.set(episode.guid, buildPlexLibraryIdentity(episode, 'episode', parentTmdbId));
+              }
             }
             for (const episode of episodes.filter(isPlexLibraryItemWatched)) {
               out.rawItems.push({ raw: episode, source: sourceName, sourceKind: 'library-watched', availableOnServer: true, serverName, serverId, serverUri: uri, serverToken: serverAccessToken });
@@ -1660,8 +1671,8 @@ async function startServer() {
           attemptedConnection = true;
 
           const connectionRawItems: any[] = [];
-          const connectionAvailabilityItems: any[] = [];
-          const connectionWatchStateItems: any[] = [];
+          const connectionAvailabilityItems: SectionScan['availability'] = [];
+          const connectionWatchStateItems: PlexLibraryWatchState[] = [];
           const connectionLibraryGuids = new Set<string>();
           let connectionHistoryComplete = !delta && !usePmsHistoryInFull;
           let connectionInventoryComplete = delta;
@@ -1816,10 +1827,16 @@ async function startServer() {
       if (!delta) {
         const reconciled = reconcileAccountHistoryWithLibraries(allRawItems, currentLibraryGuids);
         allRawItems.length = 0;
-        for (const entry of reconciled.entries) allRawItems.push(entry);
+        for (const entry of reconciled.entries) {
+          if (entry.accountActivityOnly !== true) { allRawItems.push(entry); continue; }
+          const guid = typeof entry.raw?.guid === 'string' ? entry.raw.guid : '';
+          const hydrated = hydratePlexActivityEntry(entry, libraryIdentityByGuid.get(guid));
+          if (hydrated) allRawItems.push(hydrated);
+          else sourceStats.plexAccountActivityDropped++;
+        }
         removedAccountDuplicates = reconciled.removed;
         sourceStats.plexAccountHistoryDatingOnly = reconciled.datingOnly;
-        sourceStats.plexAccountActivityDropped = reconciled.activityDropped;
+        sourceStats.plexAccountActivityDropped += reconciled.activityDropped;
       }
       sourceStats.plexAccountHistoryRetained = Math.max(0, sourceStats.plexAccountHistoryItems - removedAccountDuplicates);
 
@@ -1919,7 +1936,8 @@ async function startServer() {
         // Le Watch History compte fournit un GUID global. On l'utilise immédiatement
         // pour charger l'objet Metadata documenté par Plex : ratingKey/key/guid et,
         // pour les épisodes, parentIndex/index/grandparentGuid deviennent disponibles.
-        if (entry.sourceKind === 'account-history' && typeof meta?.guid === 'string') {
+        // Retour v1.4.305 : une entrée du seul fil Activité porte déjà l'identité de bibliothèque ; aucun appel provider.
+        if (entry.sourceKind === 'account-history' && entry.accountActivityOnly !== true && typeof meta?.guid === 'string') {
           let accountCurrentWatched: boolean | null = null;
           const providerMetadata = await fetchProviderMetadata(meta.guid);
           if (providerMetadata) {

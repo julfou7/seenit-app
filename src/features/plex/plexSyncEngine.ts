@@ -375,7 +375,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       let episodesCount = 0;
       let alreadyWatchedCount = 0;
       let unresolvedCount = 0;
-      let retryableUnresolvedCount = 0;
+      let retryableUnresolvedCount = 0, datingOnlySkipped = 0; // v1.4.305 : datations seules sans Vu à dater, jamais à retenter.
       let repairedCount = 0, datedCount = 0; const notDated: string[] = [];
       let unwatchedCount = 0;
       let watchlistUnresolvedItemCount = 0;
@@ -509,6 +509,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           const seasonNum = item.parentIndex !== undefined ? Number(item.parentIndex) : NaN;
           const episodeNum = item.index !== undefined ? Number(item.index) : NaN;
           if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) {
+            if (item.datingOnly === true) { datingOnlySkipped++; continue; }
             unresolvedCount++;
             if (getStrongPlexSourceIdentity(item)) retryableUnresolvedCount++;
             recordUnresolvedItem(item, 'episode');
@@ -525,9 +526,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let matchedShow = findShowInLocalLibrary(showsList, guidTmdbId, 'tv');
 
           // Fast skip check: if already in library and episode is already seen, skip immediately
-          if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum, provenViewedAt)) {
-            continue; // Déjà vu dans seenEpisodes ou episodeRecords : aucune notification.
-          }
+          if (skipAlreadyWatchedEpisode(matchedShow, seasonNum, episodeNum, provenViewedAt)) continue; // Déjà vu : aucune notification.
+          if (item.datingOnly === true && guidTmdbId && !matchedShow) { datingOnlySkipped++; continue; } // Rien à dater : pas de TMDB.
 
           // 2. If not found locally, check resolution cache
           let tmdbData: Awaited<ReturnType<typeof resolvePlexItem>> = null;
@@ -546,6 +546,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             tmdbData = await resolveAndCachePlexItem(cacheKey, item);
 
             if (!tmdbData) {
+              if (item.datingOnly === true) { datingOnlySkipped++; continue; }
               unresolvedCount++;
               recordUnresolvedItem(item, 'episode');
               appLogger.info('plex', `[Plex Sync] Fiche "${cleanShowTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
@@ -664,9 +665,8 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           let matchedMovie = findShowInLocalLibrary(showsList, guidTmdbId, 'movie');
 
           // Fast skip check: if already in library and movie is already marked as seen, skip immediately
-          if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt)) {
-            continue;
-          }
+          if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt)) continue;
+          if (item.datingOnly === true && guidTmdbId && !matchedMovie) { datingOnlySkipped++; continue; } // Rien à dater : pas de TMDB.
 
           // 2. If not found locally, check resolution cache
           let tmdbData: Awaited<ReturnType<typeof resolvePlexItem>> = null;
@@ -675,9 +675,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             matchedMovie = showsList.find(
               (s) => Number(s.tmdbId) === Number(tmdbData.id) && s.mediaType === 'movie'
             );
-            if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt)) {
-              continue;
-            }
+            if (skipAlreadyWatchedMovie(matchedMovie, provenViewedAt)) continue;
           }
 
           // 3. If still not resolved, query TMDB via helper
@@ -685,6 +683,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
             tmdbData = await resolveAndCachePlexItem(cacheKey, item);
 
             if (!tmdbData) {
+              if (item.datingOnly === true) { datingOnlySkipped++; continue; }
               unresolvedCount++;
               recordUnresolvedItem(item, 'movie');
               appLogger.info('plex', `[Plex Sync] Fiche film "${cleanMovieTitle}" ignorée (impossible de résoudre l'ID TMDB).`);
@@ -1061,7 +1060,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
 
       appLogger.success(
         'plex',
-        `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification, ${datedCount} Vu daté(s) par Plex.${summarizePlexDatingSkips(notDated)}`
+        `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification, ${datedCount} Vu daté(s) par Plex.${datingOnlySkipped ? ` ${datingOnlySkipped} datation(s) seule(s) sans Vu SeenIt à dater.` : ''}${summarizePlexDatingSkips(notDated)}`
       );
       if (progress.account) appLogger.warn('plex', `[Plex Sync] Historique du compte : ${progress.account.history} visionnage(s), ${progress.account.datedCount} daté(s), mode ${progress.account.mode}${progress.account.datingOnly ? `, ${progress.account.datingOnly} sur un serveur où le média n’est pas vu (datation seule)` : ''}${progress.account.activity ? `, ${progress.account.activity} lu(s) dans le seul fil Activité` : ''}${progress.account.dateError ? ` — ${progress.account.dateError}` : ''}`); // #954 : écrit après le détail de résolution pour rester dans le journal (150 lignes)
       if (unresolvedItems.length > 0) {
