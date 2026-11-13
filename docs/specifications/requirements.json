@@ -4132,6 +4132,10 @@
       "tests": [
         {
           "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 retour terrain v1.4.306 : le cadran s’ouvre sur le mois en cours, sans rendu par image ni pulsation permanente"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-003 retour terrain v1.4.294 : douze mois glissants par défaut et mois sous les tendances"
         },
         {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 
 const prefersCalm = () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -20,26 +20,31 @@ export function useReveal<T extends Element>() {
   return { ref, seen };
 }
 
-/** Compte de 0 à la valeur au premier affichage, puis d'une valeur à l'autre ; s'arrête au démontage. */
-export function useCountUp(value: number, play: boolean, duration = 1100) {
-  const [shown, setShown] = useState(() => play && !prefersCalm() ? 0 : value);
-  const from = useRef(shown);
+/**
+ * Compte de 0 à la valeur au premier affichage, puis d'une valeur à l'autre ; s'arrête au démontage.
+ * Retour terrain v1.4.306 : le texte est écrit directement dans le nœud (aucun état React par image) ; un rendu du
+ * cadran entier à chaque image saccadait l'ouverture de Mes chiffres.
+ */
+export function useCountUp(ref: RefObject<HTMLElement | null>, value: number, play: boolean, { suffix = '', blank = false, duration = 1100 } = {}) {
+  const from = useRef(value);
   const started = useRef(false);
   useEffect(() => {
-    if (!play) return;
-    if (prefersCalm()) { setShown(value); return; }
+    const node = ref.current;
+    if (!node) return;
+    const write = (next: number) => { const text = `${next}${suffix}`; if (node.textContent !== text) node.textContent = text; };
+    if (blank) { node.textContent = '–'; return; }
+    if (!play || prefersCalm()) { from.current = value; write(value); return; }
     const start = performance.now(), origin = started.current ? from.current : 0, length = started.current ? 380 : duration;
     started.current = true;
+    write(origin);
     let frame = 0;
     const step = (time: number) => {
       const progress = Math.min(1, (time - start) / length);
-      const next = Math.round(origin + (value - origin) * (1 - Math.pow(1 - progress, 3)));
-      from.current = next;
-      setShown(next);
+      from.current = Math.round(origin + (value - origin) * (1 - Math.pow(1 - progress, 3)));
+      write(from.current);
       if (progress < 1) frame = requestAnimationFrame(step);
     };
     frame = requestAnimationFrame(step);
     return () => cancelAnimationFrame(frame);
-  }, [value, play, duration]);
-  return shown;
+  }, [ref, value, play, suffix, blank, duration]);
 }

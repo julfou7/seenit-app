@@ -5,7 +5,6 @@ import { type Show } from '../types';
 import { tmdb } from '../features/shows/tmdb';
 import { getProfileAnalyticsMediaKey } from '../features/profile/profileAnalyticsSnapshot';
 import {
-  PROFILE_MONTH_LABELS,
   PROFILE_WEEKDAY_LABELS,
   buildProfileRollingStats,
   buildProfileYearStats,
@@ -174,7 +173,7 @@ export function ProAnalyticsDashboard({
             <span><b>{stats.films.toLocaleString('fr-FR')}</b><small>{stats.films > 1 ? 'films' : 'film'}</small></span>
             <span><b>{fullDays} {fullDays > 1 ? 'jours' : 'jour'}</b><small>pleins</small></span>
           </div>
-          {isCurrentYear && stats.months.length > 0 && <p className="moi-note moi-center">{`${PROFILE_MONTH_LABELS[new Date(now).getMonth()]} en cours : `}<b>{formatProfileHours(stats.months[currentMonth] || 0)}</b>. Touche un mois pour voir son détail.</p>}
+          {stats.months.length > 0 && <p className="moi-note moi-center">{isCurrentYear ? 'Touche un autre mois pour voir son détail, le centre pour revenir au total.' : 'Touche un mois pour voir son détail.'}</p>}
         </>}
       </Reveal>
 
