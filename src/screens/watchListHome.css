@@ -129,6 +129,7 @@
 .home-sync-sheet__servers span { color:#a1a1aa; font-weight:700; white-space:nowrap; font-variant-numeric:tabular-nums; }
 .home-sync-sheet__servers i { width:8px; height:8px; border-radius:50%; background:#22c55e; }.home-sync-sheet__servers li[data-tone="busy"] i { background:#e5a93d; }.home-sync-sheet__servers li[data-tone="error"] i { background:#ef4444; }.home-sync-sheet__servers li[data-tone="error"] span { color:#fca5a5; }
 .home-sync-sheet > p.home-sync-sheet__summary, .home-sync-sheet > p.home-sync-sheet__count { margin-top:8px; }
+.home-sync-sheet > p.home-sync-sheet__summary[data-tone="error"] { color:#fda4af; }
 .home-sync-sheet__pause { width:100%; min-height:44px; margin-top:10px; border-radius:15px; box-shadow:inset 0 0 0 1px #ffffff29; color:#fff; font-size:13px; font-weight:700; }
 
 /* Terrain223: centered within the usable viewport, long reports scroll inside. */

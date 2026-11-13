@@ -82,13 +82,32 @@ export function formatCompactCount(value: number): string {
 }
 
 /** État court d'un serveur pour une ligne du panneau : jamais d'URL ni de jeton. */
+/**
+ * Erreurs d'une synchro : médias non résolus, et au moins une si la synchro a échoué ou est restée incomplète
+ * (revue Codex #985 : un échec Firestore ou un serveur manquant affichait « 0 erreur »). Une pause n'en est pas une.
+ */
+export function countPlexSyncErrors(progress: { phase?: string; unresolved?: number }, message = ''): number {
+  const unresolved = Number(progress.unresolved) || 0;
+  const failed = progress.phase === 'error' && !/pause/i.test(message);
+  return failed ? Math.max(1, unresolved) : unresolved;
+}
+
+/** Résultat d'une synchro pour la bibliothèque SeenIt : Vus ajoutés ou retirés, Vus datés par Plex, erreurs. */
+export function formatPlexSyncResult(progress: { phase?: string; changed?: number; dated?: number; unresolved?: number }, message = ''): string {
+  const plural = (count: number, singular: string, pluralForm: string) => `${count} ${count > 1 ? pluralForm : singular}`;
+  return [
+    plural(Number(progress.changed) || 0, 'changement', 'changements'),
+    plural(Number(progress.dated) || 0, 'Vu daté', 'Vus datés'),
+    plural(countPlexSyncErrors(progress, message), 'erreur', 'erreurs'),
+  ].join(' · ');
+}
+
 export function serverStatusLabel(server: { state?: PlexServerProgressState; done?: number; total?: number; watched?: number; watchedItems?: number; inventory?: number; inventoryItems?: number; reason?: string }): string {
   if (server.reason) return /délai|hors ligne|timeout/i.test(server.reason) ? 'hors ligne' : 'inaccessible';
   if (server.state === 'skipped') return 'inaccessible';
   if (server.state === 'pending') return 'en attente';
   if (server.state === 'scanning') return server.total && server.total > 0 ? `${Math.round(serverFraction({ state: 'scanning', done: server.done || 0, total: server.total }) * 100)} %` : 'en cours';
-  const inventory = server.inventory ?? server.inventoryItems;
-  const watched = `${formatCompactCount(server.watched ?? server.watchedItems ?? 0)} vus`;
-  // Retour terrain v1.4.297 : « 31 vus sur 14 » se lisait comme une fraction ; les vus comptent aussi l'historique de lecture.
-  return inventory && inventory > 0 ? `${watched} · ${formatCompactCount(inventory)} en bibliothèque` : watched;
+  // Retour du 13/11 : « 33 vus · 15 en bibliothèque », « 83 vus · 7,7 k » mêlaient lectures et états de sources
+  // différentes, impossibles à comparer. Une source terminée dit seulement qu'elle a été lue ; les détails restent au journal.
+  return 'ok';
 }
