@@ -1,3 +1,5 @@
+import { buildPlexParentShowIdentityItem, extractPlexExternalIds, getPlexMetadataLookupKey, getPlexParentShowMetadataLookupKey, getStrongPlexSourceIdentity } from './plexIdentity.ts';
+
 export interface PlexAccountHistoryNode {
   id?: string | null;
   /** #954 : date du visionnage dans le Watch History du compte (ISO ou secondes), si Plex la fournit. */
@@ -296,6 +298,21 @@ export function attachPlexAccountEventIdentity<T extends { sourceKind?: string; 
     matched++;
   }
   return { matched, unmatched };
+}
+
+/**
+ * SEENIT-PLEX-005 (retour v1.4.307) : ligne d'historique serveur sans aucune identité — ni GUID, ni clé, ni ratingKey,
+ * ni vignette ou clé parente d'où en déduire une (média supprimé du serveur, non retrouvé dans le fil du compte). Elle ne
+ * peut jamais être résolue sans titre : elle est écartée et comptée, jamais remontée comme « non résolu », pour qu'une
+ * erreur de synchro signale toujours un vrai problème.
+ */
+export function isIdentitylessPlexHistoryRaw(raw: Record<string, unknown> | null | undefined): boolean {
+  if (!raw) return true;
+  // Revue Codex #982 : mêmes extracteurs que la résolution (metadataItemId, grandparentArt, grandparentGuids…),
+  // jamais une liste partielle de champs, pour ne retirer que les lignes réellement irrécupérables.
+  if (getStrongPlexSourceIdentity(raw) || getPlexMetadataLookupKey(raw) || getPlexParentShowMetadataLookupKey(raw)) return false;
+  const parent = extractPlexExternalIds(buildPlexParentShowIdentityItem(raw));
+  return !(parent.tmdbId || parent.imdbId || parent.tvdbId || parent.plexGuid);
 }
 
 /**

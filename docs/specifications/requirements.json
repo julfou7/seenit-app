@@ -1361,6 +1361,10 @@
       "tests": [
         {
           "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.307 : une ligne d’historique serveur sans aucune identité n’est jamais une erreur"
+        },
+        {
+          "file": "tests/plexHistoryDating.test.ts",
           "contains": "SEENIT-PLEX-005 retour v1.4.306 : une ligne d’historique serveur sans identité reprend le GUID de la même lecture du compte"
         },
         {

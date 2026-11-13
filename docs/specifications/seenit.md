@@ -1008,7 +1008,11 @@ pour le cache des sagas et univers.
   Activité du compte de **même type** et de **même horodatage à 1 s près**, seulement si un seul GUID correspond : c'est la
   même lecture vue par deux sources, jamais un rapprochement par titre ou année. Le provider en donne ensuite les
   identifiants externes et S/E ; la date et l'état de lecture restent ceux de la ligne d'historique (le `lastViewedAt` du
-  provider est ignoré). 24 lignes sur 27 sont ainsi identifiées ; sans événement unique, la ligne reste non résolue.
+  provider est ignoré). 24 lignes sur 27 sont ainsi identifiées.
+  Retour v1.4.307 (décision du propriétaire du 13/11 : « une erreur doit signaler un vrai souci ») : une ligne
+  d'historique serveur restée sans aucune identité (ni GUID, clé, ratingKey, vignette ni clé parente) ne peut jamais être
+  résolue sans titre. Elle est écartée avant la résolution et comptée (`pmsHistoryWithoutIdentity`), en full comme en
+  delta ; elle n'est jamais un « non résolu » et ne rend pas la synchro incomplète. Elle n'est jamais rapprochée par titre.
   Retour v1.4.306 (revue Codex #978) : la réparation de l'index vu d'un titre que SeenIt tient pour vu (statut terminé)
   n'invente jamais de date de visionnage : une date de document (`updatedAt`, `createdAt`, instant de synchro) ferait
   compter un visionnage fictif dans les chiffres par période. Sans date Plex prouvée, elle n'ajoute que la clé ; avec une
