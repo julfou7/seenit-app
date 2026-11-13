@@ -1361,6 +1361,14 @@
       "tests": [
         {
           "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.304 : le fil Activité complet date un Vu connu même absent du Watch History"
+        },
+        {
+          "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.304 : la date de l’historique du compte prime sur le lastViewedAt du provider"
+        },
+        {
+          "file": "tests/plexHistoryDating.test.ts",
           "contains": "SEENIT-PLEX-005 retour v1.4.300 : un film présent mais non vu chez un ami garde la date de sa lecture faite ailleurs"
         },
         {

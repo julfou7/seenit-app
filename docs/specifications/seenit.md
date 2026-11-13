@@ -989,6 +989,15 @@ pour le cache des sagas et univers.
   protège un Vu. Un ancien Vu sans étiquette ni heure prouvée reçoit la date prouvée de sa lecture Plex ; un import TV Time
   l'est toujours ; un Vu marqué dans SeenIt jamais. Une ligne d'historique serveur sans identifiant (média supprimé, par
   exemple Coco sur PC-JULIAN) reste impossible à dater sans titre.
+  Retour v1.4.304 (relevé du 13/11 : `watchHistory` ne renvoie que 80 visionnages depuis 01/2023 alors que le fil
+  « Activité » en date 2025 depuis 05/2018, dont Coco le 15/07/2018) : en full, le fil `activityFeed` est **toujours** lu en
+  entier (pas seulement quand `watchHistory` n'a pas de date), sans plafond silencieux de pages. Chaque GUID du fil absent du
+  Watch History devient une entrée de **datation seule**, gardée uniquement si ce GUID exact est présent **et non vu** dans une
+  bibliothèque actuelle (vu, la bibliothèque porte sa date ; absent, l'entrée est écartée) ; elle n'alimente jamais l'état
+  courant vu/non vu. Pour un même GUID, la lecture la plus récente du fil est retenue. Une entrée de datation seule n'est pas
+  écartée par un état courant du compte explicitement non vu : elle ne crée ni ne retire aucun Vu, elle date seulement un Vu
+  déjà connu. La date d'un événement de l'historique du compte prime sur le `lastViewedAt` du provider Plex, qui peut être
+  l'instant d'un marquage (Coco : `lastViewedAt` du 04/09/2026 avec `viewCount: 0`, lecture réelle du 15/07/2018).
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite

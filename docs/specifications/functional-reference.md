@@ -446,7 +446,9 @@ TV Time reste hors des chiffres par période ; les anciens Vu sans origine ne so
 (visionnages lus dans le Watch History Plex) et le nombre de Vu datés par Plex. Un film regardé puis supprimé du serveur
 reste vu grâce à l'historique du compte, avec sa date de lecture. Un Vu Plex importé par une ancienne synchro sans heure prouvée reçoit
 la date prouvée de sa lecture Plex, puis ne bouge plus (`SEENIT-PLEX-005`) ; depuis la v1.4.303, il en va de même pour
-tout ancien Vu sans heure prouvée ni étiquette SeenIt. Les totaux
+tout ancien Vu sans heure prouvée ni étiquette SeenIt. Depuis la v1.4.305, la synchro complète lit aussi tout le fil
+« Activité » du compte Plex : un ancien Vu (par exemple un film vu en 2018 et encore présent, non vu, sur le serveur d'un ami)
+reçoit la date de sa vraie lecture même absente du Watch History ; ce fil date seulement, il ne crée ni ne retire aucun Vu. Les totaux
 (épisodes, films, séries terminées) comptent tout, et une note dit ce qui a été écarté (`SEENIT-PROFILE-006`).
 Une série finie compte comme terminée même archivée. Les badges
 ont des paliers : Centenaire (visionnages) 100, 500, 1 000, 2 500, 5 000, 7 500, 10 000 ; Oiseau de nuit
