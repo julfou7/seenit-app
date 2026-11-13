@@ -3605,6 +3605,14 @@
           "contains": "SEENIT-PROVIDER-002 retour v1.4.303 : une seule détection du diffuseur d’origine, appliquée partout"
         },
         {
+          "file": "tests/canalOriginDiscover.test.ts",
+          "contains": "SEENIT-PROVIDER-002 retour v1.4.303 : la puce Canal+ d’Explorer inclut les séries dont Canal+ est la chaîne d’origine"
+        },
+        {
+          "file": "tests/explorerTrendsPrefetch.test.ts",
+          "contains": "SEENIT-PROVIDER-002 revue Codex #973 : une page suivante en échec propose « Réessayer » au lieu de finir le défilement"
+        },
+        {
           "file": "tests/watchProviderBatch.test.ts",
           "contains": "SEENIT-PROVIDER-002 #853 parse et compacte sans jamais inventer d’offre"
         },

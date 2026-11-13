@@ -75,6 +75,9 @@ d’origine en France », ouvrant la fiche programme canalplus.com de TMDB) au l
 Retour v1.4.303 : une seule lecture du diffuseur d'origine (`originalBroadcasterOf`, `originalBroadcasterRow`,
 `originalBroadcasterPlatformIds`) sert les cartes, la fiche série, la fiche épisode, le profil acteur et le filtre
 « Mes plateformes » de la recherche Explorer ; seul l'affichage diffère.
+Retour v1.4.303 (décision du propriétaire : « si Canal+ est le diffuseur d'origine, Canal+ le restera ») : une
+découverte TMDB de séries filtrée sur Canal+ (fournisseur 381) est complétée par la chaîne Canal+ (réseau 285) et fusionnée
+sans doublon, dans l'ordre de tri demandé ; les grilles Explorer filtrées sur Canal+ incluent donc ces séries.
 Retour v1.4.300 : la copie locale des diffuseurs change de clé (`seenit_watch_providers_v2`) ; une copie v1, écrite
 avant l'attribution d'origine, n'est plus servie et son espace est libéré, pour que la carte redemande le lot au lieu de
 rester sans badge jusqu'à expiration (6 h, 7 jours en repli).

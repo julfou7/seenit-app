@@ -75,7 +75,7 @@ async function loadHomePages() {
       export const isMovieAtCinema=()=>false;
       export const tmdb={
         getTrending:async(type,n)=>{p().calls.push('trending:'+type+':'+n);return page([{id:100+n,media_type:'movie',vote_count:30},{id:500,media_type:'person',name:'Personne'}]);},
-        getPopular:async(type,n)=>{p().calls.push('popular:'+type+':'+n);return page([{id:(type==='tv'?200:300)+n,media_type:type,vote_count:40}]);},
+        getPopular:async(type,n)=>{p().calls.push('popular:'+type+':'+n);if(p().failPopular)return {ok:false,error:new Error('TMDB indisponible')};return page([{id:(type==='tv'?200:300)+n,media_type:type,vote_count:40}]);},
         getPopularPersons:async n=>{p().calls.push('persons:'+n);return page([{id:900,name:'Acteur'}]);},
       };
       export const discoverSeenIt=async options=>{p().calls.push('progressive:'+options.page);return page([]);};
@@ -83,7 +83,7 @@ async function loadHomePages() {
       export const enrichCinemaEvidenceForExplorerLists=async(popular,trending)=>[popular,trending];
     ` }));
   } }] });
-  const ports = { calls: [] as string[] };
+  const ports = { calls: [] as string[], failPopular: false };
   const module = { exports: {} as {
     loadExplorerHomePage: (query: Record<string, unknown>, page: number, hooks?: Record<string, unknown>) => Promise<Page>;
     createExplorerHomePrefetch: (load?: unknown, now?: () => number) => { take: (query: Record<string, unknown>, page: number) => Promise<Page> | null; prime: (query: Record<string, unknown>, page: number) => void };
@@ -184,4 +184,18 @@ test('SEENIT-DISCOVER-007 #853 le filtre d’âge résout en avance les âges de
   assert.equal(warmAfterSeven.signal.aborted, false, 'le filtre 7 ans prépare sa propre page suivante');
   await progressive({ type: 'tv', page: 1, pegi: 'Tous' });
   assert.equal(warmAfterSeven.signal.aborted, true, 'sans filtre d’âge, plus aucune résolution anticipée ni quota consommé');
+});
+
+test('SEENIT-PROVIDER-002 revue Codex #973 : une page suivante en échec propose « Réessayer » au lieu de finir le défilement', async () => {
+  // Filtre Canal+ : l'échec d'une source remonte depuis la découverte fusionnée ; Explorer doit pouvoir redemander la page.
+  const { ports, exports } = await loadHomePages();
+  ports.failPopular = true;
+  const series = { ...query, activeCategory: 'Séries' };
+  const next = await exports.loadExplorerHomePage(series, 2);
+  assert.equal((next as { pageError?: string | null }).pageError, 'La suite n’a pas pu être chargée.');
+  assert.equal(next!.hasMore, false, 'Réessayer recharge la même page, sans en sauter');
+  const first = await exports.loadExplorerHomePage(series, 1);
+  assert.equal((first as { pageError?: string | null }).pageError, null, 'page 1 : rien d’affiché, pas d’erreur de pagination');
+  ports.failPopular = false;
+  assert.equal(((await exports.loadExplorerHomePage(series, 2)) as { pageError?: string | null }).pageError, null);
 });

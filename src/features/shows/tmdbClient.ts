@@ -1,4 +1,5 @@
 import { authenticatedFetch } from '../../lib/apiAuth';
+import { CANAL_ORIGIN_MAX_MERGED_PAGES, canalOriginDiscoverVariant, mergeCanalOriginDiscover, pageCanalOriginDiscover } from '../providers/canalOriginDiscover';
 import { resolveSeenItApiUrl } from '../../lib/seenitApi';
 import { type Result, ok, err, tryCatch } from '../../core/Result';
 import { adjustTMDBShowDataForEurope, adjustTMDBSeasonDataForEurope } from '../../lib/utils';
@@ -283,6 +284,34 @@ export class TMDBClient {
 
   async getCachedDiscoverResponse(url: string | URL): Promise<Result<SearchResponse>> {
     const requestUrl = url instanceof URL ? url : new URL(url);
+    // Retour v1.4.303 : une découverte de séries filtrée sur Canal+ inclut aussi les séries de la chaîne Canal+.
+    const originUrl = canalOriginDiscoverVariant(requestUrl);
+    if (!originUrl) return this.fetchCachedDiscover(requestUrl);
+    const sortBy = requestUrl.searchParams.get('sort_by');
+    const page = Math.max(1, Math.floor(Number(requestUrl.searchParams.get('page')) || 1));
+    if (page > CANAL_ORIGIN_MAX_MERGED_PAGES) {
+      const [primary, origin] = await Promise.all([this.fetchCachedDiscover(requestUrl), this.fetchCachedDiscover(originUrl)]);
+      if (!primary.ok) return origin.ok ? origin : primary;
+      return origin.ok ? ok(mergeCanalOriginDiscover(primary.value, origin.value, sortBy)) : primary;
+    }
+    // Revue Codex #973 : la page N est la tranche N de l'union triée des pages 1..N des deux sources (déjà en cache
+    // pendant le défilement), pour un ordre continu d'une page à l'autre.
+    const pageUrl = (base: URL, index: number) => { const next = new URL(base.toString()); next.searchParams.set('page', String(index)); return next; };
+    const indexes = Array.from({ length: page }, (_, index) => index + 1);
+    const [primaryPages, originPages] = await Promise.all([
+      Promise.all(indexes.map(index => this.fetchCachedDiscover(pageUrl(requestUrl, index)))),
+      Promise.all(indexes.map(index => this.fetchCachedDiscover(pageUrl(originUrl, index)))),
+    ]);
+    // Revue Codex #973 : la composition de l'union ne change jamais en cours de pagination. Si l'une des deux sources
+    // échoue, à n'importe quelle page, l'échec remonte (comme sans filtre Canal+) et Explorer redemande la même page :
+    // ni séries sautées, ni repli sur une seule source que la page suivante viendrait décaler.
+    const failure = [...primaryPages, ...originPages].find(result => !result.ok);
+    if (failure) return failure;
+    const values = (results: typeof primaryPages) => results.flatMap(result => result.ok ? [result.value] : []);
+    return ok(pageCanalOriginDiscover(values(primaryPages), values(originPages), sortBy, page));
+  }
+
+  private async fetchCachedDiscover(requestUrl: URL): Promise<Result<SearchResponse>> {
     const cacheKey = normalizePublicMetadataRequestKey(requestUrl);
     const cached = await readPublicMetadataCache<SearchResponse>('discover', cacheKey, { allowStale: true });
     if (cached?.fresh) return ok(cached.data);
@@ -301,11 +330,12 @@ export class TMDBClient {
       }
 
       const data = await tryCatch(response.value.json() as Promise<SearchResponse>);
-      if (!data.ok) return fallback ? ok(fallback.data) : err((data as any).error);
-      if ((data.value as any)?.status_code) {
+      if (data.ok === false) return fallback ? ok(fallback.data) : err(data.error);
+      const tmdbError = data.value as SearchResponse & { status_code?: unknown; status_message?: string };
+      if (tmdbError?.status_code) {
         return fallback
           ? ok(fallback.data)
-          : err(new Error((data.value as any).status_message || 'TMDB Error'));
+          : err(new Error(tmdbError.status_message || 'TMDB Error'));
       }
       writePublicMetadataCache('discover', cacheKey, data.value);
       return data;
