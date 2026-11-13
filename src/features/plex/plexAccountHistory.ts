@@ -299,6 +299,18 @@ export function attachPlexAccountEventIdentity<T extends { sourceKind?: string; 
 }
 
 /**
+ * SEENIT-PLEX-005 (retour v1.4.307) : ligne d'historique serveur sans aucune identité — ni GUID, ni clé, ni ratingKey,
+ * ni vignette ou clé parente d'où en déduire une (média supprimé du serveur, non retrouvé dans le fil du compte). Elle ne
+ * peut jamais être résolue sans titre : elle est écartée et comptée, jamais remontée comme « non résolu », pour qu'une
+ * erreur de synchro signale toujours un vrai problème.
+ */
+export function isIdentitylessPlexHistoryRaw(raw: Record<string, unknown> | null | undefined): boolean {
+  if (!raw) return true;
+  return ['guid', 'Guid', 'guids', 'key', 'ratingKey', 'metadataItemID', 'metadataKey', 'thumb', 'art', 'parentKey', 'grandparentKey', 'grandparentRatingKey', 'grandparentGuid', 'grandparentThumb']
+    .every(field => { const value = raw[field]; return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0); });
+}
+
+/**
  * Retour v1.4.305 (synchro terrain du 13/11 : 757 épisodes du fil Activité « Série inconnue », synchro incomplète) :
  * identité exacte d'un film ou épisode de bibliothèque, sans état de lecture ni date (`lastViewedAt`, `viewCount`
  * exclus), pour qu'une entrée du seul fil Activité la reprenne par GUID exact, sans appel provider.

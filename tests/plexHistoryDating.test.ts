@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { datePlexWatchedRecord, describePlexDatingSkip, readPlexAccountProgress, summarizePlexDatingSkips, withPlexDate } from '../src/features/plex/plexDating.ts';
-import { attachPlexAccountEventIdentity, buildPlexActivityDatingItems, buildPlexLibraryIdentity, collectPlexActivityDates, hydratePlexActivityEntry, isExcludedAccountHistoryEntry, isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, pickPlexProvenViewedAt, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_MAX_PAGES, PLEX_ACTIVITY_FEED_QUERY, type PlexActivityDate } from '../src/features/plex/plexAccountHistory.ts';
+import { attachPlexAccountEventIdentity, buildPlexActivityDatingItems, isIdentitylessPlexHistoryRaw, buildPlexLibraryIdentity, collectPlexActivityDates, hydratePlexActivityEntry, isExcludedAccountHistoryEntry, isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, pickPlexProvenViewedAt, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_MAX_PAGES, PLEX_ACTIVITY_FEED_QUERY, type PlexActivityDate } from '../src/features/plex/plexAccountHistory.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const VIEWED = Date.UTC(2026, 9, 28, 20, 15);
@@ -171,6 +171,24 @@ test('SEENIT-PLEX-005 retour v1.4.304 : le fil Activité complet date un Vu conn
   assert.match(server, /if \(!delta\) \{\n\s+const reconciled = reconcileAccountHistoryWithLibraries\(allRawItems, currentLibraryGuids\);/);
   assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 80, plexAccountActivityItems: 1945, plexAccountHistoryMode: 'dated' })?.activity, 1945);
   assert.match(read('src/features/plex/plexSyncEngine.ts'), /lu\(s\) dans le seul fil Activité/);
+});
+
+test('SEENIT-PLEX-005 retour v1.4.307 : une ligne d’historique serveur sans aucune identité n’est jamais une erreur', () => {
+  // Synchro du 13/11 : « 3 non résolus » = Coco (11/10/2026), La Petite Sirène, une 2e lecture de Dexter S1E2 sur
+  // PC-JULIAN, médias supprimés : type, titre, date, librarySectionID, originallyAvailableAt — rien d'autre.
+  const deleted = { type: 'movie', title: 'Coco', viewedAt: 1791707870, accountID: 1, librarySectionID: '1', originallyAvailableAt: '2017-11-22', historyKey: '/status/sessions/history/40' };
+  assert.equal(isIdentitylessPlexHistoryRaw(deleted), true);
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, guid: 'plex://movie/coco' }), false, 'identifiée par la lecture du compte');
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, ratingKey: '559', key: '/library/metadata/559' }), false, 'média encore présent');
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, thumb: '/library/metadata/559/thumb/1' }), false, 'clé déductible de la vignette');
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, type: 'episode', grandparentKey: '/library/metadata/12' }), false, 'série retrouvable');
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, Guid: [] }), true);
+  const server = read('server.ts');
+  // Écartée après l'identification par la lecture du compte et avant l'enrichissement, en full comme en delta.
+  const drop = server.indexOf("if (entry.sourceKind === 'pms-history' && isIdentitylessPlexHistoryRaw(entry.raw)) {");
+  assert.ok(drop > server.indexOf('const correlated = attachPlexAccountEventIdentity(allRawItems, accountActivityEvents);'));
+  assert.ok(drop < server.indexOf('const enrichEntry = async'));
+  assert.match(server, /allRawItems\.splice\(index, 1\);\n\s+sourceStats\.pmsHistoryWithoutIdentity\+\+;/);
 });
 
 test('SEENIT-PLEX-005 retour v1.4.306 : une ligne d’historique serveur sans identité reprend le GUID de la même lecture du compte', () => {

@@ -81,6 +81,7 @@ import {
   collectPlexActivityDates,
   collectPlexActivityEvents,
   hydratePlexActivityEntry,
+  isIdentitylessPlexHistoryRaw,
   type PlexActivityEvent,
   isExcludedAccountHistoryEntry,
   pickPlexProvenViewedAt,
@@ -1234,7 +1235,7 @@ async function startServer() {
         libraryInventoryScanComplete: false,
         historyCollectionComplete: false
       };
-      const libraryAvailabilityItems: any[] = [];
+      const libraryAvailabilityItems: Array<{ raw: PlexRawItem; serverName: string; serverId: string }> = [];
       const currentLibraryGuids = new Set<string>();
       // Retour v1.4.305 : identité exacte (GUID, identifiants externes, S/E) de chaque film ou épisode lu dans une
       // bibliothèque. Une entrée du seul fil Activité la reprend par GUID exact au lieu d'un appel provider par entrée.
@@ -1849,7 +1850,15 @@ async function startServer() {
         // Retour v1.4.306 : une ligne d'historique serveur sans identité reprend le GUID de la même lecture du compte.
         const correlated = attachPlexAccountEventIdentity(allRawItems, accountActivityEvents);
         sourceStats.pmsHistoryIdentifiedByAccountEvent = correlated.matched;
-        sourceStats.pmsHistoryWithoutIdentity = correlated.unmatched;
+      }
+      // Retour v1.4.307 : une ligne d'historique serveur restée sans aucune identité ne peut jamais être résolue sans
+      // titre ; écartée et comptée, elle n'est jamais un « non résolu » (full comme delta).
+      for (let index = allRawItems.length - 1; index >= 0; index--) {
+        const entry = allRawItems[index];
+        if (entry.sourceKind === 'pms-history' && isIdentitylessPlexHistoryRaw(entry.raw)) {
+          allRawItems.splice(index, 1);
+          sourceStats.pmsHistoryWithoutIdentity++;
+        }
       }
       sourceStats.plexAccountHistoryRetained = Math.max(0, sourceStats.plexAccountHistoryItems - removedAccountDuplicates);
 

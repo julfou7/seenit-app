@@ -451,7 +451,8 @@ tout ancien Vu sans heure prouvée ni étiquette SeenIt. Depuis la v1.4.305, la 
 reçoit la date de sa vraie lecture même absente du Watch History ; ce fil date seulement, il ne crée ni ne retire aucun Vu.
 Depuis la v1.4.306, une lecture d'un média supprimé d'un serveur dont l'utilisateur est titulaire (l'historique du serveur
 n'en garde que le type, le titre et la date) est identifiée par la même lecture du fil Activité, au même instant à la seconde
-près, puis importée ou datée comme toute lecture du serveur ; sans lecture correspondante, elle reste non résolue. Une date
+près, puis importée ou datée comme toute lecture du serveur ; sans lecture correspondante, elle est écartée et comptée à part,
+sans jamais apparaître en « non résolu » (v1.4.307) : une erreur de synchro signale toujours un vrai problème. Une date
 n'est jamais inventée : un Vu dont aucune source ne connaît la date reste « heure inconnue » et hors des chiffres par
 période, la date affichée n'étant qu'un repli (création ou modification de la fiche). Les totaux
 (épisodes, films, séries terminées) comptent tout, et une note dit ce qui a été écarté (`SEENIT-PROFILE-006`).
