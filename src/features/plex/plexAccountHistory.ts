@@ -256,6 +256,48 @@ export function buildPlexActivityDatingItems(
   return out;
 }
 
+export type PlexActivityEvent = { guid: string; viewedAt: number; type: string };
+
+/** Événements datés d'une page du fil Activité, tous gardés (un même GUID peut avoir plusieurs lectures). */
+export function collectPlexActivityEvents(target: PlexActivityEvent[], payload: unknown): void {
+  for (const entry of readPlexActivityDates(payload)) target.push(entry);
+}
+
+/**
+ * SEENIT-PLEX-005 (retour v1.4.306) : une ligne d'historique serveur d'un média supprimé ne garde que type, titre et
+ * date (Harry Potter 7.2 le 03/12/2024 21:32:05 sur PC-JULIAN). La même lecture figure dans le fil Activité du compte,
+ * au même instant à la seconde près, avec un GUID. Cette ligne reprend ce GUID quand un seul GUID du même type correspond
+ * à l'horodatage (tolérance 1 s) : c'est le même événement de lecture, jamais un rapprochement par titre ou année.
+ */
+export function attachPlexAccountEventIdentity<T extends { sourceKind?: string; raw?: Record<string, unknown> | null }>(
+  entries: T[],
+  events: readonly PlexActivityEvent[],
+  toleranceMs = 1000
+): { matched: number; unmatched: number } {
+  const bySecond = new Map<number, PlexActivityEvent[]>();
+  for (const event of events) {
+    const second = Math.floor(event.viewedAt / 1000);
+    bySecond.set(second, [...(bySecond.get(second) || []), event]);
+  }
+  let matched = 0, unmatched = 0;
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const raw = entry?.raw;
+    if (entry?.sourceKind !== 'pms-history' || !raw || raw.guid || raw.key || raw.ratingKey) continue;
+    const viewedAt = readPlexAccountHistoryDate(raw.viewedAt);
+    const type = String(raw.type || '').toLowerCase();
+    if (viewedAt === null || (type !== 'movie' && type !== 'episode')) { unmatched++; continue; }
+    const second = Math.floor(viewedAt / 1000);
+    const candidates = [second - 1, second, second + 1].flatMap(key => bySecond.get(key) || [])
+      .filter(event => event.type === type && Math.abs(event.viewedAt - viewedAt) <= toleranceMs);
+    const guids = [...new Set(candidates.map(event => event.guid))];
+    if (guids.length !== 1) { unmatched++; continue; }
+    entries[i] = { ...entry, raw: { ...raw, guid: guids[0], identityFromAccountEvent: true } };
+    matched++;
+  }
+  return { matched, unmatched };
+}
+
 /**
  * Retour v1.4.305 (synchro terrain du 13/11 : 757 épisodes du fil Activité « Série inconnue », synchro incomplète) :
  * identité exacte d'un film ou épisode de bibliothèque, sans état de lecture ni date (`lastViewedAt`, `viewCount`

@@ -1,4 +1,5 @@
 import { VIEWING_SOURCE_TVTIME } from '../features/history/viewingSource';
+import { buildTvTimeEpisodeRecord, buildTvTimeMovieProgress, keepLatestTvTimeDate, readTvTimeRowDate } from '../features/import/tvTimeCsv';
 import React, { useState, useRef } from 'react';
 import { Upload, AlertCircle, Loader2, Trash2, RefreshCw, RotateCcw, Search, Edit2, Check, X, Film, Tv } from 'lucide-react';
 import Papa from 'papaparse';
@@ -13,6 +14,8 @@ interface LocalTask {
   rawTitle: string;
   mediaType: 'tv' | 'movie';
   seenEpisodes: string[];
+  /** Date de visionnage lue dans l'export, par clé d'épisode ou `movie`. */
+  dates?: Record<string, number>;
   status: 'pending' | 'done' | 'failed';
   error?: string;
 }
@@ -113,7 +116,7 @@ export function CsvImporter() {
             const mergedRecords = { ...(showData.episodeRecords || {}) };
             taskSeenEpisodes.forEach(ep => {
               if (!mergedRecords[ep]) {
-                mergedRecords[ep] = { watchedAt: Date.now(), source: VIEWING_SOURCE_TVTIME };
+                mergedRecords[ep] = buildTvTimeEpisodeRecord(task.dates, ep);
               }
             });
 
@@ -123,8 +126,9 @@ export function CsvImporter() {
               updatedAt: Date.now()
             });
           } else {
+            // Retour v1.4.306 : un Vu complet (clé movie + enregistrement daté), plus jamais un simple statut.
             await updateDoc(existingDoc.ref, {
-              status: 'completed',
+              ...buildTvTimeMovieProgress(showData, task.dates?.movie ?? null),
               updatedAt: Date.now()
             });
           }
@@ -138,14 +142,12 @@ export function CsvImporter() {
               tmdbId: bestMatch.id,
               title: bestMatch.title || bestMatch.name || rawTitle,
               mediaType: 'movie' as const,
-              status: 'completed',
               posterPath: posterToUse,
               backdropPath: backdropToUse,
               isArchived: false,
               updatedAt: Date.now(),
               createdAt: Date.now(),
-              seenEpisodes: ['1x1'],
-              episodeRecords: { '1x1': { watchedAt: Date.now(), source: VIEWING_SOURCE_TVTIME } },
+              ...buildTvTimeMovieProgress(null, task.dates?.movie ?? null),
               firstAirDate: bestMatch.release_date || bestMatch.first_air_date || null,
               networks: null,
             };
@@ -153,7 +155,7 @@ export function CsvImporter() {
           } else {
             const episodeRecordsObj: Record<string, { watchedAt: number; source: typeof VIEWING_SOURCE_TVTIME }> = {};
             taskSeenEpisodes.forEach(ep => {
-              episodeRecordsObj[ep] = { watchedAt: Date.now(), source: VIEWING_SOURCE_TVTIME };
+              episodeRecordsObj[ep] = buildTvTimeEpisodeRecord(task.dates, ep);
             });
 
             const newShowData = {
@@ -257,8 +259,8 @@ export function CsvImporter() {
             const fields = results.meta?.fields || (results.data[0] ? Object.keys(results.data[0]) : []);
             const isMoviesFile = fields.some(f => /movie/i.test(f)) && !fields.some(f => /season/i.test(f) || /episode/i.test(f));
 
-            const showMap = new Map<string, { rawTitle: string; seenEpisodes: Set<string> }>();
-            const movieMap = new Map<string, { rawTitle: string }>();
+            const showMap = new Map<string, { rawTitle: string; seenEpisodes: Set<string>; dates: Record<string, number> }>();
+            const movieMap = new Map<string, { rawTitle: string; dates: Record<string, number> }>();
 
             results.data.forEach((row: Record<string, unknown> | null) => {
               if (!row || typeof row !== 'object') return;
@@ -275,15 +277,17 @@ export function CsvImporter() {
                 const title = movieTitle || showTitle;
                 if (title) {
                   const mapKey = title.toLowerCase();
-                  if (!movieMap.has(mapKey)) movieMap.set(mapKey, { rawTitle: title });
+                  if (!movieMap.has(mapKey)) movieMap.set(mapKey, { rawTitle: title, dates: {} });
+                  keepLatestTvTimeDate(movieMap.get(mapKey)!.dates, 'movie', readTvTimeRowDate(row));
                 }
               } else if (showTitle) {
                 const mapKey = showTitle.toLowerCase();
                 if (!showMap.has(mapKey)) {
-                  showMap.set(mapKey, { rawTitle: showTitle, seenEpisodes: new Set<string>() });
+                  showMap.set(mapKey, { rawTitle: showTitle, seenEpisodes: new Set<string>(), dates: {} });
                 }
                 if (hasSeasonEp) {
                   showMap.get(mapKey)!.seenEpisodes.add(`${seasonNum}x${epNum}`);
+                  keepLatestTvTimeDate(showMap.get(mapKey)!.dates, `${seasonNum}x${epNum}`, readTvTimeRowDate(row));
                 }
               }
             });
@@ -293,6 +297,7 @@ export function CsvImporter() {
               rawTitle: item.rawTitle,
               mediaType: 'tv' as const,
               seenEpisodes: Array.from(item.seenEpisodes),
+              dates: item.dates,
               status: 'pending' as const
             }));
 
@@ -301,6 +306,7 @@ export function CsvImporter() {
               rawTitle: item.rawTitle,
               mediaType: 'movie' as const,
               seenEpisodes: [],
+              dates: item.dates,
               status: 'pending' as const
             }));
 

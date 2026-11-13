@@ -1361,6 +1361,14 @@
       "tests": [
         {
           "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.306 : une ligne d’historique serveur sans identité reprend le GUID de la même lecture du compte"
+        },
+        {
+          "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.306 : la réparation de l’index vu n’invente jamais de date de visionnage"
+        },
+        {
+          "file": "tests/plexHistoryDating.test.ts",
           "contains": "SEENIT-PLEX-005 retour v1.4.305 : une entrée du fil Activité reprend l’identité de bibliothèque et ne bloque jamais la synchro"
         },
         {
@@ -4186,6 +4194,10 @@
         "apk"
       ],
       "tests": [
+        {
+          "file": "tests/tvTimeCsv.test.ts",
+          "contains": "SEENIT-PROFILE-007 retour v1.4.306 : l’import TV Time date chaque Vu et fait d’un film un Vu complet"
+        },
         {
           "file": "tests/viewingSource.test.ts",
           "contains": "SEENIT-PROFILE-007 trois origines de visionnage : TV Time, SeenIt, Plex, anciennes étiquettes comprises"
