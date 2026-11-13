@@ -968,8 +968,11 @@ pour le cache des sagas et univers.
   du compte (il garde les médias supprimés après lecture, avec leur heure) ; son échec ne fait pas échouer le serveur.
   Sur un serveur dont il est titulaire, seules les lectures du compte local 1 (le titulaire) sont retenues, en full
   comme en delta : les lectures des amis qui partagent le serveur ne deviennent jamais des Vu.
-  Retour v1.4.297 : le panneau dit « N vus · M en bibliothèque » et signale un historique du compte « sans heure » quand
-  Plex ne donne pas la date ; la complète demande d'abord la taille de chaque section (page vide) pour que le % d'un
+  Retour v1.4.307 (13/11, remplace le libellé « N vus · M en bibliothèque » de la v1.4.297) : le panneau ne compare plus des
+  sources incomparables. Chaque serveur et l'historique du compte disent seulement leur état (« ok », pourcentage pendant la
+  lecture, « hors ligne », « inaccessible ») ; l'historique du compte signale « sans heure » quand Plex ne donne pas la date.
+  Un seul résultat suit, celui de la bibliothèque SeenIt : « N changements · N Vus datés · N erreurs », en rouge s'il y a
+  une erreur. Les compteurs de lecture, de bibliothèque et de non vus restent dans le journal de diagnostic ; la complète demande d'abord la taille de chaque section (page vide) pour que le % d'un
   serveur ne redescende pas en découvrant une section.
   Retour v1.4.298 (journal terrain) : quand la requête Watch History ne fournit pas la date, la complète lit le fil
   « Activité » du compte (`activityFeed`, visionnages `ActivityWatchHistory` et leur `date`) et date chaque entrée du

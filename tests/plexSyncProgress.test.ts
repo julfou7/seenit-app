@@ -22,11 +22,10 @@ test('SEENIT-PLEX-012 calcule un vrai pourcentage, jamais inventé, qui ne recul
   assert.equal(formatCompactCount(842), '842');
   assert.equal(formatCompactCount(1234), '1,2 k');
   assert.equal(formatCompactCount(25_000), '25 k');
-  assert.equal(serverStatusLabel({ watchedItems: 1234 }), '1,2 k vus');
-  // #954 : la complète dit combien de médias ont été lus, pour distinguer peu de vus et bibliothèque non lue.
-  assert.equal(serverStatusLabel({ state: 'done', watched: 2, inventory: 1240 }), '2 vus · 1,2 k en bibliothèque');
-  assert.equal(serverStatusLabel({ watchedItems: 52, inventoryItems: 310 }), '52 vus · 310 en bibliothèque');
-  assert.equal(serverStatusLabel({ watchedItems: 31, inventoryItems: 14 }), '31 vus · 14 en bibliothèque', 'retour v1.4.297 : plus de « 31 vus sur 14 »');
+  // Retour du 13/11 : « 33 vus · 15 en bibliothèque » et « 83 vus · 7,7 k » ne se comparaient pas ; une source lue dit « ok ».
+  assert.equal(serverStatusLabel({ watchedItems: 1234 }), 'ok');
+  assert.equal(serverStatusLabel({ state: 'done', watched: 2, inventory: 1240 }), 'ok');
+  assert.equal(serverStatusLabel({ watchedItems: 31, inventoryItems: 14 }), 'ok');
   assert.equal(serverStatusLabel({ reason: 'hors ligne ou délai dépassé' }), 'hors ligne');
   assert.equal(serverStatusLabel({ reason: 'inaccessible' }), 'inaccessible');
   assert.equal(serverStatusLabel({ state: 'scanning', done: 30, total: 100 }), '30 %');

@@ -2812,6 +2812,10 @@
       ],
       "tests": [
         {
+          "file": "tests/plexSyncPresentation.test.ts",
+          "contains": "SEENIT-UX-004 le panneau de synchro dit l’état de chaque source et un seul résultat pour SeenIt"
+        },
+        {
           "file": "tests/toastSwipe.test.ts",
           "contains": "SEENIT-UX-004 retour v1.4.300 : tout toast, Plex compris, se ferme en glissant vers le bas ou vers la droite"
         },

@@ -83,7 +83,7 @@ test('SEENIT-PLEX-012 retour v1.4.297 : % de serveur stable (tailles de section 
   assert.match(server, /if \(totalsKnown\) syncProgress\.serverItems\(serverId, 0, sizes\.flat\(\)\.reduce/);
   assert.match(server, /syncProgress\.serverItems\(serverId, count, ctx\.totalsKnown \? undefined : totalSize\)/);
   assert.match(server, /sourceStats\.plexAccountHistoryMode = accountHistory\.queryMode;/);
-  assert.match(read('src/components/HomeSyncIndicator.tsx'), /progress\.account\.dated === false \? ' · sans heure' : ''/);
+  assert.match(read('src/components/HomeSyncIndicator.tsx'), /progress\.account\.dated === false \? 'ok · sans heure' : 'ok'/);
   assert.match(read('src/features/plex/plexSyncEngine.ts'), /appLogger\.info\('plex', `\[Plex Sync\] \$\{history\?\.length \|\| 0\} visionnage\(s\)/);
 });
 

@@ -8,6 +8,7 @@ import {
   formatPlexElapsed,
   formatPlexWaitingStatus
 } from '../src/features/plex/plexSyncPresentation.ts';
+import { formatPlexSyncResult } from '../src/features/plex/plexSyncProgressModel.ts';
 
 test('SEENIT-UX-004 la synchronisation Plex affiche une phase réelle et la durée écoulée sans faux pourcentage', () => {
   assert.equal(formatPlexElapsed(12_400), '12 s');
@@ -33,11 +34,14 @@ test('SEENIT-UX-018 aucun bouton pause sur un bilan Plex incomplet ou une synchr
  assert.equal(canPausePlexSync({progress:{uid:'b',phase:'watched'}},'a'),false);
 });
 
-test('SEENIT-UX-004 la ligne Historique du compte n’affiche plus de compteur « non vus » sans effet', () => {
-  // 13/11 : « 76 visionnages · 2 non vus » à chaque synchro complète — deux lectures de test que Plex garde dans
-  // l'historique mais dit aujourd'hui non vues, écartées sans aucune action. Le compteur laissait croire à un dé-vu répété.
+test('SEENIT-UX-004 le panneau de synchro dit l’état de chaque source et un seul résultat pour SeenIt', () => {
+  // 13/11 : « 33 vus · 15 en bibliothèque », « 83 vus · 7,7 k en bibliothèque », « 76 visionnages · 2 non vus » —
+  // des lectures et des états de sources différentes, impossibles à comparer, et un « non vus » sans aucune action.
   const panel = readFileSync('src/components/HomeSyncIndicator.tsx', 'utf8');
-  assert.match(panel, /<strong>Historique du compte<\/strong><span>\{formatCompactCount\(progress\.account\.history\)\} visionnages/);
-  assert.doesNotMatch(panel, /account\.unwatched/);
-  assert.doesNotMatch(panel, /non vus` : ''\}<\/span>/);
+  assert.match(panel, /<strong>Historique du compte<\/strong><span>\{progress\.account\.dated === false \? 'ok · sans heure' : 'ok'\}<\/span>/);
+  assert.doesNotMatch(panel, /account\.unwatched|visionnages|en bibliothèque/);
+  assert.match(panel, /data-tone=\{progress\.unresolved \? 'error' : 'ok'\}>\{formatPlexSyncResult\(progress\)\}/);
+  assert.equal(formatPlexSyncResult({ changed: 0, dated: 0, unresolved: 0 }), '0 changement · 0 Vu daté · 0 erreur');
+  assert.equal(formatPlexSyncResult({ changed: 3, dated: 264, unresolved: 2 }), '3 changements · 264 Vus datés · 2 erreurs');
+  assert.equal(formatPlexSyncResult({}), '0 changement · 0 Vu daté · 0 erreur');
 });
