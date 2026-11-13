@@ -60,7 +60,7 @@ const TMDB_QUERY = new Set([
   'first_air_date.gte', 'first_air_date.lte', 'release_date.gte', 'release_date.lte',
   // #853 : séries dont un épisode a été diffusé récemment (complément « tendance » d'Explorer).
   'air_date.gte', 'air_date.lte',
-  'with_genres', 'without_genres', 'watch_region', 'with_watch_providers',
+  'with_genres', 'without_genres', 'watch_region', 'with_watch_providers', 'with_networks',
   'with_watch_monetization_types', 'with_people', 'with_cast', 'with_release_type',
   'certification_country', 'certification.lte', 'certification.gte', 'with_original_language',
 ]);
@@ -275,7 +275,8 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
     tmdbMetricRequests += 1;
 
     if (tmdbMetricRequests % TMDB_CACHE_METRIC_LOG_EVERY === 0) {
-      console.info(JSON.stringify({
+      // Même sortie standard que console.info, ligne JSON lue par l'auditeur de journaux (TMDB_REQUEST_CACHE_SUMMARY).
+      process.stdout.write(`${JSON.stringify({
         seenitDiagnostic: {
           schemaVersion: 1,
           code: 'TMDB_REQUEST_CACHE_SUMMARY',
@@ -288,7 +289,7 @@ export function registerMediaProviderRoutes(app: Application, dependencies: Depe
             families: Object.fromEntries(tmdbMetricFamilies),
           },
         },
-      }));
+      })}\n`);
     }
   };
 

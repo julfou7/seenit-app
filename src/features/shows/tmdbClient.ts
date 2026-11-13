@@ -1,4 +1,5 @@
 import { authenticatedFetch } from '../../lib/apiAuth';
+import { canalOriginDiscoverVariant, mergeCanalOriginDiscover } from '../providers/canalOriginDiscover';
 import { resolveSeenItApiUrl } from '../../lib/seenitApi';
 import { type Result, ok, err, tryCatch } from '../../core/Result';
 import { adjustTMDBShowDataForEurope, adjustTMDBSeasonDataForEurope } from '../../lib/utils';
@@ -283,6 +284,16 @@ export class TMDBClient {
 
   async getCachedDiscoverResponse(url: string | URL): Promise<Result<SearchResponse>> {
     const requestUrl = url instanceof URL ? url : new URL(url);
+    // Retour v1.4.303 : une découverte de séries filtrée sur Canal+ inclut aussi les séries de la chaîne Canal+.
+    const originUrl = canalOriginDiscoverVariant(requestUrl);
+    if (!originUrl) return this.fetchCachedDiscover(requestUrl);
+    const [primary, origin] = await Promise.all([this.fetchCachedDiscover(requestUrl), this.fetchCachedDiscover(originUrl)]);
+    if (!primary.ok) return origin.ok ? origin : primary;
+    if (!origin.ok) return primary;
+    return ok(mergeCanalOriginDiscover(primary.value, origin.value, requestUrl.searchParams.get('sort_by')));
+  }
+
+  private async fetchCachedDiscover(requestUrl: URL): Promise<Result<SearchResponse>> {
     const cacheKey = normalizePublicMetadataRequestKey(requestUrl);
     const cached = await readPublicMetadataCache<SearchResponse>('discover', cacheKey, { allowStale: true });
     if (cached?.fresh) return ok(cached.data);
@@ -301,11 +312,12 @@ export class TMDBClient {
       }
 
       const data = await tryCatch(response.value.json() as Promise<SearchResponse>);
-      if (!data.ok) return fallback ? ok(fallback.data) : err((data as any).error);
-      if ((data.value as any)?.status_code) {
+      if (data.ok === false) return fallback ? ok(fallback.data) : err(data.error);
+      const tmdbError = data.value as SearchResponse & { status_code?: unknown; status_message?: string };
+      if (tmdbError?.status_code) {
         return fallback
           ? ok(fallback.data)
-          : err(new Error((data.value as any).status_message || 'TMDB Error'));
+          : err(new Error(tmdbError.status_message || 'TMDB Error'));
       }
       writePublicMetadataCache('discover', cacheKey, data.value);
       return data;
