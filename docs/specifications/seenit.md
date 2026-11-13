@@ -1734,8 +1734,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   anciens enregistrements restent lus : `plexImported` vaut Plex, `importedFrom: 'tvtime'` vaut TV Time, sans
   étiquette l'origine est inconnue ; aucune migration n'étiquette l'historique. Les chiffres par période excluent
   `tvtime`, et « Quand tu regardes » prend l'heure réelle de `plex`.
-  Retour v1.4.306 : l'import TV Time date chaque Vu par la date de l'export (`watched_at`, `seen_at`, `created_at` ou
-  `date`, la lecture la plus récente d'une même clé) et ne prend l'instant de l'import qu'à défaut. Un film importé est un
+  Retour v1.4.306 : l'import TV Time date chaque Vu par la date de l'export (`watch_date` d'abord — horodatage en secondes,
+  millisecondes ou microsecondes —, puis `watched_at`, `seen_at`, `created_at` ou `date` ; la lecture la plus récente d'une
+  même clé) et ne prend l'instant de l'import qu'à défaut. Un film importé est un
   Vu complet : clé `movie` (jamais `1x1`) et enregistrement `tvtime` ; un film déjà présent reçoit la clé et
   l'enregistrement manquants, plus jamais un simple `status: 'completed'`. Un enregistrement existant n'est pas écrasé.
 - **SEENIT-UX-023** — Statut de diffusion de la fiche série (régression de la refonte des fiches, #942). La

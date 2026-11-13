@@ -1237,8 +1237,8 @@ réputation Play Protect et consigne le comportement d'une installation propre s
 pour chaque nouveau binaire.
 
 L'import TV Time résout les entrées vers TMDB avant écriture. Un résultat introuvable reste en échec
-modifiable ; il n'est pas inventé. Depuis la v1.4.306, chaque Vu importé prend la date de l'export (`created_at` des
-fichiers TV Time) et l'instant de l'import seulement à défaut ; un film importé est un Vu complet (clé `movie`, origine
+modifiable ; il n'est pas inventé. Depuis la v1.4.306, chaque Vu importé prend la date de l'export (`watch_date`, à
+défaut `created_at` des fichiers TV Time) et l'instant de l'import seulement à défaut ; un film importé est un Vu complet (clé `movie`, origine
 TV Time), y compris un film déjà présent, qui ne reçoit plus un simple statut « terminé ». Un Vu déjà enregistré n'est
 pas écrasé. Ces Vus restent hors des chiffres par période (`SEENIT-PROFILE-007`). Les actions de maintenance ne changent jamais l'identité Firebase,
 le databaseId ou la signature APK.

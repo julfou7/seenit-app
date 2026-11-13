@@ -10,6 +10,10 @@ test('SEENIT-PROFILE-007 retour v1.4.306 : l’import TV Time date chaque Vu et 
   assert.equal(readTvTimeRowDate({ movie_name: '1917', created_at: '2021-03-29 08:33:29', watch_date: '' }), Date.parse('2021-03-29 08:33:29'));
   assert.equal(readTvTimeRowDate({ watched_at: '2020-01-01T10:00:00Z', created_at: '2021-01-01 10:00:00' }), Date.parse('2020-01-01T10:00:00Z'), 'la date de visionnage prime sur le marquage');
   assert.equal(readTvTimeRowDate({ date: '1700000000' }), 1_700_000_000_000);
+  // Revue Codex #978 : watch_date (export réel, secondes) prime sur created_at (marquage).
+  assert.equal(readTvTimeRowDate({ series_name: 'Bodyguard (2018)', created_at: '2018-12-02 19:14:39', watch_date: '1543778079' }), 1_543_778_079_000);
+  assert.equal(readTvTimeRowDate({ watch_date: '1.689410863725422e+15' }), 1_689_410_863_725, 'microsecondes de l’export v2');
+  assert.equal(readTvTimeRowDate({ watch_date: '1543778079000' }), 1_543_778_079_000, 'millisecondes');
   assert.equal(readTvTimeRowDate({ created_at: 'pas une date' }), null);
   assert.equal(readTvTimeRowDate({ movie_name: 'Sans date' }), null);
 

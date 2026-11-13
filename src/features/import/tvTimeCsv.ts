@@ -1,7 +1,16 @@
 import { VIEWING_SOURCE_TVTIME } from '../history/viewingSource.ts';
 
-/** Colonnes de date connues des exports TV Time (visionnage, puis marquage). */
-const TV_TIME_DATE_COLUMNS = ['watched_at', 'Watched At', 'seen_at', 'Seen At', 'created_at', 'Created At', 'date', 'Date'];
+/**
+ * Colonnes de date connues des exports TV Time, visionnage d'abord (`watch_date`, horodatage Unix de l'export réel :
+ * Bodyguard S1E6 `1543778079` alors que `created_at` vaut le marquage), puis marquage (revue Codex #978).
+ */
+const TV_TIME_DATE_COLUMNS = ['watch_date', 'Watch Date', 'watched_at', 'Watched At', 'seen_at', 'Seen At', 'created_at', 'Created At', 'date', 'Date'];
+
+/** Horodatage numérique en secondes, millisecondes ou microsecondes (export v2 : `1.689410863725422e+15`). */
+function tvTimeEpochToMs(value: number): number {
+  if (value >= 100_000_000_000_000) return Math.round(value / 1000);
+  return value < 10_000_000_000 ? value * 1000 : value;
+}
 
 /**
  * Retour v1.4.306 : date du visionnage d'une ligne d'export TV Time, ou null. L'import utilisait l'instant de l'import
@@ -14,7 +23,7 @@ export function readTvTimeRowDate(row: Record<string, unknown> | null | undefine
     if (value === undefined || value === null || String(value).trim() === '') continue;
     const text = String(value).trim();
     const numeric = Number(text);
-    const ms = Number.isFinite(numeric) && numeric > 0 ? (numeric < 10_000_000_000 ? numeric * 1000 : numeric) : Date.parse(text);
+    const ms = Number.isFinite(numeric) && numeric > 0 ? tvTimeEpochToMs(numeric) : Date.parse(text);
     if (Number.isFinite(ms) && ms > 0) return ms;
   }
   return null;
