@@ -339,7 +339,7 @@ test('SEENIT-PROFILE-006 retour terrain v1.4.294 : les rendez-vous réguliers re
   const scope = scopeProfileViewings([tagged], null);
   assert.equal(scope.viewings.length, 0);
   assert.equal(scope.imported, 2);
-  assert.equal((read('src/components/CsvImporter.tsx').match(/source: VIEWING_SOURCE_TVTIME/g) || []).length, 3);
+  assert.equal((read('src/features/import/tvTimeCsv.ts').match(/source: VIEWING_SOURCE_TVTIME/g) || []).length, 2);
   assert.match(read('src/components/ProAnalyticsDashboard.tsx'), /<Head title="Tes rendez-vous" note="semaine après semaine" \/>/);
 });
 

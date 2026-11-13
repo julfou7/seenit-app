@@ -29,5 +29,9 @@ test('SEENIT-PROFILE-007 chaque écriture de Vu pose son origine', () => {
   seenit('src/screens/ShowDetailScreenCore.tsx', 4);
   seenit('src/screens/EpisodeDetailModalCore.tsx', 2);
   assert.equal((read('src/features/plex/plexSyncEngine.ts').match(/source: VIEWING_SOURCE_PLEX/g) || []).length, 4);
-  assert.equal((read('src/components/CsvImporter.tsx').match(/source: VIEWING_SOURCE_TVTIME/g) || []).length, 3);
+  // Retour v1.4.306 : l'import TV Time pose son origine via tvTimeCsv (film et épisode), branché aux trois écritures.
+  assert.equal((read('src/features/import/tvTimeCsv.ts').match(/source: VIEWING_SOURCE_TVTIME/g) || []).length, 2);
+  const importer = read('src/components/CsvImporter.tsx');
+  assert.equal((importer.match(/buildTvTimeEpisodeRecord\(task\.dates, ep\)/g) || []).length, 2);
+  assert.equal((importer.match(/buildTvTimeMovieProgress\(/g) || []).length, 2);
 });

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { datePlexWatchedRecord, describePlexDatingSkip, readPlexAccountProgress, summarizePlexDatingSkips, withPlexDate } from '../src/features/plex/plexDating.ts';
-import { buildPlexActivityDatingItems, buildPlexLibraryIdentity, collectPlexActivityDates, hydratePlexActivityEntry, isExcludedAccountHistoryEntry, isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, pickPlexProvenViewedAt, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_MAX_PAGES, PLEX_ACTIVITY_FEED_QUERY, type PlexActivityDate } from '../src/features/plex/plexAccountHistory.ts';
+import { datePlexWatchedRecord, describePlexDatingSkip, readPlexAccountProgress, repairPlexSeenIndex, summarizePlexDatingSkips, withPlexDate } from '../src/features/plex/plexDating.ts';
+import { attachPlexAccountEventIdentity, buildPlexActivityDatingItems, buildPlexLibraryIdentity, collectPlexActivityDates, hydratePlexActivityEntry, isExcludedAccountHistoryEntry, isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, pickPlexProvenViewedAt, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_MAX_PAGES, PLEX_ACTIVITY_FEED_QUERY, type PlexActivityDate } from '../src/features/plex/plexAccountHistory.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const VIEWED = Date.UTC(2026, 9, 28, 20, 15);
@@ -101,7 +101,7 @@ test('SEENIT-PLEX-005 retour v1.4.298 : les dates du fil Activité de Plex daten
   const server = read('server.ts');
   assert.match(server, /if \(!item\.viewedAt && dated\) item\.viewedAt = dated\.viewedAt;/);
   // Revue Codex #963 : une page suivante en échec garde les dates déjà lues (retour { dates, error }).
-  assert.match(server, /return \{ dates, error: activityCaught instanceof Error \? activityCaught\.message : String\(activityCaught\) \};/);
+  assert.match(server, /return \{ dates, events, error: activityCaught instanceof Error \? activityCaught\.message : String\(activityCaught\) \};/);
   assert.match(server, /sourceStats\.plexAccountHistoryDateError = \[accountHistory\.datedError, accountHistory\.activityError\]/);
   assert.deepEqual(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDated: 60, plexAccountHistoryMode: 'activity' }), { history: 75, unwatched: 0, dated: true, datedCount: 60, mode: 'activity' });
   assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 75, plexAccountHistoryDateError: 'Cannot query field "date"' })?.dateError, 'Cannot query field "date"');
@@ -171,6 +171,56 @@ test('SEENIT-PLEX-005 retour v1.4.304 : le fil Activité complet date un Vu conn
   assert.match(server, /if \(!delta\) \{\n\s+const reconciled = reconcileAccountHistoryWithLibraries\(allRawItems, currentLibraryGuids\);/);
   assert.equal(readPlexAccountProgress({ plexAccountHistoryItems: 80, plexAccountActivityItems: 1945, plexAccountHistoryMode: 'dated' })?.activity, 1945);
   assert.match(read('src/features/plex/plexSyncEngine.ts'), /lu\(s\) dans le seul fil Activité/);
+});
+
+test('SEENIT-PLEX-005 retour v1.4.306 : une ligne d’historique serveur sans identité reprend le GUID de la même lecture du compte', () => {
+  // Relevé du 13/11 : PC-JULIAN garde « Harry Potter et les Reliques de la mort - 2ème partie », film, 03/12/2024 21:32:05,
+  // sans guid/ratingKey/key ; le fil Activité du compte a la même lecture à 0 s avec un GUID.
+  const HP = Date.parse('2024-12-03T20:32:05.000Z');
+  const events = [
+    { guid: 'plex://movie/hp7-2', viewedAt: HP, type: 'movie' },
+    { guid: 'plex://episode/dexter-1x2', viewedAt: Date.parse('2025-07-23T18:46:21.000Z'), type: 'episode' },
+    { guid: 'plex://movie/a', viewedAt: Date.parse('2026-01-01T10:00:00.000Z'), type: 'movie' },
+    { guid: 'plex://movie/b', viewedAt: Date.parse('2026-01-01T10:00:00.500Z'), type: 'movie' },
+  ];
+  const entries: Array<{ sourceKind: string; raw: Record<string, unknown> }> = [
+    { sourceKind: 'pms-history', raw: { type: 'movie', title: 'Harry Potter et les Reliques de la mort - 2ème partie', viewedAt: HP / 1000 } },
+    { sourceKind: 'pms-history', raw: { type: 'episode', title: 'Camera Shy', viewedAt: Date.parse('2025-07-23T18:48:30.000Z') / 1000 } },
+    { sourceKind: 'pms-history', raw: { type: 'movie', title: 'Deux lectures au même instant', viewedAt: Date.parse('2026-01-01T10:00:00.000Z') / 1000 } },
+    { sourceKind: 'pms-history', raw: { type: 'episode', title: 'Type différent', viewedAt: HP / 1000 } },
+    { sourceKind: 'pms-history', raw: { type: 'movie', ratingKey: '559', viewedAt: HP / 1000 } },
+    { sourceKind: 'library-watched', raw: { type: 'movie', viewedAt: HP / 1000 } },
+  ];
+  const result = attachPlexAccountEventIdentity(entries, events);
+  assert.equal(entries[0].raw.guid, 'plex://movie/hp7-2');
+  assert.equal(entries[0].raw.identityFromAccountEvent, true);
+  assert.equal(entries[0].raw.viewedAt, HP / 1000, 'la date reste celle de l’historique serveur');
+  assert.equal(entries[1].raw.guid, undefined, '129 s d’écart : pas la même lecture');
+  assert.equal(entries[2].raw.guid, undefined, 'deux GUID possibles : aucun choix');
+  assert.equal(entries[3].raw.guid, undefined, 'même instant mais autre type');
+  assert.equal(entries[4].raw.guid, undefined, 'ligne déjà identifiée par son ratingKey');
+  assert.equal(entries[5].raw.guid, undefined, 'seul l’historique serveur est concerné');
+  assert.deepEqual(result, { matched: 1, unmatched: 3 });
+
+  const server = read('server.ts');
+  assert.match(server, /const correlated = attachPlexAccountEventIdentity\(allRawItems, accountActivityEvents\);/);
+  assert.match(server, /entry\.sourceKind === 'pms-history' && originalRaw\.identityFromAccountEvent === true/);
+  assert.match(server, /lastViewedAt: undefined, viewCount: undefined, viewedAt: originalRaw\.viewedAt/, 'ni date ni état du provider');
+  assert.match(server, /collectPlexActivityEvents\(events, payload\);/);
+});
+
+test('SEENIT-PLEX-005 retour v1.4.306 : la réparation de l’index vu ne crée jamais un Vu sans enregistrement', () => {
+  // 13/11 : 15 films « vus » (seenEpisodes ['movie'], statut terminé) sans aucun enregistrement ni date.
+  const repaired = repairPlexSeenIndex({ seenEpisodes: [], episodeRecords: {}, updatedAt: 1234, createdAt: 99 }, 'movie', 5);
+  assert.deepEqual(repaired, { seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: 1234, watchedTimeKnown: false } } });
+  assert.equal('source' in (repaired.episodeRecords.movie as object), false, 'origine inconnue, jamais inventée');
+  // L'enregistrement réparé reste datable par Plex.
+  assert.equal(datePlexWatchedRecord(repaired.episodeRecords.movie, VIEWED)?.watchedAt, VIEWED);
+  const existing = { watchedAt: 7, source: 'seenit' };
+  assert.equal(repairPlexSeenIndex({ seenEpisodes: [], episodeRecords: { '1x2': existing } }, '1x2').episodeRecords['1x2'], existing);
+  const engine = read('src/features/plex/plexSyncEngine.ts');
+  assert.equal((engine.match(/Object\.assign\(repaired(Show|Movie), repairPlexSeenIndex\(/g) || []).length, 2);
+  assert.doesNotMatch(engine, /repaired(Show|Movie)\.seenEpisodes = /);
 });
 
 test('SEENIT-PLEX-005 retour v1.4.305 : une entrée du fil Activité reprend l’identité de bibliothèque et ne bloque jamais la synchro', () => {

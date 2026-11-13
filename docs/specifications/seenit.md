@@ -1003,6 +1003,15 @@ pour le cache des sagas et univers.
   de bibliothèque de même GUID, sans appel provider ni date ou état de lecture de bibliothèque ; sans identité, elle est
   écartée. Une datation seule non résolue, ou dont le TMDB ne correspond à aucun Vu SeenIt, est ignorée : elle n'est
   jamais une identité à retenter et ne rend pas la synchro incomplète. Le bilan en donne le nombre.
+  Retour v1.4.306 (27 non résolus de l'historique PC-JULIAN, dont Harry Potter 7.2 le 03/12/2024 21:32:05) : une ligne
+  d'historique serveur d'un média supprimé ne garde que type, titre et date. Elle reprend le GUID de l'événement du fil
+  Activité du compte de **même type** et de **même horodatage à 1 s près**, seulement si un seul GUID correspond : c'est la
+  même lecture vue par deux sources, jamais un rapprochement par titre ou année. Le provider en donne ensuite les
+  identifiants externes et S/E ; la date et l'état de lecture restent ceux de la ligne d'historique (le `lastViewedAt` du
+  provider est ignoré). 24 lignes sur 27 sont ainsi identifiées ; sans événement unique, la ligne reste non résolue.
+  Retour v1.4.306 : la réparation de l'index vu d'un titre que SeenIt tient pour vu (statut terminé) ne crée plus jamais un
+  Vu sans enregistrement ; elle pose un enregistrement sans origine ni heure prouvée (dernière date connue du titre), que
+  Plex peut ensuite dater.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite
@@ -1723,6 +1732,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   anciens enregistrements restent lus : `plexImported` vaut Plex, `importedFrom: 'tvtime'` vaut TV Time, sans
   étiquette l'origine est inconnue ; aucune migration n'étiquette l'historique. Les chiffres par période excluent
   `tvtime`, et « Quand tu regardes » prend l'heure réelle de `plex`.
+  Retour v1.4.306 : l'import TV Time date chaque Vu par la date de l'export (`watched_at`, `seen_at`, `created_at` ou
+  `date`, la lecture la plus récente d'une même clé) et ne prend l'instant de l'import qu'à défaut. Un film importé est un
+  Vu complet : clé `movie` (jamais `1x1`) et enregistrement `tvtime` ; un film déjà présent reçoit la clé et
+  l'enregistrement manquants, plus jamais un simple `status: 'completed'`. Un enregistrement existant n'est pas écrasé.
 - **SEENIT-UX-023** — Statut de diffusion de la fiche série (régression de la refonte des fiches, #942). La
   pastille de statut ouvre la rangée de pastilles : En diffusion et la date du prochain épisode quand il appartient
   à la saison en cours, Renouvelée et la saison suivante datée (ou annoncée), En cours sans date annoncée, En
