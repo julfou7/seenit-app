@@ -18,7 +18,7 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
         export const doc=(...args)=>args;export const collection=(...args)=>args;
         export const getDoc=async()=>({exists:()=>true,id:'series',data:()=>p().show});
         export const getDocs=async()=>({empty:false,docs:[{id:'series',data:()=>p().show}]});
-        export const updateDoc=async(_ref,value)=>p().writes.push(value);export const addDoc=async()=>{};
+        export const updateDoc=async(_ref,value)=>p().writes.push(value);export const addDoc=async(_ref,value)=>{(p().news||[]).push(value);};
         export const tmdb={getShowDetails:async()=>({ok:true,value:p().details}),getMediaDetails:async()=>({ok:true,value:p().details}),getSeasonDetails:async()=>p().seasonFailure?({ok:false,error:new Error("503")}):({ok:true,value:p().season})};
         export const useSyncStore={getState:()=>({setSyncStatus:()=>{},setQuotaExceeded:()=>{},resetQuotaError:()=>{},isQuotaExceeded:false})};
         export const useShowsStore={getState:()=>({shows:[p().show],updateShowOptimistic:()=>{}})};
@@ -137,6 +137,16 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
   ports.writes.length = 0;
   await module.exports.performDetailsSync(false);
   assert.equal(ports.writes.length, 0, 'la réparation ne se répète pas');
+  }
+  // SEENIT-DATA-008 : la revérification périodique d'une série déjà annulée n'annonce pas l'annulation une seconde fois.
+  const news: Array<Record<string, unknown>> = [];
+  Object.assign(ports, { news });
+  ports.details.status = 'Canceled';
+  for (const [tmdbStatus, expected] of [['Canceled', 0], ['Returning Series', 1]] as const) {
+    news.length = 0;
+    ports.show = { ...show, status: 'watching', tmdbStatus } as Show;
+    await module.exports.performDetailsSync(true);
+    assert.equal(news.filter(value => value.type === 'CANCELED').length, expected, `annonce d'annulation avec tmdbStatus=${tmdbStatus}`);
   }
   ports.seasonFailure=true; ports.writes.length=0;
   const manualFailure=await module.exports.syncSingleItem('series',true);

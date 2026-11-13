@@ -281,7 +281,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         }
 
         // 1. DÉTECTION D'ANNULATION
-        if (String(showToSync.status) !== 'Canceled' && details.status === 'Canceled') {
+        if (showToSync.tmdbStatus !== 'Canceled' && details.status === 'Canceled') {
           try {
             await addDoc(collection(db, 'users', userUid, 'news'), {
               type: 'CANCELED',
