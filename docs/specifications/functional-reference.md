@@ -276,7 +276,9 @@ Le retour terrain221 impose des titres de section homogènes16–18px non rogné
 Dans l'en-tête, l'anneau de synchronisation reste visible dès que Plex est connecté ; son point dit l'état de
 la dernière synchro (vert < 24 h, orange au-delà, rouge en échec, aucun pendant une synchro). Le toucher ouvre
 le panneau de synchro : progression, serveurs et pause pendant une synchro, sinon **Synchro rapide** (delta)
-et **Complète** (full). Un appui long de 480 ms lance directement la synchro rapide. Depuis le 03/11/2026
+et **Complète** (full). Un appui long de 480 ms lance directement la synchro rapide. Ces déclenchements manuels sont
+immédiats ; la synchro rapide automatique (ouverture, retour sur l'app, minuteur) ne part qu'au plus toutes les 6 h
+après une synchro réussie et 1 h après un essai sans succès (v1.4.307, décision du 13/11). Depuis le 03/11/2026
 (`SEENIT-PLEX-012`), le panneau affiche un vrai pourcentage en delta comme en complète, une ligne par serveur
 (nom, « 1,2 k vus », « 42 % », « hors ligne ») et tient en un écran ; la synchro complète lit les serveurs et
 leurs bibliothèques en parallèle, ne se relance plus d'elle-même et s'arrête proprement au bout de 10 min.
