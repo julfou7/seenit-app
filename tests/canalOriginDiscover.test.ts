@@ -50,5 +50,7 @@ test('SEENIT-PROVIDER-002 retour v1.4.303 : la puce Canal+ d’Explorer inclut l
   assert.match(client, /const originUrl = canalOriginDiscoverVariant\(requestUrl\);/);
   assert.match(client, /pageCanalOriginDiscover\(primaryOk, originOk\.length === page \? originOk : \[\], sortBy, page\)/);
   assert.match(client, /Array\.from\(\{ length: page \}, \(_, index\) => index \+ 1\)/);
+  // Revue Codex #973 : après la page 1, un échec d'une source remonte (nouvelle tentative) au lieu de décaler la tranche.
+  assert.match(client, /const failure = \[\.\.\.primaryPages, \.\.\.originPages\]\.find\(result => !result\.ok\);\n\s+if \(failure && page > 1\) return failure;/);
   assert.match(readFileSync(new URL('../src/features/providers/mediaProviderBackendCore.ts', import.meta.url), 'utf8'), /'with_watch_providers', 'with_networks',/);
 });

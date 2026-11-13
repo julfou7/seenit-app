@@ -304,6 +304,10 @@ export class TMDBClient {
     ]);
     const primaryOk = primaryPages.flatMap(result => result.ok ? [result.value] : []);
     const originOk = originPages.flatMap(result => result.ok ? [result.value] : []);
+    // Revue Codex #973 : au-delà de la première page, une source manquante décalerait la tranche (séries sautées) ;
+    // l'échec remonte pour qu'Explorer réessaie la même page. En page 1, rien n'est encore affiché : repli sur une source.
+    const failure = [...primaryPages, ...originPages].find(result => !result.ok);
+    if (failure && page > 1) return failure;
     if (primaryOk.length < page) return originOk.length === page ? ok(pageCanalOriginDiscover(originOk, [], sortBy, page)) : primaryPages[primaryPages.length - 1];
     return ok(pageCanalOriginDiscover(primaryOk, originOk.length === page ? originOk : [], sortBy, page));
   }
