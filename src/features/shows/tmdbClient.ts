@@ -302,14 +302,13 @@ export class TMDBClient {
       Promise.all(indexes.map(index => this.fetchCachedDiscover(pageUrl(requestUrl, index)))),
       Promise.all(indexes.map(index => this.fetchCachedDiscover(pageUrl(originUrl, index)))),
     ]);
-    const primaryOk = primaryPages.flatMap(result => result.ok ? [result.value] : []);
-    const originOk = originPages.flatMap(result => result.ok ? [result.value] : []);
-    // Revue Codex #973 : au-delà de la première page, une source manquante décalerait la tranche (séries sautées) ;
-    // l'échec remonte pour qu'Explorer réessaie la même page. En page 1, rien n'est encore affiché : repli sur une source.
+    // Revue Codex #973 : la composition de l'union ne change jamais en cours de pagination. Si l'une des deux sources
+    // échoue, à n'importe quelle page, l'échec remonte (comme sans filtre Canal+) et Explorer redemande la même page :
+    // ni séries sautées, ni repli sur une seule source que la page suivante viendrait décaler.
     const failure = [...primaryPages, ...originPages].find(result => !result.ok);
-    if (failure && page > 1) return failure;
-    if (primaryOk.length < page) return originOk.length === page ? ok(pageCanalOriginDiscover(originOk, [], sortBy, page)) : primaryPages[primaryPages.length - 1];
-    return ok(pageCanalOriginDiscover(primaryOk, originOk.length === page ? originOk : [], sortBy, page));
+    if (failure) return failure;
+    const values = (results: typeof primaryPages) => results.flatMap(result => result.ok ? [result.value] : []);
+    return ok(pageCanalOriginDiscover(values(primaryPages), values(originPages), sortBy, page));
   }
 
   private async fetchCachedDiscover(requestUrl: URL): Promise<Result<SearchResponse>> {

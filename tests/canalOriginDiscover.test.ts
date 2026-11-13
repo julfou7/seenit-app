@@ -48,9 +48,10 @@ test('SEENIT-PROVIDER-002 retour v1.4.303 : la puce Canal+ d’Explorer inclut l
 
   const client = readFileSync(new URL('../src/features/shows/tmdbClient.ts', import.meta.url), 'utf8');
   assert.match(client, /const originUrl = canalOriginDiscoverVariant\(requestUrl\);/);
-  assert.match(client, /pageCanalOriginDiscover\(primaryOk, originOk\.length === page \? originOk : \[\], sortBy, page\)/);
+  assert.match(client, /pageCanalOriginDiscover\(values\(primaryPages\), values\(originPages\), sortBy, page\)/);
   assert.match(client, /Array\.from\(\{ length: page \}, \(_, index\) => index \+ 1\)/);
-  // Revue Codex #973 : après la page 1, un échec d'une source remonte (nouvelle tentative) au lieu de décaler la tranche.
-  assert.match(client, /const failure = \[\.\.\.primaryPages, \.\.\.originPages\]\.find\(result => !result\.ok\);\n\s+if \(failure && page > 1\) return failure;/);
+  // Revue Codex #973 : à toute page, l'échec d'une des deux sources remonte (nouvelle tentative) : composition stable.
+  assert.match(client, /const failure = \[\.\.\.primaryPages, \.\.\.originPages\]\.find\(result => !result\.ok\);\n\s+if \(failure\) return failure;/);
+  assert.doesNotMatch(client, /pageCanalOriginDiscover\(originOk, \[\]/, 'plus de repli sur une seule source');
   assert.match(readFileSync(new URL('../src/features/providers/mediaProviderBackendCore.ts', import.meta.url), 'utf8'), /'with_watch_providers', 'with_networks',/);
 });
