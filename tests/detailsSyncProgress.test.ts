@@ -13,7 +13,7 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
       builder.onResolve({ filter: /^(?:react|firebase\/firestore)$|\/(?:firebase|tmdb|utils|syncStore|showsStore|syncPlex|plexStorage|logStore)$/ }, args => ({ path: args.path.split('/').at(-1)!, namespace: 'ports' }));
       builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: `
         const p=()=>globalThis.__ports;
-        export const appLogger={warn:()=>{}}; export const useEffect=()=>{}; export const useRef=()=>({current:null});
+        export const appLogger={warn:()=>{},info:()=>{}}; export const useEffect=()=>{}; export const useRef=()=>({current:null});
         export const db={};export const auth={currentUser:{uid:'fixture'}};export const sendNativeNotification=()=>{};
         export const doc=(...args)=>args;export const collection=(...args)=>args;
         export const getDoc=async()=>({exists:()=>true,id:'series',data:()=>p().show});
@@ -124,12 +124,14 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
   ports.details.seasons[0].episode_count = 10;
   ports.writes.length = 0;
   await module.exports.syncSingleItem('series', true);
-  assert.equal(ports.writes.find(value => value.seasonProgress)?.status, undefined, 'la synchronisation manuelle conserve aussi le statut utilisateur');
+  // SEENIT-DATA-008 (#333) : le statut utilisateur est conservé, sauf `completed` devant un épisode déjà diffusé et
+  // non vu (ici la fiche n'a vu aucun des épisodes diffusés le 2026-09-01) : la série redevient `watching`.
+  assert.equal(ports.writes.find(value => value.seasonProgress)?.status, oldFlag ? undefined : 'watching', 'la synchronisation manuelle conserve le statut utilisateur, sauf série terminée revenue à l’antenne');
   ports.writes.length = 0;
   await module.exports.performDetailsSync(false);
   const repaired = ports.writes.find(value => value.seasonProgress);
   assert.ok(repaired, 'l’ancienne preuve déclenche la réparation même avec une date future et un cache récent');
-  assert.equal(repaired.status, undefined, 'le statut fournisseur ne remplace jamais le statut de suivi utilisateur');
+  assert.equal(repaired.status, oldFlag ? undefined : 'watching', 'le statut fournisseur ne remplace jamais le statut de suivi utilisateur ; seul un épisode diffusé non vu réactive `completed`');
   assert.equal(repaired.tmdbStatus, providerStatus);
   ports.show = { ...ports.show, ...JSON.parse(JSON.stringify(repaired)) };
   ports.writes.length = 0;

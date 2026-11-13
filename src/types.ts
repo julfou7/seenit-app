@@ -28,6 +28,18 @@ export interface SeasonProgressEvidence {
   last_known_episode_air_date: string | null;
 }
 
+/** Prochain épisode annoncé (persisté par la synchronisation) ; les preuves de saison s'y ajoutent. */
+export interface UpcomingEpisodePointer extends Partial<SeasonProgressEvidence> {
+  season_number?: number;
+  episode_number?: number;
+  air_date?: string | null;
+  name?: string | null;
+  still_path?: string | null;
+  episode_count?: number | null;
+  is_final_season?: boolean;
+  series_ended?: boolean;
+}
+
 export interface Show {
   id: string; // Document ID from Firestore
   userId: string;
@@ -41,6 +53,8 @@ export interface Show {
   backdropPath: string | null;
   status: 'watching' | 'completed' | 'plan_to_watch' | 'dropped';
   isArchived: boolean;
+  /** `manual` : archivage explicite de l'utilisateur, jamais levé par la synchronisation (SEENIT-DATA-008). */
+  archiveSource?: 'manual';
   isFavorite?: boolean;
   notificationsEnabled?: boolean;
   updatedAt: number;
@@ -60,7 +74,7 @@ export interface Show {
   firstAirDate?: string;
   seasonsCache?: Array<{ season_number: number; episode_count?: number; poster_path?: string | null; episodes?: import('./features/shows/tmdbClient').TmdbEpisodeDetails[] }> ; // Deprecated, kept only to clean it up from Firestore
   seasonProgress?: Record<string, SeasonProgressEvidence>;
-  nextEpisodeToAir?: any;
+  nextEpisodeToAir?: UpcomingEpisodePointer | null;
   nextEpisodeToWatch?: any;
   networks?: Array<{ id?: number; name?: string; logo_path?: string | null }>;
   userRating?: number;

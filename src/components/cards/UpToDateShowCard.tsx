@@ -1,7 +1,7 @@
 import React from 'react';
 import { Circle, CheckCircle2, Sparkles, Tv, Calendar } from 'lucide-react';
 import { SeenItCheckButton } from '../SeenItCheckButton';
-import { type Show } from '../../types';
+import { type Show, UpcomingEpisodePointer } from '../../types';
 import { getNextEpisodeNumber, getAiredProgress, cn, getTodayStr } from '../../lib/utils';
 import { getFormattedProviderLogo } from '../../utils/providerLogos';
 import { usePassiveWatchProvider } from '../../hooks/usePassiveWatchProvider';
@@ -17,15 +17,7 @@ interface Props {
 export interface UpToDateCategoryInfo {
   type: 'NEW_SEASON' | 'CURRENTLY_AIRING';
   seasonNumber?: number;
-  nextEpisodeToAir?: {
-    season_number: number;
-    episode_number: number;
-    air_date: string;
-    name?: string;
-    episode_count?: number;
-    is_final_season?: boolean;
-    series_ended?: boolean;
-  };
+  nextEpisodeToAir?: UpcomingEpisodePointer;
 }
 
 export function getUpToDateOrNewSeasonCategory(show: Show): UpToDateCategoryInfo | null {

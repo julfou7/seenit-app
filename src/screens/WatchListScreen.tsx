@@ -299,6 +299,7 @@ export function WatchListScreen({
     if (!show.id) return;
     await updateShow(show.id, {
       isArchived: true,
+      archiveSource: 'manual',
       updatedAt: Date.now()
     });
     showToast(
@@ -307,7 +308,7 @@ export function WatchListScreen({
       show,
       async () => {
         if (show.id) {
-          await updateShow(show.id, { isArchived: false, updatedAt: Date.now(), lastWatchedAt: Date.now() });
+          await updateShow(show.id, { isArchived: false, archiveSource: undefined, updatedAt: Date.now(), lastWatchedAt: Date.now() });
           scrollAllCarouselsToStart();
         }
       }

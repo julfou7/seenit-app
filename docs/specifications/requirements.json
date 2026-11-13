@@ -926,6 +926,20 @@
       ]
     },
     {
+      "id": "SEENIT-DATA-008",
+      "title": "Une série terminée ou archivée qui reprend l'antenne redevient active",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 une série terminée ou archivée qui reprend l’antenne redevient active, sans perdre sa progression"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-DATA-005",
       "title": "Base Firestore SeenIt explicitement verrouillée sur default",
       "targets": [
