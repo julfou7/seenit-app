@@ -90,7 +90,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       ? tmdb.shouldLoadUniverseAndCollection({ ...(cachedInitialDetails || {}), id: Number(effectiveTmdbId), media_type: requestedMediaType })
       : false
   );
-  const [originBroadcaster, setOriginBroadcaster] = useState<unknown>(null); // #965 : diffuseur d'origine (Canal+) du lot, comme les cartes
+  const [originBroadcaster, setOriginBroadcaster] = useState<unknown>(null); // #965 : lot de diffuseurs lu par originalBroadcasterRow, comme les cartes
   const [providers, setProviders] = useState<any>(() => {
     if (!effectiveTmdbId) return null;
     return tmdb.peekWatchProviders(Number(effectiveTmdbId), requestedMediaType)?.results?.FR || null;
@@ -435,7 +435,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     setCollectionData(cachedRelations?.collection?.length ? { parts: cachedRelations.collection } : null);
     setUniverseData(cachedRelations?.universe?.length ? { parts: cachedRelations.universe } : null);
     setCollectionLoading(tmdb.shouldLoadUniverseAndCollection({ ...(cachedDetails || {}), id: Number(effectiveTmdbId), media_type: requestedMediaType }));
-    setProviders(cachedProviders?.results?.FR || null); setOriginBroadcaster(cachedProviders?.originalBroadcaster ?? null);
+    setProviders(cachedProviders?.results?.FR || null); setOriginBroadcaster(cachedProviders ?? null);
     setKeywords(getKeywordsFromDetails(cachedDetails, requestedMediaType));
     setSeasonsCache({});
     setExpandedSeason(null);
@@ -477,7 +477,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     };
     fetchDetails();
     tmdb.getWatchProviders(Number(effectiveTmdbId), targetMediaType).then(res => {
-      if (res.ok && isCurrentRequest()) { setProviders(res.value.results?.FR || []); setOriginBroadcaster(res.value.originalBroadcaster ?? null); }
+      if (res.ok && isCurrentRequest()) { setProviders(res.value.results?.FR || []); setOriginBroadcaster(res.value); }
     });
     return () => { isMounted = false; };
   }, [effectiveTmdbId, requestedMediaKey, requestedMediaType, detailsRevalidation]);
@@ -555,7 +555,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           const sectionName = sections.find(s => s.id === entry.target.id)?.name;
-          if (sectionName) setActiveTab(sectionName as any);
+          if (sectionName) setActiveTab(sectionName as 'about' | 'episodes' | 'casting');
         }
       });
     }, { root: mainScrollRef.current, rootMargin: '-20% 0px -60% 0px', threshold: 0 });

@@ -17,6 +17,7 @@ import { auth } from '../lib/firebase';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { episodeRank, formatClock, formatRating, planEpisodes } from '../features/shows/detailPlanning';
 import { useClockMinutes, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
+import { originalBroadcasterRow } from '../features/providers/passiveProviderState';
 import { dedupeProvidersByName } from '../features/providers/providerNames';
 import { appLogger } from '../store/logStore';
 import { EpisodeDetailSkeleton, EpisodeHeaderBlock, EpisodeNavRow, EpisodePlannerCard, ReactionRow, SeasonCurveCard, SpoilerSynopsis } from './mediaDetail/episodeSections';
@@ -52,6 +53,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const [showFutureConfirm, setShowFutureConfirm] = useState(false);
   const [revealedSynopsis, setRevealedSynopsis] = useState<Record<string, true>>({});
   const [streamingProviders, setStreamingProviders] = useState<WhereToWatchProvider[]>([]);
+  const [providersPayload, setProvidersPayload] = useState<unknown>(null); // #965 : même lot que les cartes (diffuseur d'origine)
   const clockMinutes = useClockMinutes();
 
   const { shows, addShow, updateShow } = useShows();
@@ -870,7 +872,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     const apply = (payload: { results?: { FR?: { flatrate?: WhereToWatchProvider[]; free?: WhereToWatchProvider[]; ads?: WhereToWatchProvider[] } } } | null) => {
       const fr = payload?.results?.FR;
       // Un seul « Netflix » même si TMDB liste aussi « Netflix Standard with Ads » (dédoublonnage par nom).
-      if (!cancelled) setStreamingProviders(dedupeProvidersByName([...(fr?.flatrate || []), ...(fr?.ads || []), ...(fr?.free || [])]).slice(0, 3));
+      if (!cancelled) { setStreamingProviders(dedupeProvidersByName([...(fr?.flatrate || []), ...(fr?.ads || []), ...(fr?.free || [])]).slice(0, 3)); setProvidersPayload(payload); }
     };
     const cached = tmdb.peekWatchProviders(Number(showTmdbId), 'tv');
     if (cached) apply(cached);
@@ -878,6 +880,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     return () => { cancelled = true; };
   }, [showTmdbId]);
   const plexAvailable = Boolean(presence.plexInfo?.available);
+  const originRow = originalBroadcasterRow(providersPayload, (tmdb.peekRenderableMediaDetails(Number(showTmdbId), 'tv') as { homepage?: string | null } | null)?.homepage);
   const watchProviders: WhereToWatchProvider[] = [...streamingProviders, ...(plexAvailable ? [{ provider_id: 999999, provider_name: 'Plex', isPlex: true, serverName: presence.plexInfo?.serverName }] : [])];
   const openPlex = () => { void openPlexWatchUrl(activeShow || { tmdbId: showTmdbId, imdbId: activeShow?.imdbId, title: activeShow?.title || tmdbShowTitle, mediaType: 'tv' }); };
   const seenThenNext = async () => { if (!isSeen) await toggleSeen(); void handleNextEpisode(); };
@@ -1089,7 +1092,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 {/* Retour terrain du 08/11 : depuis la fiche épisode, on programme aussi son téléchargement. */}
                 {isFutureEpisode ? <>{!activeShow?.id && <div className="min-h-11 rounded-2xl flex items-center justify-center gap-2 bg-[rgba(24,24,27,0.7)] text-zinc-400 text-[13px] font-bold"><Clock size={16} className="text-zinc-500" />Bientôt disponible</div>}
                   <EpisodeProgramCard title={tmdbShowTitle || activeShow?.title || ''} tmdbId={tmdbShowId || activeShow?.tmdbId} tvdbId={activeShow?.tvdbId} imdbId={activeShow?.imdbId} season={currentSeason} episode={currentNumber} presence={presence} posterPath={activeShow?.posterPath || null} /></>
-                  : watchProviders.length > 0 && <WhereToWatchCard providers={watchProviders} loading={false} userPlatforms={userPlatforms} title={activeShow?.title || tmdbShowTitle || ''} onOpenPlex={openPlex} emptyLabel="" />}
+                  : (watchProviders.length > 0 || originRow) && <WhereToWatchCard providers={watchProviders} loading={false} userPlatforms={userPlatforms} title={activeShow?.title || tmdbShowTitle || ''} onOpenPlex={openPlex} origin={originRow} emptyLabel="" />}
 
                 <RedditSection
                   query={redditEpisodeQuery}

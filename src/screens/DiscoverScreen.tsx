@@ -26,6 +26,7 @@ import { resolveParentalRatingBatch } from '../features/discover/progressiveAgeF
 import { getParentalRatingOverride } from '../store/parentalRatingStore';
 import { useNavigationSearchShortcut } from '../features/navigation/useTabShortcut';
 import type { TrailerVideo } from '../features/trailers/trailerPolicy';
+import { originalBroadcasterPlatformIds } from '../features/providers/passiveProviderState';
 
 /** Prépare la page suivante quand le fil principal est libre, pour ne jamais gêner le défilement en cours. */
 const scheduleExplorerIdle = (task: () => void) => {
@@ -583,7 +584,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
             const response = await tmdb.getWatchProviders(Number(item.id), item.media_type === 'movie' ? 'movie' : 'tv');
             if (!response.ok) return [];
             const fr = response.value?.results?.FR;
-            return [...(fr?.flatrate || []), ...(fr?.free || []), ...(fr?.ads || [])].map(provider => Number(provider.provider_id));
+            return [...[...(fr?.flatrate || []), ...(fr?.free || []), ...(fr?.ads || [])].map(provider => Number(provider.provider_id)), ...originalBroadcasterPlatformIds(response.value)];
           },
         }, controller.signal);
         const isShortQuery = debouncedQuery.trim().length <= 3;
@@ -637,7 +638,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     let list = [...sourceList];
     const qClean = debouncedQuery.trim().toLowerCase();
 
-    list = list.filter((item: any) => {
+    list = list.filter((item: TMDBMedia) => {
       if (qClean) return true;
       if (activeCategory === 'Personnes' || item.media_type === 'person') return true;
       // SEENIT-C411-004 : le classement C411 fait foi, sans les seuils de popularité ni de date d'Explorer.

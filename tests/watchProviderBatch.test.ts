@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 import express, { type RequestHandler } from 'express';
-import { resolvePassiveProviderState } from '../src/features/providers/passiveProviderState.ts';
+import { originalBroadcasterOf, originalBroadcasterPlatformIds, originalBroadcasterRow, resolvePassiveProviderState } from '../src/features/providers/passiveProviderState.ts';
 import { readWatchProviderCache, WATCH_PROVIDER_CACHE_STORAGE_KEY } from '../src/features/providers/watchProviderCache.ts';
 import { CANAL_ORIGINAL_BROADCASTER_NAME } from '../src/utils/providerLogos.ts';
 import {
@@ -211,11 +211,28 @@ test('SEENIT-PROVIDER-002 retour v1.4.300 : une copie de cache écrite avant l�
 test('SEENIT-PROVIDER-002 retour v1.4.302 : la fiche montre le même diffuseur d’origine Canal+ que la carte', () => {
   // Terrain du 12/11 : la carte du Gang des souris vertes affichait Canal+, la fiche « Pas encore disponible en streaming ».
   const core = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
-  assert.match(core, /setProviders\(cachedProviders\?\.results\?\.FR \|\| null\); setOriginBroadcaster\(cachedProviders\?\.originalBroadcaster \?\? null\);/);
-  assert.match(core, /setProviders\(res\.value\.results\?\.FR \|\| \[\]\); setOriginBroadcaster\(res\.value\.originalBroadcaster \?\? null\);/);
-  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
-  assert.match(view, /origin=\{originBroadcaster === 'canal' \? \{ name: 'Canal\+', logo: PROVIDER_BRAND_LOGOS\.canal, link: \/\^https:/);
+  assert.match(core, /setProviders\(cachedProviders\?\.results\?\.FR \|\| null\); setOriginBroadcaster\(cachedProviders \?\? null\);/);
+  assert.match(core, /setProviders\(res\.value\.results\?\.FR \|\| \[\]\); setOriginBroadcaster\(res\.value\);/);
+  assert.match(readFileSync('src/screens/ShowDetailView.tsx', 'utf8'), /origin=\{originalBroadcasterRow\(originBroadcaster, tmdbDetails\?\.homepage\)\}/);
   const card = readFileSync('src/screens/mediaDetail/detailUi.tsx', 'utf8');
   assert.match(card, /Diffuseur d’origine en France/);
   assert.match(card, /\{!loading && providers\.length === 0 && !origin && <p/, 'plus de « pas encore disponible » quand Canal+ diffuse');
+});
+
+test('SEENIT-PROVIDER-002 retour v1.4.303 : une seule détection du diffuseur d’origine, appliquée partout', () => {
+  // « Le correctif Canal est bien appliqué partout ? Même Explorer ? » : la détection est unique, seul l’affichage change.
+  const payload = { id: 335510, results: {}, originalBroadcaster: 'canal' };
+  assert.equal(originalBroadcasterOf(payload), 'canal');
+  assert.equal(originalBroadcasterOf({ results: {} }), null);
+  assert.deepEqual(originalBroadcasterPlatformIds(payload), [381], 'le filtre « Mes plateformes : Canal+ » garde la série');
+  assert.deepEqual(originalBroadcasterPlatformIds(null), []);
+  assert.deepEqual(originalBroadcasterRow(payload, 'https://www.canalplus.com/decouverte/le-gang-des-souris-vertes/h/31946070_50001'), { name: 'Canal+', logo: '/brand/providers/canalplus.png', link: 'https://www.canalplus.com/decouverte/le-gang-des-souris-vertes/h/31946070_50001' });
+  assert.deepEqual(originalBroadcasterRow(payload, 'https://example.invalid/'), { name: 'Canal+', logo: '/brand/providers/canalplus.png' }, 'lien hors canalplus.com ignoré');
+  assert.equal(originalBroadcasterRow({ results: {} }, null), null);
+  // Fiche épisode, profil acteur et recherche Explorer lisent le même lot que les cartes.
+  const episode = readFileSync('src/screens/EpisodeDetailModalCore.tsx', 'utf8');
+  assert.match(episode, /const originRow = originalBroadcasterRow\(providersPayload,/);
+  assert.match(episode, /\(watchProviders\.length > 0 \|\| originRow\) && <WhereToWatchCard [^>]*origin=\{originRow\}/);
+  assert.match(readFileSync('src/components/MovieActorProfile.tsx', 'utf8'), /resolvePassiveProviderState\(actorCreditKey\(credit\), extractOfficialStreamingProvider\(data\?\.results\), plex, true, \[\], data\?\.originalBroadcaster\)/);
+  assert.match(readFileSync('src/screens/DiscoverScreen.tsx', 'utf8'), /\.\.\.originalBroadcasterPlatformIds\(response\.value\)\]/);
 });

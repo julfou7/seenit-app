@@ -68,3 +68,24 @@ export function arePassiveProviderStatesEqual(
 ): boolean {
   return left.key === right.key && left.logo === right.logo && left.name === right.name;
 }
+
+/**
+ * SEENIT-PROVIDER-002 (#965, retour v1.4.303) : point unique de lecture du diffuseur d'origine porté par le lot de
+ * diffuseurs. Cartes, fiche série, fiche épisode, profil acteur et filtre de recherche passent tous par ici : la
+ * détection est la même partout, seul l'affichage change.
+ */
+export function originalBroadcasterOf(payload: unknown): 'canal' | null {
+  return (payload as { originalBroadcaster?: unknown } | null | undefined)?.originalBroadcaster === 'canal' ? 'canal' : null;
+}
+
+/** Identifiants de plateforme « Mes plateformes » que vaut le diffuseur d'origine (filtre de recherche). */
+export function originalBroadcasterPlatformIds(payload: unknown): number[] {
+  return originalBroadcasterOf(payload) === 'canal' ? [SEENIT_PLATFORM_BY_KEY.canal.preferenceId] : [];
+}
+
+/** Ligne « Où regarder » du diffuseur d'origine ; le lien ne s'ouvre que vers une page canalplus.com. */
+export function originalBroadcasterRow(payload: unknown, homepage?: string | null): { name: string; logo: string; link?: string } | null {
+  if (originalBroadcasterOf(payload) !== 'canal') return null;
+  const link = typeof homepage === 'string' && /^https:\/\/(?:www\.)?canalplus\.com\//.test(homepage) ? homepage : undefined;
+  return { name: 'Canal+', logo: PROVIDER_BRAND_LOGOS.canal, ...(link ? { link } : {}) };
+}
