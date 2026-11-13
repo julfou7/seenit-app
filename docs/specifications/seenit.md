@@ -998,6 +998,11 @@ pour le cache des sagas et univers.
   écartée par un état courant du compte explicitement non vu : elle ne crée ni ne retire aucun Vu, elle date seulement un Vu
   déjà connu. La date d'un événement de l'historique du compte prime sur le `lastViewedAt` du provider Plex, qui peut être
   l'instant d'un marquage (Coco : `lastViewedAt` du 04/09/2026 avec `viewCount: 0`, lecture réelle du 15/07/2018).
+  Retour v1.4.305 (synchro terrain du 13/11 : 757 épisodes du fil « Série inconnue », synchro incomplète) : une entrée du
+  seul fil Activité reprend l'identité exacte (GUID, identifiants externes, saison/épisode, TMDB de la série) de l'élément
+  de bibliothèque de même GUID, sans appel provider ni date ou état de lecture de bibliothèque ; sans identité, elle est
+  écartée. Une datation seule non résolue, ou dont le TMDB ne correspond à aucun Vu SeenIt, est ignorée : elle n'est
+  jamais une identité à retenter et ne rend pas la synchro incomplète. Le bilan en donne le nombre.
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite

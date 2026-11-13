@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { datePlexWatchedRecord, describePlexDatingSkip, readPlexAccountProgress, summarizePlexDatingSkips, withPlexDate } from '../src/features/plex/plexDating.ts';
-import { buildPlexActivityDatingItems, collectPlexActivityDates, isExcludedAccountHistoryEntry, isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, pickPlexProvenViewedAt, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_MAX_PAGES, PLEX_ACTIVITY_FEED_QUERY, type PlexActivityDate } from '../src/features/plex/plexAccountHistory.ts';
+import { buildPlexActivityDatingItems, buildPlexLibraryIdentity, collectPlexActivityDates, hydratePlexActivityEntry, isExcludedAccountHistoryEntry, isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, pickPlexProvenViewedAt, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_MAX_PAGES, PLEX_ACTIVITY_FEED_QUERY, type PlexActivityDate } from '../src/features/plex/plexAccountHistory.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const VIEWED = Date.UTC(2026, 9, 28, 20, 15);
@@ -173,6 +173,38 @@ test('SEENIT-PLEX-005 retour v1.4.304 : le fil Activité complet date un Vu conn
   assert.match(read('src/features/plex/plexSyncEngine.ts'), /lu\(s\) dans le seul fil Activité/);
 });
 
+test('SEENIT-PLEX-005 retour v1.4.305 : une entrée du fil Activité reprend l’identité de bibliothèque et ne bloque jamais la synchro', () => {
+  // Synchro terrain du 13/11 (v1.4.304) : 757 épisodes du fil « Série inconnue », 730 identités à retenter, synchro
+  // incomplète. Un appel provider par entrée échouait en masse ; l'identité vient désormais de la bibliothèque lue.
+  const episode = { guid: 'plex://episode/poi-1x1', Guid: [{ id: 'tvdb://1' }], title: 'Pilote', parentIndex: 1, index: 1, grandparentTitle: 'Person of Interest', grandparentGuid: 'plex://show/poi', lastViewedAt: 1, viewCount: 0 };
+  const identity = buildPlexLibraryIdentity(episode, 'episode', 1411);
+  assert.deepEqual(identity, { type: 'episode', guid: 'plex://episode/poi-1x1', Guid: [{ id: 'tvdb://1' }], title: 'Pilote', parentIndex: 1, index: 1, grandparentTitle: 'Person of Interest', grandparentGuid: 'plex://show/poi', grandparentGuids: ['tmdb://1411'] });
+  assert.equal('lastViewedAt' in identity || 'viewCount' in identity, false, 'aucune date ni état de lecture de bibliothèque');
+  const movie = buildPlexLibraryIdentity({ guid: 'plex://movie/coco', Guid: [{ id: 'tmdb://354912' }], title: 'Coco', year: 2017, lastViewedAt: 9 }, 'movie');
+  assert.deepEqual(movie, { type: 'movie', guid: 'plex://movie/coco', Guid: [{ id: 'tmdb://354912' }], title: 'Coco', year: 2017 });
+
+  const COCO = Date.parse('2018-07-15T00:13:16.000Z');
+  const entry = { sourceKind: 'account-history', datingOnly: true, accountActivityOnly: true, raw: { guid: 'plex://movie/coco', viewedAt: COCO, type: 'movie', title: '' } };
+  const hydrated = hydratePlexActivityEntry(entry, movie);
+  assert.equal(hydrated?.raw.viewedAt, COCO);
+  assert.equal(hydrated?.accountViewedAt, COCO);
+  assert.equal(hydrated?.raw.title, 'Coco');
+  assert.equal(hydrated?.datingOnly, true);
+  assert.equal(pickPlexProvenViewedAt(hydrated, hydrated!.raw, hydrated!.raw), COCO);
+  assert.equal(hydratePlexActivityEntry(entry, undefined), null, 'sans identité de bibliothèque, écartée');
+
+  const server = read('server.ts');
+  assert.match(server, /if \(entry\.sourceKind === 'account-history' && entry\.accountActivityOnly !== true && typeof meta\?\.guid === 'string'\)/, 'aucun appel provider pour le fil seul');
+  assert.match(server, /hydratePlexActivityEntry\(entry, libraryIdentityByGuid\.get\(guid\)\)/);
+  assert.equal((server.match(/libraryIdentityByGuid\.set\(/g) || []).length, 2, 'films et épisodes de bibliothèque');
+  // Client : une datation seule non résolue n'est jamais une identité à retenter, et sans Vu local pas de TMDB.
+  const engine = read('src/features/plex/plexSyncEngine.ts');
+  assert.equal((engine.match(/if \(item\.datingOnly === true\) \{ datingOnlySkipped\+\+; continue; \}/g) || []).length, 3);
+  assert.equal((engine.match(/if \(item\.datingOnly === true && guidTmdbId && !(matchedShow|matchedMovie)\) \{ datingOnlySkipped\+\+; continue; \}/g) || []).length, 2);
+  const coordinates = engine.indexOf('if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) {');
+  assert.ok(engine.indexOf('datingOnlySkipped++', coordinates) < engine.indexOf('retryableUnresolvedCount++', coordinates), 'avant tout compte à retenter');
+});
+
 test('SEENIT-PLEX-005 retour v1.4.304 : la date de l’historique du compte prime sur le lastViewedAt du provider', () => {
   // Coco au provider Plex : lastViewedAt 04/09/2026 (marquage), viewCount 0 ; lecture réelle du fil : 15/07/2018.
   const COCO = Date.parse('2018-07-15T00:13:16.000Z');
@@ -230,7 +262,7 @@ test('SEENIT-PLEX-005 retour v1.4.300 : un film présent mais non vu chez un ami
 test('SEENIT-PLEX-005 retour v1.4.301 : un Vu Plex créé note si son heure est prouvée, et le bilan dit pourquoi un Vu reste sans date', () => {
   const engine = read('src/features/plex/plexSyncEngine.ts');
   assert.equal((engine.match(/plexImported: true, watchedTimeKnown: provenViewedAt !== null,/g) || []).length, 4, 'les quatre créations de Vu Plex');
-  assert.match(engine, /\$\{datedCount\} Vu daté\(s\) par Plex\.\$\{summarizePlexDatingSkips\(notDated\)\}/);
+  assert.match(engine, /\$\{datedCount\} Vu daté\(s\) par Plex\.\$\{datingOnlySkipped \? [^\n]*\}\$\{summarizePlexDatingSkips\(notDated\)\}/);
   assert.equal(describePlexDatingSkip('Coco', { watchedAt: 9, watchedTimeKnown: true, plexImported: true }, VIEWED), 'Coco : heure déjà prouvée (plex)');
   assert.equal(describePlexDatingSkip('Le Robot sauvage', { watchedAt: 9, source: 'seenit' }, VIEWED), 'Le Robot sauvage : Vu SeenIt');
   assert.equal(describePlexDatingSkip('Mario', undefined, null), 'Mario : sans date Plex prouvée');

@@ -1361,6 +1361,10 @@
       "tests": [
         {
           "file": "tests/plexHistoryDating.test.ts",
+          "contains": "SEENIT-PLEX-005 retour v1.4.305 : une entrée du fil Activité reprend l’identité de bibliothèque et ne bloque jamais la synchro"
+        },
+        {
+          "file": "tests/plexHistoryDating.test.ts",
           "contains": "SEENIT-PLEX-005 retour v1.4.304 : le fil Activité complet date un Vu connu même absent du Watch History"
         },
         {

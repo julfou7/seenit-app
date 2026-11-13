@@ -257,6 +257,34 @@ export function buildPlexActivityDatingItems(
 }
 
 /**
+ * Retour v1.4.305 (synchro terrain du 13/11 : 757 épisodes du fil Activité « Série inconnue », synchro incomplète) :
+ * identité exacte d'un film ou épisode de bibliothèque, sans état de lecture ni date (`lastViewedAt`, `viewCount`
+ * exclus), pour qu'une entrée du seul fil Activité la reprenne par GUID exact, sans appel provider.
+ */
+export function buildPlexLibraryIdentity(item: Record<string, unknown>, type: 'movie' | 'episode', parentTmdbId?: number | null): Record<string, unknown> {
+  const identity: Record<string, unknown> = { type, guid: item.guid, Guid: item.Guid, title: item.title };
+  if (type === 'movie') return { ...identity, year: item.year };
+  return {
+    ...identity,
+    parentIndex: item.parentIndex,
+    index: item.index,
+    grandparentTitle: item.grandparentTitle,
+    grandparentGuid: item.grandparentGuid,
+    grandparentGuids: parentTmdbId ? [`tmdb://${parentTmdbId}`] : item.grandparentGuids
+  };
+}
+
+/**
+ * Une entrée du seul fil Activité reprend l'identité de bibliothèque de son GUID exact et garde la date de sa lecture ;
+ * sans identité de bibliothèque, elle est écartée (null).
+ */
+export function hydratePlexActivityEntry<T extends { raw?: Record<string, unknown> | null }>(entry: T, identity: Record<string, unknown> | undefined): (T & { raw: Record<string, unknown>; accountViewedAt: unknown }) | null {
+  if (!identity) return null;
+  const viewedAt = entry.raw?.viewedAt;
+  return { ...entry, raw: { ...identity, viewedAt, accountActivityOnly: true }, accountViewedAt: viewedAt };
+}
+
+/**
  * Une entrée du compte explicitement non vue aujourd'hui est écartée (#954), sauf en datation seule : elle ne crée ni ne
  * retire aucun Vu, elle date seulement un Vu déjà connu (retour v1.4.304, Coco non vu au compte mais lu le 15/07/2018).
  */
