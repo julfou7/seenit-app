@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
   canPausePlexSync,
@@ -30,4 +31,13 @@ test('SEENIT-UX-018 aucun bouton pause sur un bilan Plex incomplet ou une synchr
  assert.equal(canPausePlexSync(null,'a'),false,'un bilan conservé sans tâche active ne peut pas bloquer la prochaine synchronisation');
  assert.equal(canPausePlexSync({progress:{uid:'a',phase:'watched'}},'a'),true);
  assert.equal(canPausePlexSync({progress:{uid:'b',phase:'watched'}},'a'),false);
+});
+
+test('SEENIT-UX-004 la ligne Historique du compte n’affiche plus de compteur « non vus » sans effet', () => {
+  // 13/11 : « 76 visionnages · 2 non vus » à chaque synchro complète — deux lectures de test que Plex garde dans
+  // l'historique mais dit aujourd'hui non vues, écartées sans aucune action. Le compteur laissait croire à un dé-vu répété.
+  const panel = readFileSync('src/components/HomeSyncIndicator.tsx', 'utf8');
+  assert.match(panel, /<strong>Historique du compte<\/strong><span>\{formatCompactCount\(progress\.account\.history\)\} visionnages/);
+  assert.doesNotMatch(panel, /account\.unwatched/);
+  assert.doesNotMatch(panel, /non vus` : ''\}<\/span>/);
 });
