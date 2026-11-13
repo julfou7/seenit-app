@@ -74,6 +74,9 @@ export async function loadExplorerHomePage(
   let trending: TMDBMedia[] | null = null;
   let persons: TMDBMedia[] | null = null;
   let hasMore = false;
+  // Revue Codex #973 : une page suivante en échec (réseau, ou source Canal+ manquante) propose « Réessayer » au lieu de
+  // terminer le défilement ; elle n'est jamais lue comme la fin des résultats.
+  let pageFailed = false;
 
   // SEENIT-C411-004 (#900) : le classement C411 passe avant les filtres TMDB, une page C411 par page d'Explorer.
   if (activeCategory === 'Top C411') {
@@ -106,6 +109,7 @@ export async function loadExplorerHomePage(
       sortOrder,
     });
     if (!isCurrent()) return null;
+    pageFailed = !discoverRes?.ok;
     if (discoverRes?.ok && discoverRes.value.results) {
       popular = discoverRes.value.results;
       hasMore = activeCategory === 'Top 100'
@@ -115,6 +119,7 @@ export async function loadExplorerHomePage(
   } else if (activeCategory === 'Pépites') {
     const topRes = await tmdb.getTopRatedRecent('all', page, selectedPlatforms);
     if (!isCurrent()) return null;
+    pageFailed = !topRes?.ok;
     if (topRes?.ok && topRes.value.results) {
       popular = topRes.value.results;
       trending = topRes.value.results.slice(0, 10);
@@ -151,6 +156,7 @@ export async function loadExplorerHomePage(
       ...(docTvRes?.ok ? docTvRes.value.results.map(item => ({ ...item, media_type: 'tv' as const, genre_ids: Array.from(new Set([...(item.genre_ids || []), 99])) })) : []),
     ];
     hasMore = hasMoreTmdbPages(page, docMovRes, docTvRes);
+    pageFailed = !docMovRes?.ok || !docTvRes?.ok;
   } else if (activeCategory === 'Tout') {
     const trendAllPromise = page <= 5 ? tmdb.getTrending('all', page, selectedPlatforms) : Promise.resolve({ ok: false } as const);
     const popTvPromise = tmdb.getPopular('tv', page, selectedPlatforms);
@@ -174,6 +180,7 @@ export async function loadExplorerHomePage(
       persons = personRes.value.results.map(person => ({ ...person, media_type: 'person' as const }));
     }
     hasMore = hasMoreTmdbPages(page, popTvRes, popMovRes);
+    pageFailed = !popTvRes?.ok || !popMovRes?.ok;
   } else {
     const type = activeCategory === 'Films' ? 'movie' : 'tv';
     const [trendRes, popRes] = await Promise.all([
@@ -187,12 +194,13 @@ export async function loadExplorerHomePage(
     popular = combined.length > 0 ? combined : popList;
     trending = popular.slice(0, 10);
     hasMore = hasMoreTmdbPages(page, popRes);
+    pageFailed = !popRes?.ok;
   }
 
   if (!isCurrent()) return null;
   if (popular !== null && activeCategory !== 'Au cinéma') [popular, trending] = await enrichCinemaEvidenceForExplorerLists(popular, trending);
   if (!isCurrent()) return null;
-  return { popular, trending, persons, hasMore };
+  return { popular, trending, persons, hasMore, pageError: page > 1 && pageFailed ? 'La suite n’a pas pu être chargée.' : null };
 }
 
 /** Une page préparée mais pas encore atteinte reste utilisable 10 min, ensuite elle est rechargée. */
