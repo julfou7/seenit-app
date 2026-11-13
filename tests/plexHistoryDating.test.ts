@@ -183,6 +183,11 @@ test('SEENIT-PLEX-005 retour v1.4.307 : une ligne d’historique serveur sans au
   assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, thumb: '/library/metadata/559/thumb/1' }), false, 'clé déductible de la vignette');
   assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, type: 'episode', grandparentKey: '/library/metadata/12' }), false, 'série retrouvable');
   assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, Guid: [] }), true);
+  // Revue Codex #982 (P2) : toutes les formes d'identité déjà prises en charge par la résolution.
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, metadataItemId: '559' }), false, 'metadataItemId');
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, type: 'episode', grandparentArt: '/library/metadata/12/art/1' }), false, 'grandparentArt');
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, type: 'episode', grandparentGuids: [{ id: 'tmdb://1411' }] }), false, 'grandparentGuids');
+  assert.equal(isIdentitylessPlexHistoryRaw({ ...deleted, Guid: [{ id: 'imdb://tt2380307' }] }), false, 'Guid externe');
   const server = read('server.ts');
   // Écartée après l'identification par la lecture du compte et avant l'enrichissement, en full comme en delta.
   const drop = server.indexOf("if (entry.sourceKind === 'pms-history' && isIdentitylessPlexHistoryRaw(entry.raw)) {");

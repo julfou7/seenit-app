@@ -1,3 +1,5 @@
+import { buildPlexParentShowIdentityItem, extractPlexExternalIds, getPlexMetadataLookupKey, getPlexParentShowMetadataLookupKey, getStrongPlexSourceIdentity } from './plexIdentity.ts';
+
 export interface PlexAccountHistoryNode {
   id?: string | null;
   /** #954 : date du visionnage dans le Watch History du compte (ISO ou secondes), si Plex la fournit. */
@@ -306,8 +308,11 @@ export function attachPlexAccountEventIdentity<T extends { sourceKind?: string; 
  */
 export function isIdentitylessPlexHistoryRaw(raw: Record<string, unknown> | null | undefined): boolean {
   if (!raw) return true;
-  return ['guid', 'Guid', 'guids', 'key', 'ratingKey', 'metadataItemID', 'metadataKey', 'thumb', 'art', 'parentKey', 'grandparentKey', 'grandparentRatingKey', 'grandparentGuid', 'grandparentThumb']
-    .every(field => { const value = raw[field]; return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0); });
+  // Revue Codex #982 : mêmes extracteurs que la résolution (metadataItemId, grandparentArt, grandparentGuids…),
+  // jamais une liste partielle de champs, pour ne retirer que les lignes réellement irrécupérables.
+  if (getStrongPlexSourceIdentity(raw) || getPlexMetadataLookupKey(raw) || getPlexParentShowMetadataLookupKey(raw)) return false;
+  const parent = extractPlexExternalIds(buildPlexParentShowIdentityItem(raw));
+  return !(parent.tmdbId || parent.imdbId || parent.tvdbId || parent.plexGuid);
 }
 
 /**
