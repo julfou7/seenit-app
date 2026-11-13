@@ -1,5 +1,5 @@
 import { authenticatedFetch } from '../../lib/apiAuth';
-import { canalOriginDiscoverVariant, mergeCanalOriginDiscover } from '../providers/canalOriginDiscover';
+import { CANAL_ORIGIN_MAX_MERGED_PAGES, canalOriginDiscoverVariant, mergeCanalOriginDiscover, pageCanalOriginDiscover } from '../providers/canalOriginDiscover';
 import { resolveSeenItApiUrl } from '../../lib/seenitApi';
 import { type Result, ok, err, tryCatch } from '../../core/Result';
 import { adjustTMDBShowDataForEurope, adjustTMDBSeasonDataForEurope } from '../../lib/utils';
@@ -287,10 +287,25 @@ export class TMDBClient {
     // Retour v1.4.303 : une découverte de séries filtrée sur Canal+ inclut aussi les séries de la chaîne Canal+.
     const originUrl = canalOriginDiscoverVariant(requestUrl);
     if (!originUrl) return this.fetchCachedDiscover(requestUrl);
-    const [primary, origin] = await Promise.all([this.fetchCachedDiscover(requestUrl), this.fetchCachedDiscover(originUrl)]);
-    if (!primary.ok) return origin.ok ? origin : primary;
-    if (!origin.ok) return primary;
-    return ok(mergeCanalOriginDiscover(primary.value, origin.value, requestUrl.searchParams.get('sort_by')));
+    const sortBy = requestUrl.searchParams.get('sort_by');
+    const page = Math.max(1, Math.floor(Number(requestUrl.searchParams.get('page')) || 1));
+    if (page > CANAL_ORIGIN_MAX_MERGED_PAGES) {
+      const [primary, origin] = await Promise.all([this.fetchCachedDiscover(requestUrl), this.fetchCachedDiscover(originUrl)]);
+      if (!primary.ok) return origin.ok ? origin : primary;
+      return origin.ok ? ok(mergeCanalOriginDiscover(primary.value, origin.value, sortBy)) : primary;
+    }
+    // Revue Codex #973 : la page N est la tranche N de l'union triée des pages 1..N des deux sources (déjà en cache
+    // pendant le défilement), pour un ordre continu d'une page à l'autre.
+    const pageUrl = (base: URL, index: number) => { const next = new URL(base.toString()); next.searchParams.set('page', String(index)); return next; };
+    const indexes = Array.from({ length: page }, (_, index) => index + 1);
+    const [primaryPages, originPages] = await Promise.all([
+      Promise.all(indexes.map(index => this.fetchCachedDiscover(pageUrl(requestUrl, index)))),
+      Promise.all(indexes.map(index => this.fetchCachedDiscover(pageUrl(originUrl, index)))),
+    ]);
+    const primaryOk = primaryPages.flatMap(result => result.ok ? [result.value] : []);
+    const originOk = originPages.flatMap(result => result.ok ? [result.value] : []);
+    if (primaryOk.length < page) return originOk.length === page ? ok(pageCanalOriginDiscover(originOk, [], sortBy, page)) : primaryPages[primaryPages.length - 1];
+    return ok(pageCanalOriginDiscover(primaryOk, originOk.length === page ? originOk : [], sortBy, page));
   }
 
   private async fetchCachedDiscover(requestUrl: URL): Promise<Result<SearchResponse>> {
