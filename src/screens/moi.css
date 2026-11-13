@@ -135,7 +135,7 @@
 .moi-dial-sector{transform-box:view-box;transform-origin:161px 161px;transition:transform .35s cubic-bezier(.2,.9,.3,1.25),opacity .3s ease}
 .moi-dial-sector>path{fill:#8a6a2b}.moi-dial-sector[data-state=high]>path{fill:#c9952f}.moi-dial-sector[data-state=record]>path{fill:url(#moi-dial-gold)}.moi-dial-sector[data-state=current]>path{fill:#E5A93D}.moi-dial-sector[data-state=empty]>path{fill:#2a2a2f}
 .moi-dial-sector[data-state=future]>path{fill:rgba(255,255,255,.02);stroke:#52525b;stroke-width:1;stroke-dasharray:3 3}
-.moi-dial-sector>.moi-dial-pulse{fill:none !important;stroke:#FFF2B8;stroke-width:2.5;stroke-linejoin:round;animation:moiPulse 1.8s ease-in-out infinite}
+.moi-dial-sector>.moi-dial-pulse{fill:none !important;stroke:#FFF2B8;stroke-width:2.5;stroke-linejoin:round;opacity:.55}
 .moi-dial[data-picked=true] .moi-dial-sector{opacity:.3}.moi-dial .moi-dial-sector[data-on=true]{opacity:1;transform:translate(var(--dx),var(--dy))}
 .moi-dial[data-play=false] .moi-dial-sector{opacity:0;transform:scale(.5)}
 .moi-dial[data-play=true] .moi-dial-sector{animation:moiSector .65s cubic-bezier(.2,.9,.3,1.25) var(--delay) backwards}
@@ -206,8 +206,7 @@ i[data-level="1"]{background:rgba(229,169,61,.3)}i[data-level="2"]{background:rg
 @keyframes moiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes moiGrowY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 @keyframes moiPop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
-@keyframes moiSector{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
-@keyframes moiPulse{0%,100%{opacity:.15}50%{opacity:1}}
+@keyframes moiSector{from{opacity:0;transform:scale(.5)}}
 @keyframes moiGlow{0%,100%{opacity:0}50%{opacity:1}}
 @keyframes moiText{0%,100%{opacity:1}50%{opacity:.72}}
 @keyframes moiSweep{0%{transform:translateX(-100%)}60%,100%{transform:translateX(180%)}}

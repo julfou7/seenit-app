@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useRef, useState, type CSSProperties } from 'react';
 import { PROFILE_MONTH_LABELS } from '../../features/profile/profileYearStats';
 import { useCountUp } from './useReveal';
 import { MONTH_DIAL } from './monthDialGeometry';
@@ -42,17 +42,19 @@ const plural = (count: number, word: string) => `${count} ${word}${count > 1 ? '
  */
 export function MonthDial(props: MonthDialProps) {
   const [replay, setReplay] = useState(0);
-  return <DialBody key={replay} {...props} onReplay={() => setReplay(value => value + 1)} />;
+  return <DialBody key={replay} {...props} replayed={replay > 0} onReplay={() => setReplay(value => value + 1)} />;
 }
 
-function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, totalMinutes, play, periodLabel, monthYears, onReplay }: MonthDialProps & { onReplay: () => void }) {
+function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, totalMinutes, play, periodLabel, monthYears, replayed, onReplay }: MonthDialProps & { replayed: boolean; onReplay: () => void }) {
   const monthName = (month: number) => `${PROFILE_MONTH_LABELS[month]}${monthYears && monthYears[month] !== year ? ` ${monthYears[month]}` : ''}`;
   const period = periodLabel ?? `en ${year}`;
-  const [picked, setPicked] = useState<number | null>(null);
+  // Retour terrain v1.4.306 : le cadran s'ouvre sur le mois en cours ; un second toucher revient au total, et rejouer le total le garde (revue Codex #991).
+  const [picked, setPicked] = useState<number | null>(!replayed && currentMonth >= 0 && currentMonth < minutes.length ? currentMonth : null);
   const max = Math.max(1, ...minutes);
   const pickedKnown = picked !== null && picked < minutes.length;
   const target = picked === null ? hours(totalMinutes) : pickedKnown ? hours(minutes[picked]) : 0;
-  const shown = useCountUp(target, play);
+  const countRef = useRef<HTMLElement>(null);
+  useCountUp(countRef, target, play, { suffix: ' h', blank: picked !== null && !pickedKnown });
   const detail = picked === null ? 'devant l’écran'
     : !pickedKnown ? 'à venir'
     : minutes[picked] <= 0 ? 'rien regardé'
@@ -82,7 +84,7 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
       <button type="button" className="moi-dial-center" onClick={() => { if (picked === null) onReplay(); else setPicked(null); }}
         aria-label={picked === null ? `${period} : ${hours(totalMinutes)} heures. Rejouer l’animation` : 'Revenir au total'}>
         <span>{picked === null ? period : monthName(picked).toLowerCase()}</span>
-        <strong>{pickedKnown || picked === null ? `${shown} h` : '–'}</strong>
+        <strong ref={countRef} />
         <small>{detail}</small>
       </button>
       {MONTH_SHORT.map((label, month) => {

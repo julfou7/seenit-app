@@ -137,7 +137,7 @@ test('SEENIT-PROFILE-004 calendrier, records, année en séries sans film, films
 test('SEENIT-PROFILE-005 animations une fois à l’entrée, sur transform et opacity seulement, coupées en mouvement réduit', () => {
   const css = read('src/screens/moi.css');
   const keyframes = [...css.matchAll(/@keyframes moi\w+\{([^@]*?)\}\}/g)].map(match => match[1]);
-  assert.ok(keyframes.length >= 8);
+  assert.ok(keyframes.length >= 7);
   for (const frames of keyframes) assert.doesNotMatch(frames, /width|height|top|left|margin|box-shadow|text-shadow|filter|stroke/, frames);
   assert.match(css, /@media \(prefers-reduced-motion:reduce\)\{\.moi-reveal,\.moi-reveal \*,\.moi-dial \*/);
   const reveal = read('src/components/profile/useReveal.ts');
@@ -361,4 +361,19 @@ test('SEENIT-PROFILE-004 retour terrain v1.4.297 : toucher une série de Mon ann
   const screen = read('src/screens/ProfileScreen.tsx');
   assert.match(screen, /<ProfileYearContent onFate=\{openFate\} onOpen=\{openMediaFromStats\} \/>/);
   assert.match(screen, /if \(tmdbId > 0\) onShowClick\?\.\(String\(tmdbId\), mediaType\);/);
+});
+
+test('SEENIT-PROFILE-003 retour terrain v1.4.306 : le cadran s’ouvre sur le mois en cours, sans rendu par image ni pulsation permanente', () => {
+  const dial = read('src/components/profile/MonthDial.tsx');
+  assert.match(dial, /useState<number \| null>\(!replayed && currentMonth >= 0 && currentMonth < minutes\.length \? currentMonth : null\)/, 'le mois en cours est choisi par défaut, le total reste à un toucher');
+  assert.match(dial, /replayed=\{replay > 0\}/, 'rejouer le total ne ramène pas au mois en cours (revue Codex #991)');
+  assert.match(dial, /useCountUp\(countRef, target, play/);
+  assert.doesNotMatch(dial, /const shown = /, 'le compteur n’alimente plus un état React');
+  const reveal = read('src/components/profile/useReveal.ts');
+  const count = reveal.slice(reveal.indexOf('export function useCountUp'));
+  assert.doesNotMatch(count, /useState|setShown/, 'aucun rendu React par image pendant le comptage');
+  assert.match(count, /node\.textContent/);
+  const css = read('src/screens/moi.css');
+  assert.doesNotMatch(css, /moiPulse/, 'plus d’animation SVG infinie : elle repeignait le cadran en continu');
+  assert.match(css, /@keyframes moiSector\{from\{opacity:0;transform:scale\(\.5\)\}\}/, 'le secteur choisi rejoint sa position détachée sans saut final');
 });
