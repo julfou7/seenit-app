@@ -54,6 +54,7 @@ import { normalizePlexAvailabilityTraceBatch } from "./src/features/notification
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
 import { applySeenItServiceWorkerHeaders, createSeenItSecurityHeadersMiddleware } from "./src/features/runtime/pwaSecurityHeaders.ts";
+import { createSeenItFrontendRouter } from "./src/features/runtime/staticFrontend.ts";
 import { emitOperationalEvent } from "./src/features/runtime/operationalEvent.ts";
 import {
   CLIENT_OPERATIONAL_SIGNAL_METADATA,
@@ -1705,10 +1706,10 @@ async function startServer() {
                 connectionInventoryCount += scan.count;
                 if (!scan.ok) { connectionInventoryComplete = false; lastFailure = scan.failure; }
               }
-            } catch (error: any) {
+            } catch (error: unknown) {
               connectionInventoryComplete = false;
-              lastFailure = error?.message || error;
-              console.log(`[Plex Sync] Inventaire inaccessible sur ${serverName}: ${error?.message || error}`);
+              // Comme pour l'historique : la cause remonte dans la raison du serveur ignoré.
+              lastFailure = error instanceof Error && error.message ? error.message : error;
             }
           }
 
@@ -2949,18 +2950,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath, {
-      setHeaders: (res, filePath) => {
-        if (filePath.endsWith('index.html') || filePath.endsWith('manifest.json')) {
-          res.setHeader('Cache-Control', 'no-cache');
-        }
-      }
-    }));
-    app.get("*", (_req, res) => {
-      res.setHeader('Cache-Control', 'no-cache');
-      res.sendFile(path.join(distPath, "index.html"));
-    });
+    app.use(createSeenItFrontendRouter(path.join(process.cwd(), "dist")));
   }
 
   app.listen(PORT, "0.0.0.0", () => {
