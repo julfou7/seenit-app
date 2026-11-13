@@ -1,5 +1,5 @@
 import { canPausePlexSync, isPlexSyncTerminal } from '../features/plex/plexSyncPresentation';
-import { formatPlexSyncResult, overallPlexPercent, serverStatusLabel } from '../features/plex/plexSyncProgressModel';
+import { countPlexSyncErrors, formatPlexSyncResult, overallPlexPercent, serverStatusLabel } from '../features/plex/plexSyncProgressModel';
 import { getPlexLastSyncTimestamp, getStoredPlexToken } from '../features/plex/plexStorage';
 import { auth } from '../lib/firebase';
 import { useEffect, useRef, useState } from 'react';
@@ -79,7 +79,7 @@ export function HomeSyncIndicator() {
           })}{progress.account && <li data-tone="ok"><i aria-hidden="true" /><strong>Historique du compte</strong><span>{progress.account.dated === false ? 'ok · sans heure' : 'ok'}</span></li>}</ul>}
         {progress?.account && progress.account.dated === false && progress.account.dateError && <p className="home-sync-sheet__summary">Plex ne donne pas l’heure : {progress.account.dateError.slice(0, 140)}</p>}
         {/* Retour du 13/11 : un seul résultat, celui de ta bibliothèque SeenIt ; une erreur signale toujours un vrai problème. */}
-        {progress && !busy && progress.changed !== undefined && <p className="home-sync-sheet__summary" data-tone={progress.unresolved ? 'error' : 'ok'}>{formatPlexSyncResult(progress)}</p>}
+        {progress && !busy && progress.changed !== undefined && <p className="home-sync-sheet__summary" data-tone={countPlexSyncErrors(progress, message) ? 'error' : 'ok'}>{formatPlexSyncResult(progress, message)}</p>}
         {!progress && total !== undefined && completed !== undefined && <p className="home-sync-sheet__count">{completed} sur {total} éléments traités</p>}
         {idle && <div className="home-sync-sheet__actions">
           <button type="button" className="home-sync-sheet__primary" onClick={() => { setOpen(false); void launch(true); }}>Synchro rapide</button>

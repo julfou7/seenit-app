@@ -82,13 +82,23 @@ export function formatCompactCount(value: number): string {
 }
 
 /** État court d'un serveur pour une ligne du panneau : jamais d'URL ni de jeton. */
+/**
+ * Erreurs d'une synchro : médias non résolus, et au moins une si la synchro a échoué ou est restée incomplète
+ * (revue Codex #985 : un échec Firestore ou un serveur manquant affichait « 0 erreur »). Une pause n'en est pas une.
+ */
+export function countPlexSyncErrors(progress: { phase?: string; unresolved?: number }, message = ''): number {
+  const unresolved = Number(progress.unresolved) || 0;
+  const failed = progress.phase === 'error' && !/pause/i.test(message);
+  return failed ? Math.max(1, unresolved) : unresolved;
+}
+
 /** Résultat d'une synchro pour la bibliothèque SeenIt : Vus ajoutés ou retirés, Vus datés par Plex, erreurs. */
-export function formatPlexSyncResult(progress: { changed?: number; dated?: number; unresolved?: number }): string {
+export function formatPlexSyncResult(progress: { phase?: string; changed?: number; dated?: number; unresolved?: number }, message = ''): string {
   const plural = (count: number, singular: string, pluralForm: string) => `${count} ${count > 1 ? pluralForm : singular}`;
   return [
     plural(Number(progress.changed) || 0, 'changement', 'changements'),
     plural(Number(progress.dated) || 0, 'Vu daté', 'Vus datés'),
-    plural(Number(progress.unresolved) || 0, 'erreur', 'erreurs'),
+    plural(countPlexSyncErrors(progress, message), 'erreur', 'erreurs'),
   ].join(' · ');
 }
 

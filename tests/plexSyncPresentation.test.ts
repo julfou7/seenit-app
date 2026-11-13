@@ -8,7 +8,7 @@ import {
   formatPlexElapsed,
   formatPlexWaitingStatus
 } from '../src/features/plex/plexSyncPresentation.ts';
-import { formatPlexSyncResult } from '../src/features/plex/plexSyncProgressModel.ts';
+import { countPlexSyncErrors, formatPlexSyncResult } from '../src/features/plex/plexSyncProgressModel.ts';
 
 test('SEENIT-UX-004 la synchronisation Plex affiche une phase réelle et la durée écoulée sans faux pourcentage', () => {
   assert.equal(formatPlexElapsed(12_400), '12 s');
@@ -40,8 +40,15 @@ test('SEENIT-UX-004 le panneau de synchro dit l’état de chaque source et un s
   const panel = readFileSync('src/components/HomeSyncIndicator.tsx', 'utf8');
   assert.match(panel, /<strong>Historique du compte<\/strong><span>\{progress\.account\.dated === false \? 'ok · sans heure' : 'ok'\}<\/span>/);
   assert.doesNotMatch(panel, /account\.unwatched|visionnages|en bibliothèque/);
-  assert.match(panel, /data-tone=\{progress\.unresolved \? 'error' : 'ok'\}>\{formatPlexSyncResult\(progress\)\}/);
-  assert.equal(formatPlexSyncResult({ changed: 0, dated: 0, unresolved: 0 }), '0 changement · 0 Vu daté · 0 erreur');
-  assert.equal(formatPlexSyncResult({ changed: 3, dated: 264, unresolved: 2 }), '3 changements · 264 Vus datés · 2 erreurs');
+  assert.match(panel, /data-tone=\{countPlexSyncErrors\(progress, message\) \? 'error' : 'ok'\}>\{formatPlexSyncResult\(progress, message\)\}/);
+  assert.equal(formatPlexSyncResult({ phase: 'done', changed: 0, dated: 0, unresolved: 0 }), '0 changement · 0 Vu daté · 0 erreur');
+  assert.equal(formatPlexSyncResult({ phase: 'done', changed: 3, dated: 264, unresolved: 2 }), '3 changements · 264 Vus datés · 2 erreurs');
   assert.equal(formatPlexSyncResult({}), '0 changement · 0 Vu daté · 0 erreur');
+  // Revue Codex #985 : un échec (Firestore, collecte incomplète) n'affiche jamais « 0 erreur » ; une pause n'est pas une erreur.
+  assert.equal(countPlexSyncErrors({ phase: 'error', unresolved: 0 }, 'Synchronisation Plex incomplète — nouvel essai requis'), 1);
+  assert.equal(countPlexSyncErrors({ phase: 'error', unresolved: 0 }, 'Erreur lors de l’enregistrement'), 1);
+  assert.equal(countPlexSyncErrors({ phase: 'error', unresolved: 3 }, 'Synchronisation Plex incomplète'), 3);
+  assert.equal(countPlexSyncErrors({ phase: 'error', unresolved: 0 }, 'Synchro Plex en pause'), 0);
+  assert.equal(countPlexSyncErrors({ phase: 'done', unresolved: 0 }, 'Sync Plex terminée'), 0);
+  assert.equal(formatPlexSyncResult({ phase: 'error', changed: 0 }, 'Synchronisation Plex incomplète — nouvel essai requis'), '0 changement · 0 Vu daté · 1 erreur');
 });

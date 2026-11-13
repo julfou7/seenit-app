@@ -972,7 +972,8 @@ pour le cache des sagas et univers.
   sources incomparables. Chaque serveur et l'historique du compte disent seulement leur état (« ok », pourcentage pendant la
   lecture, « hors ligne », « inaccessible ») ; l'historique du compte signale « sans heure » quand Plex ne donne pas la date.
   Un seul résultat suit, celui de la bibliothèque SeenIt : « N changements · N Vus datés · N erreurs », en rouge s'il y a
-  une erreur. Les compteurs de lecture, de bibliothèque et de non vus restent dans le journal de diagnostic ; la complète demande d'abord la taille de chaque section (page vide) pour que le % d'un
+  une erreur. Les erreurs comptent les médias non résolus, et au moins une quand la synchro a échoué ou est restée
+  incomplète (écriture refusée, serveur manquant) ; une pause n'est pas une erreur (revue Codex #985). Les compteurs de lecture, de bibliothèque et de non vus restent dans le journal de diagnostic ; la complète demande d'abord la taille de chaque section (page vide) pour que le % d'un
   serveur ne redescende pas en découvrant une section.
   Retour v1.4.298 (journal terrain) : quand la requête Watch History ne fournit pas la date, la complète lit le fil
   « Activité » du compte (`activityFeed`, visionnages `ActivityWatchHistory` et leur `date`) et date chaque entrée du
