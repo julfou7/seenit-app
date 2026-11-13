@@ -147,7 +147,7 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
   const provider = (credit: ActorCredit) => {
     const data = tmdb.peekWatchProviders(credit.id, credit.media_type) || readWatchProviderCache(credit.id, credit.media_type, { allowStale: true })?.data;
     const plex = usePlexAvailabilityStore.getState().cache[getPlexMediaKey(credit.id, credit.media_type, uid)];
-    const result = resolvePassiveProviderState(actorCreditKey(credit), extractOfficialStreamingProvider(data?.results), plex);
+    const result = resolvePassiveProviderState(actorCreditKey(credit), extractOfficialStreamingProvider(data?.results), plex, true, [], data?.originalBroadcaster);
     const logo = getFormattedProviderLogo(result.logo, result.name);
     return logo ? <img className="actor-profile__provider" src={logo} alt={result.name || 'Diffuseur'} /> : null;
   };

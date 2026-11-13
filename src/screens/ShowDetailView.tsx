@@ -13,7 +13,8 @@ import { useShowsStore } from '../store/showsStore';
 import { useToastStore } from '../store/toastStore';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
-import { getFormattedProviderLogo, PLEX_LOGO_SVG, PROVIDER_BRAND_LOGOS } from '../utils/providerLogos';
+import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
+import { originalBroadcasterRow } from '../features/providers/passiveProviderState';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
 import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditMovieSearchQuery } from '../components/community/redditEpisodeSearch';
@@ -440,7 +441,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
             getEpisodeDownload={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)} />}
         </>}
 
-        <WhereToWatchCard providers={sortedProviders} loading={plexMediaInfo === null || providers === null} userPlatforms={userPlatforms} title={title} fallbackLink={providers?.link} onOpenPlex={openPlex} onRefreshPlex={() => void refreshPlexAvailability()} refreshing={isRefreshingPlex} canRefresh={Boolean(effectiveTmdbId)} origin={originBroadcaster === 'canal' ? { name: 'Canal+', logo: PROVIDER_BRAND_LOGOS.canal, link: /^https:\/\/(?:www\.)?canalplus\.com\//.test(tmdbDetails?.homepage || '') ? tmdbDetails?.homepage || undefined : undefined } : null} emptyLabel={isUnreleased ? 'Bientôt disponible' : 'Pas encore disponible en streaming en France.'} />
+        <WhereToWatchCard providers={sortedProviders} loading={plexMediaInfo === null || providers === null} userPlatforms={userPlatforms} title={title} fallbackLink={providers?.link} onOpenPlex={openPlex} onRefreshPlex={() => void refreshPlexAvailability()} refreshing={isRefreshingPlex} canRefresh={Boolean(effectiveTmdbId)} origin={originalBroadcasterRow(originBroadcaster, tmdbDetails?.homepage)} emptyLabel={isUnreleased ? 'Bientôt disponible' : 'Pas encore disponible en streaming en France.'} />
 
         {isSeries && <CastRows cast={cast} isSeries totalEpisodes={totalEpisodes || Number(tmdbDetails?.number_of_episodes) || 0} loading={!tmdbDetails || !castPayloadKnown} onOpenPerson={openPersonModal} />}
         {collectionData?.parts?.length > 0 && <RelationList title={tmdbDetails?.belongs_to_collection?.name || 'Ordre de visionnage'} subtitle="Ordre de visionnage" parts={collectionData.parts} currentKey={requestedMediaKey} shows={libraryShows} timeline onOpen={relationOpen} />}

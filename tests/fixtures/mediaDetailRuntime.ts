@@ -46,6 +46,7 @@ Object.assign(tmdb, {
   getEpisodeDetails: async () => ({ ok: false }),
   peekWatchProviders: () => ({ results: { FR: { flatrate: [{ provider_id: 8, provider_name: 'Netflix', logo_path: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' }], ads: [{ provider_id: 1796, provider_name: 'Netflix Standard with Ads', logo_path: '/kICQccvOh8AIBMHGkBXJ047xeHN.jpg' }] } } }),
   getWatchProviders: async () => ({ ok: true, value: { results: {} } }),
+  peekRenderableMediaDetails: () => null,
 });
 // downloadConfigStore (fonction Téléchargements désactivée par défaut) et Firestore neutres.
 export const useDownloadConfigStore = Object.assign(<T>(selector: (state: { downloadsEnabled: boolean }) => T) => selector({ downloadsEnabled: false }), { getState: () => ({ downloadsEnabled: false }) });
