@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { getPlexSyncRetryAt } from '../features/plex/plexSyncRetry';
 import { useEffect, useRef } from 'react';
+import { reconcileArchive, reconcileSeriesStatus, selectFinishedShowsToRecheck } from '../features/shows/seriesRevival';
 import { buildSeasonProgressEvidence, needsSeasonProgressRefresh, hasSeasonReleaseDue } from '../features/shows/seasonProgressEvidence';
 import { mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { readUserScopedJson } from '../lib/userIsolation';
@@ -55,9 +56,10 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
     // 0. MASS UPDATE PASS: Auto-archive or unarchive existing TV shows
     for (const s of shows) {
       if (s.mediaType !== 'tv') continue;
-      const computedArchived = computeAutoArchiveStatus(s);
+      // SEENIT-DATA-008 : une archive manuelle n'est jamais levée par le calcul automatique.
+      const computedArchived = reconcileArchive(s, computeAutoArchiveStatus(s));
       if (s.isArchived !== computedArchived) {
-        console.log(`[SyncWorker] Mass updating archive status for "${s.title}": isArchived = ${computedArchived}`);
+        appLogger.info('system', `[SyncWorker] Mise à jour de l'archive de « ${s.title} » : isArchived = ${computedArchived}`);
         try {
           await updateDoc(doc(db, 'users', userUid, 'shows', String(s.id)), {
             isArchived: computedArchived,
@@ -71,11 +73,17 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
       }
     }
 
+    // SEENIT-DATA-008 (#333) : une série terminée/archivée est revérifiée tous les 14 jours (12 par passage) pour
+    // découvrir une nouvelle saison ; sans cela elle restait « Revoir la série » malgré des épisodes diffusés.
+    const finishedToRecheck = new Set(selectFinishedShowsToRecheck(shows.map(show => ({ ...show, id: String(show.id) }))).map(show => show.id));
+
     const tvShowsToSync = shows.filter(s => {
       if (s.mediaType !== 'tv') return false;
 
       // Ne pas resynchroniser les séries abandonnées
       if (s.status === 'dropped') return false;
+
+      if (finishedToRecheck.has(String(s.id))) return true;
 
       if (forceAll) {
         // En synchronisation forcée (ex: pull-to-refresh), on prend toutes les séries TV
@@ -165,7 +173,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
       });
 
       const tmdbIdNum = Number(showToSync.tmdbId || showToSync.tmdb_id);
-      console.log(`[SyncWorker] Starting sync for TV show: ${showToSync.title} (ID: ${showId}, TMDB: ${tmdbIdNum})`);
+      appLogger.info('system', `[SyncWorker] Synchronisation de la série ${showToSync.title} (ID ${showId}, TMDB ${tmdbIdNum})`);
 
       if (!tmdbIdNum || isNaN(tmdbIdNum)) {
         console.warn(`[SyncWorker] Missing valid tmdbId for ${showToSync.title}`);
@@ -273,7 +281,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         }
 
         // 1. DÉTECTION D'ANNULATION
-        if (String(showToSync.status) !== 'Canceled' && details.status === 'Canceled') {
+        if (showToSync.tmdbStatus !== 'Canceled' && details.status === 'Canceled') {
           try {
             await addDoc(collection(db, 'users', userUid, 'news'), {
               type: 'CANCELED',
@@ -372,11 +380,16 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           nextEpisodeToAir
         });
 
+        // SEENIT-DATA-008 : archive manuelle respectée ; `completed` redevient `watching` si un épisode diffusé reste à voir.
+        const finalArchived = reconcileArchive(showToSync, shouldBeArchived);
+        const finalStatus = reconcileSeriesStatus(showToSync.status, nextEpisodeToWatch, todayStr2);
+        const hasStatusChanged = finalStatus !== showToSync.status;
+
         const hasNextToWatchChanged = JSON.stringify(showToSync.nextEpisodeToWatch || null) !== JSON.stringify(nextEpisodeToWatch || null);
         const hasNextToAirChanged = JSON.stringify(showToSync.nextEpisodeToAir || null) !== JSON.stringify(nextEpisodeToAir || null);
         const hasTotalChanged = showToSync.totalEpisodes !== totalEpisodes || showToSync.totalAiredEpisodes !== totalAiredEpisodes;
         const hasSeasonsCacheToDelete = !!showToSync.seasonsCache || JSON.stringify(showToSync.seasonProgress || {}) !== JSON.stringify(seasonProgress);
-        const hasArchivedChanged = showToSync.isArchived !== shouldBeArchived;
+        const hasArchivedChanged = showToSync.isArchived !== finalArchived;
         const hasSeriesEndedChanged = showToSync.seriesEnded !== isEnded;
         const hasTmdbStatusChanged = showToSync.tmdbStatus !== (details.status || null);
 
@@ -406,7 +419,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
         const docRef = doc(db, 'users', userUid, 'shows', showId);
 
-        if (!hasNextToWatchChanged && !hasNextToAirChanged && !hasTotalChanged && !hasSeasonsCacheToDelete && !hasArchivedChanged && !hasSeriesEndedChanged && !hasTmdbStatusChanged) {
+        if (!hasNextToWatchChanged && !hasNextToAirChanged && !hasTotalChanged && !hasSeasonsCacheToDelete && !hasArchivedChanged && !hasSeriesEndedChanged && !hasTmdbStatusChanged && !hasStatusChanged) {
 
            await updateDoc(docRef, {
              isSynced: true,
@@ -414,7 +427,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
              calendarDatesRevision: CALENDAR_DATES_REVISION,
              seriesEnded: isEnded,
              tmdbStatus: details.status || null,
-             isArchived: shouldBeArchived
+             isArchived: finalArchived
            });
            changesMade = true;
            syncedCount++;
@@ -437,7 +450,8 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           updatedAt: Date.now(),
           seriesEnded: isEnded,
           tmdbStatus: details.status || null,
-          isArchived: shouldBeArchived
+          isArchived: finalArchived,
+          ...(hasStatusChanged ? { status: finalStatus } : {})
         };
 
         updatePayload['seasonsCache'] = null;
@@ -729,8 +743,12 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       updatedAt: Date.now(),
       seriesEnded: isEnded,
       tmdbStatus: details.status || null,
-      isArchived: shouldBeArchived
+      isArchived: reconcileArchive(showToSync, shouldBeArchived)
     };
+    // SEENIT-DATA-008 : même réconciliation que la synchronisation automatique (archive manuelle respectée,
+    // `completed` → `watching` si un épisode déjà diffusé reste à voir).
+    const reconciledStatus = reconcileSeriesStatus(showToSync.status, nextEpisodeToWatch, todayStr2);
+    if (reconciledStatus !== showToSync.status) updatePayload.status = reconciledStatus;
 
     updatePayload['seasonsCache'] = null;
 

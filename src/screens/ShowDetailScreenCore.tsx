@@ -15,6 +15,7 @@ import { useToastStore } from '../store/toastStore';
 import { syncSingleItem } from '../hooks/useDetailsSyncWorker';
 import { auth, db } from '../lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
+import { appLogger } from '../store/logStore';
 import { TrailerModal } from '../components/TrailerModal';
 import { useShowsStore } from '../store/showsStore';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
@@ -736,15 +737,15 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     const now = Date.now();
     const newArchived = !show.isArchived;
     const savedShow = { ...show };
-    await updateShow(show.id, { isArchived: newArchived, updatedAt: now });
-    if (newArchived) showToast(`« ${show.title} » a été déplacée dans vos archives.`, 'archive', show, async () => { if (savedShow.id) await updateShow(savedShow.id, { isArchived: false, updatedAt: Date.now() }); });
+    await updateShow(show.id, { isArchived: newArchived, archiveSource: newArchived ? 'manual' : undefined, updatedAt: now });
+    if (newArchived) showToast(`« ${show.title} » a été déplacée dans vos archives.`, 'archive', show, async () => { if (savedShow.id) await updateShow(savedShow.id, { isArchived: false, archiveSource: undefined, updatedAt: Date.now() }); });
   };
   const followShow = handleAddOrRemoveShow;
   const resumeShow = async () => { if (show?.id) await updateShow(show.id, { status: 'watching', updatedAt: Date.now() }); };
   const rewatchShow = async () => {
     if (!show?.id) return;
     const now = Date.now();
-    await updateShow(show.id, { seenEpisodes: [], episodeRecords: {}, status: 'watching', isArchived: false, lastWatchedAt: now, nextEpisodeToWatch: { season_number: 1, episode_number: 1, air_date: null, name: null }, updatedAt: now });
+    await updateShow(show.id, { seenEpisodes: [], episodeRecords: {}, status: 'watching', isArchived: false, archiveSource: undefined, lastWatchedAt: now, nextEpisodeToWatch: { season_number: 1, episode_number: 1, air_date: null, name: null }, updatedAt: now });
     setExpandedSeason(1);
     showToast(`« ${show.title} » réinitialisée : reprise à la saison 1 !`, 'success');
   };
@@ -792,7 +793,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
           await setDoc(docRef, savedShow);
         }
       });
-    } catch (err) { console.error("Delete error:", err); }
+    } catch (err) { appLogger.error('system', 'Suppression de la fiche impossible', { error: err instanceof Error ? err.message : String(err) }); }
   };
   const rateShow = async (rating: number) => { if (show?.id) await updateShow(show.id, { userRating: rating, updatedAt: Date.now() }); };
 

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.304",
+  "applicationVersion": "1.4.305",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -922,6 +922,20 @@
         {
           "file": "tests/firestoreRecovery.test.ts",
           "contains": "SEENIT-DATA-004 partage une seule tentative entre onglets et casse la boucle de rechargement"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-DATA-008",
+      "title": "Une série terminée ou archivée qui reprend l'antenne redevient active",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 une série terminée ou archivée qui reprend l’antenne redevient active, sans perdre sa progression"
         }
       ]
     },

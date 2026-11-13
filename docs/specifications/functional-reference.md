@@ -761,6 +761,11 @@ swipes de suppression/abandon sur les cartes.
   automatiquement.
 - Abandonner conserve l'historique ; Reprendre le conserve et recalcule l'état actif.
 - Revoir réinitialise la progression et propose S1E1 comme prochain épisode.
+- Une série terminée, archivée ou `completed` est revérifiée auprès de TMDB au plus tous les 14 jours (12 par
+  passage). Si un épisode **déjà diffusé** reste à voir (nouvelle saison), elle repasse en `watching` et son
+  archive **automatique** est levée : « Revoir la série » laisse place à la continuation, la progression est
+  intacte (`SEENIT-DATA-008`, #333). Un épisode seulement annoncé ne réactive rien. Une archive **manuelle**
+  (depuis l'accueil ou la fiche) est mémorisée et n'est jamais levée par la synchronisation.
 - Lorsque Téléchargements est activé, Sonarr existe au niveau série, saison ou épisode et le détail
   affiche sa disponibilité par saison/épisode.
 - Lorsque Téléchargements est désactivé, le détail d'épisode ne montre ni « Télécharger », ni

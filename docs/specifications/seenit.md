@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.304**
+Version applicative : **1.4.305**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -223,6 +223,19 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   série enregistrée avant la révision de dates 2 (`calendarDatesRevision` absent ou inférieur) est
   resynchronisée une fois depuis TMDB, même si son prochain épisode paraît futur, et chaque écriture de
   synchronisation marque la révision 2 ; aucune autre donnée de progression n’est modifiée par ce rattrapage.
+- **SEENIT-DATA-008** — Une série terminée, archivée ou `completed` qui reprend l'antenne redevient active
+  (#333, signalement terrain du 14/09 : *La Chute de Paris*, saison 2 diffusée mais « Revoir la série »).
+  Cause : la synchronisation automatique excluait ces séries et ne les revérifiait jamais auprès de TMDB.
+  Désormais : (1) toute série terminée/archivée/`completed`, non abandonnée, est revérifiée au plus tous les
+  14 jours, 12 par passage au plus, les plus anciennes d'abord (coût TMDB borné) ; (2) quand la synchronisation
+  trouve un premier épisode non vu **déjà diffusé** (`air_date` ≤ aujourd'hui), `status` redevient `watching`
+  (la progression est conservée intégralement, aucun « Revoir » implicite) et l'archive **automatique** est
+  levée ; un épisode seulement annoncé ne réactive rien (#304) ; (3) une archive **manuelle** est une intention
+  distincte, mémorisée par `archiveSource: 'manual'` à l'archivage explicite et effacée au désarchivage ou au
+  « Revoir » : la synchronisation ne la lève jamais, mais corrige tout de même `status`. Les séries archivées
+  avant cette règle n'ont pas de provenance : elles sont traitées comme automatiques. L'identité est
+  `mediaType + TMDB ID`, jamais le titre ; la réconciliation est idempotente et identique sur PWA et APK
+  (même document Firestore).
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant
   son écriture.
 - La PWA et l'APK d'un même UID partagent Firestore et convergent vers les mêmes données, sans
@@ -517,6 +530,7 @@ points d'entrée créent `watching` sans épisode est suivi par
 | `dropped` | Reprendre | `plan_to_watch` si aucune progression, sinon `watching` | Conserve la progression existante et recalcule l'état actif. |
 | `completed` / archivée | Revoir | `watching` | Réinitialise la progression, désarchive et positionne le prochain épisode sur S1E1. |
 | Série terminée/annulée et complète | Calcul automatique | `completed` + `isArchived=true` | L'archive automatique exige l'état TMDB final et aucune progression restante. |
+| Série `completed` / archivée automatiquement | La synchronisation trouve un épisode déjà diffusé et non vu | `watching`, archive automatique levée | Progression conservée ; archive manuelle respectée ; épisode seulement annoncé sans effet (`SEENIT-DATA-008`). |
 | Sans progression | Retirer du suivi | Non suivie | Supprime la fiche après confirmation ; une synchronisation externe ne le déduit pas d'une absence ambiguë. |
 | Tout état suivi | Archiver/désarchiver, noter, favoriser | Même statut | Ces intentions ne prouvent aucun visionnage. |
 
