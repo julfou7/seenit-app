@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-13-003 | 2026-11-13 | « La synchro ne doit pas se relancer en permanence, une fois toutes les 6 h pour Plex c'est très bien » : la synchro rapide automatique part au plus toutes les 6 h après une synchro réussie (au lieu de 30 min) et 1 h après un essai sans succès (au lieu de 15 min) ; les boutons « Synchro rapide » et « Complète » restent immédiats. | `SEENIT-PLEX-012` | active |
 | USR-2026-11-13-002 | 2026-11-13 | Si Canal+ est le diffuseur d'origine, il le reste : en France, la chaîne d'origine Canal+ complète le catalogue streaming TMDB, y compris dans les grilles Explorer filtrées sur Canal+. | `SEENIT-PROVIDER-002`, [#965](https://github.com/julfou7/seenit-app/issues/965) | active |
 | USR-2026-11-13-001 | 2026-11-13 | Retour v1.4.303 : le diffuseur d'origine (Canal+) se découvre de la même manière partout — cartes, fiches série et épisode, profil acteur, recherche Explorer — seul l'affichage change. | `SEENIT-PROVIDER-002`, [#965](https://github.com/julfou7/seenit-app/issues/965) | active |
 | USR-2026-11-12-010 | 2026-11-12 | Retour v1.4.302 : la fiche du Gang des souris vertes doit montrer le même diffuseur que sa carte (Canal+), au lieu de « Pas encore disponible en streaming » ; les anciens Vus sans heure prouvée (75 « origine inconnue » au bilan) reçoivent la date Plex. | `SEENIT-PROVIDER-002`, `SEENIT-PLEX-005`, [#965](https://github.com/julfou7/seenit-app/issues/965), [#954](https://github.com/julfou7/seenit-app/issues/954) | active |

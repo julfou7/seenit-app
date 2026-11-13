@@ -16,6 +16,7 @@ import { useSyncStore } from '../store/syncStore';
 import { useShowsStore } from '../store/showsStore';
 import { performPlexSync } from '../features/plex/syncPlex';
 import { getPlexLastSyncTimestamp, getStoredPlexToken } from '../features/plex/plexStorage';
+import { PLEX_AUTO_SYNC_INTERVAL_MS, PLEX_AUTO_SYNC_RETRY_MS } from '../features/plex/plexAutoSync';
 
 export async function performDetailsSync(forceAll = false): Promise<{ success: boolean; syncedCount: number; error?: string }> {
   const setSyncStatus = useSyncStore.getState().setSyncStatus;
@@ -446,7 +447,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         changesMade = true;
         syncedCount++;
 
-        console.log(`[SyncWorker] Successfully synced details for ${showToSync.title}`);
+        appLogger.info('system', `[SyncWorker] Détails synchronisés : ${showToSync.title}`);
 
         // Add a delay between shows to not hammer TMDB/Firestore
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -510,8 +511,8 @@ export function useDetailsSyncWorker() {
       const uid = auth.currentUser?.uid;
       if (!uid || !visible() || !getStoredPlexToken(uid) || getPlexSyncRetryAt(uid)) return;
       const now = Date.now(), lastSuccess = getPlexLastSyncTimestamp(uid), lastAttempt = lastPlexRunRef.current.get(uid);
-      if (lastSuccess && now - lastSuccess < 30 * 60 * 1000) return;
-      if (lastAttempt !== undefined && now - lastAttempt < 15 * 60 * 1000) return;
+      if (lastSuccess && now - lastSuccess < PLEX_AUTO_SYNC_INTERVAL_MS) return;
+      if (lastAttempt !== undefined && now - lastAttempt < PLEX_AUTO_SYNC_RETRY_MS) return;
       lastPlexRunRef.current.set(uid, now);
       void performPlexSync({ delta: true, silent: false }).catch(logWorkerError);
     };

@@ -85,8 +85,9 @@ test('SEENIT-PLEX-002 le worker réel regroupe et annule les reprises hors écra
   h.visibility(true); await h.advance(2000);
   assert.equal(h.ports.plexCalls.length, 1); assert.equal(h.ports.detailsReads, 0, 'les deux travaux ne démarrent pas ensemble');
   await h.advance(3000); assert.equal(h.ports.detailsReads, 1);
-  h.visibility(false); await h.advance(45 * 60_000);
-  assert.equal(h.ports.plexCalls.length, 1, 'aucun polling caché malgré trois intervalles');
+  // Décision du 13/11 : un essai automatique sans succès attend 1 h (PLEX_AUTO_SYNC_RETRY_MS) avant le suivant.
+  h.visibility(false); await h.advance(65 * 60_000);
+  assert.equal(h.ports.plexCalls.length, 1, 'aucun polling caché malgré quatre intervalles');
   assert.equal(h.ports.detailsReads, 1);
   h.visibility(true); h.ports.nativeListener({ isActive: false }); await h.advance(6000);
   assert.equal(h.ports.plexCalls.length, 1, 'le signal natif caché suffit même si le DOM reste visible');

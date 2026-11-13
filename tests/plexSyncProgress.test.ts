@@ -1,3 +1,4 @@
+import { PLEX_AUTO_SYNC_INTERVAL_MS, PLEX_AUTO_SYNC_RETRY_MS } from '../src/features/plex/plexAutoSync.ts';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
@@ -161,4 +162,18 @@ test('SEENIT-PLEX-012 regroupe les toasts et compacte le panneau de synchro', ()
   const css = readFileSync('src/screens/watchListHome.css', 'utf8');
   assert.match(css, /grid-template-columns:8px minmax\(0,1fr\) auto/);
   assert.match(css, /text-overflow:ellipsis/);
+});
+
+test('SEENIT-PLEX-012 la synchro automatique part au plus toutes les 6 h, les boutons restent immédiats', () => {
+  // 13/11 : « la synchro ne doit pas se relancer en permanence, une fois toutes les 6 h ». Avant : 30 min, essai toutes les 15 min.
+  assert.equal(PLEX_AUTO_SYNC_INTERVAL_MS, 6 * 60 * 60 * 1000);
+  assert.equal(PLEX_AUTO_SYNC_RETRY_MS, 60 * 60 * 1000);
+  const worker = readFileSync('src/hooks/useDetailsSyncWorker.ts', 'utf8');
+  assert.match(worker, /if \(lastSuccess && now - lastSuccess < PLEX_AUTO_SYNC_INTERVAL_MS\) return;/);
+  assert.match(worker, /if \(lastAttempt !== undefined && now - lastAttempt < PLEX_AUTO_SYNC_RETRY_MS\) return;/);
+  assert.doesNotMatch(worker, /now - lastSuccess < 30 \* 60 \* 1000/);
+  const engine = readFileSync('src/features/plex/plexSyncEngine.ts', 'utf8');
+  assert.match(engine, /if \(!ignoreCooldown && lastSyncTimestamp[^\n]*\n[^\n]*\n\s+if \(elapsedMs < PLEX_AUTO_SYNC_INTERVAL_MS\) \{/);
+  // Les boutons du panneau et des Réglages contournent la garde.
+  assert.match(readFileSync('src/components/HomeSyncIndicator.tsx', 'utf8'), /performPlexSync\(\{ delta, silent: false, ignoreCooldown: true \}\)/);
 });

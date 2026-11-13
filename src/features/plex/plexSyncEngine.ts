@@ -49,6 +49,7 @@ import {
   setPlexLastSyncTimestamp,
   setPlexResolutionCache
 } from './plexStorage';
+import { PLEX_AUTO_SYNC_INTERVAL_MS } from './plexAutoSync';
 import { getPlexMediaKey, usePlexAvailabilityStore } from './plexAvailability';
 import type { PlexMediaInfo } from './plexAvailability';
 import {
@@ -151,11 +152,11 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
       return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: 'Aucun compte Plex associé' };
     }
 
-    // Cooldown check (30 min) pour les synchronisations automatiques
+    // Synchro automatique : au plus une fois toutes les 6 h après une synchro réussie (décision du 13/11).
     if (!ignoreCooldown && lastSyncTimestamp && !isNaN(lastSyncTimestamp)) {
-      const elapsedMinutes = (Date.now() - lastSyncTimestamp) / (1000 * 60);
-      if (elapsedMinutes < 30) {
-        // // appLogger.info('plex', `Synchronisation automatique Plex ignorée : dernière synchronisation il y a ${Math.round(elapsedMinutes)} min (< 30 min)`);
+      const elapsedMs = Date.now() - lastSyncTimestamp;
+      if (elapsedMs < PLEX_AUTO_SYNC_INTERVAL_MS) {
+        // Rien à faire : la prochaine synchro automatique viendra après l'intervalle ; les boutons restent immédiats.
         return { success: true, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [] };
       }
     }
