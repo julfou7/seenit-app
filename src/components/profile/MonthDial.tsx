@@ -42,14 +42,14 @@ const plural = (count: number, word: string) => `${count} ${word}${count > 1 ? '
  */
 export function MonthDial(props: MonthDialProps) {
   const [replay, setReplay] = useState(0);
-  return <DialBody key={replay} {...props} onReplay={() => setReplay(value => value + 1)} />;
+  return <DialBody key={replay} {...props} replayed={replay > 0} onReplay={() => setReplay(value => value + 1)} />;
 }
 
-function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, totalMinutes, play, periodLabel, monthYears, onReplay }: MonthDialProps & { onReplay: () => void }) {
+function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, totalMinutes, play, periodLabel, monthYears, replayed, onReplay }: MonthDialProps & { replayed: boolean; onReplay: () => void }) {
   const monthName = (month: number) => `${PROFILE_MONTH_LABELS[month]}${monthYears && monthYears[month] !== year ? ` ${monthYears[month]}` : ''}`;
   const period = periodLabel ?? `en ${year}`;
-  // Retour terrain v1.4.306 : le cadran s'ouvre sur le mois en cours ; un second toucher revient au total.
-  const [picked, setPicked] = useState<number | null>(currentMonth >= 0 && currentMonth < minutes.length ? currentMonth : null);
+  // Retour terrain v1.4.306 : le cadran s'ouvre sur le mois en cours ; un second toucher revient au total, et rejouer le total le garde (revue Codex #991).
+  const [picked, setPicked] = useState<number | null>(!replayed && currentMonth >= 0 && currentMonth < minutes.length ? currentMonth : null);
   const max = Math.max(1, ...minutes);
   const pickedKnown = picked !== null && picked < minutes.length;
   const target = picked === null ? hours(totalMinutes) : pickedKnown ? hours(minutes[picked]) : 0;

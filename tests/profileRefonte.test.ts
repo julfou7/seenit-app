@@ -365,7 +365,8 @@ test('SEENIT-PROFILE-004 retour terrain v1.4.297 : toucher une série de Mon ann
 
 test('SEENIT-PROFILE-003 retour terrain v1.4.306 : le cadran s’ouvre sur le mois en cours, sans rendu par image ni pulsation permanente', () => {
   const dial = read('src/components/profile/MonthDial.tsx');
-  assert.match(dial, /useState<number \| null>\(currentMonth >= 0 && currentMonth < minutes\.length \? currentMonth : null\)/, 'le mois en cours est choisi par défaut, le total reste à un toucher');
+  assert.match(dial, /useState<number \| null>\(!replayed && currentMonth >= 0 && currentMonth < minutes\.length \? currentMonth : null\)/, 'le mois en cours est choisi par défaut, le total reste à un toucher');
+  assert.match(dial, /replayed=\{replay > 0\}/, 'rejouer le total ne ramène pas au mois en cours (revue Codex #991)');
   assert.match(dial, /useCountUp\(countRef, target, play/);
   assert.doesNotMatch(dial, /const shown = /, 'le compteur n’alimente plus un état React');
   const reveal = read('src/components/profile/useReveal.ts');
