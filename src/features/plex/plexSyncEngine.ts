@@ -1,5 +1,5 @@
 import { VIEWING_SOURCE_PLEX } from '../history/viewingSource';
-import { describePlexDatingSkip, readPlexAccountProgress, repairPlexSeenIndex, summarizePlexDatingSkips, withPlexDate } from './plexDating';
+import { describePlexDatingSkip, readPlexAccountProgress, summarizePlexDatingSkips, withPlexDate } from './plexDating';
 import { writeUserScopedJson } from '../../lib/userIsolation';
 import { loadPlexCloudState, persistPlexCloudState } from './plexCloudState';
 import { getPlexSyncRetryAt, PlexSyncHttpError } from './plexSyncRetry';
@@ -441,7 +441,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const canonicalKey = `${seasonNumber}x${episodeNumber}`;
         if (!current.seenEpisodes?.includes(canonicalKey)) {
           const repairedShow: Show = mutatedShows[candidate.id] || { ...current };
-          Object.assign(repairedShow, repairPlexSeenIndex(repairedShow, canonicalKey)); // v1.4.306 : jamais de Vu sans enregistrement.
+          repairedShow.seenEpisodes = [...new Set([...(repairedShow.seenEpisodes || []), canonicalKey])];
           repairedShow.updatedAt = Date.now();
           mutatedShows[candidate.id] = repairedShow;
           repairedCount++;
@@ -465,7 +465,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         alreadyWatchedCount++;
         if (!current.seenEpisodes?.includes('movie')) {
           const repairedMovie: Show = mutatedShows[candidate.id] || { ...current };
-          Object.assign(repairedMovie, repairPlexSeenIndex(repairedMovie, 'movie')); // v1.4.306 : jamais de Vu sans enregistrement.
+          repairedMovie.seenEpisodes = [...new Set([...(repairedMovie.seenEpisodes || []), 'movie'])];
           repairedMovie.updatedAt = Date.now();
           mutatedShows[candidate.id] = repairedMovie;
           repairedCount++;

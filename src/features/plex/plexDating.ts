@@ -19,21 +19,6 @@ export function datePlexWatchedRecord(record: unknown, viewedAt: number | null):
   return { ...(current || {}), watchedAt: viewedAt, watchedTimeKnown: true, source: VIEWING_SOURCE_PLEX };
 }
 
-/**
- * Retour v1.4.306 : la synchro répare l'index vu d'un titre que SeenIt tient déjà pour vu (statut terminé). Elle ne crée
- * plus jamais un Vu sans enregistrement (15 films « vus » sans date ni origine le 13/11) : il reçoit un enregistrement sans
- * origine ni heure prouvée (dernière date connue du titre), que Plex peut ensuite dater.
- */
-export function repairPlexSeenIndex(
-  show: { seenEpisodes?: string[]; episodeRecords?: Record<string, unknown>; lastWatchedAt?: number; updatedAt?: number; createdAt?: number },
-  key: string,
-  now = Date.now()
-): { seenEpisodes: string[]; episodeRecords: Record<string, unknown> } {
-  const records: Record<string, unknown> = { ...(show.episodeRecords || {}) };
-  if (!records[key]) records[key] = { watchedAt: Number(show.lastWatchedAt) || Number(show.updatedAt) || Number(show.createdAt) || now, watchedTimeKnown: false };
-  return { seenEpisodes: [...new Set([...(show.seenEpisodes || []), key])], episodeRecords: records };
-}
-
 /** Le même titre avec l'enregistrement `key` daté par Plex, ou null s'il n'y a rien à dater. */
 export function withPlexDate<T extends { episodeRecords?: Record<string, unknown>; lastWatchedAt?: number; updatedAt?: number }>(show: T, key: string, viewedAt: number | null): T | null {
   const dated = datePlexWatchedRecord(show.episodeRecords?.[key], viewedAt);

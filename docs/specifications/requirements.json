@@ -1365,7 +1365,7 @@
         },
         {
           "file": "tests/plexHistoryDating.test.ts",
-          "contains": "SEENIT-PLEX-005 retour v1.4.306 : la réparation de l’index vu ne crée jamais un Vu sans enregistrement"
+          "contains": "SEENIT-PLEX-005 retour v1.4.306 : la réparation de l’index vu n’invente jamais de date de visionnage"
         },
         {
           "file": "tests/plexHistoryDating.test.ts",

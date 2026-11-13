@@ -1009,9 +1009,11 @@ pour le cache des sagas et univers.
   même lecture vue par deux sources, jamais un rapprochement par titre ou année. Le provider en donne ensuite les
   identifiants externes et S/E ; la date et l'état de lecture restent ceux de la ligne d'historique (le `lastViewedAt` du
   provider est ignoré). 24 lignes sur 27 sont ainsi identifiées ; sans événement unique, la ligne reste non résolue.
-  Retour v1.4.306 : la réparation de l'index vu d'un titre que SeenIt tient pour vu (statut terminé) ne crée plus jamais un
-  Vu sans enregistrement ; elle pose un enregistrement sans origine ni heure prouvée (dernière date connue du titre), que
-  Plex peut ensuite dater.
+  Retour v1.4.306 (revue Codex #978) : la réparation de l'index vu d'un titre que SeenIt tient pour vu (statut terminé)
+  n'invente jamais de date de visionnage : une date de document (`updatedAt`, `createdAt`, instant de synchro) ferait
+  compter un visionnage fictif dans les chiffres par période. Sans date Plex prouvée, elle n'ajoute que la clé ; avec une
+  date prouvée, l'enregistrement Plex daté est posé. La cause de ces Vus sans enregistrement, l'import TV Time qui ne
+  posait qu'un statut terminé sur un film existant, est corrigée (`SEENIT-PROFILE-007`).
   L'historique PMS récent et les états `viewCount` explicites restent des preuves selon leur contrat.
   En delta, SeenIt complète l'historique récent par un snapshot léger des éléments **actuellement vus**
   des bibliothèques PMS : ces entrées `library-watched` sont retenues avec un `viewCount > 0` explicite

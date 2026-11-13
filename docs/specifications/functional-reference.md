@@ -448,7 +448,12 @@ reste vu grâce à l'historique du compte, avec sa date de lecture. Un Vu Plex i
 la date prouvée de sa lecture Plex, puis ne bouge plus (`SEENIT-PLEX-005`) ; depuis la v1.4.303, il en va de même pour
 tout ancien Vu sans heure prouvée ni étiquette SeenIt. Depuis la v1.4.305, la synchro complète lit aussi tout le fil
 « Activité » du compte Plex : un ancien Vu (par exemple un film vu en 2018 et encore présent, non vu, sur le serveur d'un ami)
-reçoit la date de sa vraie lecture même absente du Watch History ; ce fil date seulement, il ne crée ni ne retire aucun Vu. Les totaux
+reçoit la date de sa vraie lecture même absente du Watch History ; ce fil date seulement, il ne crée ni ne retire aucun Vu.
+Depuis la v1.4.306, une lecture d'un média supprimé d'un serveur dont l'utilisateur est titulaire (l'historique du serveur
+n'en garde que le type, le titre et la date) est identifiée par la même lecture du fil Activité, au même instant à la seconde
+près, puis importée ou datée comme toute lecture du serveur ; sans lecture correspondante, elle reste non résolue. Une date
+n'est jamais inventée : un Vu dont aucune source ne connaît la date reste « heure inconnue » et hors des chiffres par
+période, la date affichée n'étant qu'un repli (création ou modification de la fiche). Les totaux
 (épisodes, films, séries terminées) comptent tout, et une note dit ce qui a été écarté (`SEENIT-PROFILE-006`).
 Une série finie compte comme terminée même archivée. Les badges
 ont des paliers : Centenaire (visionnages) 100, 500, 1 000, 2 500, 5 000, 7 500, 10 000 ; Oiseau de nuit
@@ -1232,7 +1237,10 @@ réputation Play Protect et consigne le comportement d'une installation propre s
 pour chaque nouveau binaire.
 
 L'import TV Time résout les entrées vers TMDB avant écriture. Un résultat introuvable reste en échec
-modifiable ; il n'est pas inventé. Les actions de maintenance ne changent jamais l'identité Firebase,
+modifiable ; il n'est pas inventé. Depuis la v1.4.306, chaque Vu importé prend la date de l'export (`created_at` des
+fichiers TV Time) et l'instant de l'import seulement à défaut ; un film importé est un Vu complet (clé `movie`, origine
+TV Time), y compris un film déjà présent, qui ne reçoit plus un simple statut « terminé ». Un Vu déjà enregistré n'est
+pas écrasé. Ces Vus restent hors des chiffres par période (`SEENIT-PROFILE-007`). Les actions de maintenance ne changent jamais l'identité Firebase,
 le databaseId ou la signature APK.
 
 ## 13. Résilience, UX et limites assumées

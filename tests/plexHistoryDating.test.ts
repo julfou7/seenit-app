@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { datePlexWatchedRecord, describePlexDatingSkip, readPlexAccountProgress, repairPlexSeenIndex, summarizePlexDatingSkips, withPlexDate } from '../src/features/plex/plexDating.ts';
+import { datePlexWatchedRecord, describePlexDatingSkip, readPlexAccountProgress, summarizePlexDatingSkips, withPlexDate } from '../src/features/plex/plexDating.ts';
 import { attachPlexAccountEventIdentity, buildPlexActivityDatingItems, buildPlexLibraryIdentity, collectPlexActivityDates, hydratePlexActivityEntry, isExcludedAccountHistoryEntry, isOwnerPmsHistoryEntry, normalizePlexAccountHistoryNode, pickPlexProvenViewedAt, reconcileAccountHistoryWithLibraries, readPlexAccountHistoryDate, readPlexActivityDates, PLEX_ACCOUNT_HISTORY_DATED_QUERY, PLEX_ACTIVITY_FEED_MAX_PAGES, PLEX_ACTIVITY_FEED_QUERY, type PlexActivityDate } from '../src/features/plex/plexAccountHistory.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -209,18 +209,15 @@ test('SEENIT-PLEX-005 retour v1.4.306 : une ligne d’historique serveur sans id
   assert.match(server, /collectPlexActivityEvents\(events, payload\);/);
 });
 
-test('SEENIT-PLEX-005 retour v1.4.306 : la réparation de l’index vu ne crée jamais un Vu sans enregistrement', () => {
-  // 13/11 : 15 films « vus » (seenEpisodes ['movie'], statut terminé) sans aucun enregistrement ni date.
-  const repaired = repairPlexSeenIndex({ seenEpisodes: [], episodeRecords: {}, updatedAt: 1234, createdAt: 99 }, 'movie', 5);
-  assert.deepEqual(repaired, { seenEpisodes: ['movie'], episodeRecords: { movie: { watchedAt: 1234, watchedTimeKnown: false } } });
-  assert.equal('source' in (repaired.episodeRecords.movie as object), false, 'origine inconnue, jamais inventée');
-  // L'enregistrement réparé reste datable par Plex.
-  assert.equal(datePlexWatchedRecord(repaired.episodeRecords.movie, VIEWED)?.watchedAt, VIEWED);
-  const existing = { watchedAt: 7, source: 'seenit' };
-  assert.equal(repairPlexSeenIndex({ seenEpisodes: [], episodeRecords: { '1x2': existing } }, '1x2').episodeRecords['1x2'], existing);
+test('SEENIT-PLEX-005 retour v1.4.306 : la réparation de l’index vu n’invente jamais de date de visionnage', () => {
+  // Revue Codex #978 (P2) : poser updatedAt/createdAt comme watchedAt ferait compter un visionnage fictif dans les
+  // chiffres par période. Sans date prouvée, la réparation n'ajoute que la clé ; seul un enregistrement Plex daté suit.
   const engine = read('src/features/plex/plexSyncEngine.ts');
-  assert.equal((engine.match(/Object\.assign\(repaired(Show|Movie), repairPlexSeenIndex\(/g) || []).length, 2);
-  assert.doesNotMatch(engine, /repaired(Show|Movie)\.seenEpisodes = /);
+  assert.equal((engine.match(/repaired(Show|Movie)\.seenEpisodes = \[\.\.\.new Set\(/g) || []).length, 2);
+  assert.doesNotMatch(engine, /repairPlexSeenIndex|watchedAt: (Number\()?(repaired|current)\w*\.(updatedAt|createdAt)/);
+  // Un Vu sans enregistrement reçoit la date prouvée de Plex, et seulement elle.
+  assert.equal(datePlexWatchedRecord(undefined, VIEWED)?.watchedAt, VIEWED);
+  assert.equal(datePlexWatchedRecord(undefined, null), null);
 });
 
 test('SEENIT-PLEX-005 retour v1.4.305 : une entrée du fil Activité reprend l’identité de bibliothèque et ne bloque jamais la synchro', () => {
