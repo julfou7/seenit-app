@@ -18,7 +18,7 @@ type PlexRawItem = Record<string, unknown>;
 interface PlexConnectionResource { uri?: string; local?: boolean; relay?: boolean }
 interface PlexServerResource { name?: string; clientIdentifier?: string; accessToken?: string; owned?: unknown; connections?: PlexConnectionResource[] }
 interface PlexSectionResource { key?: string; type?: string; title?: string }
-interface PlexSyncEntry { raw: PlexRawItem; source: string; sourceKind: string; availableOnServer?: boolean; datingOnly?: boolean; serverName?: string; serverId?: string; serverUri?: string; serverToken?: string }
+interface PlexSyncEntry { raw: PlexRawItem; source: string; sourceKind: string; availableOnServer?: boolean; datingOnly?: boolean; accountActivityOnly?: boolean; serverName?: string; serverId?: string; serverUri?: string; serverToken?: string }
 const plexGuidValues = (value: unknown): string[] => Array.isArray(value) ? value.map((entry: unknown) => typeof entry === 'string' ? entry : String((entry as { id?: unknown } | null)?.id || '')).filter(Boolean) : [];
 const isPlexOwned = (owned: unknown) => owned === true || owned === 1 || owned === '1';
 const PLEX_DELTA_COLLECT_DEADLINE_MS = 40_000;
@@ -73,8 +73,13 @@ import {
   isPlexLibraryItemWatched,
   normalizePlexAccountHistoryNode,
   PLEX_ACCOUNT_HISTORY_DATED_QUERY,
+  PLEX_ACTIVITY_FEED_MAX_PAGES,
   PLEX_ACTIVITY_FEED_QUERY,
-  readPlexActivityDates,
+  buildPlexActivityDatingItems,
+  collectPlexActivityDates,
+  isExcludedAccountHistoryEntry,
+  pickPlexProvenViewedAt,
+  type PlexActivityDate,
   reconcileAccountHistoryWithLibraries,
   isOwnerPmsHistoryEntry,
   PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY,
@@ -1209,6 +1214,8 @@ async function startServer() {
         plexAccountHistoryDateError: '',
         plexAccountHistoryRetained: 0,
         plexAccountHistoryDatingOnly: 0,
+        plexAccountActivityItems: 0,
+        plexAccountActivityDropped: 0,
         plexAccountCurrentStateResolved: 0,
         plexAccountCurrentWatched: 0,
         plexAccountCurrentUnwatched: 0,
@@ -1247,13 +1254,43 @@ async function startServer() {
         }
       };
 
-      const fetchPlexAccountWatchHistory = async (): Promise<{ available: boolean; items: PlexRawItem[]; queryMode: string; datedError?: string; activityError?: string }> => {
+      // SEENIT-PLEX-005 (retour v1.4.304) : le fil « Activité » du compte (« Vous avez regardé … ») porte la date de chaque
+      // visionnage depuis l'origine du compte, alors que `watchHistory` n'en renvoie qu'une partie récente. Il est lu en
+      // entier à chaque full ; les dates déjà lues restent utilisables si une page suivante échoue (revue Codex #963).
+      const fetchPlexActivityFeedDates = async (): Promise<{ dates: Map<string, PlexActivityDate>; error?: string }> => {
+        const dates = new Map<string, PlexActivityDate>();
+        try {
+          let after: string | null = null;
+          for (let page = 0; page < PLEX_ACTIVITY_FEED_MAX_PAGES; page++) {
+            const response = await fetch('https://community.plex.tv/api', {
+              method: 'POST',
+              headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Plex-Token': token, 'X-Plex-Client-Identifier': plexClientIdentifier, 'X-Plex-Product': 'SeenIt' },
+              body: JSON.stringify({ query: PLEX_ACTIVITY_FEED_QUERY, operationName: 'GetActivityFeed', variables: { first: 100, ...(after ? { after } : {}) } }),
+              signal: routeSignal(10000)
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const payload = await response.json() as { errors?: Array<{ message?: unknown }>; data?: { activityFeed?: { pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } } } };
+            if (Array.isArray(payload?.errors) && payload.errors.length > 0) throw new Error(payload.errors.map(error => String(error?.message || 'GraphQL error')).join(' | '));
+            collectPlexActivityDates(dates, payload);
+            const pageInfo = payload?.data?.activityFeed?.pageInfo;
+            if (!pageInfo?.hasNextPage || !pageInfo.endCursor) return { dates };
+            if (page === PLEX_ACTIVITY_FEED_MAX_PAGES - 1) throw new Error(`Fil Activité Plex plafonné à ${PLEX_ACTIVITY_FEED_MAX_PAGES * 100} éléments`);
+            after = String(pageInfo.endCursor);
+          }
+          return { dates };
+        } catch (activityCaught: unknown) {
+          return { dates, error: activityCaught instanceof Error ? activityCaught.message : String(activityCaught) };
+        }
+      };
+
+      const fetchPlexAccountWatchHistory = async (): Promise<{ available: boolean; items: PlexRawItem[]; activityItems: PlexRawItem[]; queryMode: string; datedError?: string; activityError?: string }> => {
         const uuid = await getPlexAccountUuid();
-        if (!uuid) return { available: false, items: [], queryMode: 'none' };
+        if (!uuid) return { available: false, items: [], activityItems: [], queryMode: 'none' };
+        const activityTask = fetchPlexActivityFeedDates();
         let datedError: string | undefined;
 
         const runQuery = async (query: string, queryMode: string) => {
-          const collected: any[] = [];
+          const collected: PlexRawItem[] = [];
           const seenGuids = new Set<string>();
           let after: string | null = null;
 
@@ -1311,51 +1348,36 @@ async function startServer() {
           return { available: true, items: collected, queryMode };
         };
 
+        // Retour v1.4.304 : le fil Activité date les entrées du Watch History sans date et ajoute, en datation seule, les
+        // visionnages qu'il est seul à connaître ; toujours par GUID global exact, jamais par titre.
+        const withActivity = async (history: { available: boolean; items: PlexRawItem[]; queryMode: string }) => {
+          const activity = await activityTask;
+          for (const item of history.items) {
+            const dated = typeof item.guid === 'string' ? activity.dates.get(item.guid) : undefined;
+            if (!item.viewedAt && dated) item.viewedAt = dated.viewedAt;
+          }
+          const activityItems = history.available ? buildPlexActivityDatingItems(history.items, activity.dates) as PlexRawItem[] : [];
+          const queryMode = history.queryMode === 'rich' && history.items.some(item => item.viewedAt) ? 'activity' : history.queryMode;
+          return { ...history, activityItems, queryMode, datedError, activityError: activity.error };
+        };
+
         try {
-          return await runQuery(PLEX_ACCOUNT_HISTORY_DATED_QUERY, 'dated');
+          return await withActivity(await runQuery(PLEX_ACCOUNT_HISTORY_DATED_QUERY, 'dated'));
         } catch (datedCaught: unknown) {
           // Schéma sans `date` : la requête riche reste la référence ; la raison remonte dans le journal de l'app (#954).
           datedError = datedCaught instanceof Error ? datedCaught.message : String(datedCaught);
         }
         try {
-          const rich = await runQuery(PLEX_ACCOUNT_HISTORY_QUERY, 'rich');
-          // #954 : le fil « Activité » de Plex (« Vous avez regardé … ») porte la date de chaque visionnage ; il date les
-          // entrées du Watch History par GUID exact, jamais par titre.
-          let activityError: string | undefined;
-          // Revue Codex #963 : les dates déjà lues restent appliquées même si une page suivante échoue.
-          const dates = new Map<string, number>();
-          try {
-            let after: string | null = null;
-            for (let page = 0; page < 20; page++) {
-              const response = await fetch('https://community.plex.tv/api', {
-                method: 'POST',
-                headers: { 'Accept': 'application/json', 'Content-Type': 'application/json', 'X-Plex-Token': token, 'X-Plex-Client-Identifier': plexClientIdentifier, 'X-Plex-Product': 'SeenIt' },
-                body: JSON.stringify({ query: PLEX_ACTIVITY_FEED_QUERY, operationName: 'GetActivityFeed', variables: { first: 100, ...(after ? { after } : {}) } }),
-                signal: routeSignal(10000)
-              });
-              if (!response.ok) throw new Error(`HTTP ${response.status}`);
-              const payload = await response.json() as { errors?: Array<{ message?: unknown }>; data?: { activityFeed?: { pageInfo?: { hasNextPage?: boolean; endCursor?: string | null } } } };
-              if (Array.isArray(payload?.errors) && payload.errors.length > 0) throw new Error(payload.errors.map(error => String(error?.message || 'GraphQL error')).join(' | '));
-              for (const entry of readPlexActivityDates(payload)) if (!dates.has(entry.guid)) dates.set(entry.guid, entry.viewedAt);
-              const pageInfo = payload?.data?.activityFeed?.pageInfo;
-              if (!pageInfo?.hasNextPage || !pageInfo.endCursor) break;
-              after = String(pageInfo.endCursor);
-            }
-          } catch (activityCaught: unknown) {
-            activityError = activityCaught instanceof Error ? activityCaught.message : String(activityCaught);
-          }
-          for (const item of rich.items) if (!item.viewedAt && typeof item.guid === 'string' && dates.has(item.guid)) item.viewedAt = dates.get(item.guid);
-          const datedCount = rich.items.filter(item => item.viewedAt).length;
-          return { ...rich, queryMode: datedCount > 0 ? 'activity' : rich.queryMode, datedError, activityError };
+          return await withActivity(await runQuery(PLEX_ACCOUNT_HISTORY_QUERY, 'rich'));
         } catch (caught: unknown) {
           const richError = caught as { message?: unknown } | null;
           console.log(`[Plex Sync] Watch History GraphQL rich query unavailable, fallback minimal: ${richError?.message || richError}`);
           try {
-            return await runQuery(PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY, 'minimal');
+            return await withActivity(await runQuery(PLEX_ACCOUNT_HISTORY_MINIMAL_QUERY, 'minimal'));
           } catch (minimalCaught: unknown) {
             const minimalError = minimalCaught as { message?: unknown } | null;
             console.log(`[Plex Sync] Watch History Plex Account unavailable: ${minimalError?.message || minimalError}`);
-            return { available: false, items: [], queryMode: 'none' };
+            return { available: false, items: [], activityItems: [], queryMode: 'none' };
           }
         }
       };
@@ -1375,7 +1397,7 @@ async function startServer() {
       serversTask.catch(() => undefined); // l'erreur est relevée par l'await plus bas, pas en rejet orphelin
       // L'historique du compte (full) ne dépend ni de la Watchlist ni du cloud : il part avec eux (SEENIT-PLEX-012).
       const accountHistoryTask = delta ? null : fetchPlexAccountWatchHistory()
-        .catch((error: unknown) => ({ available: false, items: [] as PlexRawItem[], queryMode: 'none', datedError: error instanceof Error ? error.message : String(error), activityError: undefined as string | undefined }))
+        .catch((error: unknown) => ({ available: false, items: [] as PlexRawItem[], activityItems: [] as PlexRawItem[], queryMode: 'none', datedError: error instanceof Error ? error.message : String(error), activityError: undefined as string | undefined }))
         .finally(() => syncProgress.accountStep());
       let watchlistCollectionSucceeded = false;
       let watchlistCollectionComplete = false;
@@ -1464,6 +1486,11 @@ async function startServer() {
           visitedSources.push(`Plex Account History (${accountHistory.items.length} GUID, mode ${accountHistory.queryMode})`);
           console.log(`[Plex Sync] Plex Account Watch History: ${accountHistory.items.length} identité(s) globale(s) récupérée(s) (${accountHistory.queryMode}).`);
         }
+        // Retour v1.4.304 : visionnages connus du seul fil Activité, en datation seule (filtrés par bibliothèque plus bas).
+        for (const item of accountHistory.activityItems) {
+          allRawItems.push({ raw: item, source: 'Plex Account Activity', sourceKind: 'account-history', datingOnly: true, accountActivityOnly: true });
+        }
+        sourceStats.plexAccountActivityItems = accountHistory.activityItems.length;
       }
 
       // 2. Fetch user's servers from Plex.tv (Both owned servers & shared servers from friends)
@@ -1784,13 +1811,15 @@ async function startServer() {
 
       // #954 : un événement Account History en double d'un média VU dans une bibliothèque actuelle est retiré ; présent
       // mais non vu (serveur d'un ami), il reste la seule date de la lecture et ne sert qu'à dater un Vu connu.
+      // Retour v1.4.304 : appelée même sans bibliothèque lue, pour écarter les entrées du seul fil Activité.
       let removedAccountDuplicates = 0;
-      if (!delta && currentLibraryGuids.size > 0) {
+      if (!delta) {
         const reconciled = reconcileAccountHistoryWithLibraries(allRawItems, currentLibraryGuids);
         allRawItems.length = 0;
         for (const entry of reconciled.entries) allRawItems.push(entry);
         removedAccountDuplicates = reconciled.removed;
         sourceStats.plexAccountHistoryDatingOnly = reconciled.datingOnly;
+        sourceStats.plexAccountActivityDropped = reconciled.activityDropped;
       }
       sourceStats.plexAccountHistoryRetained = Math.max(0, sourceStats.plexAccountHistoryItems - removedAccountDuplicates);
 
@@ -1934,7 +1963,8 @@ async function startServer() {
             }
           }
 
-          entry = { ...entry, raw, accountCurrentWatched };
+          // Retour v1.4.304 : la date de l'événement du compte, avant que le `lastViewedAt` du provider ne la recouvre.
+          entry = { ...entry, raw, accountCurrentWatched, accountViewedAt: originalRaw.viewedAt };
         }
 
         const rawType = String(meta.type || raw.type || '').toLowerCase();
@@ -2042,6 +2072,8 @@ async function startServer() {
 
       for (const entry of enrichedEntries) {
         if (entry?.sourceKind !== 'account-history') continue;
+        // Retour v1.4.304 : une entrée du seul fil Activité date un Vu et n'alimente jamais l'état courant vu/non vu.
+        if (entry?.accountActivityOnly === true) continue;
         if (typeof entry?.accountCurrentWatched !== 'boolean') {
           accountCurrentStateUnknown++;
           continue;
@@ -2093,7 +2125,7 @@ async function startServer() {
       for (const entry of enrichedEntries) {
         // SEENIT-PLEX-005 (décision du 12/11/2026, #954) : un événement du Watch History du compte prouve un
         // visionnage, même si le média a été supprimé du serveur. Seul un état courant explicitement non vu l'écarte.
-        if (entry?.sourceKind === 'account-history' && entry?.accountCurrentWatched === false) continue;
+        if (isExcludedAccountHistoryEntry(entry)) continue;
 
         const raw = entry.raw || {};
         const meta = unwrapPlexMediaItem(raw);
@@ -2110,7 +2142,7 @@ async function startServer() {
         const index = meta.index ?? raw.index ?? meta.episodeNumber ?? raw.episodeNumber;
 
         // #954 : seule une date de lecture prouve l'heure ; createdAt/updatedAt/addedAt ou « maintenant » ne sont qu'un repli.
-        const provenViewed = meta.lastViewedAt || meta.viewedAt || raw.viewedAt || raw.lastViewedAt || raw.date;
+        const provenViewed = pickPlexProvenViewedAt(entry, meta, raw);
         const rawViewed = provenViewed || raw.createdAt || raw.updatedAt || meta.updatedAt || meta.addedAt || Date.now();
         const viewedTimestamp = rawViewed ? (Number(rawViewed) < 10000000000 ? Number(rawViewed) * 1000 : Number(rawViewed)) : Date.now();
         const sourceIdentity = getStrongPlexSourceIdentity({ ...meta, serverId: entry.serverId });

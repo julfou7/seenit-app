@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  isExcludedAccountHistoryEntry,
   isPlexLibraryItemWatched,
   normalizePlexAccountHistoryNode
 } from '../src/features/plex/plexAccountHistory.ts';
@@ -80,7 +81,11 @@ test('SEENIT-PLEX-005 le backend écarte un historique compte seulement s’il e
   assert.ok(serverSource.includes('metadata.provider.plex.tv/library/metadata/'));
   assert.ok(serverSource.includes('/userState'));
   assert.ok(serverSource.includes("sourceKind === 'account-history'"));
-  // Décision du 12/11/2026 (#954) : seul un état courant explicitement non vu écarte un événement du Watch History.
-  assert.ok(serverSource.includes('accountCurrentWatched === false) continue'));
+  // Décision du 12/11/2026 (#954) : seul un état courant explicitement non vu écarte un événement du Watch History,
+  // sauf en datation seule (retour v1.4.304 : elle ne crée ni ne retire aucun Vu).
+  assert.ok(serverSource.includes('if (isExcludedAccountHistoryEntry(entry)) continue;'));
+  assert.equal(isExcludedAccountHistoryEntry({ sourceKind: 'account-history', accountCurrentWatched: false }), true);
+  assert.equal(isExcludedAccountHistoryEntry({ sourceKind: 'account-history', accountCurrentWatched: true }), false);
+  assert.equal(isExcludedAccountHistoryEntry({ sourceKind: 'account-history', accountCurrentWatched: false, datingOnly: true }), false);
   assert.ok(serverSource.includes('plexAccountCurrentUnwatched'));
 });

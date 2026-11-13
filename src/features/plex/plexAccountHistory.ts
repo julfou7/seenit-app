@@ -212,17 +212,69 @@ query GetActivityFeed($first: PaginationInt!, $after: String) {
   }
 }`;
 
-export function readPlexActivityDates(payload: unknown): Array<{ guid: string; viewedAt: number }> {
+export function readPlexActivityDates(payload: unknown): Array<{ guid: string; viewedAt: number; type: string }> {
   const nodes = (payload as { data?: { activityFeed?: { nodes?: unknown } } } | null)?.data?.activityFeed?.nodes;
   if (!Array.isArray(nodes)) return [];
-  const out: Array<{ guid: string; viewedAt: number }> = [];
+  const out: Array<{ guid: string; viewedAt: number; type: string }> = [];
   for (const node of nodes) {
-    const value = node as { date?: unknown; metadataItem?: { guid?: unknown } | null } | null;
+    const value = node as { date?: unknown; metadataItem?: { guid?: unknown; type?: unknown } | null } | null;
     const guid = typeof value?.metadataItem?.guid === 'string' ? value.metadataItem.guid.trim() : '';
     const viewedAt = readPlexAccountHistoryDate(value?.date);
-    if (guid && viewedAt !== null) out.push({ guid, viewedAt });
+    const type = typeof value?.metadataItem?.type === 'string' ? value.metadataItem.type.toLowerCase() : '';
+    if (guid && viewedAt !== null) out.push({ guid, viewedAt, type });
   }
   return out;
+}
+
+/** Retour v1.4.304 : le fil compte 2000+ visionnages depuis 2018 ; au-delà de ce plafond, une erreur est signalée. */
+export const PLEX_ACTIVITY_FEED_MAX_PAGES = 200;
+
+export type PlexActivityDate = { viewedAt: number; type: string };
+
+/** Ajoute les dates d'une page du fil Activité ; le fil va du plus récent au plus ancien, la première lecture vue est gardée. */
+export function collectPlexActivityDates(target: Map<string, PlexActivityDate>, payload: unknown): void {
+  for (const entry of readPlexActivityDates(payload)) {
+    if (!target.has(entry.guid)) target.set(entry.guid, { viewedAt: entry.viewedAt, type: entry.type });
+  }
+}
+
+/**
+ * SEENIT-PLEX-005 (retour v1.4.304) : `watchHistory` ne renvoie qu'une partie récente des visionnages ; le fil Activité
+ * date aussi les plus anciens. Chaque film ou épisode du fil absent du Watch History devient une entrée de datation seule,
+ * par GUID global exact.
+ */
+export function buildPlexActivityDatingItems(
+  accountItems: ReadonlyArray<{ guid?: unknown } | null | undefined>,
+  dates: ReadonlyMap<string, PlexActivityDate>
+): Array<{ type: string; guid: string; title: string; viewedAt: number; accountActivityOnly: true }> {
+  const known = new Set(accountItems.map(item => typeof item?.guid === 'string' ? item.guid.trim() : '').filter(Boolean));
+  const out: Array<{ type: string; guid: string; title: string; viewedAt: number; accountActivityOnly: true }> = [];
+  for (const [guid, entry] of dates) {
+    if (known.has(guid) || (entry.type !== 'movie' && entry.type !== 'episode')) continue;
+    out.push({ type: entry.type, guid, title: '', viewedAt: entry.viewedAt, accountActivityOnly: true });
+  }
+  return out;
+}
+
+/**
+ * Une entrée du compte explicitement non vue aujourd'hui est écartée (#954), sauf en datation seule : elle ne crée ni ne
+ * retire aucun Vu, elle date seulement un Vu déjà connu (retour v1.4.304, Coco non vu au compte mais lu le 15/07/2018).
+ */
+export function isExcludedAccountHistoryEntry(entry: { sourceKind?: unknown; accountCurrentWatched?: unknown; datingOnly?: unknown } | null | undefined): boolean {
+  return entry?.sourceKind === 'account-history' && entry?.accountCurrentWatched === false && entry?.datingOnly !== true;
+}
+
+/**
+ * Retour v1.4.304 : la date d'un événement de l'historique du compte prime sur le `lastViewedAt` du provider, qui peut être
+ * l'instant d'un marquage. Les autres sources gardent leur ordre de preuve.
+ */
+export function pickPlexProvenViewedAt(
+  entry: { sourceKind?: unknown; accountViewedAt?: unknown } | null | undefined,
+  meta: Record<string, unknown>,
+  raw: Record<string, unknown>
+): unknown {
+  const accountViewedAt = entry?.sourceKind === 'account-history' ? entry.accountViewedAt : undefined;
+  return accountViewedAt || meta.lastViewedAt || meta.viewedAt || raw.viewedAt || raw.lastViewedAt || raw.date;
 }
 
 /**
@@ -232,16 +284,18 @@ export function readPlexActivityDates(payload: unknown): Array<{ guid: string; v
  * entre serveurs —, l'événement reste la seule date de la lecture faite ailleurs : il est gardé en `datingOnly`, pour
  * dater un Vu déjà connu sans jamais en créer un que l'état non vu de cette bibliothèque retirerait.
  */
-export function reconcileAccountHistoryWithLibraries<T extends { sourceKind?: string; raw?: { guid?: unknown } | null; datingOnly?: boolean }>(entries: readonly T[], libraryGuids: ReadonlySet<string>): { entries: T[]; removed: number; datingOnly: number } {
+export function reconcileAccountHistoryWithLibraries<T extends { sourceKind?: string; raw?: { guid?: unknown } | null; datingOnly?: boolean; accountActivityOnly?: boolean }>(entries: readonly T[], libraryGuids: ReadonlySet<string>): { entries: T[]; removed: number; datingOnly: number; activityDropped: number } {
   const guidOf = (entry: T) => typeof entry?.raw?.guid === 'string' ? entry.raw.guid : '';
   const watched = new Set(entries.filter(entry => entry?.sourceKind === 'library-watched').map(guidOf).filter(Boolean));
-  let removed = 0, datingOnly = 0;
+  let removed = 0, datingOnly = 0, activityDropped = 0;
   const out: T[] = [];
   for (const entry of entries) {
     const guid = entry?.sourceKind === 'account-history' ? guidOf(entry) : '';
-    if (!guid || !libraryGuids.has(guid)) out.push(entry);
-    else if (watched.has(guid)) removed++;
+    // Retour v1.4.304 : une entrée venue du seul fil Activité n'est gardée que si son GUID exact est dans une bibliothèque.
+    if (entry?.accountActivityOnly === true && (!guid || !libraryGuids.has(guid))) activityDropped++;
+    else if (!guid || !libraryGuids.has(guid)) out.push(entry);
+    else if (watched.has(guid)) { if (entry?.accountActivityOnly !== true) removed++; }
     else { datingOnly++; out.push({ ...entry, datingOnly: true }); }
   }
-  return { entries: out, removed, datingOnly };
+  return { entries: out, removed, datingOnly, activityDropped };
 }

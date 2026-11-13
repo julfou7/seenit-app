@@ -1063,7 +1063,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         'plex',
         `[Plex Sync] Bilan : ${syncCount} changement(s), ${alreadyWatchedCount} déjà vu(s) ignoré(s), ${unresolvedCount} non résolu(s), ${repairedCount} index vu(s) réparé(s) sans notification, ${datedCount} Vu daté(s) par Plex.${summarizePlexDatingSkips(notDated)}`
       );
-      if (progress.account) appLogger.warn('plex', `[Plex Sync] Historique du compte : ${progress.account.history} visionnage(s), ${progress.account.datedCount} daté(s), mode ${progress.account.mode}${progress.account.datingOnly ? `, ${progress.account.datingOnly} sur un serveur où le média n’est pas vu (datation seule)` : ''}${progress.account.dateError ? ` — ${progress.account.dateError}` : ''}`); // #954 : écrit après le détail de résolution pour rester dans le journal (150 lignes)
+      if (progress.account) appLogger.warn('plex', `[Plex Sync] Historique du compte : ${progress.account.history} visionnage(s), ${progress.account.datedCount} daté(s), mode ${progress.account.mode}${progress.account.datingOnly ? `, ${progress.account.datingOnly} sur un serveur où le média n’est pas vu (datation seule)` : ''}${progress.account.activity ? `, ${progress.account.activity} lu(s) dans le seul fil Activité` : ''}${progress.account.dateError ? ` — ${progress.account.dateError}` : ''}`); // #954 : écrit après le détail de résolution pour rester dans le journal (150 lignes)
       if (unresolvedItems.length > 0) {
         appLogger.warn(
           'plex',
