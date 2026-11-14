@@ -4,6 +4,9 @@ const path = require('node:path');
 
 const ROOT = path.resolve(__dirname, '..');
 const FORMATTED_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.cjs', '.mjs', '.json']);
+// #518 : la fin de ligne finale est aussi vérifiée (jamais réécrite) pour la documentation et les workflows ;
+// les espaces de fin significatifs du Markdown ne sont donc pas touchés par `--write`.
+const EOF_CHECKED_EXTENSIONS = new Set([...FORMATTED_EXTENSIONS, '.md', '.yml', '.yaml']);
 
 function resolveBaseSha(root = ROOT) {
   const explicit = String(process.env.SEENIT_LINT_BASE_SHA || '').trim();
@@ -27,7 +30,7 @@ function normalizeText(content) {
   return normalized + '\n';
 }
 
-function changedFormatFiles(baseSha, root = ROOT) {
+function changedFormatFiles(baseSha, root = ROOT, extensions = FORMATTED_EXTENSIONS) {
   const output = execFileSync('git', ['diff', '--name-only', baseSha, '--'], {
     cwd: root,
     encoding: 'utf8'
@@ -35,7 +38,7 @@ function changedFormatFiles(baseSha, root = ROOT) {
   return output
     .split(/\r?\n/)
     .filter(Boolean)
-    .filter(file => FORMATTED_EXTENSIONS.has(path.extname(file)))
+    .filter(file => extensions.has(path.extname(file)))
     .filter(file => fs.existsSync(path.join(root, file)));
 }
 
@@ -47,7 +50,7 @@ function checkChangedFormatting(baseSha, root = ROOT) {
   const problems = [];
   if (result.status !== 0) problems.push(String(result.stdout || result.stderr || '').trim());
 
-  for (const file of changedFormatFiles(baseSha, root)) {
+  for (const file of changedFormatFiles(baseSha, root, EOF_CHECKED_EXTENSIONS)) {
     const content = fs.readFileSync(path.join(root, file), 'utf8');
     if (!content.endsWith('\n')) problems.push(`${file}: fin de ligne finale manquante`);
   }
