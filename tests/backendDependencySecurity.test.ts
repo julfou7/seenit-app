@@ -52,6 +52,11 @@ test('#649 les overrides de sécurité ne cassent aucune plage déclarée de bra
     checked.push(`${path}→${resolved.version}`);
   }
   assert.ok(checked.some(item => /minimatch→5\./.test(item)), `minimatch 10 garde brace-expansion 5 : ${checked.join(', ')}`);
-  // Les copies 2.x vulnérables restent relevées par l'override borné.
-  assert.equal(packageJson.overrides['brace-expansion@>=2.0.0 <2.1.7'], '2.1.7');
+  // npm 10 (moteur imposé) appliquait l'override global à plage même à minimatch 10 : les copies 2.x sont
+  // relevées par sous-arbre, et minimatch 10 reçoit explicitement la 5.x qu'il déclare.
+  assert.equal(packageJson.overrides['brace-expansion@>=2.0.0 <2.1.7'], undefined);
+  assert.equal(packageJson.overrides['@capacitor/assets']['brace-expansion'], '2.1.7');
+  assert.equal(packageJson.overrides['google-gax']['brace-expansion'], '2.1.7');
+  assert.equal(packageJson.overrides['minimatch@>=10']['brace-expansion'], '5.0.13');
+  assert.ok(checked.every(item => !/→2\.(0\.|1\.[0-6]$)/.test(item)), `aucune copie 2.x vulnérable : ${checked.join(', ')}`);
 });
