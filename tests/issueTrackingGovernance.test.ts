@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { normalizeDocText, readDocText } from './helpers/docText.ts';
 
 test('SEENIT-QUALITY-004 maintient les issues et leurs checkboxes à jour pendant le travail', () => {
   const agents = fs.readFileSync('AGENTS.md', 'utf8');
@@ -134,10 +135,10 @@ test('SEENIT-QUALITY-004 transmet une APK déléguée par un relais release dist
 });
 
 test('SEENIT-QUALITY-004 priorise un relais APK délégué avant les PR ouvertes', () => {
-  const agents = fs.readFileSync('AGENTS.md', 'utf8').replace(/\s+/g, ' ');
-  const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8').replace(/\s+/g, ' ');
-  const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8').replace(/\s+/g, ' ');
-  const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8').replace(/\s+/g, ' ');
+  const agents = readDocText('AGENTS.md');
+  const bootstrap = readDocText('.agents/AGENTS.md');
+  const delivery = readDocText('docs/process/delivery.md');
+  const spec = readDocText('docs/specifications/seenit.md');
 
   assert.match(agents, /prompt de reprise est générique[\s\S]*#102[\s\S]*HANDOFF_READY[\s\S]*prime sur toute PR ouverte/i);
   for (const source of [bootstrap, delivery, spec]) {
@@ -151,7 +152,7 @@ test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continu
   const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
   const requestRegistry = fs.readFileSync('docs/requests/registry.md', 'utf8');
 
-  const normalizeReflowableText = (source: string) => source.replace(/\s+/g, ' ');
+  const normalizeReflowableText = normalizeDocText;
   for (const source of [agents, bootstrap, spec].map(normalizeReflowableText)) {
     assert.match(source, /difficulté[\s\S]*corrigeable/i);
     assert.match(source, /issues GitHub ouvertes[\s\S]*fermées|recherche GitHub ciblée/i);
@@ -182,7 +183,7 @@ test('SEENIT-QUALITY-004 exige un reçu pré-acquisition avant tout clone local'
   const bootstrap = fs.readFileSync('.agents/AGENTS.md', 'utf8');
   const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
   const remote = fs.readFileSync('docs/process/agent-remote-workspace.md', 'utf8');
-  const normalize = (source: string) => source.replace(/\s+/g, ' ');
+  const normalize = normalizeDocText;
 
   for (const source of [agents, bootstrap, delivery, remote].map(normalize)) {
     assert.match(source, /seenit-workspace-acquisition/i);
@@ -204,7 +205,7 @@ test('SEENIT-QUALITY-004 capture tout axe d’amélioration concret sans ralenti
   const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
   const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
   const registry = fs.readFileSync('docs/requests/registry.md', 'utf8');
-  const normalize = (source: string) => source.replace(/\s+/g, ' ');
+  const normalize = normalizeDocText;
 
   for (const source of [agents, bootstrap, delivery, spec].map(normalize)) {
     assert.match(source, /axe d'amélioration concret[^.]*actionnable/i);
