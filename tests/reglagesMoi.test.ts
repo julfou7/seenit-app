@@ -15,7 +15,7 @@ test('Réglages · cinq lignes avec leur état, déconnexion confirmée en bas',
   for (const label of ['Mes plateformes', 'Notifications', 'Plex', 'Appareils', 'Application']) {
     assert.match(core, new RegExp(`<SettingsRow icon=\\{\\w+\\} label="${label}"`), `ligne ${label}`);
   }
-  assert.match(core, /<SettingsGroup title="Connexions">/);
+  assert.match(core, /<SettingsGroup title="Connexions"( foot="[^"]+")?>/);
   assert.match(core, /badge=\{hasUpdate && latestRelease \? 'Mise à jour' : undefined\}/);
   assert.match(core, /className="reg-danger" onClick=\{\(\) => setConfirm\('logout'\)\}/);
   assert.match(core, /onConfirm=\{\(\) => \{ setConfirm\(null\); void handleLogout\(\); \}\}/);
