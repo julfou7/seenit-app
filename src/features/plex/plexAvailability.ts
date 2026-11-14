@@ -7,7 +7,7 @@ import { auth } from '../../lib/firebase';
 import { appLogger } from '../../store/logStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 import { buildNativeBackendAttempts, executeBackendAttempts } from '../../lib/nativeBackendRetry';
-import { readPlexEpisodeCoverage } from './plexSeriesCoverage';
+import { needsPlexSeriesCoverage, readPlexEpisodeCoverage } from './plexSeriesCoverage';
 export { isPlexEpisodePresent } from './plexSeriesCoverage';
 import { resolveSeenItApiCandidates } from '../../lib/seenitApi';
 import { getStoredPlexToken } from './plexStorage';
@@ -34,6 +34,8 @@ export interface PlexMediaInfo {
   episodeCount?: number;
   /** #255 : épisodes présents `saison:épisode` ; absent = couverture par épisode inconnue. */
   episodes?: string[];
+  /** #255 : date de la dernière lecture réseau de couverture (série) ; absente = jamais lue. */
+  coverageCheckedAt?: number;
   lastChecked: number;
 }
 
@@ -163,7 +165,10 @@ async function performPlexAvailabilityCheck(params: {
   // Cache policy: Positive cache = 24h, Negative cache = 30s.
   // Un full scan reconstruit les entrées positives connues, donc une fiche peut
   // généralement répondre ici sans requête réseau supplémentaire.
-  if (!forceRefresh && cached) {
+  // #255 (revue Codex #1001) : la synchro reconstruit les entrées positives sans couverture. Une fiche
+  // ouverte en mode réseau lit alors une fois la couverture de la série, puis la garde avec l'entrée.
+  const needsSeriesCoverage = needsPlexSeriesCoverage(cached, mediaType, shouldRunPlexAvailabilityNetwork(networkMode));
+  if (!forceRefresh && cached && !needsSeriesCoverage) {
     const isPositiveValid = cached.available && (now - cached.lastChecked < 24 * 60 * 60 * 1000);
     const isNegativeValid = !cached.available && (now - cached.lastChecked < 30 * 1000);
     if (isPositiveValid || isNegativeValid) {
@@ -289,6 +294,7 @@ async function performPlexAvailabilityCheck(params: {
             title: typeof data.title === 'string' ? data.title : undefined,
             year: typeof data.year === 'number' ? data.year : undefined,
             ...readPlexEpisodeCoverage(data),
+            ...(mediaType === 'tv' ? { coverageCheckedAt: Date.now() } : {}),
             lastChecked: Date.now()
           };
           store.setMediaAvailability(key, info);

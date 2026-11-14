@@ -707,7 +707,9 @@ n'est rouverte que par une nouvelle décision produit explicite.
     `/library/metadata/<clé exacte de la série>/allLeaves` sur le serveur où l'identité exacte a été trouvée,
     jamais d'un appel par épisode ; un échec, un timeout ou une liste tronquée laisse la couverture inconnue.
     Sur la fiche **épisode**, Plex n'est proposé que si cet épisode précis figure dans la liste ; liste
-    inconnue (ancien cache, lecture échouée) = comportement antérieur, sans conclusion d'absence. Les films
+    inconnue (ancien cache, lecture échouée) = comportement antérieur, sans conclusion d'absence. La synchro
+    Plex reconstruit les entrées sans couverture (une liste conservée pourrait masquer un épisode tout juste
+    importé) : l'ouverture d'une fiche relit alors une fois la couverture, jamais depuis une carte. Les films
     restent binaires ;
   - la fiche média garde la barre de navigation ; seuls les dialogues plein écran la masquent ;
   - une seule fiche acteur dans toute l'app : fiches, Explorer, Moi et À voir ouvrent celle des billets ;

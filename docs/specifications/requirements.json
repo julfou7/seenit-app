@@ -1706,6 +1706,10 @@
         {
           "file": "tests/plexSeriesCoverage.test.ts",
           "contains": "SEENIT-PLEX-013 un épisode n’est annoncé sur Plex qu’avec la preuve de cet épisode précis"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 une série reconstruite par la synchro relit sa couverture une fois, depuis une fiche seulement"
         }
       ]
     },

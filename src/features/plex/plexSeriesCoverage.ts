@@ -72,3 +72,15 @@ export function isPlexEpisodePresent(info: { available?: boolean; episodes?: str
   if (!info?.available || !Array.isArray(info.episodes)) return null;
   return info.episodes.includes(`${season}:${episode}`);
 }
+
+/**
+ * #255 : une entrée positive de série sans lecture de couverture (reconstruite par la synchro Plex) déclenche
+ * une seule vérification réseau, uniquement depuis un parcours autorisé à interroger le réseau (fiche).
+ */
+export function needsPlexSeriesCoverage(
+  cached: { available?: boolean; coverageCheckedAt?: number } | null | undefined,
+  mediaType: 'movie' | 'tv',
+  networkAllowed: boolean,
+): boolean {
+  return networkAllowed && mediaType === 'tv' && Boolean(cached?.available) && !Number.isFinite(cached?.coverageCheckedAt);
+}

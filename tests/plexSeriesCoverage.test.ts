@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import { findPlexAvailabilityOnServers, type PlexServerResource } from '../src/backend/plexAvailabilityBackend.ts';
-import { countAiredEpisodes, describePlexSeriesCoverage, isPlexEpisodePresent, readPlexEpisodeCoverage } from '../src/features/plex/plexSeriesCoverage.ts';
+import { countAiredEpisodes, describePlexSeriesCoverage, isPlexEpisodePresent, needsPlexSeriesCoverage, readPlexEpisodeCoverage } from '../src/features/plex/plexSeriesCoverage.ts';
 
 const json = (data: unknown) => new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const server: PlexServerResource = { name: 'PC-Julian', clientIdentifier: 'pms-1', accessToken: 'server-token', provides: 'server', connections: [{ uri: 'https://pms.example.test', local: false }] };
@@ -88,4 +89,16 @@ test('SEENIT-PLEX-013 un épisode n’est annoncé sur Plex qu’avec la preuve 
   assert.deepEqual(readPlexEpisodeCoverage({ episodeCount: 3, episodes: ['1:3'] }), { episodeCount: 3 }, 'liste incohérente ignorée');
   assert.deepEqual(readPlexEpisodeCoverage({ episodeCount: 1, episodes: ['x'] }), { episodeCount: 1 });
   for (const invalid of [{}, { episodeCount: null }, { episodeCount: '4' }, { episodeCount: -1 }, null]) assert.deepEqual(readPlexEpisodeCoverage(invalid), {});
+});
+
+test('SEENIT-PLEX-013 une série reconstruite par la synchro relit sa couverture une fois, depuis une fiche seulement', () => {
+  const rebuiltBySync = { available: true, lastChecked: Date.now() };
+  assert.equal(needsPlexSeriesCoverage(rebuiltBySync, 'tv', true), true, 'fiche : une lecture réseau malgré le cache positif de 24 h');
+  assert.equal(needsPlexSeriesCoverage(rebuiltBySync, 'tv', false), false, 'cartes cache-only : aucune requête');
+  assert.equal(needsPlexSeriesCoverage({ ...rebuiltBySync, coverageCheckedAt: Date.now() }, 'tv', true), false, 'déjà lue : cache respecté');
+  assert.equal(needsPlexSeriesCoverage(rebuiltBySync, 'movie', true), false, 'film binaire');
+  assert.equal(needsPlexSeriesCoverage({ available: false }, 'tv', true), false);
+  const source = readFileSync('src/features/plex/plexAvailability.ts', 'utf8');
+  assert.match(source, /if \(!forceRefresh && cached && !needsSeriesCoverage\)/);
+  assert.match(source, /\.\.\.\(mediaType === 'tv' \? \{ coverageCheckedAt: Date\.now\(\) \} : \{\}\)/);
 });
