@@ -70,7 +70,7 @@ export interface WhereToWatchProvider {
  * « Où regarder » en lignes du prototype (logo 44 px, nom, mention, action). Le titre reste affiché
  * pendant le chargement et l'actualisation Plex garde sa cible de 44 px (SEENIT-PERF-001).
  */
-export function WhereToWatchCard({ providers, loading, userPlatforms, title, fallbackLink, onOpenPlex, onRefreshPlex, refreshing, canRefresh, emptyLabel, origin }: { providers: readonly WhereToWatchProvider[]; loading: boolean; userPlatforms: readonly number[]; title: string; fallbackLink?: string; onOpenPlex: (provider: WhereToWatchProvider) => void; onRefreshPlex?: () => void; refreshing?: boolean; canRefresh?: boolean; emptyLabel: string; origin?: { name: string; logo: string; link?: string } | null }) {
+export function WhereToWatchCard({ providers, loading, userPlatforms, title, fallbackLink, onOpenPlex, onRefreshPlex, refreshing, canRefresh, emptyLabel, origin, failed = false }: { providers: readonly WhereToWatchProvider[]; loading: boolean; userPlatforms: readonly number[]; title: string; fallbackLink?: string; onOpenPlex: (provider: WhereToWatchProvider) => void; onRefreshPlex?: () => void; refreshing?: boolean; canRefresh?: boolean; emptyLabel: string; origin?: { name: string; logo: string; link?: string } | null; failed?: boolean }) {
   return <DetailCard className="flex flex-col">
     <div className="flex items-center justify-between pl-3.5 pr-1 pt-1.5"><h3 className="text-[15px] font-bold text-white">Où regarder</h3>{onRefreshPlex && <button type="button" onClick={onRefreshPlex} disabled={!canRefresh || refreshing} aria-label="Actualiser Plex" title="Actualiser Plex" className="w-11 h-11 inline-flex items-center justify-center rounded-full text-zinc-500 hover:text-white disabled:opacity-60 active:scale-95"><RefreshCw size={16} className={cn(refreshing && 'animate-spin')} /></button>}</div>
     {providers.map((provider, index) => {
@@ -98,7 +98,10 @@ export function WhereToWatchCard({ providers, loading, userPlatforms, title, fal
       <span className="flex-1 min-w-0 flex flex-col gap-0.5"><span className="text-[15px] font-bold text-white">{origin.name}</span><span className="text-[12px] text-zinc-400 truncate">Diffuseur d’origine en France</span></span>
       {origin.link && <span className="text-[12px] font-bold text-[#E5A93D]">Ouvrir</span>}
     </button>}
-    {!loading && providers.length === 0 && !origin && <p className="px-3.5 py-3 border-t border-white/[0.06] text-[13px] text-zinc-400">{emptyLabel}</p>}
+    {/* #397 : vide confirmé → emptyLabel ; panne de la source → message distinct, jamais « aucun diffuseur ». */}
+    {!loading && providers.length === 0 && !origin && (failed
+      ? <p role="status" data-providers-failed="" className="px-3.5 py-3 border-t border-white/[0.06] text-[13px] text-zinc-400">Diffuseurs indisponibles pour le moment. Réessaie plus tard.</p>
+      : emptyLabel && <p className="px-3.5 py-3 border-t border-white/[0.06] text-[13px] text-zinc-400">{emptyLabel}</p>)}
   </DetailCard>;
 }
 
