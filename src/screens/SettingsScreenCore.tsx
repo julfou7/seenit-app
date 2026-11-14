@@ -11,6 +11,7 @@ import { registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { DEFAULT_NOTIFICATION_PREFS, mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { Capacitor } from '@capacitor/core';
+import { useBackendHealth } from '../features/settings/serviceHealth';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -631,6 +632,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
   };
 
   const isNative = Capacitor.isNativePlatform();
+  const backendHealth = useBackendHealth();
   const isAndroid = Capacitor.getPlatform() === 'android';
   const devicePlace = isNative ? 'ce téléphone' : 'ce navigateur';
   const avatarUrl = getProfileAvatarUrl(user);
@@ -1075,7 +1077,9 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
           <SettingsRow icon={Bell} label="Notifications" sub={`${notificationSummary} · rappels à 09:00`} onClick={() => setPage('notifs')} />
         </SettingsGroup>
 
-        <SettingsGroup title="Connexions">
+        {/* #404 : météo des services — chaque point vient d'un signal réel et daté, jamais d'un simple jeton. */}
+        <SettingsGroup title="Connexions" foot="État vérifié à l’ouverture des Réglages.">
+          <SettingsRow icon={Cloud} label="Serveur SeenIt" sub={backendHealth.text} tone={backendHealth.tone} dot />
           <SettingsRow icon={Server} label="Plex" sub={plexState.text} tone={plexState.tone} dot={Boolean(plexState.tone)} onClick={() => setPage('plex')} />
           <SettingsRow icon={MonitorSmartphone} label="Appareils" sub={isNative ? 'Ce téléphone' : 'Ce navigateur'} onClick={() => setPage('devices')} />
         </SettingsGroup>
