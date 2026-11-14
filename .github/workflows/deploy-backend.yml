@@ -138,12 +138,43 @@ jobs:
             --location "$GCP_REGION" \
             --format='value(name)' >/dev/null
 
-          build_id="$(gcloud builds submit . \
-            --project "$GCP_PROJECT_ID" \
-            --region "$GCP_REGION" \
-            --pack "image=${image_tag}" \
-            --async \
-            --format='value(id)')"
+          # FinOps #23 : le bucket Cloud Build par défaut est multi-région US. Chaque archive source y
+          # payait réplication + lecture inter-région par le build us-west1. Le staging régional, dans la
+          # région du build et du quota gratuit Storage, supprime ces deux SKU. Repli explicite si indisponible.
+          staging_bucket="gs://${GCP_PROJECT_ID}_cloudbuild_${GCP_REGION}"
+          staging_args=()
+          if gcloud storage buckets describe "$staging_bucket" --format='value(name)' >/dev/null 2>&1 \
+            || gcloud storage buckets create "$staging_bucket" \
+              --project "$GCP_PROJECT_ID" \
+              --location "$GCP_REGION" \
+              --default-storage-class=STANDARD \
+              --uniform-bucket-level-access \
+              --public-access-prevention \
+              --soft-delete-duration=0 \
+              --lifecycle-file=cloudbuild/source-staging-lifecycle.json \
+              --quiet; then
+            staging_args=(--gcs-source-staging-dir "${staging_bucket}/source")
+            echo "Archive source stagée dans le bucket régional $GCP_REGION."
+          else
+            echo "::warning::Bucket de staging régional indisponible ; repli sur le bucket Cloud Build multi-région (transfert facturable)."
+          fi
+
+          submit_build() {
+            gcloud builds submit . \
+              --project "$GCP_PROJECT_ID" \
+              --region "$GCP_REGION" \
+              --pack "image=${image_tag}" \
+              "$@" \
+              --async \
+              --format='value(id)'
+          }
+          if ! build_id="$(submit_build "${staging_args[@]}")"; then
+            if (( ${#staging_args[@]} == 0 )); then
+              exit 1
+            fi
+            echo "::warning::Envoi vers le staging régional refusé ; nouvel essai sur le bucket Cloud Build par défaut."
+            build_id="$(submit_build)"
+          fi
           if [[ ! "$build_id" =~ ^[0-9a-f-]{36}$ ]]; then
             echo "Identifiant Cloud Build invalide: ${build_id:-absent}"
             exit 1

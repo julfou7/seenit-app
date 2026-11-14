@@ -180,8 +180,26 @@ test('SEENIT-COST-001 purge les artefacts de build régénérables seulement apr
   assert.match(cleanup, /--repository=/);
   assert.match(cleanup, /--location=/);
   assert.match(cleanup, /\$\{PROJECT_ID\}_cloudbuild\/source/);
+  assert.match(cleanup, /\$\{PROJECT_ID\}_cloudbuild_\$\{_REGION\}\/source/);
   assert.match(cleanup, /gcloud storage rm/);
   assert.match(cleanup, /logging:\s*CLOUD_LOGGING_ONLY/);
+});
+
+test('SEENIT-COST-001 stage la source Cloud Build dans la région du build avec repli explicite', () => {
+  const ensureBucket = workflow.indexOf('gcloud storage buckets create "$staging_bucket"');
+  const buildImage = workflow.indexOf('gcloud builds submit .');
+  const fallback = workflow.indexOf('build_id="$(submit_build)"');
+
+  assert.match(workflow, /staging_bucket="gs:\/\/\$\{GCP_PROJECT_ID\}_cloudbuild_\$\{GCP_REGION\}"/);
+  assert.ok(ensureBucket >= 0 && buildImage > ensureBucket);
+  assert.match(workflow, /--location "\$GCP_REGION"\s*\\\s*--default-storage-class=STANDARD/);
+  assert.match(workflow, /--soft-delete-duration=0/);
+  assert.match(workflow, /--public-access-prevention/);
+  assert.match(workflow, /--gcs-source-staging-dir "\$\{staging_bucket\}\/source"/);
+  assert.ok(fallback > buildImage, 'un refus du staging régional ne bloque pas le déploiement');
+
+  const lifecycle = JSON.parse(fs.readFileSync(path.join(rootDir, 'cloudbuild', 'source-staging-lifecycle.json'), 'utf8'));
+  assert.deepEqual(lifecycle.rule, [{ action: { type: 'Delete' }, condition: { age: 1 } }]);
 });
 
 test('SEENIT-COST-001 capture un inventaire GCP en lecture seule après la purge', () => {

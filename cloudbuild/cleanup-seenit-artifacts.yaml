@@ -10,11 +10,12 @@ steps:
           echo "Package Artifact Registry ${_SERVICE} déjà absent."
         fi
 
-        source_bucket="gs://${PROJECT_ID}_cloudbuild/source"
-        if gcloud storage ls "$$source_bucket/" >/dev/null 2>&1; then
-          gcloud storage rm "$$source_bucket/**"
-        else
-          echo "Archives source Cloud Build déjà absentes."
-        fi
+        for source_bucket in "gs://${PROJECT_ID}_cloudbuild/source" "gs://${PROJECT_ID}_cloudbuild_${_REGION}/source"; do
+          if gcloud storage ls "$$source_bucket/" >/dev/null 2>&1; then
+            gcloud storage rm "$$source_bucket/**"
+          else
+            echo "Archives source Cloud Build déjà absentes de $$source_bucket."
+          fi
+        done
 options:
   logging: CLOUD_LOGGING_ONLY

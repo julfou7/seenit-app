@@ -21,6 +21,15 @@ supprime le package Artifact Registry `seenit-app` en une seule opération (tout
 importe l'image lors du déploiement et conserve sa propre copie pour les révisions déployées. Le build
 de nettoyage utilise uniquement Cloud Logging afin de ne pas recréer un bucket de logs utilisateur.
 
+Depuis le 14/11/2026, l'archive source n'est plus envoyée dans le bucket Cloud Build par défaut
+(`_cloudbuild`, **multi-région US**) : chaque archive y facturait `Network Data Transfer GCP Replication
+within Northern America` et `Network Data Transfer GCP Multi-region within Northern America` (lecture
+par le build `us-west1`), soit ~0,02 € sur 1–14 novembre. Le workflow utilise
+`gs://gen-lang-client-0201895414_cloudbuild_us-west1/source` : même région que le build, quota gratuit
+Storage, prévention d'accès public, suppression réversible désactivée et règle de cycle de vie qui
+supprime tout objet de plus d'un jour. Le bucket est créé s'il manque ; si la création ou l'envoi est
+refusé, le déploiement repasse sur le bucket par défaut avec un avertissement au lieu d'échouer.
+
 ## Cause réseau à traiter
 
 Le runtime canonique est actuellement en `us-west1`. Le coût historique de #23 contient du
