@@ -11,6 +11,7 @@ import { registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { DEFAULT_NOTIFICATION_PREFS, mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { Capacitor } from '@capacitor/core';
+import { useBackendHealth } from '../features/settings/serviceHealth';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -89,6 +90,11 @@ const ANDROID_ALERTS = [
   { channelId: 'seenit_reminders', icon: Bell, label: 'Rappels', sub: 'Les cloches posées sur un épisode ou un film' },
   { channelId: 'seenit_downloads', icon: DownloadMark, label: 'Téléchargements et Plex', sub: 'Import terminé, disponible dans Plex, échec' },
   { channelId: 'seenit_updates', icon: Package, label: 'Mise à jour de SeenIt', sub: 'Nouvelle version disponible ou téléchargée' },
+] as const;
+// #402 : sur Android, ces canaux remplacent les quatre interrupteurs Séries/Films (épisode, saison, cinéma, VOD).
+const ANDROID_MEDIA_CHANNELS = [
+  { channelId: 'seenit_episodes', icon: Tv, label: 'Épisodes et saisons', sub: 'Nouvel épisode le jour J, nouvelle saison 7 jours avant' },
+  { channelId: 'seenit_movies', icon: Film, label: 'Films', sub: 'Sortie au cinéma et en DVD / VOD, le jour J' },
 ] as const;
 
 type SettingsPage = 'plats' | 'notifs' | 'plex' | 'devices' | 'compte' | 'app';
@@ -631,6 +637,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
   };
 
   const isNative = Capacitor.isNativePlatform();
+  const backendHealth = useBackendHealth();
   const isAndroid = Capacitor.getPlatform() === 'android';
   const devicePlace = isNative ? 'ce téléphone' : 'ce navigateur';
   const avatarUrl = getProfileAvatarUrl(user);
@@ -903,6 +910,16 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
               <button type="button" className="reg-primary" onClick={() => void handleRequestNotifications()}>Autoriser les notifications</button>
             </SettingsCard>
           )}
+          {/* #402 : sur Android, une seule autorité — les canaux système ; les interrupteurs restent pour la PWA. */}
+          {isAndroid ? (
+            <SettingsGroup title="Séries et films" foot="Coupés ou réglés dans Android, catégorie par catégorie.">
+              {ANDROID_MEDIA_CHANNELS.map(channel => (
+                <SettingsRow key={channel.channelId} icon={channel.icon} label={channel.label} sub={channel.sub}
+                  onClick={() => { void NotificationSettings.openChannel({ channelId: channel.channelId }).catch(() => showToast('Réglages Android indisponibles.', 'error')); }} />
+              ))}
+              <SettingsRow icon={Newspaper} label="Actualités" sub="Renouvellements, annulations, saisons annoncées" toggle={notificationPrefs.news} onClick={() => void handleToggleNotif('news', !notificationPrefs.news)} />
+            </SettingsGroup>
+          ) : <>
           <SettingsGroup title="Séries">
             <SettingsRow icon={Tv} label="Nouvel épisode" sub="Le jour de la diffusion" toggle={notificationPrefs.release_today_tv} onClick={() => void handleToggleNotif('release_today_tv', !notificationPrefs.release_today_tv)} />
             <SettingsRow icon={Clock} label="Nouvelle saison" sub="7 jours avant" toggle={notificationPrefs.season_d7} onClick={() => void handleToggleNotif('season_d7', !notificationPrefs.season_d7)} />
@@ -912,6 +929,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
             <SettingsRow icon={Film} label="Sortie au cinéma" sub="Le jour J, en France" toggle={notificationPrefs.movie_theater} onClick={() => void handleToggleNotif('movie_theater', !notificationPrefs.movie_theater)} />
             <SettingsRow icon={Film} label="Sortie DVD / VOD" sub="Le jour J, si la date est connue" toggle={notificationPrefs.movie_dvd_vod} onClick={() => void handleToggleNotif('movie_dvd_vod', !notificationPrefs.movie_dvd_vod)} />
           </SettingsGroup>
+          </>}
           <SettingsGroup title="Autres alertes" foot={isAndroid ? 'Coupées ou réglées dans Android, type par type.' : 'Réglées par le navigateur.'}>
             {ANDROID_ALERTS.map(alert => (
               <SettingsRow key={alert.channelId} icon={alert.icon} label={alert.label} sub={alert.sub}
@@ -1075,7 +1093,9 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
           <SettingsRow icon={Bell} label="Notifications" sub={`${notificationSummary} · rappels à 09:00`} onClick={() => setPage('notifs')} />
         </SettingsGroup>
 
-        <SettingsGroup title="Connexions">
+        {/* #404 : météo des services — chaque point vient d'un signal réel et daté, jamais d'un simple jeton. */}
+        <SettingsGroup title="Connexions" foot="État vérifié à l’ouverture des Réglages.">
+          <SettingsRow icon={Cloud} label="Serveur SeenIt" sub={backendHealth.text} tone={backendHealth.tone} dot />
           <SettingsRow icon={Server} label="Plex" sub={plexState.text} tone={plexState.tone} dot={Boolean(plexState.tone)} onClick={() => setPage('plex')} />
           <SettingsRow icon={MonitorSmartphone} label="Appareils" sub={isNative ? 'Ce téléphone' : 'Ce navigateur'} onClick={() => setPage('devices')} />
         </SettingsGroup>
