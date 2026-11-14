@@ -3,6 +3,7 @@ import test from 'node:test';
 import express from 'express';
 import {
   apiErrorMiddleware,
+  apiNotFoundHandler,
   backendHealthHandler,
   buildBackendHealthPayload,
   installAsyncRouteForwarding,
@@ -27,7 +28,10 @@ test('SEENIT-RUNTIME-001 contient les rejets async API sans terminer le backend'
     throw error;
   });
   app.get('/api/health', backendHealthHandler);
+  app.use('/api', apiNotFoundHandler);
   app.use('/api', apiErrorMiddleware);
+  // Retombée SPA, comme le routeur frontend en production.
+  app.use((_req, res) => { res.type('html').send('<!doctype html><div id="root"></div>'); });
 
   const server = await new Promise<ReturnType<typeof app.listen>>((resolve, reject) => {
     const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
@@ -38,6 +42,16 @@ test('SEENIT-RUNTIME-001 contient les rejets async API sans terminer le backend'
     const address = server.address();
     assert.ok(address && typeof address === 'object');
     const origin = `http://127.0.0.1:${address.port}`;
+
+    for (const [method, url] of [['GET', '/api/route-inexistante'], ['POST', '/api/tv/sport'], ['GET', '/api']] as const) {
+      const missing = await fetch(`${origin}${url}`, { method });
+      assert.equal(missing.status, 404, `${method} ${url} répond 404`);
+      assert.match(missing.headers.get('content-type') || '', /application\/json/);
+      assert.equal((await missing.json()).error, 'API_ROUTE_NOT_FOUND');
+    }
+    const spa = await fetch(`${origin}/moi/liste`);
+    assert.equal(spa.status, 200, 'les routes de l’application restent servies');
+    assert.match(spa.headers.get('content-type') || '', /text\/html/);
 
     const failed = await fetch(`${origin}/api/fail`);
     assert.equal(failed.status, 500);
