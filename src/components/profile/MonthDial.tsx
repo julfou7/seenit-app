@@ -82,7 +82,7 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
   };
   const summary = PROFILE_MONTH_LABELS.map((_, month) => month < minutes.length ? `${monthName(month).toLowerCase()} ${hours(minutes[month])}` : null).filter(Boolean).join(', ');
   return (
-    <div className="moi-dial" data-play={play} data-picked={picked !== null}>
+    <div className="moi-dial" data-play={play} data-picked={picked !== null} data-touched={touched}>
       {/* Retour terrain v1.4.307 : le fond du cadran ne bouge plus (un seul fondu d'opacité) ; le secteur choisi et celui qu'on
           quitte sont deux petits calques qui glissent par transform, ce que le téléphone compose sans repeindre le SVG. */}
       <svg className="moi-dial-base" viewBox="0 0 322 322" aria-hidden="true">
@@ -92,10 +92,10 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
         {/* Retour terrain v1.4.293 : toucher un secteur, même fin, ouvre son mois comme son étiquette. */}
         {MONTH_SHORT.map((label, month) => <path key={label} className="moi-dial-hit" data-month={month} d={sectorPath(month, MONTH_DIAL.hitRadius)} onClick={() => setPicked(current => current === month ? null : month)} />)}
       </svg>
-      {left !== null && left !== picked && left < minutes.length && (
+      {left !== null && left !== picked && (
         <svg key={`drop-${left}`} className="moi-dial-drop" viewBox="0 0 322 322" aria-hidden="true" style={popVars(left)} onAnimationEnd={() => setLeft(null)}>{sector(left)}</svg>
       )}
-      {picked !== null && picked < minutes.length && (
+      {picked !== null && (
         <svg key={`lift-${picked}`} className="moi-dial-lift" data-swap={touched} viewBox="0 0 322 322" aria-hidden="true" style={popVars(picked, picked * 55)}>{sector(picked)}</svg>
       )}
       <button type="button" className="moi-dial-center" onClick={() => { if (picked === null) onReplay(); else setPicked(null); }}

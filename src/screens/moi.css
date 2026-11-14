@@ -141,7 +141,7 @@
 .moi-dial>svg.moi-dial-lift,.moi-dial>svg.moi-dial-drop{position:absolute;inset:0;will-change:transform}
 .moi-dial-lift{transform:translate(var(--dx),var(--dy))}.moi-dial-drop{animation:moiDrop .3s ease-out forwards}
 .moi-dial[data-play=false] .moi-dial-base .moi-dial-sector,.moi-dial[data-play=false] .moi-dial-lift{opacity:0;transform:scale(.5)}
-.moi-dial[data-play=true] .moi-dial-base .moi-dial-sector{animation:moiSector .65s cubic-bezier(.2,.9,.3,1.25) var(--delay) backwards}
+.moi-dial[data-play=true]:not([data-touched=true]) .moi-dial-base .moi-dial-sector{animation:moiSector .65s cubic-bezier(.2,.9,.3,1.25) var(--delay) backwards}
 .moi-dial[data-play=true] .moi-dial-lift{animation:moiSector .65s cubic-bezier(.2,.9,.3,1.25) var(--delay) backwards}
 .moi-dial[data-play=true] .moi-dial-lift[data-swap=true]{animation:moiLift .35s cubic-bezier(.2,.9,.3,1.25)}
 .moi-dial-center{position:absolute;left:30.7%;top:30.7%;width:38.6%;height:38.6%;padding:0;border:0;border-radius:50%;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;will-change:transform}

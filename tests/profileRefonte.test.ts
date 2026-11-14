@@ -389,6 +389,9 @@ test('SEENIT-PROFILE-003 retour terrain v1.4.307 : changer de mois ne repeint pl
   assert.doesNotMatch(sectorRules, /transition/, 'plus de transition sur les secteurs SVG, repeints à chaque image');
   assert.match(dial, /MONTH_SHORT\.map\(\(_, month\) => month === picked \? null : sector\(month\)\)/, 'le secteur choisi quitte le fond pour son calque');
   assert.match(dial, /className="moi-dial-lift"/);
+  assert.doesNotMatch(dial, /picked < minutes\.length && \(|left < minutes\.length/, 'un mois à venir garde son secteur pointillé (revue Codex #992)');
+  assert.match(dial, /data-touched=\{touched\}/);
+  assert.match(css, /\.moi-dial\[data-play=true\]:not\(\[data-touched=true\]\) \.moi-dial-base \.moi-dial-sector\{animation:moiSector/, 'l’entrée des secteurs ne rejoue pas quand un secteur retourne dans le fond (revue Codex #992)');
   assert.match(dial, /className="moi-dial-drop"[^>]*onAnimationEnd=\{\(\) => setLeft\(null\)\}/);
   assert.match(css, /\.moi-dial-drop\{display:none\}/, 'en mouvement réduit le calque quitté disparaît sans animation');
 });
