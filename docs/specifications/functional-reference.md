@@ -1160,6 +1160,9 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
   canal), l'interrupteur Actualités restant, puis **Autres alertes** sans préférence SeenIt (Rappels,
   Téléchargements et Plex, Mise à jour de SeenIt) : chaque ligne ouvre son canal Android, réglages
   Android, et « Envoyer une notification test » qui déplie les quatre tests existants ;
+- **Connexions → Serveur SeenIt** (#404, « météo » des services) : point vert « Opérationnel » seulement si
+  `/api/health` répond `status: ok`, orange si la réponse dépasse 2,5 s, rouge si injoignable ; sondé au
+  plus une fois toutes les 5 minutes, sans contacter TMDB/TVDB/OMDb depuis l'appareil ;
 - **Connexions → Plex** (point vert si synchro de moins de 24 h, orange sinon) → compte et titres
   reconnus, « Synchroniser maintenant », serveurs du dernier bilan de synchro, synchro complète et
   déconnexion confirmée ; association et annulation inchangées ;
