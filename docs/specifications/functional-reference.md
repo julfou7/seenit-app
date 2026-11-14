@@ -1151,7 +1151,9 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
   gardé 30 jours ; pastille de secours si un logo manque), un toucher par plateforme ;
 - **Notifications** (nombre activé, rappels à 09:00) → état réel de l'autorisation sur l'appareil avec
   « Autoriser les notifications », interrupteurs Séries (nouvel épisode, nouvelle saison J-7,
-  actualités) et Films (cinéma, DVD/VOD), puis **Autres alertes** sans préférence SeenIt (Rappels,
+  actualités) et Films (cinéma, DVD/VOD) en PWA ; dans l'APK Android (#402), ces quatre interrupteurs
+  sont remplacés par les canaux système « Épisodes et saisons » et « Films » (chaque ligne ouvre son
+  canal), l'interrupteur Actualités restant, puis **Autres alertes** sans préférence SeenIt (Rappels,
   Téléchargements et Plex, Mise à jour de SeenIt) : chaque ligne ouvre son canal Android, réglages
   Android, et « Envoyer une notification test » qui déplie les quatre tests existants ;
 - **Connexions → Serveur SeenIt** (#404, « météo » des services) : point vert « Opérationnel » seulement si
@@ -1337,7 +1339,7 @@ Terrain229 : une réouverture de panneau ne suffit pas à prouver sa fluidité. 
 
 Le titre nomme l’œuvre ; le type est dans l’en-tête Android (`subText`), le compact donne un fait et le développé ajoute du contexte. Les téléchargements distinguent envoi au client, import et preuve Plex exacte. Les huit canaux dédiés (dont « Mises à jour de SeenIt », qui sonne et vibre pour une nouvelle version, #909) sont créés au démarrage sans recréer Téléchargements ni écraser les choix Android. Les réglages exposent Actualités et l’accès au panneau système ; la migration v8 reprogramme les rappels. Les images gardent le cache privé borné, contain et l’hydratation à la livraison. Les alertes vues/archivées sont retirées ; une notification Vu peut afficher la reprise suivante avec la même identité sans son. Voir SEENIT-NOTIFICATION-005 à 008 et [contrat](notification-refactor-2026-10-27.md).
 
-Complément Explorer29/10 (#398/#787) : [fiche personnage](../design/explorer-personnage-2026-10-29.md), reprise exacte sur crédits par épisode, cache public borné, calcul au premier accès uniquement ; progression/favoris isolés par UID. Toasts au-dessus du champ et retour aux résultats avec la même requête, clavier fermé. Depuis #872, la fiche personnage défile jusqu'en bas même ouverte clavier tout juste fermé, n'affiche un univers que s'il a un nom exact (sinon « Personnage » seul) et montre « vus par toi » partiel (« ≥ N ») tant que tout n'est pas vérifié.
+Complément Explorer29/10 (#398/#787) : [fiche personnage](../design/explorer-personnage-2026-10-29.md), reprise exacte sur crédits par épisode, cache public borné, calcul au premier accès uniquement ; progression/favoris isolés par UID. Toasts au-dessus du champ et retour aux résultats avec la même requête, clavier fermé. Depuis #872, la fiche personnage défile jusqu'en bas même ouverte clavier tout juste fermé, n'affiche un univers que s'il a un nom exact (sinon « Personnage » seul) et montre « vus par toi » partiel (« ≥ N ») tant que tout n'est pas vérifié. Depuis #398, elle liste tous les interprètes crédités (« Joué par N interprètes »), le plus crédité d'abord, chacun avec les œuvres exactes où il joue ce rôle.
 ### Téléchargements — prototype du 5 novembre 2026 (#861)
 
 Notification import #801 : l'affiche du média exact est attachée au reçu « Import Plex terminé »

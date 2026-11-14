@@ -3,7 +3,27 @@ import { nextTonightReminder } from '../src/features/notifications/tonightRemind
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { mergeNotificationPreferences } from '../src/features/notifications/notificationPreferences.ts';
+import { effectiveNotificationPreferences, mergeNotificationPreferences, readEffectiveNotificationPreferences } from '../src/features/notifications/notificationPreferences.ts';
+
+test('SEENIT-NOTIFICATION-006 #402 sur Android, les canaux système sont la seule autorité des rappels', () => {
+  const stored = { release_today_tv: false, season_d7: false, movie_theater: false, movie_dvd_vod: false, news: false };
+  // Android : les anciens « non » ne filtrent plus (le canal décide), les actualités restent un choix SeenIt.
+  assert.deepEqual(readEffectiveNotificationPreferences(stored, 'android'),
+    { release_today_tv: true, season_d7: true, movie_theater: true, movie_dvd_vod: true, news: false });
+  // PWA et web : les interrupteurs SeenIt restent l'autorité.
+  assert.deepEqual(readEffectiveNotificationPreferences(stored, 'web'), stored);
+  assert.deepEqual(effectiveNotificationPreferences(mergeNotificationPreferences(stored), false), stored);
+  // Planification et cloche lisent les préférences effectives de la plateforme.
+  for (const file of ['src/hooks/useRemindersNotifier.ts', 'src/features/notifications/episodeReminder.ts']) {
+    const source = readFileSync(file, 'utf8');
+    assert.match(source, /readEffectiveNotificationPreferences\(readUserScopedJson\(uid, 'notifications', null\), Capacitor\.getPlatform\(\)\)/, file);
+    assert.doesNotMatch(source, /mergeNotificationPreferences\(/, file);
+  }
+  const settings = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
+  assert.match(settings, /\{isAndroid \? \(\s*<SettingsGroup title="Séries et films"/);
+  assert.match(settings, /channelId: 'seenit_episodes'[^\n]*label: 'Épisodes et saisons'/);
+  assert.match(settings, /channelId: 'seenit_movies'[^\n]*label: 'Films'/);
+});
 import { isObsoleteMediaAlert, isSameVisibleMediaAlert } from '../src/features/notifications/notificationLifecycle.ts';
 import { buildTvEpisodeReminderCopy } from '../src/features/notifications/tvReminderCopy.ts';
 import { buildDownloadWebhookPresentation } from '../src/features/downloads/downloadWebhookNotification.ts';
