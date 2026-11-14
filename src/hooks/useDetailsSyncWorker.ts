@@ -9,6 +9,7 @@ import { reconcileArchive, reconcileSeriesStatus, selectFinishedShowsToRecheck }
 import { buildSeasonProgressEvidence, needsSeasonProgressRefresh, hasSeasonReleaseDue } from '../features/shows/seasonProgressEvidence';
 import { mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { readUserScopedJson } from '../lib/userIsolation';
+import { lastAutoSyncRun, writeAutoSyncRun } from '../lib/autoSyncThrottle';
 import { db, auth, sendNativeNotification } from '../lib/firebase';
 import { doc, updateDoc, getDoc, getDocs, collection, addDoc } from 'firebase/firestore';
 import { tmdb } from '../features/shows/tmdb';
@@ -19,7 +20,8 @@ import { performPlexSync } from '../features/plex/syncPlex';
 import { getPlexLastSyncTimestamp, getStoredPlexToken } from '../features/plex/plexStorage';
 import { PLEX_AUTO_SYNC_INTERVAL_MS, PLEX_AUTO_SYNC_RETRY_MS } from '../features/plex/plexAutoSync';
 
-export async function performDetailsSync(forceAll = false): Promise<{ success: boolean; syncedCount: number; error?: string }> {
+/** `complete: false` : au moins une série n'a pas pu être lue (fournisseur indisponible, quota) ; le passage sera retenté. */
+export async function performDetailsSync(forceAll = false): Promise<{ success: boolean; syncedCount: number; complete?: boolean; error?: string }> {
   const setSyncStatus = useSyncStore.getState().setSyncStatus;
   const setQuotaExceeded = useSyncStore.getState().setQuotaExceeded;
 
@@ -68,7 +70,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           s.isArchived = computedArchived;
           changesMade = true;
         } catch (err) {
-          console.error(`[SyncWorker] Error mass updating ${s.title}:`, err);
+          appLogger.error('system', `[SyncWorker] Error mass updating ${s.title}:`, { error: err instanceof Error ? err.message : String(err) });
         }
       }
     }
@@ -155,6 +157,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
     }
 
     const totalTvShows = tvShowsToSync.length;
+    let interrupted = false;
 
     for (let i = 0; i < tvShowsToSync.length; i++) {
       const showToSync = tvShowsToSync[i];
@@ -162,6 +165,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
       const currentQuotaExceeded = useSyncStore.getState().isQuotaExceeded;
       if (currentQuotaExceeded) {
+         interrupted = true;
          setSyncStatus(null);
          break;
       }
@@ -176,7 +180,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
       appLogger.info('system', `[SyncWorker] Synchronisation de la série ${showToSync.title} (ID ${showId}, TMDB ${tmdbIdNum})`);
 
       if (!tmdbIdNum || isNaN(tmdbIdNum)) {
-        console.warn(`[SyncWorker] Missing valid tmdbId for ${showToSync.title}`);
+        appLogger.warn('system', `[SyncWorker] Missing valid tmdbId for ${showToSync.title}`);
         continue;
       }
 
@@ -185,7 +189,8 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const detailsRes = await tmdb.getMediaDetails(tmdbIdNum, showToSync.mediaType || 'tv', true);
         if (!detailsRes.ok) {
           const errMsg = 'error' in detailsRes ? (typeof detailsRes.error === 'object' && detailsRes.error !== null && 'message' in detailsRes.error ? detailsRes.error.message : String(detailsRes.error)) : 'Unknown error';
-          console.warn(`[SyncWorker] Could not fetch details for ${showToSync.title}: ${errMsg}`);
+          appLogger.warn('system', `[SyncWorker] Could not fetch details for ${showToSync.title}: ${errMsg}`);
+          interrupted = true;
           continue;
         }
 
@@ -292,7 +297,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
               createdAt: Date.now()
             });
           } catch (newsErr) {
-            console.error('[SyncWorker] Error adding CANCELED news:', newsErr);
+            appLogger.error('system', '[SyncWorker] Error adding CANCELED news:', { error: newsErr instanceof Error ? newsErr.message : String(newsErr) });
           }
         }
 
@@ -308,7 +313,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
               createdAt: Date.now()
             });
           } catch (newsErr) {
-            console.error('[SyncWorker] Error adding ENDED news:', newsErr);
+            appLogger.error('system', '[SyncWorker] Error adding ENDED news:', { error: newsErr instanceof Error ? newsErr.message : String(newsErr) });
           }
         }
 
@@ -352,7 +357,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
               await addDoc(collection(db, 'users', userUid, 'news'), docData);
             } catch (newsErr) {
-              console.error('[SyncWorker] Error adding DATE_ANNOUNCED/NEW_SEASON/FINAL_SEASON news:', newsErr);
+              appLogger.error('system', '[SyncWorker] Error adding DATE_ANNOUNCED/NEW_SEASON/FINAL_SEASON news:', { error: newsErr instanceof Error ? newsErr.message : String(newsErr) });
             }
           }
         }
@@ -467,7 +472,8 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (err: unknown) {
-        console.error(`[SyncWorker] Error syncing details for ${showToSync.title}:`, err);
+        interrupted = true;
+        appLogger.error('system', `[SyncWorker] Error syncing details for ${showToSync.title}:`, { error: err instanceof Error ? err.message : String(err) });
         const errStr = err instanceof Error ? err.message : String(err);
         const isQuotaError =
           (err && typeof err === 'object' && 'code' in err && err.code === 'resource-exhausted') ||
@@ -477,7 +483,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           errStr.toLowerCase().includes('resource_exhausted');
 
         if (isQuotaError) {
-          console.warn("[SyncWorker] Firestore quota exhausted. Stopping synchronizer.");
+          appLogger.warn('system', "[SyncWorker] Firestore quota exhausted. Stopping synchronizer.");
           setQuotaExceeded(true);
           setSyncStatus(null);
           break;
@@ -486,9 +492,9 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
     }
 
     setSyncStatus(null);
-    return { success: true, syncedCount };
+    return { success: true, syncedCount, complete: !interrupted };
   } catch (err: unknown) {
-    console.error("[SyncWorker] Error fetching shows to sync:", err);
+    appLogger.error('system', "[SyncWorker] Error fetching shows to sync:", { error: err instanceof Error ? err.message : String(err) });
     setSyncStatus(null);
     return { success: false, syncedCount, error: err instanceof Error ? err.message : String(err) };
   }
@@ -513,21 +519,23 @@ export function useDetailsSyncWorker() {
     const runSync = () => {
       const uid = auth.currentUser?.uid;
       if (!uid || !visible() || runningDetailsRef.current.has(uid)) return;
-      const now = Date.now(), last = lastRunRef.current.get(uid);
+      // Retour terrain v1.4.308 : le dernier passage est mémorisé par compte, pas seulement pour la session.
+      const now = Date.now(), last = lastAutoSyncRun(uid, 'details', lastRunRef.current.get(uid));
       if (last !== undefined && now - last < 60_000) return;
       const boundaryDue = useShowsStore.getState().shows.some(show => show.mediaType === 'tv' && show.status !== 'dropped' && (needsSeasonProgressRefresh(show) || hasSeasonReleaseDue(show, now)));
       if (last !== undefined && now - last < 12 * 60 * 60 * 1000 && !boundaryDue) return;
       lastRunRef.current.set(uid, now);
       runningDetailsRef.current.add(uid);
-      void performDetailsSync(false).catch(logWorkerError).finally(() => runningDetailsRef.current.delete(uid));
+      void performDetailsSync(false).then(result => { if (result.success && result.complete !== false) writeAutoSyncRun(uid, 'details'); }).catch(logWorkerError).finally(() => runningDetailsRef.current.delete(uid));
     };
     const runPlexSync = () => {
       const uid = auth.currentUser?.uid;
       if (!uid || !visible() || !getStoredPlexToken(uid) || getPlexSyncRetryAt(uid)) return;
-      const now = Date.now(), lastSuccess = getPlexLastSyncTimestamp(uid), lastAttempt = lastPlexRunRef.current.get(uid);
+      const now = Date.now(), lastSuccess = getPlexLastSyncTimestamp(uid), lastAttempt = lastAutoSyncRun(uid, 'plex', lastPlexRunRef.current.get(uid));
       if (lastSuccess && now - lastSuccess < PLEX_AUTO_SYNC_INTERVAL_MS) return;
       if (lastAttempt !== undefined && now - lastAttempt < PLEX_AUTO_SYNC_RETRY_MS) return;
       lastPlexRunRef.current.set(uid, now);
+      writeAutoSyncRun(uid, 'plex', now);
       void performPlexSync({ delta: true, silent: false }).catch(logWorkerError);
     };
     const schedule = () => {
@@ -757,7 +765,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     if (!silent) setSyncStatus(null);
     return { success: true, title: showToSync.title };
   } catch (err) {
-    console.error(`[SyncWorker] Error syncing single item ${showId}:`, err);
+    appLogger.error('system', `[SyncWorker] Error syncing single item ${showId}:`, { error: err instanceof Error ? err.message : String(err) });
     if (!silent) setSyncStatus(null);
     return { success: false, error: err?.message || String(err) };
   }

@@ -13,7 +13,7 @@ test('SEENIT-UX-014 les deux synchronisations conservent la finale avant de supp
       builder.onResolve({ filter: /^(?:react|firebase\/firestore)$|\/(?:firebase|tmdb|utils|syncStore|showsStore|syncPlex|plexStorage|logStore)$/ }, args => ({ path: args.path.split('/').at(-1)!, namespace: 'ports' }));
       builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: `
         const p=()=>globalThis.__ports;
-        export const appLogger={warn:()=>{},info:()=>{}}; export const useEffect=()=>{}; export const useRef=()=>({current:null});
+        export const appLogger={warn:()=>{},info:()=>{},error:()=>{}}; export const useEffect=()=>{}; export const useRef=()=>({current:null});
         export const db={};export const auth={currentUser:{uid:'fixture'}};export const sendNativeNotification=()=>{};
         export const doc=(...args)=>args;export const collection=(...args)=>args;
         export const getDoc=async()=>({exists:()=>true,id:'series',data:()=>p().show});

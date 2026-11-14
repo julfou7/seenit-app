@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 export interface PlexSyncProgress {
-  uid: string; mode: 'delta' | 'full'; phase: 'collect' | 'resolve' | 'watched' | 'watchlist' | 'save' | 'done' | 'error';
+  uid: string; mode: 'delta' | 'full'; phase: 'collect' | 'resolve' | 'watched' | 'watchlist' | 'save' | 'done' | 'incomplete' | 'error';
   processed: number; total?: number; historyTotal?: number; watchlistTotal?: number;
   changed?: number; alreadyWatched?: number; unresolved?: number; complete?: boolean;
   /** #954 : Vu déjà connus datés par leur lecture Plex ; entrées de l'historique du compte (non vus explicites à part). */

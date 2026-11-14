@@ -37,7 +37,7 @@ export function formatPlexCompletionSummary(
 
 
 export function isPlexSyncTerminal(phase?: string, message = ''): boolean {
-  return phase ? phase === 'done' || phase === 'error' : /terminé|à jour|erreur|pause|incompl/i.test(message);
+  return phase ? phase === 'done' || phase === 'incomplete' || phase === 'error' : /terminé|à jour|erreur|pause|incompl/i.test(message);
 }
 export function canPausePlexSync(active: { progress?: { uid: string; phase: string } } | null, uid?: string): boolean {
   return Boolean(uid && active?.progress?.uid === uid && !isPlexSyncTerminal(active.progress.phase));

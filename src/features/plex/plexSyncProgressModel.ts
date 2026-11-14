@@ -54,7 +54,7 @@ export function collectFraction(progress: Pick<PlexCollectProgress, 'state' | 'a
 }
 
 export interface PlexSyncPercentInput {
-  phase: 'collect' | 'resolve' | 'watched' | 'watchlist' | 'save' | 'done' | 'error';
+  phase: 'collect' | 'resolve' | 'watched' | 'watchlist' | 'save' | 'done' | 'incomplete' | 'error';
   processed: number;
   total?: number;
   collectPercent?: number;
@@ -83,8 +83,9 @@ export function formatCompactCount(value: number): string {
 
 /** État court d'un serveur pour une ligne du panneau : jamais d'URL ni de jeton. */
 /**
- * Erreurs d'une synchro : médias non résolus, et au moins une si la synchro a échoué ou est restée incomplète
- * (revue Codex #985 : un échec Firestore ou un serveur manquant affichait « 0 erreur »). Une pause n'en est pas une.
+ * Erreurs d'une synchro : médias non résolus, et au moins une si la synchro a échoué (revue Codex #985 : un échec
+ * Firestore affichait « 0 erreur »). Une pause n'en est pas une, ni une synchro restée incomplète parce que des
+ * serveurs sont injoignables (retour du 14/11 : « il n'y a pas d'erreur, juste trois serveurs indisponibles »).
  */
 export function countPlexSyncErrors(progress: { phase?: string; unresolved?: number }, message = ''): number {
   const unresolved = Number(progress.unresolved) || 0;
