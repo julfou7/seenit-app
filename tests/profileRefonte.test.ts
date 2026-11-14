@@ -377,3 +377,18 @@ test('SEENIT-PROFILE-003 retour terrain v1.4.306 : le cadran s’ouvre sur le mo
   assert.doesNotMatch(css, /moiPulse/, 'plus d’animation SVG infinie : elle repeignait le cadran en continu');
   assert.match(css, /@keyframes moiSector\{from\{opacity:0;transform:scale\(\.5\)\}\}/, 'le secteur choisi rejoint sa position détachée sans saut final');
 });
+
+test('SEENIT-PROFILE-003 retour terrain v1.4.307 : changer de mois ne repeint plus le cadran à chaque image', () => {
+  const css = read('src/screens/moi.css');
+  const dial = read('src/components/profile/MonthDial.tsx');
+  // Le fond n'anime que son opacité ; le secteur choisi et celui quitté sont des calques composés par transform.
+  assert.match(css, /\.moi-dial-base\{transition:opacity \.3s ease\}\.moi-dial\[data-picked=true\] \.moi-dial-base\{opacity:\.3\}/);
+  assert.match(css, /\.moi-dial>svg\.moi-dial-lift,\.moi-dial>svg\.moi-dial-drop\{position:absolute;inset:0;will-change:transform\}/);
+  assert.match(css, /@keyframes moiLift\{from\{transform:translate\(0,0\)\}\}/);
+  const sectorRules = css.split('\n').filter(line => /^\.moi-dial-sector\{/.test(line)).join('');
+  assert.doesNotMatch(sectorRules, /transition/, 'plus de transition sur les secteurs SVG, repeints à chaque image');
+  assert.match(dial, /MONTH_SHORT\.map\(\(_, month\) => month === picked \? null : sector\(month\)\)/, 'le secteur choisi quitte le fond pour son calque');
+  assert.match(dial, /className="moi-dial-lift"/);
+  assert.match(dial, /className="moi-dial-drop"[^>]*onAnimationEnd=\{\(\) => setLeft\(null\)\}/);
+  assert.match(css, /\.moi-dial-drop\{display:none\}/, 'en mouvement réduit le calque quitté disparaît sans animation');
+});

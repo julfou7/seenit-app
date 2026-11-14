@@ -4132,6 +4132,10 @@
       "tests": [
         {
           "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 retour terrain v1.4.307 : changer de mois ne repeint plus le cadran à chaque image"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-003 retour terrain v1.4.306 : le cadran s’ouvre sur le mois en cours, sans rendu par image ni pulsation permanente"
         },
         {

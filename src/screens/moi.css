@@ -132,14 +132,19 @@
 .moi-dial>svg{display:block;width:100%;height:100%;overflow:visible}
 .moi-dial-guide{fill:none;stroke:rgba(255,255,255,.05);stroke-width:1}
 .moi-dial>svg[aria-hidden]{pointer-events:none}.moi-dial-hit{fill:transparent;pointer-events:all;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.moi-dial-sector{transform-box:view-box;transform-origin:161px 161px;transition:transform .35s cubic-bezier(.2,.9,.3,1.25),opacity .3s ease}
+.moi-dial-sector{transform-box:view-box;transform-origin:161px 161px}
 .moi-dial-sector>path{fill:#8a6a2b}.moi-dial-sector[data-state=high]>path{fill:#c9952f}.moi-dial-sector[data-state=record]>path{fill:url(#moi-dial-gold)}.moi-dial-sector[data-state=current]>path{fill:#E5A93D}.moi-dial-sector[data-state=empty]>path{fill:#2a2a2f}
 .moi-dial-sector[data-state=future]>path{fill:rgba(255,255,255,.02);stroke:#52525b;stroke-width:1;stroke-dasharray:3 3}
 .moi-dial-sector>.moi-dial-pulse{fill:none !important;stroke:#FFF2B8;stroke-width:2.5;stroke-linejoin:round;opacity:.55}
-.moi-dial[data-picked=true] .moi-dial-sector{opacity:.3}.moi-dial .moi-dial-sector[data-on=true]{opacity:1;transform:translate(var(--dx),var(--dy))}
-.moi-dial[data-play=false] .moi-dial-sector{opacity:0;transform:scale(.5)}
-.moi-dial[data-play=true] .moi-dial-sector{animation:moiSector .65s cubic-bezier(.2,.9,.3,1.25) var(--delay) backwards}
-.moi-dial-center{position:absolute;left:30.7%;top:30.7%;width:38.6%;height:38.6%;padding:0;border:0;border-radius:50%;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer}
+/* Retour terrain v1.4.307 : le fond ne s'anime que par son opacité ; le secteur choisi (lift) et celui qu'on quitte (drop) sont des calques composés. */
+.moi-dial-base{transition:opacity .3s ease}.moi-dial[data-picked=true] .moi-dial-base{opacity:.3}
+.moi-dial>svg.moi-dial-lift,.moi-dial>svg.moi-dial-drop{position:absolute;inset:0;will-change:transform}
+.moi-dial-lift{transform:translate(var(--dx),var(--dy))}.moi-dial-drop{animation:moiDrop .3s ease-out forwards}
+.moi-dial[data-play=false] .moi-dial-base .moi-dial-sector,.moi-dial[data-play=false] .moi-dial-lift{opacity:0;transform:scale(.5)}
+.moi-dial[data-play=true] .moi-dial-base .moi-dial-sector{animation:moiSector .65s cubic-bezier(.2,.9,.3,1.25) var(--delay) backwards}
+.moi-dial[data-play=true] .moi-dial-lift{animation:moiSector .65s cubic-bezier(.2,.9,.3,1.25) var(--delay) backwards}
+.moi-dial[data-play=true] .moi-dial-lift[data-swap=true]{animation:moiLift .35s cubic-bezier(.2,.9,.3,1.25)}
+.moi-dial-center{position:absolute;left:30.7%;top:30.7%;width:38.6%;height:38.6%;padding:0;border:0;border-radius:50%;background:transparent;color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;will-change:transform}
 .moi-dial-center>span{font-size:12.5px;font-weight:700;color:#a1a1aa}.moi-dial-center>strong{font-size:40px;font-weight:800;letter-spacing:-1.5px;line-height:44px;color:#F2C36B}.moi-dial-center>small{font-size:11.5px;font-weight:600;color:#a1a1aa;text-align:center}
 .moi-dial-month{position:absolute;width:46px;height:44px;transform:translate(-50%,-50%);padding:0;border:0;border-radius:14px;background:transparent;color:#d4d4d8;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer;transition:transform .25s ease,background-color .25s ease,color .25s ease}
 .moi-dial-month>span{font-size:11px;font-weight:700;line-height:13px}.moi-dial-month>b{font-size:13.5px;font-weight:800;line-height:16px}
@@ -205,12 +210,14 @@ i[data-level="1"]{background:rgba(229,169,61,.3)}i[data-level="2"]{background:rg
 .moi-sweep{position:relative;overflow:hidden}.moi-sweep::after{content:'';position:absolute;top:0;bottom:0;left:0;width:60%;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.75),rgba(255,255,255,0));transform:translateX(-100%);animation:moiSweep 2.8s ease-in-out 1.4s infinite}
 @keyframes moiGrowX{from{transform:scaleX(0)}to{transform:scaleX(1)}}
 @keyframes moiGrowY{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes moiLift{from{transform:translate(0,0)}}
+@keyframes moiDrop{from{transform:translate(var(--dx),var(--dy))}to{opacity:0}}
 @keyframes moiPop{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:scale(1)}}
 @keyframes moiSector{from{opacity:0;transform:scale(.5)}}
 @keyframes moiGlow{0%,100%{opacity:0}50%{opacity:1}}
 @keyframes moiText{0%,100%{opacity:1}50%{opacity:.72}}
 @keyframes moiSweep{0%{transform:translateX(-100%)}60%,100%{transform:translateX(180%)}}
-@media (prefers-reduced-motion:reduce){.moi-reveal,.moi-reveal *,.moi-dial *,.moi-glow::after,.moi-sweep::after{animation:none !important;transition:none !important}.moi-reveal[data-seen=false],.moi-reveal[data-seen=false] *{opacity:1 !important;transform:none !important}.moi-dial[data-play=false] .moi-dial-sector{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.moi-reveal,.moi-reveal *,.moi-dial *,.moi-glow::after,.moi-sweep::after{animation:none !important;transition:none !important}.moi-reveal[data-seen=false],.moi-reveal[data-seen=false] *{opacity:1 !important;transform:none !important}.moi-dial[data-play=false] .moi-dial-base .moi-dial-sector,.moi-dial[data-play=false] .moi-dial-lift{opacity:1;transform:none}.moi-dial[data-play=false] .moi-dial-lift{transform:translate(var(--dx),var(--dy))}.moi-dial-drop{display:none}}
 /* Retour terrain v1.4.291 : pas de grand vide en bas des pages de Moi. */
 .moi-root .moi-panel:last-child,.moi-root .moi-library{padding-bottom:0}
 .moi-root .home-load-more:last-child{margin-bottom:8px}
