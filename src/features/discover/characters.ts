@@ -1,6 +1,7 @@
 import type { Show } from '../../types.ts';
 
-export interface CharacterActor { id: number; name: string; photo: string | null }
+/** #398 : `works` = clés exactes des œuvres où cet acteur est crédité pour ce rôle (jamais déduit du titre). */
+export interface CharacterActor { id: number; name: string; photo: string | null; works?: string[] }
 export interface CharacterEpisode { key: string; name: string; airDate: string | null }
 export interface CharacterWork {
  key: string; id: number; type: 'tv' | 'movie'; title: string; poster: string | null;
@@ -47,14 +48,23 @@ export function buildCharacters(media: CharacterMedia[]): CharacterRecord[] {
    results.set(id, character);
   }
   for (const alias of aliases) if (!character.aliases.includes(alias)) character.aliases.push(alias);
-  if (!character.actors.some(existing => existing.id === actor.id)) character.actors.push({ id: actor.id, name: actor.name, photo: actor.photo });
+  let performer = character.actors.find(existing => existing.id === actor.id);
+  if (!performer) { performer = { id: actor.id, name: actor.name, photo: actor.photo, works: [] }; character.actors.push(performer); }
+  if (!performer.works?.includes(work.key)) performer.works = [...(performer.works || []), work.key];
   const existing = character.works.find(item => item.key === work.key);
   if (!existing) character.works.push({ key: work.key, id: work.id, type: work.type, title: work.title, poster: work.poster, creditCount: role.count, releaseDate: work.releaseDate, runtime: work.runtime, cinema: work.cinema, ...(work.type === 'movie' ? { complete: work.coverageComplete !== false, episodes: [{ key: 'movie', name: work.title, airDate: work.releaseDate || null }] } : {}) });
   else existing.creditCount = null; // Alias counts may overlap; only episode evidence can resolve this.
  }
- for (const character of results.values()) { character.works.sort((a,b) => (a.releaseDate || '9999').localeCompare(b.releaseDate || '9999')); character.complete = character.works.every(work => work.complete); }
+ for (const character of results.values()) {
+  character.works.sort((a,b) => (a.releaseDate || '9999').localeCompare(b.releaseDate || '9999')); character.complete = character.works.every(work => work.complete);
+  // #398 : l'interprète le plus crédité d'abord ; ordre d'apparition conservé à égalité.
+  character.actors.sort((a, b) => (b.works?.length || 0) - (a.works?.length || 0));
+ }
  return [...results.values()];
 }
+/** #398 : œuvres où un interprète joue ce personnage, par clé exacte, dans l'ordre du parcours. */
+export const performerWorkTitles = (actor: CharacterActor, works: readonly CharacterWork[]) =>
+ works.filter(work => actor.works?.includes(work.key)).map(work => work.title).join(' · ');
 export function characterRoleMatches(character: CharacterRecord, work: CharacterMedia, actorId: number, role: string): boolean {
  return character.actors.some(actor => actor.id === actorId) && characterAliases(role).some(alias =>
   characterId(work.universeId, alias) === character.id || character.aliases.some(name => normalizeCharacterName(name) === normalizeCharacterName(alias)));

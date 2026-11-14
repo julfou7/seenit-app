@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import express, { type Request, type RequestHandler } from 'express';
-import { buildCharacters, characterId, characterProgress, type CharacterMedia } from '../src/features/discover/characters.ts';
+import { buildCharacters, characterId, characterProgress, performerWorkTitles, type CharacterMedia } from '../src/features/discover/characters.ts';
 import { registerCharacterRoutes, CHARACTER_CACHE_TTL, CHARACTER_UPSTREAM_CONCURRENCY } from '../src/features/providers/characterBackend.ts';
 import type { Show } from '../src/types.ts';
 
@@ -18,6 +18,25 @@ test('SEENIT-DISCOVER-004 identité par univers, alias explicites et interprète
  const twoActors=buildCharacters([work,{...work,key:'movie:8',id:8,type:'movie',cast:[{id:2,name:'Autre interprète',photo:'/actor.png',roles:[{name:'Saul Goodman',count:1}]}]}]);
  assert.equal(twoActors[0].actors.length,2);
  assert.equal(characterProgress(saul,[]).complete,false,'un count aggregate ne devient pas une preuve de visionnage');
+});
+
+test('#398 chaque interprète porte ses œuvres exactes ; le plus crédité d’abord ; la fiche les liste tous', async () => {
+ const base: CharacterMedia = { key:'tv:1',id:1,type:'tv',title:'Daredevil',poster:null,universeId:'mcu',universe:'Marvel',seasons:[],releaseDate:'2015-04-10',
+  cast:[{id:10,name:'Jon Bernthal',photo:'/jon.jpg',roles:[{name:'Frank Castle',count:10}]}] };
+ const records = buildCharacters([
+  { ...base, key:'movie:2',id:2,type:'movie',title:'Punisher: War Zone',releaseDate:'2008-12-05',cast:[{id:20,name:'Ray Stevenson',photo:null,roles:[{name:'Frank Castle',count:1}]}] },
+  base,
+  { ...base, key:'tv:3',id:3,title:'The Punisher',releaseDate:'2017-11-17' },
+ ]);
+ const frank = records.find(record => record.name === 'Frank Castle')!;
+ assert.deepEqual(frank.actors.map(actor => actor.name), ['Jon Bernthal','Ray Stevenson'], 'deux interprètes distincts, le plus crédité d’abord');
+ assert.deepEqual(frank.actors[0].works, ['tv:1','tv:3']);
+ assert.deepEqual(frank.actors[1].works, ['movie:2']);
+ assert.equal(performerWorkTitles(frank.actors[0], frank.works), 'Daredevil · The Punisher');
+ assert.equal(performerWorkTitles({ id: 30, name: 'Ancien cache', photo: null }, frank.works), '', 'un cache sans œuvres ne casse pas la fiche');
+ const modal = (await import('node:fs')).readFileSync('src/components/CharacterDetailModal.tsx','utf8');
+ assert.doesNotMatch(modal, /detail\.actors\.slice\(0,\s*1\)/, 'plus de limite au premier interprète');
+ assert.match(modal, /Joué par \{detail\.actors\.length\} interprètes/);
 });
 
 test('SEENIT-DISCOVER-004 route production : crédits exacts, co-crédits et cache public sans vus privés', async t => {
