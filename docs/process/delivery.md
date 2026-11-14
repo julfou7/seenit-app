@@ -132,10 +132,13 @@ branche à jour ou si `main` n'est plus protégée, aucun merge ne doit contourn
 sans preuve exacte repasse par la validation complète. Le job n'obtient que `actions: read` en plus de
 `contents: read`.
 
-Le smoke navigateur s'exécute en **quatre couloirs** Chromium isolés : un profil et un stockage par couloir,
-avec focus émulé. Chaque couloir suit l'ordre historique : rendu → clavier → actions #180 → dialogues,
-diffuseurs, cartes, historique, navigation ; TV → recherche → minuterie 18c (horloge virtuelle en
-dernier) ; terrains Accueil 220–223 ; terrains 224–227 → À voir → performance → jamais commencées. `SEENIT_PWA_LANES=1` rejoue la
+Le smoke navigateur s'exécute en **huit couloirs** Chromium isolés : un profil et un stockage par couloir,
+avec focus émulé. Les couloirs sont des tranches contiguës de l'ordre historique, équilibrées sur les
+durées CI mesurées (le plus long ≈ 45 s, contre 79 s avec quatre couloirs, #84) : rendu → clavier →
+actions #180 → dialogues, diffuseurs, cartes, historique ; navigation ; TV ; recherche → minuterie 18c
+(horloge virtuelle en dernier) ; terrains Accueil 220–221 ; 222–223 → fiche → téléchargements ;
+terrain 224 ; terrains 226–227 → À voir → performance → jamais commencées. Les harnais sont construits
+en parallèle avant le lancement des navigateurs. `SEENIT_PWA_LANES=1` rejoue la
 séquence d'origine sur un seul client pour diagnostiquer. Le rapport `pwa-browser.json` publie la durée
 de chaque harnais (`timings`). Une condition attendue n'échoue qu'à l'expiration de son délai : pendant
 l'attente, une exception (élément pas encore rendu) vaut « pas encore ». Sans cette règle, deux courses

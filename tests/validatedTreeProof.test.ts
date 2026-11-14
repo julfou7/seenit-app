@@ -161,22 +161,25 @@ test('#85 câblage du workflow : lecture seule, après installation, smoke condi
   assert.match(job, /name: \$\{\{ steps\.proof\.outputs\.artifact_name \}\}/);
 });
 
-test('SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés dans l’ordre historique', () => {
+test('SEENIT-QUALITY-013 le smoke navigateur tourne en huit couloirs isolés dans l’ordre historique', () => {
   const smoke = require('../scripts/pwa-browser-smoke.cjs');
   const config = JSON.parse(readFileSync('docs/specifications/quality-gates.json', 'utf8'));
   const groups = smoke.buildLaneGroups(config) as Array<Array<[string, unknown]>>;
-  assert.equal(groups.length, 4);
+  // #84 : tranches contiguës de la séquence historique, équilibrées sur les durées CI mesurées.
+  assert.equal(groups.length, 8);
   assert.deepEqual(groups.flat().map(([key]) => key), [
     'viewports', 'accessibility', 'componentActions', 'dialogs', 'providers', 'seriesCards', 'history', 'navbar',
     'tv', 'searchKeyboard', 'watchNext',
     'homeV4', 'homeTerrain221', 'homeTerrain222', 'homeTerrain223', 'mediaDetail', 'downloads', 'homeTerrain224', 'homeTerrain226', 'homeTerrain227', 'home', 'homePerformance', 'homeUnseen',
   ], 'SEENIT_PWA_LANES=1 rejoue exactement la séquence historique');
-  assert.equal(groups[1].at(-1)?.[0], 'watchNext', 'l’horloge virtuelle 18c reste la dernière de son client');
+  assert.equal(groups[3].at(-1)?.[0], 'watchNext', 'l’horloge virtuelle 18c reste la dernière de son client');
   assert.deepEqual(groups[0].slice(0, 3).map(([key]) => key), ['viewports', 'accessibility', 'componentActions']);
-  assert.equal(smoke.resolveLaneCount(undefined, 4), 4);
-  assert.equal(smoke.resolveLaneCount('1', 4), 1);
-  assert.equal(smoke.resolveLaneCount('0', 4), 1);
-  assert.equal(smoke.resolveLaneCount('9', 4), 4);
+  assert.equal(smoke.resolveLaneCount(undefined, 8), 8);
+  assert.equal(smoke.resolveLaneCount('1', 8), 1);
+  assert.equal(smoke.resolveLaneCount('0', 8), 1);
+  assert.equal(smoke.resolveLaneCount('9', 8), 8);
+  const source0 = readFileSync('scripts/pwa-browser-smoke.cjs', 'utf8');
+  assert.match(source0, /await Promise\.all\(\[\n\s*buildComponentActionHarness\(\),/, 'harnais construits en parallèle');
 
   const source = readFileSync('scripts/pwa-browser-smoke.cjs', 'utf8');
   assert.match(source, /--user-data-dir=\$\{userDataDir\}/, 'un profil, donc un stockage, par couloir');

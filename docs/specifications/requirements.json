@@ -3534,7 +3534,7 @@
         },
         {
           "file": "tests/validatedTreeProof.test.ts",
-          "contains": "SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés dans l’ordre historique"
+          "contains": "SEENIT-QUALITY-013 le smoke navigateur tourne en huit couloirs isolés dans l’ordre historique"
         },
         {
           "file": "tests/validatedTreeProof.test.ts",

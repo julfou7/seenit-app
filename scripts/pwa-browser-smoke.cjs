@@ -530,10 +530,14 @@ function buildLaneGroups(config) {
       ['providers', client => testProviderHarness(client, root)],
       ['seriesCards', client => testSeriesCardHarness(client, root)],
       ['history', client => testHistoryHarness(client, root)],
+    ],
+    [
       ['navbar', client => testNavbarHarness(client, root)],
     ],
     [
       ['tv', client => testTvHarness(client, root)],
+    ],
+    [
       ['searchKeyboard', client => testSearchKeyboardHarness(client, root)],
       // L'horloge virtuelle de la minuterie 18c reste la dernière vérification de son client CDP.
       ['watchNext', client => testWatchNextHarness(client, root)],
@@ -541,6 +545,8 @@ function buildLaneGroups(config) {
     [
       ['homeV4', client => testTerrain220Harness(client, root)],
       ['homeTerrain221', client => testTerrain221Harness(client, root)],
+    ],
+    [
       ['homeTerrain222', client => testTerrain222Harness(client, root)],
       ['homeTerrain223', client => testTerrain223Harness(client, root)],
       ['mediaDetail', client => testMediaDetailHarness(client)],
@@ -548,6 +554,8 @@ function buildLaneGroups(config) {
     ],
     [
       ['homeTerrain224', client => testTerrain224Harness(client, root)],
+    ],
+    [
       ['homeTerrain226', client => testTerrain226Harness(client, root)],
       ['homeTerrain227', client => testTerrain227Harness(client, root)],
       ['home', client => testHomeHarness(client, root)],
@@ -634,19 +642,21 @@ async function main() {
   let preview;
   let browsers = [];
   try {
-    await buildComponentActionHarness();
-    await buildDialogHarness(root);
-    await buildProviderHarness(root);
-    await buildSeriesCardHarness(root);
-    await buildHistoryHarness(root);
-    await buildWatchNextHarness(root);
-    await buildNavbarHarness(root);
-    await buildTvHarness(root);
-
-    await buildSearchKeyboardHarness(root);
-    await buildHomeHarness(root);
-    await buildMediaDetailHarness(root);
-    await buildDownloadsHarness(root);
+    // #84 : les harnais écrivent des fichiers distincts ; esbuild les construit en parallèle.
+    await Promise.all([
+      buildComponentActionHarness(),
+      buildDialogHarness(root),
+      buildProviderHarness(root),
+      buildSeriesCardHarness(root),
+      buildHistoryHarness(root),
+      buildWatchNextHarness(root),
+      buildNavbarHarness(root),
+      buildTvHarness(root),
+      buildSearchKeyboardHarness(root),
+      buildHomeHarness(root),
+      buildMediaDetailHarness(root),
+      buildDownloadsHarness(root),
+    ]);
     const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
     if (!fs.existsSync(viteBin)) throw new Error('Vite installé requis avant le smoke navigateur.');
     preview = spawn(process.execPath, [viteBin, 'preview', '--host', '127.0.0.1', '--port', '4173', '--strictPort'], {
@@ -657,7 +667,7 @@ async function main() {
     preview.stderr.on('data', chunk => diagnostics.push(`[vite] ${chunk.toString().trim()}`));
     await waitForHttp(previewUrl);
 
-    // Quatre navigateurs isolés (profil, stockage, horloge virtuelle) exécutent chacun un couloir dans
+    // Huit navigateurs isolés (profil, stockage, horloge virtuelle) exécutent chacun un couloir dans
     // l'ordre historique ; SEENIT_PWA_LANES=1 rejoue exactement la séquence d'origine sur un seul client.
     // SEENIT_PWA_ONLY=mediaDetail,home : rejoue localement quelques harnais seulement (jamais en CI).
     const only = String(process.env.SEENIT_PWA_ONLY || '').split(',').map(key => key.trim()).filter(Boolean);
