@@ -4132,6 +4132,10 @@
       "tests": [
         {
           "file": "tests/profileRefonte.test.ts",
+          "contains": "SEENIT-PROFILE-003 retour terrain v1.4.308 : le cadran se monte seul, le reste de Mes chiffres arrive par paliers"
+        },
+        {
+          "file": "tests/profileRefonte.test.ts",
           "contains": "SEENIT-PROFILE-003 retour terrain v1.4.307 : changer de mois ne repeint plus le cadran à chaque image"
         },
         {

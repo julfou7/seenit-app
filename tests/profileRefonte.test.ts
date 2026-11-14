@@ -148,7 +148,7 @@ test('SEENIT-PROFILE-005 animations une fois à l’entrée, sur transform et op
   assert.match(dial, /aria-pressed=\{picked === month\}/);
   assert.match(dial, /setPicked\(current => current === month \? null : month\)/);
   const dashboard = read('src/components/ProAnalyticsDashboard.tsx');
-  assert.match(dashboard, /const \{ data, loading, contributions \} = useProAnalytics\(shows, libraryReady\)/);
+  assert.match(dashboard, /const \{ data, loading, contributions \} = useProAnalytics\(shows, libraryReady && level >= 3\)/);
   assert.match(dashboard, /contributions\?\.\[getProfileAnalyticsMediaKey\(show\)\]\?\.value/, 'genres et têtes d’affiche sur tous les titres vus (revue Codex #944)');
   assert.match(read('src/hooks/useProAnalytics.ts'), /return \{ data, loading, contributions \};/);
   assert.match(dial, /left: `\$\{\(x \/ 322 \* 100\)\.toFixed\(2\)\}%`/, 'les mois suivent un cadran rétréci (revue Codex #944)');
@@ -394,4 +394,25 @@ test('SEENIT-PROFILE-003 retour terrain v1.4.307 : changer de mois ne repeint pl
   assert.match(css, /\.moi-dial\[data-play=true\]:not\(\[data-touched=true\]\) \.moi-dial-base \.moi-dial-sector\{animation:moiSector/, 'l’entrée des secteurs ne rejoue pas quand un secteur retourne dans le fond (revue Codex #992)');
   assert.match(dial, /className="moi-dial-drop"[^>]*onAnimationEnd=\{\(\) => setLeft\(null\)\}/);
   assert.match(css, /\.moi-dial-drop\{display:none\}/, 'en mouvement réduit le calque quitté disparaît sans animation');
+});
+
+test('SEENIT-PROFILE-003 retour terrain v1.4.308 : le cadran se monte seul, le reste de Mes chiffres arrive par paliers', () => {
+  const staged = read('src/components/profile/useStagedMount.ts');
+  assert.match(staged, /export function useStagedMount\(steps: number, \{ start = 1500, gap = 260 \}/, 'premier palier après l’introduction du cadran (compteur 1,1 s, secteurs 1,25 s)');
+  const dashboard = read('src/components/ProAnalyticsDashboard.tsx');
+  assert.match(dashboard, /const level = useStagedMount\(5\);/);
+  assert.match(dashboard, /useProAnalytics\(shows, libraryReady && level >= 3\)/, 'la réconciliation des statistiques ne démarre pas pendant l’introduction');
+  for (const [section, step] of [['Trois repères', 1], ['Ce que tu regardes', 2], ['Quand tu regardes', 3], ['Où tu regardes', 3], ['Badges', 5]] as const) {
+    const index = dashboard.indexOf(`label="${section}"`);
+    assert.ok(index > 0, section);
+    assert.match(dashboard.slice(Math.max(0, index - 160), index), new RegExp(`level >= ${step}`), `${section} attend le palier ${step}`);
+  }
+  // Le cadran, lui, est monté dès le premier rendu.
+  const dial = dashboard.indexOf('label="Heures par mois"');
+  assert.doesNotMatch(dashboard.slice(Math.max(0, dial - 120), dial), /level >=/);
+  // Les calculs lourds ne tournent qu'à leur palier.
+  assert.match(dashboard, /const later = <T,>\(step: number, items: T\[\]\): T\[\] => level >= step \? items : \[\];/);
+  assert.match(dashboard, /buildProfileInsights\(later\(1, viewings\)/);
+  assert.match(dashboard, /buildGenreShares\(later\(2, yearViewings\)/);
+  assert.match(dashboard, /buildLeadActors\(later\(5, yearViewings\)/);
 });

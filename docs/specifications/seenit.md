@@ -1732,6 +1732,11 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   Retour v1.4.307 : changer de mois saccadait encore sur téléphone ; le fond du cadran ne bouge plus que par un fondu
   d'opacité et le secteur choisi (qui sort du fond) comme celui qu'on quitte (qui revient en place en s'estompant)
   sont de petits calques glissés par `transform`, sans transition SVG repeinte à chaque image.
+  Retour v1.4.308 : à l'ouverture de Mes chiffres le compteur restait figé puis sautait, parce que toute la page
+  (calculs et rendu de chaque bloc, réconciliation des statistiques) se montait pendant l'introduction du cadran ;
+  le cadran se monte seul et les blocs suivants arrivent par paliers une fois l'introduction finie (repères et
+  tendances, puis genres et rendez-vous, créneaux et plateformes, séries laissées en route et réactions, enfin têtes
+  d'affiche et badges), sans changer leur contenu.
 - **SEENIT-PROFILE-004** — Mon année : titre « L'année X, puis Y » d'après les séries les plus regardées,
   calendrier jour par jour (quatre niveaux, journée record), mois record, plus longue suite de jours, plus
   gros marathon d'une série en un jour et plus longue pause, « Ton année en séries » (série la plus
