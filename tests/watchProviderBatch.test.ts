@@ -216,7 +216,23 @@ test('SEENIT-PROVIDER-002 retour v1.4.302 : la fiche montre le même diffuseur d
   assert.match(readFileSync('src/screens/ShowDetailView.tsx', 'utf8'), /origin=\{originalBroadcasterRow\(originBroadcaster, tmdbDetails\?\.homepage\)\}/);
   const card = readFileSync('src/screens/mediaDetail/detailUi.tsx', 'utf8');
   assert.match(card, /Diffuseur d’origine en France/);
-  assert.match(card, /\{!loading && providers\.length === 0 && !origin && <p/, 'plus de « pas encore disponible » quand Canal+ diffuse');
+  assert.match(card, /\{!loading && providers\.length === 0 && !origin && \(failed/, 'plus de « pas encore disponible » quand Canal+ diffuse');
+});
+
+test('#397 Où regarder distingue chargement, vide confirmé et panne de la source', () => {
+  const core = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
+  const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
+  const card = readFileSync('src/screens/mediaDetail/detailUi.tsx', 'utf8');
+  // Chargement : providers === null tant que la source n'a pas répondu.
+  assert.match(view, /loading=\{plexMediaInfo === null \|\| providers === null\}/);
+  // Vide confirmé : un tableau vide, jamais marqué en panne.
+  assert.match(core, /if \(isCurrentRequest\(\)\) \{ setProviders\(res\.value\.results\?\.FR \|\| \[\]\); setOriginBroadcaster\(res\.value\); setProvidersFailed\(false\); \}/);
+  // Panne (réponse en échec ou rejet) : la recherche se termine et l'échec est porté à part.
+  assert.match(core, /const markProvidersFailed = \(\) => \{ if \(isCurrentRequest\(\)\) \{ setProviders\(\(current: unknown\) => current \?\? \{\}\); setProvidersFailed\(true\); \} \};/);
+  assert.match(core, /\.then\(res => \{ if \(!res\.ok\) return markProvidersFailed\(\);[^\n]*\}\)\.catch\(markProvidersFailed\);/);
+  assert.match(view, /failed=\{providersFailed\}/);
+  assert.match(card, /\(failed\n\s*\? <p role="status" data-providers-failed=""[^>]*>Diffuseurs indisponibles pour le moment\. Réessaie plus tard\.<\/p>\n\s*: emptyLabel && <p/);
+  assert.doesNotMatch(card, /failed[^\n]*Pas encore disponible/, 'une panne n’affiche jamais le libellé d’absence');
 });
 
 test('SEENIT-PROVIDER-002 retour v1.4.303 : une seule détection du diffuseur d’origine, appliquée partout', () => {
