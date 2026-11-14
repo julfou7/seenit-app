@@ -23,6 +23,7 @@ const plexGuidValues = (value: unknown): string[] => Array.isArray(value) ? valu
 const isPlexOwned = (owned: unknown) => owned === true || owned === 1 || owned === '1';
 const PLEX_DELTA_COLLECT_DEADLINE_MS = 40_000;
 import { processReleaseUpdateNotificationRequest } from "./src/features/release/releaseUpdatePushBackend.ts";
+import { isReleaseUpdatePushFailure } from "./src/features/release/releaseUpdatePushCore.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
 import dns from "node:dns/promises";
 import net from "node:net";
@@ -514,7 +515,6 @@ function startCronJobs() {
       }
 
       await batch.commit();
-      console.log("[CRON] Vérification terminée et base de données nettoyée.");
     } catch (error) {
       console.error("[CRON] Erreur générale lors de l'exécution :", error);
     }
@@ -2621,7 +2621,7 @@ async function startServer() {
         `[ReleaseUpdatePush] v${body.version}: ${Number(body.sent || 0)} envoyée(s), ` +
         `${Number(body.alreadySent || 0)} déjà traitée(s), ${Number(body.invalid || 0)} token(s) invalide(s).`
       );
-    } else if (result.status >= 400) {
+    } else if (isReleaseUpdatePushFailure(result.status, body.error)) {
       emitOperationalEvent({
         code: 'RELEASE_UPDATE_PUSH_FAILED',
         context: {
