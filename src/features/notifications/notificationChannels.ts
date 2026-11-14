@@ -30,6 +30,20 @@ const CHANNELS: ReadonlyArray<Channel> = [
 let ensurePromise: Promise<void> | null = null;
 
 /**
+ * Canaux SeenIt bloqués par l'utilisateur dans Android (importance NONE = 0). Hors Android ou en cas
+ * d'échec de lecture : aucun canal considéré bloqué (le comportement historique est conservé).
+ */
+export const readBlockedSeenItChannels = async (): Promise<Set<string>> => {
+  if (Capacitor.getPlatform() !== 'android') return new Set();
+  try {
+    const { channels } = await LocalNotifications.listChannels();
+    return new Set(channels.filter(channel => channel.id.startsWith('seenit_') && channel.importance === 0).map(channel => channel.id));
+  } catch {
+    return new Set();
+  }
+};
+
+/**
  * SEENIT-NOTIFICATION-006 — crée uniquement les nouveaux canaux SeenIt (huit depuis #909).
  * `seenit_downloads` est volontairement absent : il existe déjà et ses choix système
  * doivent être conservés au lieu d'être recréés/réinitialisés par la refonte #778.
