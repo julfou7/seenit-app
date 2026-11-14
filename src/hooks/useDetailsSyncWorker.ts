@@ -20,7 +20,8 @@ import { performPlexSync } from '../features/plex/syncPlex';
 import { getPlexLastSyncTimestamp, getStoredPlexToken } from '../features/plex/plexStorage';
 import { PLEX_AUTO_SYNC_INTERVAL_MS, PLEX_AUTO_SYNC_RETRY_MS } from '../features/plex/plexAutoSync';
 
-export async function performDetailsSync(forceAll = false): Promise<{ success: boolean; syncedCount: number; error?: string }> {
+/** `complete: false` : au moins une série n'a pas pu être lue (fournisseur indisponible, quota) ; le passage sera retenté. */
+export async function performDetailsSync(forceAll = false): Promise<{ success: boolean; syncedCount: number; complete?: boolean; error?: string }> {
   const setSyncStatus = useSyncStore.getState().setSyncStatus;
   const setQuotaExceeded = useSyncStore.getState().setQuotaExceeded;
 
@@ -156,6 +157,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
     }
 
     const totalTvShows = tvShowsToSync.length;
+    let interrupted = false;
 
     for (let i = 0; i < tvShowsToSync.length; i++) {
       const showToSync = tvShowsToSync[i];
@@ -163,6 +165,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
 
       const currentQuotaExceeded = useSyncStore.getState().isQuotaExceeded;
       if (currentQuotaExceeded) {
+         interrupted = true;
          setSyncStatus(null);
          break;
       }
@@ -187,6 +190,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         if (!detailsRes.ok) {
           const errMsg = 'error' in detailsRes ? (typeof detailsRes.error === 'object' && detailsRes.error !== null && 'message' in detailsRes.error ? detailsRes.error.message : String(detailsRes.error)) : 'Unknown error';
           appLogger.warn('system', `[SyncWorker] Could not fetch details for ${showToSync.title}: ${errMsg}`);
+          interrupted = true;
           continue;
         }
 
@@ -468,6 +472,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         await new Promise(resolve => setTimeout(resolve, 500));
 
       } catch (err: unknown) {
+        interrupted = true;
         appLogger.error('system', `[SyncWorker] Error syncing details for ${showToSync.title}:`, { error: err instanceof Error ? err.message : String(err) });
         const errStr = err instanceof Error ? err.message : String(err);
         const isQuotaError =
@@ -487,7 +492,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
     }
 
     setSyncStatus(null);
-    return { success: true, syncedCount };
+    return { success: true, syncedCount, complete: !interrupted };
   } catch (err: unknown) {
     appLogger.error('system', "[SyncWorker] Error fetching shows to sync:", { error: err instanceof Error ? err.message : String(err) });
     setSyncStatus(null);
@@ -521,7 +526,7 @@ export function useDetailsSyncWorker() {
       if (last !== undefined && now - last < 12 * 60 * 60 * 1000 && !boundaryDue) return;
       lastRunRef.current.set(uid, now);
       runningDetailsRef.current.add(uid);
-      void performDetailsSync(false).then(result => { if (result.success) writeAutoSyncRun(uid, 'details'); }).catch(logWorkerError).finally(() => runningDetailsRef.current.delete(uid));
+      void performDetailsSync(false).then(result => { if (result.success && result.complete !== false) writeAutoSyncRun(uid, 'details'); }).catch(logWorkerError).finally(() => runningDetailsRef.current.delete(uid));
     };
     const runPlexSync = () => {
       const uid = auth.currentUser?.uid;

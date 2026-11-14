@@ -34,7 +34,9 @@ test('SEENIT-PLEX-012 retour du 14/11 : le worker lit les délais mémorisés et
   assert.match(worker, /lastAutoSyncRun\(uid, 'details', lastRunRef\.current\.get\(uid\)\)/);
   assert.match(worker, /lastAutoSyncRun\(uid, 'plex', lastPlexRunRef\.current\.get\(uid\)\)/);
   assert.match(worker, /writeAutoSyncRun\(uid, 'plex', now\);\n\s+void performPlexSync/, 'l’essai Plex est mémorisé avant de partir');
-  assert.match(worker, /if \(result\.success\) writeAutoSyncRun\(uid, 'details'\)/, 'seul un passage terminé retarde le suivant');
+  assert.match(worker, /if \(result\.success && result\.complete !== false\) writeAutoSyncRun\(uid, 'details'\)/, 'seul un passage terminé sans série illisible retarde le suivant (revue Codex #994)');
+  assert.equal([...worker.matchAll(/interrupted = true;/g)].length, 3, 'quota, réponse TMDB refusée et exception par série interrompent le passage');
+  assert.match(worker, /return \{ success: true, syncedCount, complete: !interrupted \};/);
   const engine = read('src/features/plex/plexSyncEngine.ts');
   assert.match(engine, /\/erreur\|pause\/i\.test\(message \|\| ''\) \? 'error' : \/incompl\/i\.test\(message \|\| ''\) \? 'incomplete' : 'done'/);
   assert.equal([...engine.matchAll(/if \(!silent && ignoreCooldown\) \{\s+useToastStore\.getState\(\)\.showToast\(`(?:Synchronisation Plex incomplète|Plex sera retenté)/g)].length, 2, 'seule une synchro manuelle annonce un essai incomplet');
