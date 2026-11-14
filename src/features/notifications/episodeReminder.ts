@@ -6,7 +6,8 @@ import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '
 import { useShowActions } from '../../hooks/useShows';
 import { useToastStore } from '../../store/toastStore';
 import { appLogger } from '../../store/logStore';
-import { mergeNotificationPreferences } from './notificationPreferences';
+import { Capacitor } from '@capacitor/core';
+import { readEffectiveNotificationPreferences } from './notificationPreferences';
 
 export interface ReminderEpisode { season_number: number; episode_number: number; name?: string | null; air_date?: string | null }
 
@@ -25,7 +26,7 @@ export function seriesRemindersActive(show: Show | null | undefined, uid = auth.
   if (!show?.id) return false;
   if (show.notificationsEnabled === true || readUserScopedJson(uid, `reminder_${show.id}`, false)) return true;
   if (show.notificationsEnabled === false || show.isArchived || show.status === 'dropped') return false;
-  const prefs = mergeNotificationPreferences(readUserScopedJson(uid, 'notifications', null));
+  const prefs = readEffectiveNotificationPreferences(readUserScopedJson(uid, 'notifications', null), Capacitor.getPlatform());
   return show.mediaType === 'movie' ? prefs.movie_theater || prefs.movie_dvd_vod : prefs.release_today_tv;
 }
 

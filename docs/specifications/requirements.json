@@ -3949,6 +3949,10 @@
         },
         {
           "file": "tests/notificationRefactor.test.ts",
+          "contains": "SEENIT-NOTIFICATION-006 #402 sur Android, les canaux système sont la seule autorité des rappels"
+        },
+        {
+          "file": "tests/notificationRefactor.test.ts",
           "contains": "SEENIT-NOTIFICATION-006 fusionne les préférences sans écraser les choix"
         },
         {
