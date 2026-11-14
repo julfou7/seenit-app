@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.306**
+Version applicative : **1.4.307**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1729,6 +1729,9 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   centre ou sur ce mois revient au total ; sur une année passée il s'ouvre sur le total. Le compteur du centre
   s'écrit directement dans le nœud (aucun rendu du cadran par image) et plus aucune animation SVG ne tourne en
   continu : l'ouverture de Mes chiffres restait saccadée sur téléphone.
+  Retour v1.4.307 : changer de mois saccadait encore sur téléphone ; le fond du cadran ne bouge plus que par un fondu
+  d'opacité et le secteur choisi (qui sort du fond) comme celui qu'on quitte (qui revient en place en s'estompant)
+  sont de petits calques glissés par `transform`, sans transition SVG repeinte à chaque image.
 - **SEENIT-PROFILE-004** — Mon année : titre « L'année X, puis Y » d'après les séries les plus regardées,
   calendrier jour par jour (quatre niveaux, journée record), mois record, plus longue suite de jours, plus
   gros marathon d'une série en un jour et plus longue pause, « Ton année en séries » (série la plus

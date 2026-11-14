@@ -50,6 +50,11 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
   const period = periodLabel ?? `en ${year}`;
   // Retour terrain v1.4.306 : le cadran s'ouvre sur le mois en cours ; un second toucher revient au total, et rejouer le total le garde (revue Codex #991).
   const [picked, setPicked] = useState<number | null>(!replayed && currentMonth >= 0 && currentMonth < minutes.length ? currentMonth : null);
+  // Mois quitté : son calque revient en place en s'estompant pendant que le fond le montre déjà en retrait.
+  const [previous, setPrevious] = useState(picked);
+  const [left, setLeft] = useState<number | null>(null);
+  const [touched, setTouched] = useState(false);
+  if (previous !== picked) { setPrevious(picked); setLeft(previous); setTouched(true); }
   const max = Math.max(1, ...minutes);
   const pickedKnown = picked !== null && picked < minutes.length;
   const target = picked === null ? hours(totalMinutes) : pickedKnown ? hours(minutes[picked]) : 0;
@@ -59,28 +64,40 @@ function DialBody({ year, minutes, episodes, films, recordMonth, currentMonth, t
     : !pickedKnown ? 'à venir'
     : minutes[picked] <= 0 ? 'rien regardé'
     : [films[picked] ? plural(films[picked], 'film') : null, episodes[picked] ? `${episodes[picked]} ép.` : null].filter(Boolean).join(' · ');
+  const popVars = (month: number, delay = 0) => {
+    const angle = (month * 30 + 15) * Math.PI / 180;
+    return { '--delay': `${delay}ms`, '--dx': `${(POP * Math.sin(angle)).toFixed(1)}px`, '--dy': `${(-POP * Math.cos(angle)).toFixed(1)}px` } as CSSProperties;
+  };
+  const sector = (month: number) => {
+    const known = month < minutes.length;
+    const value = known ? minutes[month] : 0;
+    const outer = INNER + (value > 0 ? Math.max(5, value / max * MAX_GROWTH) : 5);
+    const state = !known ? 'future' : month === recordMonth ? 'record' : month === currentMonth ? 'current' : value <= 0 ? 'empty' : value / max >= 0.45 ? 'high' : 'low';
+    return (
+      <g key={month} className="moi-dial-sector" data-state={state} style={{ '--delay': `${month * 55}ms` } as CSSProperties}>
+        <path d={sectorPath(month, outer)} />
+        {state === 'current' && <path className="moi-dial-pulse" d={sectorPath(month, outer)} />}
+      </g>
+    );
+  };
   const summary = PROFILE_MONTH_LABELS.map((_, month) => month < minutes.length ? `${monthName(month).toLowerCase()} ${hours(minutes[month])}` : null).filter(Boolean).join(', ');
   return (
-    <div className="moi-dial" data-play={play} data-picked={picked !== null}>
-      <svg viewBox="0 0 322 322" aria-hidden="true">
+    <div className="moi-dial" data-play={play} data-picked={picked !== null} data-touched={touched}>
+      {/* Retour terrain v1.4.307 : le fond du cadran ne bouge plus (un seul fondu d'opacité) ; le secteur choisi et celui qu'on
+          quitte sont deux petits calques qui glissent par transform, ce que le téléphone compose sans repeindre le SVG. */}
+      <svg className="moi-dial-base" viewBox="0 0 322 322" aria-hidden="true">
         <defs><linearGradient id="moi-dial-gold" x1="10%" y1="5%" x2="90%" y2="95%"><stop offset="0%" stopColor="#FFF2B8" /><stop offset="32%" stopColor="#F5C518" /><stop offset="70%" stopColor="#E5A93D" /><stop offset="100%" stopColor="#B37812" /></linearGradient></defs>
         {MONTH_DIAL.guides.map(radius => <circle key={radius} cx={CENTER} cy={CENTER} r={radius} className="moi-dial-guide" />)}
-        {MONTH_SHORT.map((_, month) => {
-          const known = month < minutes.length;
-          const value = known ? minutes[month] : 0;
-          const outer = INNER + (value > 0 ? Math.max(5, value / max * MAX_GROWTH) : 5);
-          const angle = (month * 30 + 15) * Math.PI / 180;
-          const state = !known ? 'future' : month === recordMonth ? 'record' : month === currentMonth ? 'current' : value <= 0 ? 'empty' : value / max >= 0.45 ? 'high' : 'low';
-          return (
-            <g key={month} className="moi-dial-sector" data-state={state} data-on={picked === month} style={{ '--delay': `${month * 55}ms`, '--dx': `${(POP * Math.sin(angle)).toFixed(1)}px`, '--dy': `${(-POP * Math.cos(angle)).toFixed(1)}px` } as CSSProperties}>
-              <path d={sectorPath(month, outer)} />
-              {state === 'current' && <path className="moi-dial-pulse" d={sectorPath(month, outer)} />}
-            </g>
-          );
-        })}
+        {MONTH_SHORT.map((_, month) => month === picked ? null : sector(month))}
         {/* Retour terrain v1.4.293 : toucher un secteur, même fin, ouvre son mois comme son étiquette. */}
         {MONTH_SHORT.map((label, month) => <path key={label} className="moi-dial-hit" data-month={month} d={sectorPath(month, MONTH_DIAL.hitRadius)} onClick={() => setPicked(current => current === month ? null : month)} />)}
       </svg>
+      {left !== null && left !== picked && (
+        <svg key={`drop-${left}`} className="moi-dial-drop" viewBox="0 0 322 322" aria-hidden="true" style={popVars(left)} onAnimationEnd={() => setLeft(null)}>{sector(left)}</svg>
+      )}
+      {picked !== null && (
+        <svg key={`lift-${picked}`} className="moi-dial-lift" data-swap={touched} viewBox="0 0 322 322" aria-hidden="true" style={popVars(picked, picked * 55)}>{sector(picked)}</svg>
+      )}
       <button type="button" className="moi-dial-center" onClick={() => { if (picked === null) onReplay(); else setPicked(null); }}
         aria-label={picked === null ? `${period} : ${hours(totalMinutes)} heures. Rejouer l’animation` : 'Revenir au total'}>
         <span>{picked === null ? period : monthName(picked).toLowerCase()}</span>
