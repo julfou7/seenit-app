@@ -46,6 +46,15 @@ export class ReleaseNotificationSourceError extends Error {
   }
 }
 
+/**
+ * #478 : un refus `untrusted_repository` arrive avant toute vérification et ne correspond à aucune
+ * tentative de notification. C'est notamment la sonde volontaire du déploiement (`--data '{}'`) qui
+ * prouve que la route est active ; elle ne doit pas alimenter l'alerte « échecs de notification ».
+ */
+export function isReleaseUpdatePushFailure(status: number, errorCode: unknown): boolean {
+  return status >= 400 && errorCode !== 'untrusted_repository';
+}
+
 export type FetchLike = (
   input: string | URL | Request,
   init?: RequestInit
@@ -79,11 +88,22 @@ function githubHeaders(githubToken?: string): Record<string, string> {
   return headers;
 }
 
-async function fetchGithubJson(
+// Champs GitHub lus par la vérification ; tout reste `unknown` et est contrôlé avant usage.
+interface GithubGitObject { sha?: unknown; type?: unknown }
+interface GithubRef { object?: GithubGitObject }
+interface GithubWorkflowRun {
+  repository?: { full_name?: unknown };
+  path?: unknown; event?: unknown; head_branch?: unknown; head_sha?: unknown; status?: unknown; conclusion?: unknown;
+  run_started_at?: unknown; created_at?: unknown; updated_at?: unknown;
+}
+interface GithubReleaseAsset { name?: unknown; browser_download_url?: unknown; digest?: unknown }
+interface GithubRelease { tag_name?: unknown; draft?: unknown; prerelease?: unknown; published_at?: unknown; assets?: unknown }
+
+async function fetchGithubJson<T>(
   url: string,
   fetchImpl: FetchLike,
   githubToken?: string
-): Promise<any> {
+): Promise<T> {
   let response: Response;
   try {
     response = await fetchImpl(url, { headers: githubHeaders(githubToken) });
@@ -118,7 +138,7 @@ async function resolveTagCommitSha(
   fetchImpl: FetchLike,
   githubToken?: string
 ): Promise<string> {
-  const ref = await fetchGithubJson(
+  const ref = await fetchGithubJson<GithubRef | null>(
     `https://api.github.com/repos/${OFFICIAL_SEENIT_REPOSITORY}/git/ref/tags/${encodeURIComponent(tagName)}`,
     fetchImpl,
     githubToken
@@ -128,7 +148,7 @@ async function resolveTagCommitSha(
     throw new ReleaseNotificationSourceError(502, 'invalid_tag_ref', 'Référence GitHub de release invalide');
   }
   if (object.type === 'tag') {
-    const annotated = await fetchGithubJson(
+    const annotated = await fetchGithubJson<GithubRef | null>(
       `https://api.github.com/repos/${OFFICIAL_SEENIT_REPOSITORY}/git/tags/${object.sha}`,
       fetchImpl,
       githubToken
@@ -188,7 +208,7 @@ export async function verifyOfficialReleaseNotification(
   const request = parseRequest(input);
   const fetchImpl = options.fetchImpl || fetch;
 
-  const run = await fetchGithubJson(
+  const run = await fetchGithubJson<GithubWorkflowRun>(
     `https://api.github.com/repos/${OFFICIAL_SEENIT_REPOSITORY}/actions/runs/${request.runId}`,
     fetchImpl,
     options.githubToken
@@ -206,7 +226,7 @@ export async function verifyOfficialReleaseNotification(
     throw new ReleaseNotificationSourceError(403, 'untrusted_workflow_run', 'Le run GitHub ne prouve pas une release SeenIt réussie');
   }
 
-  const release = await fetchGithubJson(
+  const release = await fetchGithubJson<GithubRelease>(
     `https://api.github.com/repos/${OFFICIAL_SEENIT_REPOSITORY}/releases/latest`,
     fetchImpl,
     options.githubToken
@@ -239,9 +259,9 @@ export async function verifyOfficialReleaseNotification(
   const version = `${Number(tagMatch[1])}.${Number(tagMatch[2])}.${Number(tagMatch[3])}`;
   const apkName = `SeenIt-v${version}.apk`;
   const shaName = `${apkName}.sha256`;
-  const assets = Array.isArray(release.assets) ? release.assets : [];
-  const apkAssets = assets.filter((asset: { name?: unknown } | null) => asset?.name === apkName);
-  const shaAssets = assets.filter((asset: { name?: unknown } | null) => asset?.name === shaName);
+  const assets: Array<GithubReleaseAsset | null> = Array.isArray(release.assets) ? release.assets : [];
+  const apkAssets = assets.filter((asset): asset is GithubReleaseAsset => asset?.name === apkName);
+  const shaAssets = assets.filter((asset): asset is GithubReleaseAsset => asset?.name === shaName);
   if (apkAssets.length !== 1 || shaAssets.length !== 1) {
     throw new ReleaseNotificationSourceError(502, 'release_assets_missing', 'Paire APK/SHA-256 officielle manquante ou ambiguë');
   }
