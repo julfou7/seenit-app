@@ -8,7 +8,7 @@ import { appLogger } from '../../store/logStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 import { buildNativeBackendAttempts, executeBackendAttempts } from '../../lib/nativeBackendRetry';
 import { needsPlexSeriesCoverage, readPlexEpisodeCoverage } from './plexSeriesCoverage';
-export { isPlexEpisodePresent } from './plexSeriesCoverage';
+export { getPlexEpisodeUrl, isPlexEpisodePresent } from './plexSeriesCoverage';
 import { resolveSeenItApiCandidates } from '../../lib/seenitApi';
 import { getStoredPlexToken } from './plexStorage';
 import { replacePlexUserCache } from './plexAvailabilityCache';
@@ -34,6 +34,8 @@ export interface PlexMediaInfo {
   episodeCount?: number;
   /** #255 : épisodes présents `saison:épisode` ; absent = couverture par épisode inconnue. */
   episodes?: string[];
+  /** #255 : `ratingKey` exact de chaque épisode présent (ouverture de l'épisode précis). */
+  episodeKeys?: Record<string, string>;
   /** #255 : date de la dernière lecture réseau de couverture (série) ; absente = jamais lue. */
   coverageCheckedAt?: number;
   lastChecked: number;
@@ -195,7 +197,7 @@ async function performPlexAvailabilityCheck(params: {
     const url = urls[0];
 
     try {
-      let data: any = null;
+      let data: Record<string, unknown> | null = null;
       let status = 0;
       const normalizedImdbId = typeof imdbId === 'string' && /^tt\d{5,12}$/i.test(imdbId.trim())
         ? imdbId.trim().toLowerCase()

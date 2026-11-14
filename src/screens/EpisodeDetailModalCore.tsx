@@ -6,7 +6,7 @@ import { type Show } from '../types';
 import { X, ChevronLeft, ChevronRight, Clock, ArrowLeft, Sparkles } from 'lucide-react';
 import { EpisodeReminderBell } from '../components/EpisodeReminderBell';
 import { EpisodeProgramCard } from '../components/EpisodeProgramCard';
-import { computeAutoArchiveStatus, formatAirDateSafe, getTodayStr, getCalendarDaysDiff, scrollAllCarouselsToStart } from '../lib/utils';
+import { computeAutoArchiveStatus, formatAirDateSafe, getTodayStr, getCalendarDaysDiff, openExternalUrl, scrollAllCarouselsToStart } from '../lib/utils';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { tmdb } from '../features/shows/tmdb';
@@ -23,7 +23,7 @@ import { appLogger } from '../store/logStore';
 import { EpisodeDetailSkeleton, EpisodeHeaderBlock, EpisodeNavRow, EpisodePlannerCard, ReactionRow, SeasonCurveCard, SpoilerSynopsis } from './mediaDetail/episodeSections';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
-import { isPlexEpisodePresent } from '../features/plex/plexAvailability';
+import { getPlexEpisodeUrl, isPlexEpisodePresent } from '../features/plex/plexAvailability';
 import { type EpisodeDetailData } from './episodeDetailTypes';
 import {
   canStartEpisodeSwipeFromTarget,
@@ -886,7 +886,15 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const plexAvailable = Boolean(presence.plexInfo?.available) && plexEpisodePresence !== false;
   const originRow = originalBroadcasterRow(providersPayload, (tmdb.peekRenderableMediaDetails(Number(showTmdbId), 'tv') as { homepage?: string | null } | null)?.homepage);
   const watchProviders: WhereToWatchProvider[] = [...streamingProviders, ...(plexAvailable ? [{ provider_id: 999999, provider_name: 'Plex', isPlex: true, serverName: presence.plexInfo?.serverName }] : [])];
-  const openPlex = () => { void openPlexWatchUrl(activeShow || { tmdbId: showTmdbId, imdbId: activeShow?.imdbId, title: activeShow?.title || tmdbShowTitle, mediaType: 'tv' }); };
+  // #255 : « Lire » ouvre l'épisode précis sur le serveur quand son ratingKey est prouvé ; sinon, la série.
+  const openPlex = () => {
+    const episodeUrl = getPlexEpisodeUrl(presence.plexInfo, currentSeason, Number(currentEpisode?.episode_number));
+    if (episodeUrl) {
+      void openExternalUrl(episodeUrl).then(opened => { if (!opened) useToastStore.getState().showToast('Impossible d’ouvrir Plex sur cet appareil.', 'error'); });
+      return;
+    }
+    void openPlexWatchUrl(activeShow || { tmdbId: showTmdbId, imdbId: activeShow?.imdbId, title: activeShow?.title || tmdbShowTitle, mediaType: 'tv' });
+  };
   const seenThenNext = async () => { if (!isSeen) await toggleSeen(); void handleNextEpisode(); };
 
   // Retour terrain du 09/11 (« absence de nav bar sur la fiche épisode ») : comme la fiche média, la fiche épisode
