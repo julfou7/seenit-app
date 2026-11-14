@@ -1429,7 +1429,9 @@ pour le cache des sagas et univers.
   à la version installée et inférieure ou égale à la cible. Une pagination ou une source d'historique
   indisponible ne bloque jamais l'installation et retombe sur les seules notes de la cible.
 - **SEENIT-UPDATE-005** — Depuis Réglages → Application, la ligne Nouveautés ouvre l’historique
-  complet des releases SeenIt officielles disposant de leur APK canonique. Les versions sont présentées
+  des releases SeenIt officielles conservées par GitHub : les **10 dernières**, dont seule la plus récente
+  garde son APK (#312, politique `docs/process/github-storage-retention.md`). Les notes d'une release sans
+  APK restent affichées, mais seule une release avec son APK canonique vérifié est installable. Les versions sont présentées
   de la plus récente à la plus ancienne par pagination bornée. Une page distante indisponible conserve les
   entrées officielles déjà chargées ou, à défaut, la dernière release connue ; elle ne bloque pas l'écran.
 - **SEENIT-UPDATE-006** — Une mise à jour APK ne peut pas conserver l'ancienne Activity pendant le

@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-14-005 | 2026-11-14 | « On garde que les 10 dernières au pire » — GitHub conserve les notes des 10 dernières releases pour l'historique des versions ; seule la dernière garde son APK, les plus anciennes sont supprimées entièrement. Remplace la cible « exactement 1 release » de #668. | `SEENIT-UPDATE-005`, [#312](https://github.com/julfou7/seenit-app/issues/312), [#668](https://github.com/julfou7/seenit-app/issues/668) | active |
 | USR-2026-11-14-004 | 2026-11-14 | Retour v1.4.308 : la synchro Plex et les métadonnées de séries « au hasard » se relancent à chaque ouverture de l'app ; trois serveurs Plex éteints affichent « 1 erreur » alors qu'il n'y a pas d'erreur (accord explicite pour modifier `SEENIT-PLEX-012`). | `SEENIT-PLEX-012`, `SEENIT-DATA-008` | active |
 | USR-2026-11-14-003 | 2026-11-14 | Retour v1.4.307 : Mes chiffres saccade toujours, surtout au premier chargement de la page ; l'animation du cadran plaît et reste. | `SEENIT-PROFILE-003`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |
 | USR-2026-11-14-002 | 2026-11-14 | Retour v1.4.306 : passer d'un mois à l'autre dans le cadran de Mes chiffres saccade encore sur téléphone ; l'animation plaît et doit rester. | `SEENIT-PROFILE-003`, [#942](https://github.com/julfou7/seenit-app/issues/942) | active |

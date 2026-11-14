@@ -2553,6 +2553,14 @@
         {
           "file": "tests/updateReleasePolicy.test.ts",
           "contains": "SEENIT-UPDATE-005 conserve les pages d'historique valides en cas de panne tardive"
+        },
+        {
+          "file": "tests/updateReleasePolicy.test.ts",
+          "contains": "SEENIT-UPDATE-005 #312 l’historique lit les notes des releases dont l’APK a été purgé"
+        },
+        {
+          "file": "tests/githubStorageRetention.test.ts",
+          "contains": "#312 garde les notes des 10 dernières releases"
         }
       ]
     },

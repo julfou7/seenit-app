@@ -123,6 +123,24 @@ test("SEENIT-UPDATE-005 trie tout l'historique officiel du plus récent au plus 
   assert.equal(history[0].releaseNotes, 'doublon remplacé');
 });
 
+test('SEENIT-UPDATE-005 #312 l’historique lit les notes des releases dont l’APK a été purgé', () => {
+  const notesOnly = { ...releasePayload('1.4.300', 'Notes sans APK'), assets: [] };
+  assert.equal(parseSeenItRelease(notesOnly), null, 'une release sans APK reste non installable');
+  const history = selectSeenItCompleteReleaseHistory([
+    releasePayload('1.4.301'),
+    notesOnly,
+    { ...releasePayload('1.4.302'), draft: true },
+    { ...releasePayload('1.4.303'), prerelease: true },
+    { ...releasePayload('1.4.299'), tag_name: 'latest' },
+  ]);
+  assert.deepEqual(history.map(entry => entry.version), ['1.4.301', '1.4.300']);
+  assert.equal(history[1].releaseNotes, 'Notes sans APK');
+  assert.equal(history[1].htmlUrl, 'https://github.com/julfou7/seenit-app/releases/tag/v1.4.300');
+
+  const between = selectSeenItReleaseHistory([notesOnly, releasePayload('1.4.301')], '1.4.299', '1.4.301');
+  assert.deepEqual(between.map(entry => entry.version), ['1.4.300', '1.4.301'], 'la fenêtre de mise à jour agrège aussi les notes sans APK');
+});
+
 test("SEENIT-UPDATE-005 conserve les pages d'historique valides en cas de panne tardive", async () => {
   let page = 0;
   const fetchImpl = async () => {

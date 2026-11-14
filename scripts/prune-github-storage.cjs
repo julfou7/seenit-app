@@ -3,6 +3,7 @@ const CANONICAL_REPOSITORY = 'julfou7/seenit-app';
 const API_VERSION = '2022-11-28';
 const MAX_DELETIONS_PER_RUN = 100;
 const MUTATION_DELAY_MS = 1500;
+const RELEASE_NOTES_KEPT = 10;
 
 const ARTIFACT_RETENTION_POLICIES = Object.freeze([
   {
@@ -48,12 +49,23 @@ function buildStoragePlan({ protectedRelease, releases = [], artifacts = [], now
     throw new Error('La release protégée est absente de la collection GitHub ; purge des releases refusée');
   }
 
-  const releasesToDelete = protectedId
+  const olderReleases = protectedId
     ? releaseList.filter(release => Number(release?.id) > 0 && Number(release.id) !== protectedId
       && !release.draft && !release.prerelease
       && (!protectedRelease.published_at || (release.published_at
         && Date.parse(release.published_at) <= Date.parse(protectedRelease.published_at))))
     : [];
+  // #312 : les RELEASE_NOTES_KEPT dernières releases gardent leurs notes (historique des versions),
+  // mais seule la release protégée garde ses binaires. Au-delà, la release entière est supprimée.
+  const newestFirst = [...olderReleases].sort((left, right) =>
+    (Date.parse(right.published_at || '') || 0) - (Date.parse(left.published_at || '') || 0)
+    || Number(right.id) - Number(left.id));
+  const notesOnly = newestFirst.slice(0, RELEASE_NOTES_KEPT - 1);
+  const releasesToDelete = newestFirst.slice(RELEASE_NOTES_KEPT - 1)
+    .sort((left, right) => Number(left.id) - Number(right.id));
+  const assetsToDelete = notesOnly.flatMap(release => (Array.isArray(release.assets) ? release.assets : [])
+    .filter(asset => Number(asset?.id) > 0)
+    .map(asset => ({ id: Number(asset.id), name: asset.name, size: Number(asset.size || 0), releaseTag: release.tag_name })));
 
   const artifactsToDelete = artifactList.filter(artifact => {
     const policy = retentionPolicyForArtifact(artifact?.name);
@@ -67,11 +79,13 @@ function buildStoragePlan({ protectedRelease, releases = [], artifacts = [], now
     protectedReleaseId: protectedId || null,
     protectedReleaseTag: protectedRelease?.tag_name || null,
     releasesToDelete,
+    assetsToDelete,
     artifactsToDelete,
     estimatedBytes: {
       releases: releasesToDelete.reduce((sum, release) => sum + (Array.isArray(release?.assets)
         ? release.assets.reduce((assetSum, asset) => assetSum + Number(asset?.size || 0), 0)
         : 0), 0),
+      assets: assetsToDelete.reduce((sum, asset) => sum + asset.size, 0),
       artifacts: artifactsToDelete.reduce((sum, artifact) => sum + Number(artifact?.size_in_bytes || 0), 0)
     }
   };
@@ -160,12 +174,20 @@ async function runMaintenance({ request = githubRequest, nowMs = Date.now(),
 
   console.log(`[Storage] release protégée : ${plan.protectedReleaseTag || 'aucune'} (${plan.protectedReleaseId || 'n/a'})`);
   console.log(`[Storage] releases à supprimer : ${plan.releasesToDelete.length} (${formatBytes(plan.estimatedBytes.releases)})`);
+  console.log(`[Storage] binaires d'anciennes releases à supprimer (notes conservées) : ${plan.assetsToDelete.length} (${formatBytes(plan.estimatedBytes.assets)})`);
   console.log(`[Storage] artefacts à supprimer : ${plan.artifactsToDelete.length} (${formatBytes(plan.estimatedBytes.artifacts)})`);
   console.log(`[Storage] mode : ${apply ? 'APPLY' : 'DRY-RUN'}`);
 
   if (!apply) return plan;
 
   let deleted = 0;
+  for (const asset of plan.assetsToDelete) {
+    if (deleted >= MAX_DELETIONS_PER_RUN) break;
+    if (deleted > 0) await sleep(MUTATION_DELAY_MS);
+    await request(`/releases/assets/${asset.id}`, { method: 'DELETE' });
+    deleted += 1;
+    console.log(`[Storage] binaire supprimé : ${asset.name || asset.id} (${asset.releaseTag || 'release'})`);
+  }
   for (const release of plan.releasesToDelete) {
     if (deleted >= MAX_DELETIONS_PER_RUN) break;
     if (deleted > 0) await sleep(MUTATION_DELAY_MS);
@@ -180,7 +202,7 @@ async function runMaintenance({ request = githubRequest, nowMs = Date.now(),
     deleted += 1;
     console.log(`[Storage] artefact supprimé : ${artifact.name || artifact.id}`);
   }
-  const remaining = plan.releasesToDelete.length + plan.artifactsToDelete.length - deleted;
+  const remaining = plan.assetsToDelete.length + plan.releasesToDelete.length + plan.artifactsToDelete.length - deleted;
   console.log(`[Storage] suppressions confirmées : ${deleted} ; restantes : ${remaining} (prochaine maintenance)`);
   return { ...plan, deleted, remaining };
 }
@@ -192,6 +214,7 @@ module.exports = {
   DAY_MS,
   MAX_DELETIONS_PER_RUN,
   MUTATION_DELAY_MS,
+  RELEASE_NOTES_KEPT,
   ageInDays,
   buildStoragePlan,
   formatBytes,
