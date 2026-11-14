@@ -7,8 +7,9 @@ Référence visuelle complète : page « SeenIt Marque », section Tour 13.
 - `seenit-marque-demo.html` : page autonome (HTML, CSS, SVG, sans dépendance) avec le logo, l'animation « marquer vu » cliquable, le splash animé, le logo TV et la barre de navigation. Le code du bouton coche est dans la page.
 
 ## app/
-- `seenit-logo-sombre.svg` / `.png` : logo principal (anneau + « seenit » + point or), fond nuit.
-- `seenit-logo-clair` : sur fond blanc (« it » et point en or foncé #B37812).
+- `seenit-logo-sombre.svg` / `.png` : logo principal (anneau + « seenit » + point or), pour fond sombre ; fond transparent (14/11/2026).
+- `seenit-logo-clair` : pour fond clair (« it » et point en or foncé #B37812) ; fond transparent.
+- Règle : aucun logo n'embarque de fond (seule l'icône d'app en garde un). Voir `docs/design/marque-2026-11-14.md`.
 - `seenit-logo-blanc`, `seenit-logo-noir` : monochromes, fond transparent.
 - `seenit-logo-empile-sombre`, `seenit-logo-empile-blanc` : version empilée (anneau au-dessus de « seenit »), celle du splash.
 - `seenit-anneau.svg` / `-512.png` : le symbole seul, fond transparent.
