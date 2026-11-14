@@ -8,6 +8,7 @@ import { cn, computeAutoArchiveStatus, formatAirDateSafe, formatVoteCount, getBe
 import { EpisodeDetailModal } from './EpisodeDetailModal';
 import { MediaDetailColdShell } from './MediaDetailColdShell';
 import { useDetailsRevalidation } from './mediaDetail/useDetailsRevalidation';
+import { detectCompletionCelebration, useCelebrationStore } from '../features/shows/completionCelebration';
 import { TimelineMediaCard } from '../components/cards/TimelineMediaCard';
 import { EpisodeRatingsChart } from '../components/EpisodeRatingsChart';
 import { useShows } from '../hooks/useShows';
@@ -520,7 +521,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     if (initialSeason !== undefined && initialSeason !== null && initialEpisode && effectiveTmdbId) {
       setActiveTab('episodes');
       setExpandedSeason(initialSeason);
-      const tryOpenEpisode = (seasonData: any) => {
+      const tryOpenEpisode = (seasonData: { episodes?: Array<{ episode_number?: number }> } | null | undefined) => {
         const ep = seasonData?.episodes?.find((x: { episode_number?: number }) => x.episode_number === initialEpisode);
         if (ep) {
           setSelectedEpisode({ season: initialSeason, episode: ep });
@@ -658,9 +659,8 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
     }
     await updateShow(currentShow.id, { seenEpisodes: Array.from(newSeen as Set<string>), episodeRecords: newRecords, lastWatchedAt: calculatedLastWatchedAt, updatedAt: Date.now(), nextEpisodeToWatch: optimisticNextEp, isArchived: autoArchived, status: optimisticNextEp ? 'watching' : 'completed' });
     scrollAllCarouselsToStart();
-    const sNumStr = String(season).padStart(2, '0');
-    const eNumStr = String(episode).padStart(2, '0');
-    const showTitleStr = currentShow.title || tmdbDetails?.name || tmdbDetails?.title || 'Série';
+    const sNumStr = String(season).padStart(2, '0'), eNumStr = String(episode).padStart(2, '0'), showTitleStr = currentShow.title || tmdbDetails?.name || tmdbDetails?.title || 'Série';
+    useCelebrationStore.getState().celebrate(detectCompletionCelebration({ season, wasSeen, previousSeen: prevSeenEpisodes, nextSeen: newSeen, seasonEpisodes: seasonsCache[season]?.episodes, today: getTodayStr(), nextEpisodeToWatch: optimisticNextEp, seriesEnded: Boolean(isEnded) }), showTitleStr); // #436
     const undo = async () => {
       if (currentShow?.id) {
         await updateShow(currentShow.id, { seenEpisodes: prevSeenEpisodes, episodeRecords: prevEpisodeRecords, lastWatchedAt: prevLastWatchedAt, nextEpisodeToWatch: prevNextEpisodeToWatch, isArchived: prevIsArchived, updatedAt: Date.now() });

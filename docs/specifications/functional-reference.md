@@ -705,6 +705,11 @@ swipes de suppression/abandon sur les cartes.
 - Suivre sans visionner crée « À voir ».
 - Marquer un épisode vu/non vu met à jour `seenEpisodes`, `episodeRecords`, `lastWatchedAt` et le
   prochain épisode à voir.
+- #436 : depuis la fiche Série, un marquage individuel qui fait passer une saison de « au moins un
+  épisode diffusé non vu » à « tous vus » affiche une courte célébration non bloquante « Saison N
+  terminée ! » (ou « Série terminée ! » s'il ne reste rien à voir et que TMDB déclare la série finie).
+  Ni le numéro du final, ni « Tout marquer vu », ni un décochage ne la déclenchent ; animation coupée
+  par `prefers-reduced-motion`.
 - Marquer une saison cible uniquement les épisodes déjà diffusés lorsque TMDB les distingue.
 - Une série complète devient `completed`; si TMDB la déclare Ended/Canceled elle peut être archivée
   automatiquement.
