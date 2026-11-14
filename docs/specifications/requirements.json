@@ -2357,7 +2357,7 @@
         },
         {
           "file": "tests/durableVisualRules.test.ts",
-          "contains": "SEENIT-NOTIFICATION-003 #443 la cible paysage est tracée sans remplacer le contrat runtime contain"
+          "contains": "SEENIT-NOTIFICATION-003 #443 la notification développée montre l’image paysage, l’affiche en repli contain"
         },
         {
           "file": "tests/plexDownloadAvailabilityAndroid.test.ts",

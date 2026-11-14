@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import {
   deliverReleaseUpdatePush,
+  isReleaseUpdatePushFailure,
   ReleaseNotificationSourceError,
   verifyOfficialReleaseNotification,
   type ReleaseDeliveryClaim,
@@ -267,4 +269,22 @@ test('SEENIT-UPDATE-003 reprend seulement les échecs FCM explicites et supprime
   assert.equal(sends.get(ok.installationHash), 1);
   assert.equal(sends.get(transient.installationHash), 2);
   assert.equal(sends.get(invalid.installationHash), 1);
+});
+
+test('#478 la sonde de déploiement (dépôt absent) ne compte pas comme un échec de notification', async () => {
+  // Même requête que la sonde de deploy-backend.yml : corps vide, refus 403 attendu avant tout appel GitHub.
+  let probe: unknown;
+  await verifyOfficialReleaseNotification({}, { fetchImpl: async () => { throw new Error('aucun appel attendu'); } })
+    .catch(error => { probe = error; });
+  assert.ok(probe instanceof ReleaseNotificationSourceError);
+  assert.equal(probe.status, 403);
+  assert.equal(probe.code, 'untrusted_repository');
+  assert.equal(isReleaseUpdatePushFailure(probe.status, probe.code), false);
+  assert.match(readFileSync('src/features/release/releaseUpdatePushBackend.ts', 'utf8'), /body: \{ success: false, error: error\.code \}/, 'le code du refus devient body.error lu par server.ts');
+  // Les vrais échecs restent signalés : run non prouvé, requête invalide, panne amont.
+  assert.equal(isReleaseUpdatePushFailure(403, 'untrusted_workflow_run'), true);
+  assert.equal(isReleaseUpdatePushFailure(400, 'invalid_request'), true);
+  assert.equal(isReleaseUpdatePushFailure(502, 'github_unavailable'), true);
+  assert.equal(isReleaseUpdatePushFailure(200, undefined), false);
+  assert.match(readFileSync('server.ts', 'utf8'), /else if \(isReleaseUpdatePushFailure\(result\.status, body\.error\)\) \{\s*emitOperationalEvent\(\{\s*code: 'RELEASE_UPDATE_PUSH_FAILED'/);
 });

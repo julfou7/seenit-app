@@ -1361,12 +1361,14 @@ pour le cache des sagas et univers.
   saison + épisode exacts. Le titre n'est jamais une preuve d'identité. Une copie native momentanément
   absente est retentée de façon bornée ; une empreinte UID différente échoue fermée. Le tap principal des
   deux états ouvre la fiche SeenIt exacte. Après preuve Plex, l'affiche issue de la correspondance PMS
-  exacte suit le même contrat visuel : `largeIcon` carré en contain dans l'état replié, BigPicture
-  centré en contain dans l'état développé et `largeIcon` masqué dans ce style pour éviter le doublon.
-  **Cible #443 (`USR-2026-11-06-004`), non encore livrée** : l'état développé affichera l'image paysage
-  exacte du média (backdrop du film, image de l'épisode ou de la série) au lieu de répéter l'affiche ;
-  l'affiche portrait reste la vignette repliée et ne redevient la grande image en contain que si aucune
-  image paysage n'est connue. Jusqu'à cette livraison, le contrat contain ci-dessus reste celui du runtime.
+  exacte suit le même contrat visuel : `largeIcon` carré en contain dans l'état replié et `largeIcon`
+  masqué dans le style développé pour éviter le doublon. **#443 (`USR-2026-11-06-004`)** : l'état
+  développé affiche l'image paysage exacte du média, lue dans la même fiche TMDB fr-FR que l'affiche
+  (backdrop `w780` du film ou de la série, sans lecture TMDB supplémentaire), recadrée au centre pour
+  remplir le canevas BigPicture 512×288 sans bandes ni étirement. Elle suit le même transport que
+  l'affiche : URL TMDB bornée dans la donnée FCM, cache privé, décodage borné, aucun octet dans
+  WorkManager. Sans image paysage connue, l'affiche entière redevient la grande image, centrée en
+  contain ; sans aucune image, la notification reste textuelle.
   Le fallback texte reste fonctionnel, et l'action « Ouvrir dans Plex » n'est exposée que si le slug
   Plex Discover est résolu strictement depuis ce TMDB ID ;
   elle ouvre `https://watch.plex.tv/movie|show/<slug>`, application Plex puis Web, sans fallback

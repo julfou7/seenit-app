@@ -57,6 +57,26 @@ test('SEENIT-NOTIFICATION-003 #801 le vrai dispatcher transmet seulement la réf
   }
 });
 
+test('#443 image paysage : backdrop w780 de la même fiche exacte, transmis au seul reçu natif', async () => {
+  const resolve = createDownloadNotificationMediaResolver({ apiKey: () => 'secret', request: async input => {
+    const id = Number(new URL(String(input)).pathname.split('/').at(-1));
+    if (id === 1) return Response.json({ id, title: 'Drive', poster_path: '/drive.jpg', backdrop_path: '/drive-large.jpg' });
+    if (id === 2) return Response.json({ id, title: 'Sans paysage', poster_path: '/p.jpg', backdrop_path: 'https://evil.example/b.jpg' });
+    return Response.json({ id: id + 1, backdrop_path: '/autre.jpg' });
+  } });
+  assert.deepEqual(await resolve(1, 'movie'), { posterUrl: 'https://image.tmdb.org/t/p/w342/drive.jpg', backdropUrl: 'https://image.tmdb.org/t/p/w780/drive-large.jpg', title: 'Drive' });
+  assert.deepEqual(await resolve(2, 'movie'), { posterUrl: 'https://image.tmdb.org/t/p/w342/p.jpg', title: 'Sans paysage' }, 'chemin injecté refusé');
+  assert.deepEqual(await resolve(3, 'movie'), {}, 'autre identité : pas d’image paysage');
+
+  const presentation = buildDownloadWebhookPresentation('radarr', { eventType: 'Download', movie: { title: 'Drive', tmdbId: 1 }, downloadId: 'drive' });
+  const sent: Array<Record<string, string>> = [];
+  await deliverDownloadWebhookPresentation({ uid: 'a', ownerUidHash: '0123456789abcdef', presentation, resolveMedia: resolve,
+    sendPush: async (_uid, _notification, data = {}) => { sent.push(data); return { attempted: 1, delivered: 1, invalid: 0 }; } });
+  assert.equal(sent[0].backdropUrl, 'https://image.tmdb.org/t/p/w780/drive-large.jpg');
+  assert.equal(sent[0].posterUrl, 'https://image.tmdb.org/t/p/w342/drive.jpg');
+  assert.deepEqual(sent.slice(1).map(data => data.backdropUrl), [undefined, undefined], 'APK ancienne et PWA inchangées');
+});
+
 test('SEENIT-DOWNLOAD-022 notifications de téléchargement : titre de la fiche TMDB fr-FR par identité exacte, repli Sonarr/Radarr', async () => {
   // Retour terrain du 09/11 : « The House with a Clock in Its Walls · Import Plex terminé » au lieu de « La Prophétie de l'Horloge ».
   const calls: string[] = [];

@@ -1095,9 +1095,10 @@ est daté affiche « Prochain épisode dans 6 jours » (ou « demain », « aujo
   la copie privée Plex est confirmée, le signal data-only affiche localement le média avec
   « Import terminé » puis réutilise le même identifiant pour passer à
   « Disponible dans Plex » après preuve TMDB exacte (et saison/épisode exacts pour la TV). Le tap ouvre
-  la fiche SeenIt exacte ; lorsque le poster PMS exact est disponible, l'état replié le conserve à
-  droite en contain sans crop et l'état développé l'affiche une seule fois, entier et centré dans le
-  BigPicture. « Ouvrir dans Plex » n'est exposé que lorsqu'un slug Discover strictement résolu par TMDB
+  la fiche SeenIt exacte ; l'état replié garde l'affiche à droite en contain sans crop. Développée
+  (#443), la notification montre l'image paysage du film ou de la série, prise dans la même fiche TMDB,
+  qui remplit le cadre sans bandes ; sans image paysage, l'affiche y est montrée une seule fois, entière
+  et centrée. « Ouvrir dans Plex » n'est exposé que lorsqu'un slug Discover strictement résolu par TMDB
   permet l'URL
   `watch.plex.tv/movie|show/<slug>`. Aucun titre/année ni accueil Plex n'est un fallback. Associer ou
   retirer Plex rafraîchit immédiatement l'enregistrement de l'appareil déjà autorisé afin que cette

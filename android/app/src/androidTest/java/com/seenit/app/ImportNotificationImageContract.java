@@ -64,6 +64,7 @@ final class ImportNotificationImageContract {
             assertEquals("Film de contrôle", rich.extras.getCharSequence(Notification.EXTRA_TITLE).toString());
             assertEquals("Import Plex terminé", rich.extras.getCharSequence(Notification.EXTRA_TEXT).toString());
             assertEquals("import", rich.extras.getString("downloadPhase"));
+            verifyLandscape(context, message);
             try (FileOutputStream output = new FileOutputStream(cached)) { output.write(new byte[] { 1, 2, 3 }); }
             assertNull(NotificationPosterCache.read(context, url));
             assertNull(PlexAvailabilityWorker.buildImportNotification(context, message).build().getLargeIcon());
@@ -74,6 +75,33 @@ final class ImportNotificationImageContract {
                 assertFalse(NotificationPosterCache.warm(context, invalid));
                 assertNull(NotificationPosterCache.read(context, invalid));
             }
+        } finally { if (cached.exists()) assertTrue(cached.delete()); }
+    }
+
+    /** #443 : l'image paysage remplit la notification développée sans bandes ; l'affiche reste en petit. */
+    private static void verifyLandscape(Context context, Map<String, String> message) throws Exception {
+        String url = "https://image.tmdb.org/t/p/w780/seenit_native_landscape.png";
+        assertTrue(NotificationPosterCache.allowed(url));
+        assertFalse(NotificationPosterCache.allowed("https://image.tmdb.org/t/p/w500/seenit_native_landscape.png"));
+        File cached = NotificationPosterCache.file(context, url);
+        assertNotNull(cached);
+        Map<String, String> landscape = new HashMap<>(message);
+        landscape.put("backdropUrl", url);
+        try {
+            Bitmap source = Bitmap.createBitmap(160, 90, Bitmap.Config.ARGB_8888);
+            new Canvas(source).drawColor(Color.GREEN);
+            try (FileOutputStream output = new FileOutputStream(cached)) { assertTrue(source.compress(Bitmap.CompressFormat.PNG, 100, output)); }
+            source.recycle();
+            Notification rich = PlexAvailabilityWorker.buildImportNotification(context, landscape).build();
+            assertNotNull(rich.getLargeIcon());
+            Bitmap picture = rich.extras.getParcelable(Notification.EXTRA_PICTURE);
+            assertNotNull(picture);
+            assertEquals(512, picture.getWidth());
+            assertEquals(288, picture.getHeight());
+            assertEquals(Color.GREEN, picture.getPixel(256, 144));
+            assertEquals(Color.GREEN, picture.getPixel(2, 2));
+            assertEquals(Color.GREEN, picture.getPixel(509, 285));
+            assertNull(rich.extras.getParcelable("android.largeIcon.big"));
         } finally { if (cached.exists()) assertTrue(cached.delete()); }
     }
 }
