@@ -657,6 +657,10 @@ La section **« Où regarder »** est un repère stable : son titre reste toujou
 remplacé par un skeleton. Tant que Plex et/ou les diffuseurs TMDB sont en résolution, la fiche utilise le
 libellé unique **« Recherche Plex & streaming… »**. Les diffuseurs résolus sont conservés dans un cache
 borné (120 médias, 6 h frais, réutilisable jusqu'à 7 jours en cas d'indisponibilité du fournisseur).
+Depuis #397, trois fins distinctes : diffuseurs trouvés (lignes) ; absence confirmée (« Pas encore
+disponible en streaming en France. », ou « Bientôt disponible » avant la sortie) ; panne de la source
+(réponse en échec ou rejet, sans cache) → **« Diffuseurs indisponibles pour le moment. Réessaie plus
+tard. »**, jamais présentée comme une absence de diffuseur ni comme une recherche sans fin.
 Une icône **« Actualiser Plex »** adjacente au titre force la redécouverte des serveurs Plex puis revérifie
 le média courant, sans effacer le dernier inventaire de serveurs utilisable si la redécouverte échoue.
 Le glyph reste compact mais sa cible tactile mesure au moins 44 × 44 CSS px, avec nom accessible, focus

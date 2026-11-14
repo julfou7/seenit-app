@@ -24,8 +24,10 @@ import {
 } from '../features/notifications/movieReleaseReminder';
 import {
   buildReminderToastSummary,
+  keepToastsForOpenChannels,
   type ReminderToastCandidate,
 } from '../features/notifications/reminderToastSummary';
+import { readBlockedSeenItChannels } from '../features/notifications/notificationChannels';
 import {
   buildTvEpisodeReminderCopy,
   buildTvSeasonReminderSummary,
@@ -198,6 +200,7 @@ export function useRemindersNotifier() {
                   body: msgBody,
                   posterPath: s.posterPath,
                   show: s,
+                  channelId: 'seenit_movies',
                 });
                 if ((await send()).delivered) writeUserScopedJson(uid, notifiedKey, true);
               }
@@ -355,6 +358,7 @@ export function useRemindersNotifier() {
                   body: msgBody,
                   posterPath: s.posterPath,
                   show: s,
+                  channelId: isSpecificReminder ? 'seenit_reminders' : 'seenit_episodes',
                 });
               }
               if ((await send()).delivered) writeUserScopedJson(uid, notifiedKey, true);
@@ -387,7 +391,8 @@ export function useRemindersNotifier() {
         }
       }
 
-      const toastSummary = buildReminderToastSummary(dueToastCandidates);
+      // Revue Codex #1012 : une catégorie coupée dans Android fait aussi taire la bannière équivalente.
+      const toastSummary = buildReminderToastSummary(keepToastsForOpenChannels(dueToastCandidates, await readBlockedSeenItChannels()));
       if (toastSummary) {
         const receiptKey = `reminder_toast_${REMINDER_TOAST_RECEIPT_SCHEMA}_${todayStr}`;
         const previousSignature = readUserScopedJson<string>(uid, receiptKey, '');

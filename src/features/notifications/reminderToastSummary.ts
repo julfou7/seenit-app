@@ -7,6 +7,20 @@ export interface ReminderToastCandidate {
   body: string;
   posterPath?: string | null;
   show?: Show;
+  /** Canal Android de la notification équivalente (#402) : une bannière suit le même choix. */
+  channelId?: string;
+}
+
+/**
+ * Revue Codex #1012 — Sur Android, couper une catégorie (« Films », « Épisodes et saisons »…) doit
+ * aussi faire taire les bannières internes équivalentes : sans cela, un ancien « non » réapparaît
+ * dans l'app sans réglage pour le supprimer.
+ */
+export function keepToastsForOpenChannels(
+  candidates: readonly ReminderToastCandidate[],
+  blockedChannels: ReadonlySet<string>,
+): ReminderToastCandidate[] {
+  return candidates.filter(candidate => !candidate.channelId || !blockedChannels.has(candidate.channelId));
 }
 
 export interface ReminderToastSummary {
