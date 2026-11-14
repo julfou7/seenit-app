@@ -294,6 +294,16 @@ test('SEENIT-RELEASE-003 documente un format public court et homogène', () => {
   assert.match(viewer, /\(\^\|\[\\s\(«“\]\)/);
 });
 
+test('#312 le badge « Version x.y.z » défile avec sa release, jamais en sticky', () => {
+  const viewer = readFileSync(new URL('../src/components/ChangelogViewer.tsx', import.meta.url), 'utf8');
+  const history = viewer.slice(viewer.indexOf('history.map(entry =>'));
+  assert.ok(history.length > 0, 'ReleaseHistoryViewer rend chaque release');
+  const badge = history.slice(0, history.indexOf('Version {entry.version}'));
+  const badgeClass = badge.slice(badge.lastIndexOf('className="'));
+  assert.doesNotMatch(badgeClass, /\b(sticky|fixed)\b/, 'le badge de release ne reste pas accroché au scroll');
+  assert.match(history, /<ChangelogViewer content=\{entry\.releaseNotes\} scrollable=\{false\} \/>/);
+});
+
 test('SEENIT-RELEASE-003 une seule grammaire Changelog pour le générateur et le validateur', () => {
   // Retours #195 du 31/10/2026 : « Changelog: » suivi d’une phrase nue était ignoré puis refusé.
   const paragraph = 'fix(ui): corriger les plateformes\n\nChangelog:\nLes filtres de plateformes affichent désormais\nles bons logos.\n- détail interne du store\n\nDétails techniques:\n- recalcule les logos';

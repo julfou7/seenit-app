@@ -187,7 +187,7 @@ export function ChangelogViewer({ content, scrollable = true }: ChangelogViewerP
               </ul>
             );
           },
-          li: ({ children }: any) => (
+          li: ({ children }) => (
             <li className="text-zinc-300 list-disc ml-3 text-xs leading-relaxed marker:text-amber-400/80">
               {children}
             </li>
@@ -226,7 +226,8 @@ export function ReleaseHistoryViewer({ history }: { history: SeenItReleaseNotesE
     <div className="space-y-4">
       {history.map(entry => (
         <section key={entry.version} className="space-y-1.5">
-          <div className="sticky top-0 z-10 w-fit rounded-full border border-amber-500/25 bg-zinc-950/95 px-2.5 py-1 text-[10px] font-black text-amber-300 shadow-sm">
+          {/* #312 : le badge défile avec sa release ; seul l’en-tête de la modale reste fixe. */}
+          <div className="w-fit rounded-full border border-amber-500/25 bg-zinc-950/95 px-2.5 py-1 text-[10px] font-black text-amber-300 shadow-sm">
             Version {entry.version}
           </div>
           <ChangelogViewer content={entry.releaseNotes} scrollable={false} />
