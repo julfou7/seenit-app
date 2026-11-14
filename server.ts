@@ -55,6 +55,7 @@ import { executeIdempotentMutation, type TimedMutationResult } from "./src/featu
 import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
 import { applySeenItServiceWorkerHeaders, createSeenItSecurityHeadersMiddleware } from "./src/features/runtime/pwaSecurityHeaders.ts";
 import { createSeenItFrontendRouter } from "./src/features/runtime/staticFrontend.ts";
+import { createJsonGzipMiddleware } from "./src/features/runtime/responseCompression.ts";
 import { emitOperationalEvent } from "./src/features/runtime/operationalEvent.ts";
 import {
   CLIENT_OPERATIONAL_SIGNAL_METADATA,
@@ -492,10 +493,7 @@ function startCronJobs() {
         .where("air_date", "==", todayStr)
         .get();
 
-      if (remindersSnap.empty) {
-        console.log("[CRON] Aucun rappel prévu pour aujourd'hui.");
-        return;
-      }
+      if (remindersSnap.empty) return;
 
       console.log(`[CRON] ${remindersSnap.size} rappel(s) trouvé(s). Envoi en cours...`);
       const batch = db.batch();
@@ -616,6 +614,8 @@ async function startServer() {
 
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // SEENIT-COST-001 : Cloud Run ne compresse pas ; chaque octet servi vers l'Europe est facturé.
+  app.use('/api', createJsonGzipMiddleware());
   registerTvPairingRoutes(app, {
     store: createFirestoreTvLinkStore(adminDb), authenticate: requireAuth, rateLimit,
     library: uid => readTvLibrary(adminDb, uid),

@@ -105,6 +105,15 @@ attribuer le centime à une ressource précise.
 L'audit FinOps dans `docs/audits/audit-finops-gcp-2026-09-20.md` est la preuve durable ; aucune
 valeur de secret ni identifiant de facturation privé n'y est enregistrée.
 
+## Compression des réponses
+
+Cloud Run ne compresse pas les réponses. Mesure du 14/11/2026 (agrégats par route) : le JSON TMDB
+`/api/media/tmdb/*` représentait ~74 % des octets servis, `/api/service-proxy` ~12 %, `/assets/*` ~9 %,
+tous non compressés. Le serveur gzippe désormais toute réponse JSON `/api` d'au moins 1 Kio et les assets
+texte hashés (compressés une seule fois, gardés en mémoire). Les petites réponses du service-proxy
+(~1 Kio) restent quasi inchangées. Pour atteindre 0,00 €, l'étape suivante possible est l'appel TMDB
+direct depuis le client, qui exposerait la clé TMDB : décision du propriétaire requise.
+
 ## Kill switch sans suppression de données
 
 Pour stopper immédiatement les requêtes publiques Cloud Run sans supprimer le service ni les données,
