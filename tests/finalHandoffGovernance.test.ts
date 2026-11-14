@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readDocText } from './helpers/docText.ts';
 
-const agentRules = readFileSync('AGENTS.md', 'utf8');
-const bootstrapRules = readFileSync('.agents/AGENTS.md', 'utf8');
+const agentRules = readDocText('AGENTS.md');
+const bootstrapRules = readDocText('.agents/AGENTS.md');
 
 test('le rapport final SeenIt trace les difficultés réelles pour l’amélioration continue', () => {
   assert.match(agentRules, /Difficultés rencontrées \/ amélioration continue/);

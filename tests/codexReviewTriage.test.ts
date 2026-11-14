@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
+import { normalizeDocText } from './helpers/docText.ts';
 
 const require = createRequire(import.meta.url);
 const {
@@ -78,7 +79,7 @@ test('SEENIT-QUALITY-004 matérialise chaque finding Codex non résolu en issue 
   const delivery = fs.readFileSync('docs/process/delivery.md', 'utf8');
   const spec = fs.readFileSync('docs/specifications/seenit.md', 'utf8');
   const registry = fs.readFileSync('docs/requests/registry.md', 'utf8');
-  const normalize = (source: string) => source.replace(/\s+/g, ' ');
+  const normalize = normalizeDocText;
 
   assert.match(workflow, /pull_request_review:[\s\S]*submitted/);
   assert.match(workflow, /pull_request:[\s\S]*closed/);
@@ -124,7 +125,7 @@ test('SEENIT-QUALITY-004 réconcilie tous les findings après remplacement d’u
   assert.match(script, /async function main\(\)[\s\S]*await backfill\(\{ repository \}\);/);
   assert.doesNotMatch(script, /GITHUB_EVENT_PATH|await triage\(\{ repository, prNumber \}\)/);
 
-  for (const source of [delivery, spec].map(value => value.replace(/\s+/g, ' '))) {
+  for (const source of [delivery, spec].map(normalizeDocText)) {
     assert.match(source, /chaque exécution survivante/i);
     assert.match(source, /remplac(?:e|é|ement)[^.]*run[^.]*attente/i);
   }
