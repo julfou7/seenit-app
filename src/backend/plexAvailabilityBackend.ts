@@ -238,7 +238,8 @@ export async function attachEpisodeCoverage(
     if (String(item?.type || '').toLowerCase() !== 'episode') continue;
     const season = Number(item.parentIndex);
     const episode = Number(item.index);
-    if (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 0) continue;
+    // Revue Codex #1001 : un épisode illisible rend la liste non exhaustive ; elle n'est alors pas publiée.
+    if (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 0) return result;
     episodes.add(`${season}:${episode}`);
   }
   const declared = Number(container.totalSize ?? container.size);

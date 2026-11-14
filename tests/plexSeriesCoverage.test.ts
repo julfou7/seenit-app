@@ -47,6 +47,11 @@ test('SEENIT-PLEX-013 une liste illisible ou tronquée ne produit jamais une cou
   const truncated = await find(plexServer(() => json({ MediaContainer: { totalSize: 40, size: 1, Metadata: [{ type: 'episode', parentIndex: 1, index: 1 }] } })).request);
   assert.equal(truncated?.episodes, undefined);
   assert.equal(truncated?.episodeCount, 1);
+
+  // Revue Codex #1001 : un épisode sans numéro exploitable ne réduit jamais la liste à une couverture fausse.
+  const unreadable = await find(plexServer(() => json({ MediaContainer: { size: 2, Metadata: [{ type: 'episode', parentIndex: 1, index: 1 }, { type: 'episode', parentIndex: 1 }] } })).request);
+  assert.equal(unreadable?.episodes, undefined);
+  assert.equal(unreadable?.episodeCount, 1, 'décompte Plex d’origine (leafCount) seulement');
 });
 
 test('SEENIT-PLEX-013 un film garde une disponibilité binaire, sans appel de couverture', async () => {
