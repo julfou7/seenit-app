@@ -23,7 +23,8 @@ final class NotificationPosterCache {
             return "https".equals(parsed.getScheme()) && "image.tmdb.org".equals(parsed.getHost())
                 && parsed.getPort() == -1 && parsed.getRawUserInfo() == null
                 && parsed.getRawQuery() == null && parsed.getRawFragment() == null
-                && parsed.getRawPath().matches("/t/p/w342/[A-Za-z0-9_-]+\\.(jpg|png|webp)");
+                // w342 : affiche ; w780 : image paysage de la notification développée (#443).
+                && parsed.getRawPath().matches("/t/p/(w342|w780)/[A-Za-z0-9_-]+\\.(jpg|png|webp)");
         } catch (Exception ignored) { return false; }
     }
 
@@ -45,7 +46,11 @@ final class NotificationPosterCache {
             BitmapFactory.decodeFile(cached.getPath(), bounds);
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0 || bounds.outWidth > 8192 || bounds.outHeight > 8192) return null;
             int sample = 1;
-            while (bounds.outWidth / sample > 512 || bounds.outHeight / sample > 768) sample *= 2;
+            // Borne portrait 512×768 ou paysage 800×512 : un backdrop w780 reste net dans le cadre 512×288.
+            boolean landscape = bounds.outWidth > bounds.outHeight;
+            int maxWidth = landscape ? 800 : 512;
+            int maxHeight = landscape ? 512 : 768;
+            while (bounds.outWidth / sample > maxWidth || bounds.outHeight / sample > maxHeight) sample *= 2;
             BitmapFactory.Options options = new BitmapFactory.Options();
             options.inSampleSize = sample;
             return BitmapFactory.decodeFile(cached.getPath(), options);

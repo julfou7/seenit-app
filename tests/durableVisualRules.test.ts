@@ -51,11 +51,12 @@ test('SEENIT-UX-020 les titres média déjà livrés en or le restent, même lus
   assert.doesNotMatch(css, /\.home-notice--read[^{]*strong \{[^}]*color:(?!#f2c36b)/i, 'un titre lu ne perd pas l’or');
 });
 
-test('SEENIT-NOTIFICATION-003 #443 la cible paysage est tracée sans remplacer le contrat runtime contain', () => {
+test('SEENIT-NOTIFICATION-003 #443 la notification développée montre l’image paysage, l’affiche en repli contain', () => {
   const rule = section(spec, '- **SEENIT-NOTIFICATION-003**', '\n- **SEENIT-');
-  assert.match(rule, /BigPicture\s+centré en contain dans l'état développé/);
-  assert.match(rule, /Cible #443 \(`USR-2026-11-06-004`\), non encore livrée/);
-  assert.match(rule, /image paysage/);
-  assert.match(rule, /le contrat contain ci-dessus reste celui du runtime/);
+  assert.match(rule, /\*\*#443 \(`USR-2026-11-06-004`\)\*\*/);
+  assert.doesNotMatch(rule, /non encore livrée/);
+  assert.match(rule, /image paysage exacte du média/);
+  assert.match(rule, /sans bandes ni étirement/);
+  assert.match(rule, /l'affiche entière redevient la grande image, centrée en\s+contain/);
   assert.match(registry, /\| USR-2026-11-06-004 \|[^\n]*SEENIT-NOTIFICATION-003[^\n]*\| active \|/);
 });
