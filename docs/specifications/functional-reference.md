@@ -1151,7 +1151,9 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
   gardé 30 jours ; pastille de secours si un logo manque), un toucher par plateforme ;
 - **Notifications** (nombre activé, rappels à 09:00) → état réel de l'autorisation sur l'appareil avec
   « Autoriser les notifications », interrupteurs Séries (nouvel épisode, nouvelle saison J-7,
-  actualités) et Films (cinéma, DVD/VOD), puis **Autres alertes** sans préférence SeenIt (Rappels,
+  actualités) et Films (cinéma, DVD/VOD) en PWA ; dans l'APK Android (#402), ces quatre interrupteurs
+  sont remplacés par les canaux système « Épisodes et saisons » et « Films » (chaque ligne ouvre son
+  canal), l'interrupteur Actualités restant, puis **Autres alertes** sans préférence SeenIt (Rappels,
   Téléchargements et Plex, Mise à jour de SeenIt) : chaque ligne ouvre son canal Android, réglages
   Android, et « Envoyer une notification test » qui déplie les quatre tests existants ;
 - **Connexions → Plex** (point vert si synchro de moins de 24 h, orange sinon) → compte et titres

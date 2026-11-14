@@ -5,7 +5,8 @@ import { useToastStore } from '../store/toastStore';
 import { getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
 import { auth } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
-import { mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
+import { Capacitor } from '@capacitor/core';
+import { readEffectiveNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { tmdb } from '../features/shows/tmdb';
 import { resolveNotificationMediaVisual } from '../features/notifications/notificationMedia';
@@ -53,7 +54,8 @@ export function useRemindersNotifier() {
 
     const uid = auth.currentUser?.uid;
     if (!uid) return;
-    const userPrefs = mergeNotificationPreferences(readUserScopedJson(uid, 'notifications', null));
+    // #402 : sur Android, les canaux système filtrent ; ailleurs, les interrupteurs SeenIt.
+    const userPrefs = readEffectiveNotificationPreferences(readUserScopedJson(uid, 'notifications', null), Capacitor.getPlatform());
     let cancelled = false;
     const active = () => !cancelled && auth.currentUser?.uid === uid;
     void reconcileDeliveredMediaAlerts(uid, shows);
