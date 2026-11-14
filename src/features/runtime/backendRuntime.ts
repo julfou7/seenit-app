@@ -1007,13 +1007,23 @@ export function installAsyncRouteForwarding(app: Application): void {
   }
 }
 
-export const apiErrorMiddleware: ErrorRequestHandler = (error: any, req, res, next) => {
+// Une adresse /api inconnue répond 404 JSON au lieu de retomber sur la page de l'application :
+// un appel cassé côté client ou script reste visible au lieu de passer pour un succès HTML.
+export const apiNotFoundHandler: RequestHandler = (_req, res) => {
+  res.status(404).json({
+    error: 'API_ROUTE_NOT_FOUND',
+    message: 'Cette adresse du backend SeenIt n’existe pas.'
+  });
+};
+
+export const apiErrorMiddleware: ErrorRequestHandler = (error: unknown, req, res, next) => {
   if (res.headersSent) {
     next(error);
     return;
   }
 
-  const code = String(error?.code ?? error?.name ?? 'API_ERROR').slice(0, 80);
+  const fields = (error && typeof error === 'object' ? error : {}) as { code?: unknown; name?: unknown };
+  const code = String(fields.code ?? fields.name ?? 'API_ERROR').slice(0, 80);
   // Ne jamais journaliser le message, la route ou les entêtes : ils peuvent contenir une URL,
   // une identité ou un secret tiers. Le contrat d'événement ne conserve que des champs allowlistés.
   emitOperationalEvent({

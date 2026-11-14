@@ -49,7 +49,7 @@ import { processDownloadFailureNotification } from "./src/features/downloads/dow
 import { supportsPlexAvailabilityBackgroundV1 } from "./src/features/notifications/notificationCapabilities.ts";
 import { normalizePlexAvailabilityTraceBatch } from "./src/features/notifications/plexAvailabilityDiagnostics.ts";
 import { executeIdempotentMutation, type TimedMutationResult } from "./src/features/downloads/downloadIdempotency.ts";
-import { apiErrorMiddleware, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
+import { apiErrorMiddleware, apiNotFoundHandler, backendHealthHandler, installAsyncRouteForwarding, seenItCorsMiddleware } from "./src/features/runtime/backendRuntime.ts";
 import { applySeenItServiceWorkerHeaders, createSeenItSecurityHeadersMiddleware } from "./src/features/runtime/pwaSecurityHeaders.ts";
 import { createSeenItFrontendRouter } from "./src/features/runtime/staticFrontend.ts";
 import { createJsonGzipMiddleware } from "./src/features/runtime/responseCompression.ts";
@@ -622,8 +622,6 @@ async function startServer() {
   });
 
   const handleResolveSlug = async (req: express.Request, res: express.Response) => {
-    console.log('[Plex Resolve Backend] --- DÉBUT DE LA RÉSOLUTION DU SLUG PLEX ---');
-
     try {
       const queryParams = req.query || {};
       const bodyParams = req.body || {};
@@ -2999,6 +2997,8 @@ async function startServer() {
     }
   );
 
+  // Une adresse /api inconnue répond 404 JSON, jamais la page de l'application.
+  app.use('/api', apiNotFoundHandler);
   // Dernier garde API : toute erreur async qui échappe à une route devient une réponse JSON générique.
   app.use('/api', apiErrorMiddleware);
 
