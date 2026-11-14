@@ -62,6 +62,34 @@ test('#85 le cas terrain sans saut de ligne final est refusé par le contrôle m
   }
 });
 
+test('#518 ligne vide EOF d’un test et fin de ligne manquante en Markdown/YAML bloquées au préflight', () => {
+  const root = mkdtempSync(join(tmpdir(), 'seenit-format-eof-'));
+  try {
+    mkdirSync(join(root, 'tests'));
+    mkdirSync(join(root, 'docs'));
+    execFileSync('git', ['init'], { cwd: root, stdio: 'ignore' });
+    execFileSync('git', ['config', 'user.email', 'seenit-test@example.invalid'], { cwd: root });
+    execFileSync('git', ['config', 'user.name', 'SeenIt Test'], { cwd: root });
+    writeFileSync(join(root, 'tests', 'issueTrackingGovernance.test.ts'), "test('a', () => {});\n", 'utf8');
+    writeFileSync(join(root, 'docs', 'registry.md'), '| a |\n', 'utf8');
+    writeFileSync(join(root, 'workflow.yml'), 'name: a\n', 'utf8');
+    execFileSync('git', ['add', '.'], { cwd: root });
+    execFileSync('git', ['commit', '-m', 'fixture'], { cwd: root, stdio: 'ignore' });
+    const baseSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+
+    // Cas terrain #195/#496 : une écriture API ajoute un test et laisse une ligne vide en fin de fichier.
+    writeFileSync(join(root, 'tests', 'issueTrackingGovernance.test.ts'), "test('a', () => {});\ntest('b', () => {});\n\n", 'utf8');
+    writeFileSync(join(root, 'docs', 'registry.md'), '| a |\n| b |', 'utf8');
+    writeFileSync(join(root, 'workflow.yml'), 'name: b', 'utf8');
+    const problems = checkChangedFormatting(baseSha, root).join('\n');
+    assert.match(problems, /tests\/issueTrackingGovernance\.test\.ts:\d+: new blank line at EOF/);
+    assert.match(problems, /docs\/registry\.md: fin de ligne finale manquante/);
+    assert.match(problems, /workflow\.yml: fin de ligne finale manquante/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('#85 EditorConfig demande une fin de ligne finale aux éditeurs compatibles', () => {
   const editorConfig = readFileSync('.editorconfig', 'utf8');
   assert.match(editorConfig, /^root = true/m);
