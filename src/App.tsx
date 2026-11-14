@@ -20,6 +20,7 @@ import { SplashScreen } from './components/SplashScreen';
 
 import { BottomNav } from './components/BottomNav';
 import { ToastContainer } from './components/ToastContainer';
+import { CompletionCelebration } from './components/CompletionCelebration';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
 import { AppUpdateBanner } from './components/AppUpdateBanner';
 import { useNavigation } from './features/navigation/useNavigation';
@@ -750,6 +751,7 @@ function MainApp() {
         {quickAccountOpen && <Suspense fallback={null}><QuickAccountSheet onClose={() => setQuickAccountOpen(false)} /></Suspense>}
 
         <ToastContainer />
+        <CompletionCelebration />
       </div>
     </div>
   );
