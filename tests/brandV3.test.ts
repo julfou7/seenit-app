@@ -26,3 +26,12 @@ test('SEENIT-UX-009 marque v3 réutilise les tracés et termine la séquence de 
  assert.doesNotMatch(fs.readFileSync('public/brand/seenit-logo-empile-sombre.svg','utf8'),/<rect/);
  assert.doesNotMatch(brandStackedSvg,/<rect/);
 });
+
+test('SEENIT-UX-009 aucun logo SeenIt n’embarque de fond : il se pose sur n’importe quel fond de l’app', () => {
+ // Retour terrain du 14/11 : le fond nuit intégré au logo de l'en-tête dessinait un cadre noir sur le dégradé.
+ // Seule l'icône d'app (carré Play Store / launcher) garde volontairement son fond.
+ const logos=fs.readdirSync('public/brand').filter(name=>/^seenit-(?:logo|anneau).*\.svg$/.test(name));
+ assert.ok(logos.includes('seenit-logo-sombre.svg')&&logos.includes('seenit-logo-clair.svg'));
+ for(const name of logos) assert.doesNotMatch(fs.readFileSync('public/brand/'+name,'utf8'),/<rect\b/,name);
+ assert.match(fs.readFileSync('public/brand/seenit-icone.svg','utf8'),/<rect\b/,'l’icône d’app garde son fond');
+});
