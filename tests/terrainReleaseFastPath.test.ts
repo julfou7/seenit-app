@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
+import { readDocText } from './helpers/docText.ts';
 
 const require = createRequire(import.meta.url);
 const {
@@ -26,8 +27,8 @@ const { buildFinalReleaseSummary } = require('../scripts/notify-release-update.c
 
 const releaseWorkflow = readFileSync('.github/workflows/build-apk.yml', 'utf8');
 const controlWorkflow = readFileSync('.github/workflows/release-control.yml', 'utf8');
-const agentRules = readFileSync('AGENTS.md', 'utf8');
-const delivery = readFileSync('docs/process/delivery.md', 'utf8');
+const agentRules = readDocText('AGENTS.md');
+const delivery = readDocText('docs/process/delivery.md');
 const releaseSpec = readFileSync('docs/specifications/release-control.md', 'utf8');
 
 test('issue #368 expose une commande terrain distincte sans changer la release complète', () => {

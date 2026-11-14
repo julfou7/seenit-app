@@ -140,3 +140,23 @@ test('SEENIT-QUALITY-008 #869 accepte actionlint 1.7.12 compilé depuis les sour
   assert.equal(parseActionlintVersion('built with go1.24.2'), null, 'la version de Go n’est jamais prise pour celle d’actionlint');
   assert.equal(parseActionlintVersion(''), null);
 });
+
+test('#511 toute suppression GCS est précédée du préflight testIamPermissions storage.objects.delete', () => {
+  const { validateDestructiveStoragePreflight } = require('../scripts/validate-workflow-policy.cjs') as {
+    validateDestructiveStoragePreflight: (content: string) => string[];
+  };
+  const probe = 'curl "https://storage.googleapis.com/storage/v1/b/$B/iam/testPermissions?permissions=storage.objects.list&permissions=storage.objects.delete"';
+  assert.deepEqual(validateDestructiveStoragePreflight('run: gcloud storage ls gs://b/'), [], 'lecture seule : rien exigé');
+  assert.equal(validateDestructiveStoragePreflight('run: gcloud storage rm --recursive gs://b/p/').length, 1, 'suppression sans préflight refusée');
+  assert.equal(validateDestructiveStoragePreflight(`run: gcloud storage rm gs://b/p/\nrun: ${probe}`).length, 1, 'préflight après la suppression refusé');
+  assert.equal(validateDestructiveStoragePreflight(`run: ${probe.replace('&permissions=storage.objects.delete', '')}\nrun: gcloud storage rm gs://b/p/`).length, 1, 'sans storage.objects.delete refusé');
+  assert.deepEqual(validateDestructiveStoragePreflight(`run: ${probe}\nrun: gcloud storage rm --recursive gs://b/p/`), []);
+
+  // Le vrai contrôleur : préflight avant la suppression, refus explicite, aucune extension de périmètre.
+  const cleanup = fs.readFileSync('.github/workflows/cleanup-tv-track-offline.yml', 'utf8');
+  assert.deepEqual(validateDestructiveStoragePreflight(cleanup), []);
+  assert.ok(cleanup.indexOf('Preflight effective delete permission') < cleanup.indexOf('Delete exact orphan prefix'));
+  assert.match(cleanup, /Nettoyage refusé avant toute suppression : permission\(s\) absente\(s\)/);
+  assert.match(cleanup, /echo "::add-mask::\$\{token\}"/, 'jeton d’accès masqué dans le journal');
+  assert.match(cleanup, /\[\[ "\$target" == 'gs:\/\/ai-studio-bucket-799043440232-us-west1\/services\/tv-track-offline\/' \]\]/);
+});

@@ -93,6 +93,31 @@ jobs:
           echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
           echo "Preview: ${count} active object(s), ${bytes} bytes."
 
+      # #511 : prouver les permissions effectives sans rien modifier, avant la première suppression.
+      - name: Preflight effective delete permission
+        if: steps.preview.outputs.objects != '0'
+        shell: bash
+        run: |
+          set -euo pipefail
+          required='storage.objects.list storage.objects.get storage.objects.delete'
+          token="$(gcloud auth print-access-token)"
+          echo "::add-mask::${token}"
+          granted="$(curl --silent --show-error --fail \
+            --header "Authorization: Bearer ${token}" \
+            "https://storage.googleapis.com/storage/v1/b/${CLEANUP_BUCKET}/iam/testPermissions?permissions=storage.objects.list&permissions=storage.objects.get&permissions=storage.objects.delete" \
+            | jq -r '.permissions // [] | .[]')"
+          missing=''
+          for permission in $required; do
+            grep -qx "$permission" <<<"$granted" || missing="${missing} ${permission}"
+          done
+          if [[ -n "$missing" ]]; then
+            echo "Nettoyage refusé avant toute suppression : permission(s) absente(s) :${missing}."
+            echo "Accorder temporairement à ${GCP_DEPLOY_SERVICE_ACCOUNT} un rôle donnant ces permissions (ex. roles/storage.objectAdmin)"
+            echo "sur gs://${CLEANUP_BUCKET} uniquement, relancer la commande, puis retirer le rôle."
+            exit 1
+          fi
+          echo "Permissions effectives prouvées :$(tr '\n' ' ' <<<" ${granted}")"
+
       - name: Delete exact orphan prefix
         if: steps.preview.outputs.objects != '0'
         shell: bash
