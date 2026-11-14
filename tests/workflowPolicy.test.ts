@@ -141,7 +141,7 @@ test('SEENIT-QUALITY-008 #869 accepte actionlint 1.7.12 compilé depuis les sour
   assert.equal(parseActionlintVersion(''), null);
 });
 
-test('#511 toute suppression GCS est précédée du préflight testIamPermissions storage.objects.delete', () => {
+test('SEENIT-QUALITY-014 #511 toute suppression GCS est précédée du préflight testIamPermissions storage.objects.delete', () => {
   const { validateDestructiveStoragePreflight } = require('../scripts/validate-workflow-policy.cjs') as {
     validateDestructiveStoragePreflight: (content: string) => string[];
   };
