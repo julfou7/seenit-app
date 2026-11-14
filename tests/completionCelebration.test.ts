@@ -60,4 +60,8 @@ test('#436 textes, store et branchement sur le marquage individuel uniquement', 
   const popup = readFileSync('src/components/CompletionCelebration.tsx', 'utf8');
   assert.match(popup, /motion-safe:animate-in/, 'animation coupée par prefers-reduced-motion');
   assert.match(popup, /aria-label="Fermer la célébration"/);
+  // Revue Codex #1014 : la couche passe au-dessus de la fiche média (z-[150]) qui déclenche la célébration.
+  const layer = Number(popup.match(/data-celebration-layer="" className="[^"]*z-\[(\d+)\]/)?.[1]);
+  const mediaLayer = Number(readFileSync('src/App.tsx', 'utf8').match(/z-\[(1[5-9]\d)\]/)?.[1] || 150);
+  assert.ok(layer > mediaLayer, `célébration z-${layer} au-dessus de la fiche z-${mediaLayer}`);
 });

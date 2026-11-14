@@ -25,7 +25,8 @@ export function CompletionCelebration() {
   const series = current.celebration.kind === 'series';
   const Icon = series ? Trophy : PartyPopper;
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+16px)] z-[120] flex justify-center px-4">
+    // Revue Codex #1014 : au-dessus de la fiche Série (portail z-[150]) qui déclenche la célébration, comme les toasts.
+    <div data-celebration-layer="" className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+16px)] z-[99998] flex justify-center px-4">
       <div key={current.id} role="status" aria-live="polite" data-completion-celebration={current.celebration.kind}
         className="pointer-events-auto flex w-full max-w-sm items-center gap-3 rounded-2xl border border-amber-400/30 bg-zinc-950/95 px-4 py-3 shadow-2xl motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:duration-300">
         <span className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${series ? 'bg-amber-400 text-zinc-950' : 'bg-amber-400/15 text-amber-300'}`}>
