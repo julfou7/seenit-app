@@ -329,7 +329,9 @@ annulation.
   l'historique » propose Annuler, qui restaure la date exacte.
 - La liste affiche dix entrées puis Voir plus avec le nombre restant (dix maximum par lot). Les heures connues sont conservées dans les libellés accessibles et l’édition.
 - Le fil Actualités, désormais dans la feuille Notifications, affiche les événements non lus de séries encore présentes : nouvelle saison,
-  diffusion, renouvellement/annulation et informations générées par le worker de détails.
+  diffusion, renouvellement/annulation et informations générées par le worker de détails. Depuis #437
+  (phase A), le fil et la cloche écoutent `users/{uid}/news` en direct (50 dernières) : une actualité
+  écrite pendant que l'écran est ouvert apparaît sans recharger ; la génération reste au worker.
 - Une actualité lue est retirée et son état est partagé entre appareils.
 
 ## 6. Profil, statistiques et Ma Liste

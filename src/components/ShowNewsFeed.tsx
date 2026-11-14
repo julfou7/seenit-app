@@ -1,12 +1,16 @@
 import { DialogLayer } from './ui/DialogLayer';
 import React, { useEffect, useState } from 'react';
-import { collection, query, orderBy, getDocs, getDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, getDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import { X, Ban, CheckCircle, Sparkles, Calendar, Tv, Eye, Layers, Flag, Play, Clapperboard } from 'lucide-react';
 import { useShowsStore } from '../store/showsStore';
 import { tmdb } from '../features/shows/tmdb';
 import { TrailerModal } from './TrailerModal';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
+import { appLogger } from '../store/logStore';
+
+/** #437 : borne du fil en direct (lectures Firestore maîtrisées). */
+export const NEWS_FEED_LIMIT = 50;
 
 export interface ShowNews {
   id: string;
@@ -190,17 +194,13 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
       return;
     }
     const newsRef = collection(db, 'users', currentUser.uid, 'news');
-    const q = query(newsRef, orderBy('createdAt', 'desc'));
-
-    getDocs(q).then((snapshot) => {
-      const newsData: ShowNews[] = [];
-      snapshot.forEach((doc) => {
-        newsData.push({ ...doc.data(), id: String(doc.id) } as ShowNews);
-      });
-      setNews(newsData);
+    // #437 : fil vivant — une actualité écrite pendant que l'écran est ouvert apparaît sans recharger.
+    const q = query(newsRef, orderBy('createdAt', 'desc'), limit(NEWS_FEED_LIMIT));
+    return onSnapshot(q, snapshot => {
+      setNews(snapshot.docs.map(item => ({ ...item.data(), id: String(item.id) }) as ShowNews));
       setHasLoaded(true);
-    }).catch((err) => {
-      console.warn('News fetch error:', err);
+    }, err => {
+      appLogger.warn('sync', '[News] Fil indisponible', err instanceof Error ? err.message : String(err));
       setHasLoaded(true);
     });
   }, [currentUser]);
