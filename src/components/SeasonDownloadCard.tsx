@@ -6,6 +6,7 @@ import { findMatchingShowForDownload } from '../features/downloads/downloadIdent
 import { preferSeenItImagePath, selectStableDownloadPosterPath } from '../features/downloads/downloadPosterStability';
 import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
 import { downloadGroup } from '../features/downloads/downloadGroups';
+import { releaseVariantLabel } from '../features/downloads/releaseQuality';
 import { addEpisodeToSeason, useNextEpisodeToAdd } from '../features/downloads/addNextEpisode';
 import { useToastStore } from '../store/toastStore';
 const PreciseVersionPage = lazy(() => import('../screens/mediaDetail/PreciseVersionPage'));
@@ -97,7 +98,7 @@ export function SeasonDownloadCard({ seasonNumber, items, onShowClick, onRemove 
           <span className="download-season__code">{code}</span>
           <span className="download-season__text">
             <span className="download-season__title">{item.episodeTitle || `Épisode ${item.episodeNumber}`}</span>
-            <span className={`download-season__state is-${kind}`}>{rowState(item, kind)}</span>
+            <span className={`download-season__state is-${kind}`}>{[rowState(item, kind), releaseVariantLabel(item.releaseTitle)].filter(Boolean).join(' · ')}</span>
             {kind === 'active' && <span role="progressbar" aria-label={`Progression de ${code}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(item)} className="download-season__progress"><i style={{ width: `${percent(item)}%` }} /></span>}
           </span>
           <button type="button" className="download-season__remove" onClick={() => onRemove(item)}

@@ -69,6 +69,13 @@ test('SEENIT-DOWNLOAD-013 #293 la variante HD Light ou Standard reste visible da
   assert.equal(releaseVariantLabel('Moonlight.2016.HDR.2160p'), 'Standard', 'mention explicite seulement');
   assert.equal(releaseVariantLabel(undefined), null, 'release inconnue : aucune variante supposée');
   assert.equal(releaseVariantLabel('  '), null);
+  // Revue Codex #1003 : titre provisoire d'une demande (avant sélection) ou titre d'affichage : aucune variante.
+  assert.equal(releaseVariantLabel('Dune • 1080p'), null);
+  assert.equal(releaseVariantLabel('Moonlight • S01E02 • 1080p'), null);
+  assert.equal(releaseVariantLabel('Twilight'), null, 'titre sans marque technique');
+  assert.equal(releaseVariantLabel('Show.S01E02.1080p.WEB.H264-GRP'), 'Standard');
+  const season = readFileSync('src/components/SeasonDownloadCard.tsx', 'utf8');
+  assert.match(season, /\[rowState\(item, kind\), releaseVariantLabel\(item\.releaseTitle\)\]/, 'épisodes regroupés : variante par ligne');
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
   assert.match(card, /const variant = releaseVariantLabel\(item\.releaseTitle\);/);
   assert.match(card, /\['Film', item\.quality, variant\]/);
