@@ -708,6 +708,11 @@ Les actions de téléchargement n'existent dans la fiche que lorsque la fonction
 activée pour le compte courant. Un favori active les notifications du média sans créer de progression.
 Une note/favorite/archive est une intention distincte du statut de visionnage.
 
+Sur une fiche **série**, la ligne Plex indique la couverture du serveur (#255, `SEENIT-PLEX-013`) :
+« Sur PC-Julian · 1 épisode sur 34 » quand il manque des épisodes déjà diffusés, « · 34 épisodes » sinon,
+rien si le décompte est inconnu ; jamais « complet ». Sur une fiche **épisode**, Plex n'apparaît que si cet
+épisode précis est sur le serveur (quand la liste est connue). Les films ne changent pas.
+
 La section **« Où regarder »** est un repère stable : son titre reste toujours affiché et n'est jamais
 remplacé par un skeleton. Tant que Plex et/ou les diffuseurs TMDB sont en résolution, la fiche utilise le
 libellé unique **« Recherche Plex & streaming… »**. Les diffuseurs résolus sont conservés dans un cache

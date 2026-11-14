@@ -20,6 +20,7 @@ import { TrailerModal } from '../components/TrailerModal';
 import { useShowsStore } from '../store/showsStore';
 import { getFormattedProviderLogo, PLEX_LOGO_SVG } from '../utils/providerLogos';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
+import { countAiredEpisodes, describePlexSeriesCoverage } from '../features/plex/plexSeriesCoverage';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { RedditSection } from '../components/community/RedditSection';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
@@ -386,9 +387,11 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const sortedProviders = useMemo(() => {
     const list: any[] = [...uniqueProviders];
     if (plexMediaInfo?.available) {
-      list.push({ provider_id: 999999, provider_name: plexMediaInfo.serverName ? `Plex (${plexMediaInfo.serverName})` : 'Plex', logo_path: 'PLEX_CUSTOM_SVG', isPlex: true, serverName: plexMediaInfo.serverName, plexUrl: plexMediaInfo.plexUrl, watchUrl: plexMediaInfo.watchUrl });
+      // #255 : une série n'est plus « disponible » sans nuance quand Plex n'en possède qu'une partie.
+      const coverage = isSeries ? describePlexSeriesCoverage(plexMediaInfo, countAiredEpisodes(tmdbDetails)).label : null;
+      list.push({ provider_id: 999999, provider_name: plexMediaInfo.serverName ? `Plex (${plexMediaInfo.serverName})` : 'Plex', logo_path: 'PLEX_CUSTOM_SVG', isPlex: true, serverName: plexMediaInfo.serverName, plexCoverage: coverage, plexUrl: plexMediaInfo.plexUrl, watchUrl: plexMediaInfo.watchUrl });
     }
-    return list.sort((a: any, b: any) => {
+    return list.sort((a, b) => {
       if (a.isPlex && !b.isPlex) return 1;
       if (!a.isPlex && b.isPlex) return -1;
       const aHas = userPlatforms.includes(a.provider_id);
@@ -397,7 +400,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       if (!aHas && bHas) return 1;
       return 0;
     });
-  }, [uniqueProviders, plexMediaInfo, userPlatforms]);
+  }, [uniqueProviders, plexMediaInfo, userPlatforms, isSeries, tmdbDetails]);
 
   const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);

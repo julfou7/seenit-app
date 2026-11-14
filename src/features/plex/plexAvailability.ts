@@ -7,6 +7,8 @@ import { auth } from '../../lib/firebase';
 import { appLogger } from '../../store/logStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 import { buildNativeBackendAttempts, executeBackendAttempts } from '../../lib/nativeBackendRetry';
+import { readPlexEpisodeCoverage } from './plexSeriesCoverage';
+export { isPlexEpisodePresent } from './plexSeriesCoverage';
 import { resolveSeenItApiCandidates } from '../../lib/seenitApi';
 import { getStoredPlexToken } from './plexStorage';
 import { replacePlexUserCache } from './plexAvailabilityCache';
@@ -28,6 +30,10 @@ export interface PlexMediaInfo {
   watchUrl?: string;
   title?: string;
   year?: number;
+  /** #255 : nombre d'épisodes présents sur le serveur (série uniquement), absent si inconnu. */
+  episodeCount?: number;
+  /** #255 : épisodes présents `saison:épisode` ; absent = couverture par épisode inconnue. */
+  episodes?: string[];
   lastChecked: number;
 }
 
@@ -282,6 +288,7 @@ async function performPlexAvailabilityCheck(params: {
               : (typeof data.plexUrl === 'string' ? data.plexUrl : undefined),
             title: typeof data.title === 'string' ? data.title : undefined,
             year: typeof data.year === 'number' ? data.year : undefined,
+            ...readPlexEpisodeCoverage(data),
             lastChecked: Date.now()
           };
           store.setMediaAvailability(key, info);
@@ -299,8 +306,8 @@ async function performPlexAvailabilityCheck(params: {
       if (status > 0) {
         appLogger.warn('plex', `[Plex Availability] Backend a répondu HTTP ${status}; le cache Plex n'est pas modifié.`);
       }
-    } catch (error: any) {
-      appLogger.warn('plex', `[Plex Availability] Backend unique indisponible : ${error?.message || error}`);
+    } catch (error) {
+      appLogger.warn('plex', `[Plex Availability] Backend unique indisponible : ${error instanceof Error ? error.message : String(error)}`);
     }
 
     const newerCached = usePlexAvailabilityStore.getState().getMediaAvailability(key);

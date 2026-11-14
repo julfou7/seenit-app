@@ -700,6 +700,15 @@ n'est rouverte que par une nouvelle décision produit explicite.
     génériques traduits et accordés (« Self » → « Lui-même » / « Elle-même », « (voice) » → « · voix ») ;
   - **Où regarder** dédoublonne les plateformes par nom (« Netflix » et « Netflix Standard with Ads » ne
     font qu'un), sur la fiche comme sur l'épisode ;
+  - **SEENIT-PLEX-013** (#255) — la ligne Plex d'une **série** porte sa couverture : « Sur <serveur> · 1 épisode
+    sur 34 » quand le serveur possède moins d'épisodes que TMDB n'en a diffusé (hors spéciaux), « · 34
+    épisodes » sinon, rien quand le décompte est inconnu. Le mot « complet » n'est jamais affiché : le décompte
+    Plex inclut les spéciaux et ne prouve pas chaque épisode. La couverture vient d'un seul appel PMS
+    `/library/metadata/<clé exacte de la série>/allLeaves` sur le serveur où l'identité exacte a été trouvée,
+    jamais d'un appel par épisode ; un échec, un timeout ou une liste tronquée laisse la couverture inconnue.
+    Sur la fiche **épisode**, Plex n'est proposé que si cet épisode précis figure dans la liste ; liste
+    inconnue (ancien cache, lecture échouée) = comportement antérieur, sans conclusion d'absence. Les films
+    restent binaires ;
   - la fiche média garde la barre de navigation ; seuls les dialogues plein écran la masquent ;
   - une seule fiche acteur dans toute l'app : fiches, Explorer, Moi et À voir ouvrent celle des billets ;
     retour v1.4.295 : comme les fiches média et épisode, elle laisse la barre de navigation au-dessus d'elle
