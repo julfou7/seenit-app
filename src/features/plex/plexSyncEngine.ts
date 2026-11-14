@@ -179,7 +179,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
     }
 
     const clearPlexSyncStatusDelayed = (message?: string, delayMs: number = 3000) => {
-      progress.phase = /erreur|pause|incompl/i.test(message || '') ? 'error' : 'done';
+      progress.phase = /erreur|pause/i.test(message || '') ? 'error' : /incompl/i.test(message || '') ? 'incomplete' : 'done';
       if (auth.currentUser?.uid === user.uid) writeUserScopedJson(user.uid, 'plex_last_sync_report_v1', { message: message || 'Synchronisation terminée', progress: { ...progress } });
       if (message && !silent) {
         publishStatus({ message });
@@ -257,7 +257,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
           const reason = describeIncompletePlexSync(plexData?.integrity);
           appLogger.warn('plex', `[Plex Sync] Curseur conservé : ${reason}.`);
           clearPlexSyncStatusDelayed('Sync Plex incomplète — nouvel essai requis', 5000);
-          if (!silent) {
+          if (!silent && ignoreCooldown) {
             useToastStore.getState().showToast(`Synchronisation Plex incomplète : ${reason}. Rien n'a été perdu, un nouvel essai sera effectué.`, 'info');
           }
           return { success: false, syncedCount: 0, moviesCount: 0, episodesCount: 0, syncedItems: [], error: reason };
@@ -1102,7 +1102,7 @@ export async function performPlexSync(options: { delta?: boolean; silent?: boole
         const reason = describeIncompletePlexSync(plexData?.integrity, retryableUnresolvedCount);
         clearPlexSyncStatusDelayed('Synchronisation Plex incomplète — nouvel essai requis', 5000);
         appLogger.warn('plex', `[Plex Sync] Curseur conservé pour permettre un nouvel essai : ${reason}.`);
-        if (!silent) {
+        if (!silent && ignoreCooldown) {
           useToastStore.getState().showToast(`Plex sera retenté automatiquement : ${reason}.`, 'info');
         }
       }

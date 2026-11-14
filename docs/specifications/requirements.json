@@ -1688,6 +1688,10 @@
       ],
       "tests": [
         {
+          "file": "tests/autoSyncThrottle.test.ts",
+          "contains": "SEENIT-PLEX-012 retour du 14/11 : les délais automatiques survivent au lancement et un serveur injoignable n’est pas une erreur"
+        },
+        {
           "file": "tests/plexSyncProgress.test.ts",
           "contains": "SEENIT-PLEX-012 la synchro automatique part au plus toutes les 6 h, les boutons restent immédiats"
         },

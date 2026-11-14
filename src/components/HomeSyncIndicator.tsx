@@ -51,7 +51,8 @@ export function HomeSyncIndicator() {
   const busy = Boolean(ownedActivePlex && !isPlexSyncTerminal(ownedActivePlex.progress?.phase, ownedActivePlex.message));
   const lastSync = getPlexLastSyncTimestamp(uid);
   const failed = !busy && (lastReport?.progress?.phase === 'error' || /erreur|expir/i.test(lastReport?.message || ''));
-  const dot = busy || !plexConnected ? undefined : failed ? 'error' : lastSync && Date.now() - lastSync < PLEX_FRESH_MS ? 'ok' : 'warn';
+  const incomplete = !busy && lastReport?.progress?.phase === 'incomplete';
+  const dot = busy || !plexConnected ? undefined : failed ? 'error' : incomplete ? 'warn' : lastSync && Date.now() - lastSync < PLEX_FRESH_MS ? 'ok' : 'warn';
   const idle = plexConnected && !busy && !details;
   const launch = async (delta: boolean) => {
     try { await startPlexSync(delta); } catch { showToast('Synchro Plex impossible pour le moment.', 'error'); }
@@ -74,7 +75,8 @@ export function HomeSyncIndicator() {
         <p role="status" className="home-sync-sheet__status">{paused ? 'En pause · la collecte en cours termine avant la pause' : idle && !lastReport ? (lastSync ? `Dernière synchro ${new Intl.RelativeTimeFormat('fr-FR', { numeric: 'auto' }).format(-Math.max(1, Math.round((Date.now() - lastSync) / 3_600_000)), 'hour')}` : 'Aucune synchro Plex pour l’instant') : message}</p>
         {progress && busy && <div className="home-sync-sheet__progress"><div className="home-sync-sheet__bar" role="presentation"><span style={{width:`${percent ?? 0}%`}} /></div>{stepCount && <small>{stepCount}</small>}</div>}
         {progress && progress.servers.length > 0 && <ul className="home-sync-sheet__servers" aria-label="Serveurs Plex">{progress.servers.map((server, index) => {
-          const tone = server.reason || server.state === 'skipped' ? 'error' : server.state === 'scanning' || server.state === 'pending' ? 'busy' : 'ok';
+          // Retour du 14/11 : un serveur injoignable (PC éteint) est un état, pas une erreur : pastille ambre.
+          const tone = server.reason || server.state === 'skipped' ? 'warn' : server.state === 'scanning' || server.state === 'pending' ? 'busy' : 'ok';
           return <li key={server.id || index} data-tone={tone}><i aria-hidden="true" /><strong title={server.name}>{server.name}</strong><span>{serverStatusLabel(server)}</span></li>;
           })}{progress.account && <li data-tone="ok"><i aria-hidden="true" /><strong>Historique du compte</strong><span>{progress.account.dated === false ? 'ok · sans heure' : 'ok'}</span></li>}</ul>}
         {progress?.account && progress.account.dated === false && progress.account.dateError && <p className="home-sync-sheet__summary">Plex ne donne pas l’heure : {progress.account.dateError.slice(0, 140)}</p>}

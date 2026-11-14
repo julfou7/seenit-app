@@ -223,7 +223,7 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   série enregistrée avant la révision de dates 2 (`calendarDatesRevision` absent ou inférieur) est
   resynchronisée une fois depuis TMDB, même si son prochain épisode paraît futur, et chaque écriture de
   synchronisation marque la révision 2 ; aucune autre donnée de progression n’est modifiée par ce rattrapage.
-- **SEENIT-DATA-008** — Une série terminée, archivée ou `completed` qui reprend l'antenne redevient active
+- **SEENIT-DATA-008** — (retour du 14/11 : le passage automatique des métadonnées — au plus toutes les 12 h hors épisode attendu — est mémorisé par compte, sinon chaque lancement revérifiait douze séries finies de plus.) Une série terminée, archivée ou `completed` qui reprend l'antenne redevient active
   (#333, signalement terrain du 14/09 : *La Chute de Paris*, saison 2 diffusée mais « Revoir la série »).
   Cause : la synchronisation automatique excluait ces séries et ne les revérifiait jamais auprès de TMDB.
   Désormais : (1) toute série terminée/archivée/`completed`, non abandonnée, est revérifiée au plus tous les
@@ -1130,7 +1130,11 @@ pour le cache des sagas et univers.
   - **Synchro automatique toutes les 6 h au plus** (décision du propriétaire du 13/11, remplace le seuil de 30 min) :
     à l'ouverture, au retour sur l'app ou au minuteur, la synchro rapide automatique ne part que si la dernière synchro
     réussie date de plus de 6 h, et un essai automatique sans succès attend 1 h (le délai de reprise du backend prime).
-    Les boutons « Synchro rapide » et « Complète » restent immédiats.
+    Les boutons « Synchro rapide » et « Complète » restent immédiats. Retour du 14/11 : ces délais sont mémorisés par
+    compte (`autoSyncThrottle`) et non plus seulement pour la session, sinon chaque lancement relançait Plex ; un essai
+    automatique incomplet n'affiche aucun toast (seule une synchro lancée à la main l'annonce) ; une synchro incomplète
+    parce que des serveurs sont injoignables (PC éteint) n'est **pas une erreur** : phase `incomplete`, « 0 erreur »,
+    pastille ambre et serveurs injoignables en ambre, la collecte étant retentée plus tard avec son curseur conservé.
   - **Une seule collecte par demande.** L'app ne relance jamais automatiquement une collecte expirée
     (seules une panne DNS ou une connexion refusée essaient l'origine ou le transport suivant). Si l'app
     se déconnecte, le backend arrête la collecte en cours. La collecte complète dispose de 12 min côté
