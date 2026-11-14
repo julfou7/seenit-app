@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { ChevronLeft, ChevronRight, Heart } from 'lucide-react';
 import { DialogLayer } from './ui/DialogLayer';
-import { characterProgress, characterWorkProgress, type CharacterRecord, type CharacterWork } from '../features/discover/characters';
+import { characterProgress, characterWorkProgress, performerWorkTitles, type CharacterRecord, type CharacterWork } from '../features/discover/characters';
 import { authenticatedFetch } from '../lib/apiAuth';
 import { auth } from '../lib/firebase';
 import { readUserScopedJson, subscribeUserScopedStorageField, writeUserScopedJson } from '../lib/userIsolation';
@@ -58,10 +58,12 @@ export function CharacterDetailModal({ character, shows, onClose, onPersonClick,
      {detail.aliases.filter(alias => alias !== detail.name).length > 0 && <small>alias {detail.aliases.filter(alias => alias !== detail.name).join(' · ')}</small>}
     </div></div>
    </div>
-   <div className="character-actors">{detail.actors.slice(0,1).map(actor => <button type="button" key={actor.id} aria-label={'Joué par ' + actor.name} onClick={() => onPersonClick(actor.id)}>
+   {/* #398 : tous les interprètes crédités, chacun avec ses œuvres exactes ; jamais fusionnés sur un nom. */}
+   {detail.actors.length > 1 && <h2>Joué par {detail.actors.length} interprètes</h2>}
+   <div className="character-actors">{detail.actors.map(actor => { const titles = performerWorkTitles(actor, detail.works); return <button type="button" key={actor.id} aria-label={'Joué par ' + actor.name + (titles ? ' dans ' + titles : '')} onClick={() => onPersonClick(actor.id)}>
     <span>{actor.photo ? <img src={'https://image.tmdb.org/t/p/w92'+actor.photo} alt="" /> : characterInitials(actor.name)}</span>
-    <div><small>Joué par</small><strong>{actor.name}</strong></div><ChevronRight size={18} />
-   </button>)}</div>
+    <div><small>{detail.actors.length > 1 ? titles || 'Interprète' : 'Joué par'}</small><strong>{actor.name}</strong></div><ChevronRight size={18} />
+   </button>; })}</div>
    <div className="character-stats" aria-busy={loading}>
     <div><strong>{progress.complete ? progress.total : credited ?? '—'}</strong><small>{filmOnly ? 'films' : progress.complete ? 'épisodes' : 'ép. crédités'}</small></div>
     <div><strong>{progress.from ? progress.from === progress.to ? progress.from : progress.from + '→' + progress.to?.slice(-2) : '—'}</strong><small>{progress.from && progress.to ? Math.max(1,Number(progress.to)-Number(progress.from))+' an'+(Number(progress.to)-Number(progress.from)>1?'s':'') : 'période'}</small></div>
