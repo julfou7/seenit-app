@@ -40,6 +40,12 @@ export const query = (...args: unknown[]) => args;
 export const orderBy = (...args: unknown[]) => args;
 export const limit = (count: number) => count;
 export const getDocs = async () => ({ docs: [{ id: 'news-1', data: () => ({ showId: 'series-0', message: 'Nouvelle saison annoncée' }) }] });
+// #437 : la cloche écoute les actualités en direct ; même contenu que getDocs, livré une fois.
+export const onSnapshot = (_query: unknown, next: (snapshot: Awaited<ReturnType<typeof getDocs>>) => void) => {
+  let active = true;
+  void getDocs().then(snapshot => { if (active) next(snapshot); });
+  return () => { active = false; };
+};
 export const getDoc = async () => ({ exists: () => true, data: () => ({ readNewsIds: [] }) });
 export const reminderControl = { holdPermission:false, failWrite:false, permissionCalls:0, nativeNotifications:0, release:()=>{} };
 export const setDoc = async (path:string[],payload:Record<string,unknown>) => {

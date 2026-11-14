@@ -1,7 +1,7 @@
 import { collectDeliveredNotifications, formatNotificationEpisodeCodes, NOTIFICATION_INBOX_FIELD, type InboxNotification } from '../features/notifications/notificationInbox';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Bell } from 'lucide-react';
-import { collection, query, orderBy, limit, getDocs, getDoc, doc, setDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, getDoc, doc, setDoc, arrayUnion } from 'firebase/firestore';
 import type { Show } from '../types';
 import { auth, db } from '../lib/firebase';
 import { readUserScopedJson, writeUserScopedJson, subscribeUserScopedStorageField } from '../lib/userIsolation';
@@ -55,19 +55,19 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
     const unsubscribe = subscribeUserScopedStorageField(uid, 'home_read_notifications', refresh);
     const unsubscribeNews = subscribeUserScopedStorageField(uid, 'read_news_ids', refresh);
     const unsubscribeDismissed = subscribeUserScopedStorageField(uid, 'home_dismissed_notifications', refresh);
-    if (uid) void getDocs(query(collection(db, 'users', uid, 'news'), orderBy('createdAt', 'desc'), limit(50))).then(snapshot => {
-      if (current) {
-        const items = snapshot.docs.map(item => ({ ...item.data(), id: item.id }) as News);
-        setNews(items); writeUserScopedJson(uid, 'home_news', items);
-      }
-    }).catch(() => { /* Les notifications locales restent disponibles hors ligne. */ }).finally(() => { if (current) setLoading(false); });
+    // #437 : la cloche suit les actualités en direct ; hors ligne, la copie locale reste affichée.
+    const unsubscribeFeed = uid ? onSnapshot(query(collection(db, 'users', uid, 'news'), orderBy('createdAt', 'desc'), limit(50)), snapshot => {
+      if (!current) return;
+      const items = snapshot.docs.map(item => ({ ...item.data(), id: item.id }) as News);
+      setNews(items); writeUserScopedJson(uid, 'home_news', items); setLoading(false);
+    }, () => { if (current) setLoading(false); }) : () => {};
     if (uid) void getDoc(doc(db, 'users', uid, 'settings', 'news_preferences')).then(snapshot => {
       const remote: unknown = snapshot.exists() ? snapshot.data()?.readNewsIds : null;
       if (!current || !Array.isArray(remote)) return;
       const ids = [...new Set([...readUserScopedJson<string[]>(uid, 'read_news_ids', []), ...remote.filter((id): id is string => typeof id === 'string')])];
       setReadNews(ids); writeUserScopedJson(uid, 'read_news_ids', ids);
     }).catch(() => {});
-    return () => { current = false; unsubscribe(); unsubscribeNews(); unsubscribeDismissed(); };
+    return () => { current = false; unsubscribe(); unsubscribeNews(); unsubscribeDismissed(); unsubscribeFeed(); };
   }, [uid]);
   useEffect(() => {
     if (!downloadsEnabled) { setDownloads([]); return; }
