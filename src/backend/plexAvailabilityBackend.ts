@@ -20,6 +20,8 @@ export interface PlexAvailabilityResult {
   episodeCount?: number;
   /** Épisodes présents, `saison:épisode` (saison 0 = spéciaux), triés. */
   episodes?: string[];
+  /** #255 : `ratingKey` exact de chaque épisode présent, pour ouvrir cet épisode précis (jamais la série). */
+  episodeKeys?: Record<string, string>;
 }
 
 interface PlexConnection {
@@ -33,6 +35,8 @@ export interface PlexServerResource {
   clientIdentifier?: string;
   accessToken?: string;
   provides?: string;
+  /** plex.tv : `true` pour un serveur appartenant au compte (« mon serveur »), prioritaire (#255). */
+  owned?: boolean;
   connections?: PlexConnection[];
 }
 
@@ -102,7 +106,7 @@ function buildStrongGuidCandidates(identity: StrongPlexIdentity): string[] {
 }
 
 function isExactIdentityMatch(
-  item: any,
+  item: Record<string, unknown> | null | undefined,
   identity: StrongPlexIdentity,
   mediaType: PlexAvailabilityMediaType
 ): boolean {
@@ -234,13 +238,18 @@ export async function attachEpisodeCoverage(
   const container = payload?.MediaContainer;
   if (!container || !Array.isArray(container.Metadata)) return result;
   const episodes = new Set<string>();
+  const episodeKeys: Record<string, string> = {};
   for (const item of container.Metadata) {
     if (String(item?.type || '').toLowerCase() !== 'episode') continue;
     const season = Number(item.parentIndex);
     const episode = Number(item.index);
     // Revue Codex #1001 : un épisode illisible rend la liste non exhaustive ; elle n'est alors pas publiée.
     if (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 0) return result;
-    episodes.add(`${season}:${episode}`);
+    const key = `${season}:${episode}`;
+    episodes.add(key);
+    // Deux fichiers d'un même épisode : la première entrée de Plex reste la référence (ordre déterministe).
+    const ratingKey = String(item.ratingKey ?? '').trim();
+    if (!episodeKeys[key] && /^[A-Za-z0-9_-]{1,40}$/.test(ratingKey)) episodeKeys[key] = ratingKey;
   }
   const declared = Number(container.totalSize ?? container.size);
   // Liste tronquée par le serveur : le décompte reste celui de Plex, sans liste d'épisodes non prouvée.
@@ -251,7 +260,12 @@ export async function attachEpisodeCoverage(
     const [bs, be] = b.split(':').map(Number);
     return as - bs || ae - be;
   });
-  return { ...result, episodeCount: sorted.length, episodes: sorted };
+  return {
+    ...result,
+    episodeCount: sorted.length,
+    episodes: sorted,
+    ...(Object.keys(episodeKeys).length > 0 ? { episodeKeys } : {})
+  };
 }
 
 async function queryConnection(options: {
@@ -385,19 +399,36 @@ async function queryServer(
   }
 }
 
+/**
+ * #255 : tous les serveurs sont interrogés en parallèle. Un serveur possédé par le compte (« mon serveur »)
+ * l'emporte toujours ; une copie sur un serveur partagé n'est retenue que lorsque plus aucun serveur
+ * possédé ne peut répondre. Un serveur en échec ne masque jamais une copie accessible ailleurs.
+ */
 export async function findPlexAvailabilityOnServers(options: FindOptions): Promise<PlexAvailabilityResult | null> {
   if (options.servers.length === 0) return null;
   const controller = new AbortController();
+  let ownedPending = options.servers.filter(server => server.owned === true).length;
+  let pending = options.servers.length;
+  let sharedFound: { index: number; result: PlexAvailabilityResult } | null = null;
   try {
-    const attempts = options.servers.map(server => queryServer(server, options, controller.signal).then(result => {
-      if (!result) throw new Error('PLEX_AVAILABILITY_MISS');
-      return result;
-    }));
-    const found = await Promise.any(attempts);
-    controller.abort();
-    return found;
-  } catch {
-    return null;
+    return await new Promise<PlexAvailabilityResult | null>(resolve => {
+      const settle = () => {
+        if (ownedPending === 0 && sharedFound) resolve(sharedFound.result);
+        else if (pending === 0) resolve(sharedFound?.result ?? null);
+      };
+      options.servers.forEach((server, index) => {
+        const owned = server.owned === true;
+        queryServer(server, options, controller.signal)
+          .catch(() => null)
+          .then(result => {
+            pending -= 1;
+            if (owned) ownedPending -= 1;
+            if (result && owned) { resolve(result); return; }
+            if (result && (!sharedFound || index < sharedFound.index)) sharedFound = { index, result };
+            settle();
+          });
+      });
+    });
   } finally {
     controller.abort();
   }

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { findPlexAvailabilityOnServers, type PlexServerResource } from '../src/backend/plexAvailabilityBackend.ts';
-import { countAiredEpisodes, describePlexSeriesCoverage, isPlexEpisodePresent, needsPlexSeriesCoverage, readPlexEpisodeCoverage } from '../src/features/plex/plexSeriesCoverage.ts';
+import { countAiredEpisodes, describePlexSeriesCoverage, getPlexEpisodeUrl, isPlexEpisodePresent, needsPlexSeriesCoverage, readPlexEpisodeCoverage } from '../src/features/plex/plexSeriesCoverage.ts';
 
 const json = (data: unknown) => new Response(JSON.stringify(data), { status: 200, headers: { 'Content-Type': 'application/json' } });
 const server: PlexServerResource = { name: 'PC-Julian', clientIdentifier: 'pms-1', accessToken: 'server-token', provides: 'server', connections: [{ uri: 'https://pms.example.test', local: false }] };
@@ -106,4 +106,50 @@ test('SEENIT-PLEX-013 une série reconstruite par la synchro relit sa couverture
   const source = readFileSync('src/features/plex/plexAvailability.ts', 'utf8');
   assert.match(source, /if \(!forceRefresh && cached && !needsSeriesCoverage\)/);
   assert.match(source, /\.\.\.\(mediaType === 'tv' \? \{ coverageCheckedAt: Date\.now\(\) \} : \{\}\)/);
+});
+
+test('SEENIT-PLEX-013 mon serveur passe avant un serveur partagé, même s’il répond plus lentement', async () => {
+  const shared: PlexServerResource = { name: 'Plex Ami', clientIdentifier: 'friend', accessToken: 'friend-token', provides: 'server', owned: false, connections: [{ uri: 'https://friend.example.test' }] };
+  const mine: PlexServerResource = { ...server, owned: true, connections: [{ uri: 'https://mine.example.test' }] };
+  const request: typeof fetch = async input => {
+    const url = String(input);
+    if (url.includes('/allLeaves')) return json({ MediaContainer: { size: 0, Metadata: [] } });
+    if (!decodeURIComponent(url).includes('tmdb://97546')) return json({ MediaContainer: { Metadata: [] } });
+    if (url.startsWith('https://mine.')) await new Promise(r => setTimeout(r, 60));
+    return json({ MediaContainer: { Metadata: [{ ...tedLasso, ratingKey: url.startsWith('https://mine.') ? 'mine-77' : 'friend-77' }] } });
+  };
+  const result = await findPlexAvailabilityOnServers({ servers: [shared, mine], accountToken: 'a', tmdbId: 97546, mediaType: 'tv', request, fastTimeoutMs: 500, inventoryTimeoutMs: 50, inventoryBudgetMs: 100 });
+  assert.equal(result?.serverName, 'PC-Julian');
+  assert.equal(result?.ratingKey, 'mine-77');
+});
+
+test('SEENIT-PLEX-013 une copie partagée reste utilisable quand mon serveur n’a pas la série ou échoue', async () => {
+  const shared: PlexServerResource = { name: 'Plex Ami', clientIdentifier: 'friend', accessToken: 'friend-token', provides: 'server', connections: [{ uri: 'https://friend.example.test' }] };
+  const mine: PlexServerResource = { ...server, owned: true, connections: [{ uri: 'https://mine.example.test' }] };
+  const request: typeof fetch = async input => {
+    const url = String(input);
+    if (url.startsWith('https://mine.')) throw new Error('serveur éteint');
+    if (url.includes('/allLeaves')) return json({ MediaContainer: { size: 0, Metadata: [] } });
+    if (decodeURIComponent(url).includes('tmdb://97546')) return json({ MediaContainer: { Metadata: [tedLasso] } });
+    return json({ MediaContainer: { Metadata: [] } });
+  };
+  const result = await findPlexAvailabilityOnServers({ servers: [mine, shared], accountToken: 'a', tmdbId: 97546, mediaType: 'tv', request, fastTimeoutMs: 100, inventoryTimeoutMs: 50, inventoryBudgetMs: 100 });
+  assert.equal(result?.serverName, 'Plex Ami');
+});
+
+test('SEENIT-PLEX-013 « Lire » ouvre l’épisode précis par son ratingKey, jamais la série à sa place', async () => {
+  const { request } = plexServer(() => json({ MediaContainer: { size: 3, Metadata: [
+    { type: 'episode', parentIndex: 2, index: 9, ratingKey: '9209' },
+    { type: 'episode', parentIndex: 2, index: 9, ratingKey: '9999' },
+    { type: 'episode', parentIndex: 1, index: 1, ratingKey: '9101' },
+  ] } }));
+  const result = await find(request);
+  assert.deepEqual(result?.episodeKeys, { '2:9': '9209', '1:1': '9101' }, 'doublon : première entrée de Plex');
+  const info = { available: true, serverId: 'pms-1', ...readPlexEpisodeCoverage(result) };
+  assert.equal(getPlexEpisodeUrl(info, 2, 9), 'https://app.plex.tv/desktop/#!/server/pms-1/details?key=%2Flibrary%2Fmetadata%2F9209');
+  assert.equal(getPlexEpisodeUrl(info, 2, 8), null, 'épisode absent : pas d’URL');
+  assert.equal(getPlexEpisodeUrl({ available: true, serverId: 'pms-1' }, 2, 9), null, 'sans clé prouvée : pas d’URL de série à la place');
+  assert.deepEqual(readPlexEpisodeCoverage({ episodeCount: 1, episodes: ['1:1'], episodeKeys: { '1:2': '5' } }), { episodeCount: 1, episodes: ['1:1'] }, 'clé hors liste rejetée');
+  const source = readFileSync('src/screens/EpisodeDetailModalCore.tsx', 'utf8');
+  assert.match(source, /const episodeUrl = getPlexEpisodeUrl\(presence\.plexInfo, currentSeason, Number\(currentEpisode\?\.episode_number\)\);/);
 });

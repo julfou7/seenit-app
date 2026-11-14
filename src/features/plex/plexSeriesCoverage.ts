@@ -1,3 +1,5 @@
+import { buildPlexMediaUrl } from './plexAvailabilityCache.ts';
+
 /**
  * #255 : couverture Plex d'une série, sans requête par épisode.
  *
@@ -53,15 +55,42 @@ export function describePlexSeriesCoverage(
 }
 
 /** #255 : n'accepte qu'une couverture bien formée ; toute anomalie laisse la couverture inconnue. */
-export function readPlexEpisodeCoverage(data: unknown): { episodeCount?: number; episodes?: string[] } {
-  const source = data as { episodeCount?: unknown; episodes?: unknown } | null;
+export function readPlexEpisodeCoverage(data: unknown): { episodeCount?: number; episodes?: string[]; episodeKeys?: Record<string, string> } {
+  const source = data as { episodeCount?: unknown; episodes?: unknown; episodeKeys?: unknown } | null;
   const count = source?.episodeCount;
   if (typeof count !== 'number' || !Number.isInteger(count) || count < 0) return {};
   const episodes = Array.isArray(source?.episodes) && source.episodes.length === count
     && source.episodes.every(value => typeof value === 'string' && /^\d{1,3}:\d{1,4}$/.test(value))
     ? source.episodes as string[]
     : undefined;
-  return episodes ? { episodeCount: count, episodes } : { episodeCount: count };
+  if (!episodes) return { episodeCount: count };
+  const episodeKeys = readEpisodeKeys(source?.episodeKeys, episodes);
+  return episodeKeys ? { episodeCount: count, episodes, episodeKeys } : { episodeCount: count, episodes };
+}
+
+/** #255 : chaque clé doit désigner un épisode présent et chaque valeur un `ratingKey` Plex bien formé. */
+function readEpisodeKeys(value: unknown, episodes: readonly string[]): Record<string, string> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const present = new Set(episodes);
+  const keys: Record<string, string> = {};
+  for (const [episode, ratingKey] of Object.entries(value as Record<string, unknown>)) {
+    if (!present.has(episode) || typeof ratingKey !== 'string' || !/^[A-Za-z0-9_-]{1,40}$/.test(ratingKey)) return undefined;
+    keys[episode] = ratingKey;
+  }
+  return Object.keys(keys).length > 0 ? keys : undefined;
+}
+
+/**
+ * #255 : URL Plex de l'épisode précis sur le serveur où la série a été trouvée, ou `null` sans preuve exacte
+ * (jamais l'URL de la série à la place de l'épisode).
+ */
+export function getPlexEpisodeUrl(
+  info: { available?: boolean; serverId?: string; episodeKeys?: Record<string, string> } | null | undefined,
+  season: number,
+  episode: number,
+): string | null {
+  const ratingKey = info?.available && info.serverId ? info.episodeKeys?.[`${season}:${episode}`] : undefined;
+  return ratingKey ? buildPlexMediaUrl(info!.serverId!, ratingKey) : null;
 }
 
 /**

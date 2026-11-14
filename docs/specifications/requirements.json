@@ -1710,6 +1710,18 @@
         {
           "file": "tests/plexSeriesCoverage.test.ts",
           "contains": "SEENIT-PLEX-013 une série reconstruite par la synchro relit sa couverture une fois, depuis une fiche seulement"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 mon serveur passe avant un serveur partagé, même s’il répond plus lentement"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 une copie partagée reste utilisable quand mon serveur n’a pas la série ou échoue"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 « Lire » ouvre l’épisode précis par son ratingKey, jamais la série à sa place"
         }
       ]
     },

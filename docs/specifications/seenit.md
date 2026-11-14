@@ -709,8 +709,12 @@ n'est rouverte que par une nouvelle décision produit explicite.
     Sur la fiche **épisode**, Plex n'est proposé que si cet épisode précis figure dans la liste ; liste
     inconnue (ancien cache, lecture échouée) = comportement antérieur, sans conclusion d'absence. La synchro
     Plex reconstruit les entrées sans couverture (une liste conservée pourrait masquer un épisode tout juste
-    importé) : l'ouverture d'une fiche relit alors une fois la couverture, jamais depuis une carte. Les films
-    restent binaires ;
+    importé) : l'ouverture d'une fiche relit alors une fois la couverture, jamais depuis une carte. Tous les
+    serveurs sont interrogés en parallèle et un serveur **possédé par le compte** (`owned` de plex.tv) l'emporte
+    toujours ; une copie partagée n'est retenue que si aucun serveur possédé ne l'a, et un serveur en échec ne
+    masque jamais une copie accessible ailleurs. Sur la fiche épisode, **Lire** ouvre l'épisode précis par son
+    `ratingKey` (lu dans le même `allLeaves`) sur ce serveur ; sans clé prouvée, la série s'ouvre comme avant,
+    jamais l'URL de la série présentée comme celle de l'épisode. Les films restent binaires ;
   - la fiche média garde la barre de navigation ; seuls les dialogues plein écran la masquent ;
   - une seule fiche acteur dans toute l'app : fiches, Explorer, Moi et À voir ouvrent celle des billets ;
     retour v1.4.295 : comme les fiches média et épisode, elle laisse la barre de navigation au-dessus d'elle
