@@ -3,7 +3,7 @@ import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { X, Clapperboard, Maximize } from 'lucide-react';
 import { prepareTrailerVideos, trailerEmbedUrl, type TrailerVideo } from '../features/trailers/trailerPolicy';
 import { startTrailerPresentation } from '../features/trailers/trailerPresentation';
-import { isNativeTrailer, trailerPresentationAdapter } from '../features/trailers/trailerPlatform';
+import { supportsNativeTrailerImmersion, trailerPresentationAdapter } from '../features/trailers/trailerPlatform';
 
 export type { TrailerVideo } from '../features/trailers/trailerPolicy';
 
@@ -23,19 +23,20 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
   const [nativeImmersive, setNativeImmersive] = useState(false);
   const currentVideo = choices.find(video => video.key === selectedKey) || choices[0];
   const hasVideo = Boolean(currentVideo);
-  const native = isNativeTrailer();
+  const native = supportsNativeTrailerImmersion();
   const immersive = fullscreen || nativeImmersive;
 
   const present = () => {
     const element = overlayRef.current;
     if (!element || presentationRef.current) return;
-    if (native) setNativeImmersive(true);
     const session = startTrailerPresentation(trailerPresentationAdapter(element));
     presentationRef.current = session;
-    void session.ready.then(() => {
-      if (!native && document.fullscreenElement !== element && presentationRef.current === session) {
-        presentationRef.current = null;
-      }
+    void session.ready.then(result => {
+      if (presentationRef.current !== session) return;
+      // #672 : le rendu immersif suit l'immersion réellement appliquée par le bridge, jamais la seule plateforme.
+      if (native) setNativeImmersive(result.immersive);
+      const presented = native ? result.immersive : document.fullscreenElement === element;
+      if (!presented) presentationRef.current = null;
     });
   };
 

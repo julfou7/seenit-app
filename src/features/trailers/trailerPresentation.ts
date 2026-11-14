@@ -1,13 +1,18 @@
+/** #672 : le bridge Android indique s'il a réellement appliqué l'immersion (téléphone seulement). */
+export interface TrailerPresentationResult {
+  immersive?: boolean;
+}
+
 export interface TrailerPresentationAdapter {
   serialized?: boolean;
-  enter: () => Promise<void>;
+  enter: () => Promise<TrailerPresentationResult | void>;
   leave: () => Promise<void>;
 }
 
 /** Seul le bridge natif est sérialisé ; le Web doit appeler requestFullscreen dans le geste. */
 export function createTrailerPresentationQueue(adapter: TrailerPresentationAdapter): TrailerPresentationAdapter {
-  let pending = Promise.resolve();
-  const enqueue = (action: () => Promise<void>) => {
+  let pending: Promise<unknown> = Promise.resolve();
+  const enqueue = <T>(action: () => Promise<T>) => {
     const next = pending.then(action);
     pending = next.catch(() => undefined);
     return next;
@@ -16,7 +21,9 @@ export function createTrailerPresentationQueue(adapter: TrailerPresentationAdapt
 }
 
 export function startTrailerPresentation(adapter: TrailerPresentationAdapter) {
-  const ready = adapter.enter().catch(() => undefined);
+  const ready = adapter.enter()
+    .then(result => ({ immersive: (result as TrailerPresentationResult | undefined)?.immersive === true }))
+    .catch(() => ({ immersive: false }));
   let closing: Promise<void> | undefined;
   return {
     ready,

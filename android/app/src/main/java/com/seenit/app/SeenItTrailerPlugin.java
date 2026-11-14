@@ -5,6 +5,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -38,7 +39,10 @@ public class SeenItTrailerPlugin extends Plugin {
                     controller.hide(WindowInsetsCompat.Type.systemBars());
                     getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
                 }
-                call.resolve();
+                // #672 : le Web n'affiche le rendu immersif que si l'immersion est réellement active.
+                JSObject result = new JSObject();
+                result.put("immersive", active);
+                call.resolve(result);
             } catch (Exception error) {
                 restore();
                 call.reject("TRAILER_PRESENTATION_UNAVAILABLE", error);

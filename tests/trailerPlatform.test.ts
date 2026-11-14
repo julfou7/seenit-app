@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { trailerPresentationAdapter } from '../src/features/trailers/trailerPlatform.ts';
-import { startTrailerPresentation } from '../src/features/trailers/trailerPresentation.ts';
+import { createTrailerPresentationQueue, startTrailerPresentation } from '../src/features/trailers/trailerPresentation.ts';
 
 test('le chemin PWA de production demande le plein écran avant tout await puis libère le paysage', async () => {
   const calls: string[] = [];
@@ -60,4 +60,25 @@ test('le lecteur partagé et le bridge Android conservent la pile Retour et rest
   assert.match(plugin, /SCREEN_ORIENTATION_PORTRAIT/);
   assert.match(plugin, /setMediaPlaybackRequiresUserGesture\(playbackRequiresGesture\)/);
   assert.match(plugin, /handleOnDestroy\(\)/);
+});
+
+test('SEENIT-UX-013 #672 le rendu immersif suit l’immersion réellement appliquée par le bridge, pas la plateforme', async () => {
+  const bridge = (answer: unknown) => createTrailerPresentationQueue({ enter: async () => answer as { immersive?: boolean }, leave: async () => {} });
+  assert.deepEqual(await startTrailerPresentation(bridge({ immersive: true })).ready, { immersive: true }, 'téléphone');
+  assert.deepEqual(await startTrailerPresentation(bridge({ immersive: false })).ready, { immersive: false }, 'tablette ou grand pliable');
+  assert.deepEqual(await startTrailerPresentation(bridge(undefined)).ready, { immersive: false }, 'réponse absente : jamais immersif');
+  const failing = createTrailerPresentationQueue({ enter: async () => { throw new Error('bridge'); }, leave: async () => {} });
+  assert.deepEqual(await startTrailerPresentation(failing).ready, { immersive: false });
+
+  const modal = readFileSync('src/components/TrailerModal.tsx', 'utf8');
+  const platform = readFileSync('src/features/trailers/trailerPlatform.ts', 'utf8');
+  const plugin = readFileSync('android/app/src/main/java/com/seenit/app/SeenItTrailerPlugin.java', 'utf8');
+  assert.doesNotMatch(modal, /if \(native\) setNativeImmersive\(true\)/, 'plus d’immersion forcée sur toute APK');
+  assert.match(modal, /if \(native\) setNativeImmersive\(result\.immersive\);/);
+  assert.match(modal, /const native = supportsNativeTrailerImmersion\(\);/);
+  // Tablette (plus petit côté ≥ 600 dp) : plein écran Web dans le geste, comme la PWA.
+  assert.match(platform, /isNativeTrailer\(\) && typeof screen !== 'undefined' && Math\.min\(screen\.width, screen\.height\) < 600/);
+  assert.match(platform, /if \(supportsNativeTrailerImmersion\(\)\) return nativeQueue;/);
+  assert.match(plugin, /smallestScreenWidthDp < 600/);
+  assert.match(plugin, /result\.put\("immersive", active\);\s*call\.resolve\(result\);/);
 });
