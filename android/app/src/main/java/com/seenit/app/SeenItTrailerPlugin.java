@@ -15,6 +15,7 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "SeenItTrailer")
 public class SeenItTrailerPlugin extends Plugin {
     private boolean active = false;
+    private boolean orientationLocked = false;
     private int previousBehavior;
     private int previousOrientation;
     private boolean statusVisible;
@@ -25,7 +26,9 @@ public class SeenItTrailerPlugin extends Plugin {
     public void enter(PluginCall call) {
         getActivity().runOnUiThread(() -> {
             try {
-                if (!active && getActivity().getResources().getConfiguration().smallestScreenWidthDp < 600) {
+                // #672 : immersion sur tout appareil (le plein écran Web est refermé par la WebView Capacitor) ;
+                // le paysage n'est imposé qu'aux téléphones, une tablette garde son orientation.
+                if (!active) {
                     WindowInsetsControllerCompat controller = controller();
                     previousBehavior = controller.getSystemBarsBehavior();
                     previousOrientation = getActivity().getRequestedOrientation();
@@ -37,9 +40,10 @@ public class SeenItTrailerPlugin extends Plugin {
                     getBridge().getWebView().getSettings().setMediaPlaybackRequiresUserGesture(false);
                     controller.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
                     controller.hide(WindowInsetsCompat.Type.systemBars());
-                    getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+                    orientationLocked = getActivity().getResources().getConfiguration().smallestScreenWidthDp < 600;
+                    if (orientationLocked) getActivity().setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
                 }
-                // #672 : le Web n'affiche le rendu immersif que si l'immersion est réellement active.
+                // Le Web n'affiche le rendu immersif que si l'immersion est réellement active.
                 JSObject result = new JSObject();
                 result.put("immersive", active);
                 call.resolve(result);
@@ -72,8 +76,12 @@ public class SeenItTrailerPlugin extends Plugin {
         else controller.hide(WindowInsetsCompat.Type.statusBars());
         if (navigationVisible) controller.show(WindowInsetsCompat.Type.navigationBars());
         else controller.hide(WindowInsetsCompat.Type.navigationBars());
-        getActivity().setRequestedOrientation(previousOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-            ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : previousOrientation);
+        // Une tablette n'a jamais été tournée : son orientation n'est pas touchée à la sortie.
+        if (orientationLocked) {
+            getActivity().setRequestedOrientation(previousOrientation == ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                ? ActivityInfo.SCREEN_ORIENTATION_PORTRAIT : previousOrientation);
+        }
+        orientationLocked = false;
     }
 
     @Override

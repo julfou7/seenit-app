@@ -3,7 +3,7 @@ import React, { useLayoutEffect, useRef, useState, useMemo } from 'react';
 import { X, Clapperboard, Maximize } from 'lucide-react';
 import { prepareTrailerVideos, trailerEmbedUrl, type TrailerVideo } from '../features/trailers/trailerPolicy';
 import { startTrailerPresentation } from '../features/trailers/trailerPresentation';
-import { supportsNativeTrailerImmersion, trailerPresentationAdapter } from '../features/trailers/trailerPlatform';
+import { isNativeTrailer, trailerPresentationAdapter } from '../features/trailers/trailerPlatform';
 
 export type { TrailerVideo } from '../features/trailers/trailerPolicy';
 
@@ -23,7 +23,7 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
   const [nativeImmersive, setNativeImmersive] = useState(false);
   const currentVideo = choices.find(video => video.key === selectedKey) || choices[0];
   const hasVideo = Boolean(currentVideo);
-  const native = supportsNativeTrailerImmersion();
+  const native = isNativeTrailer();
   const immersive = fullscreen || nativeImmersive;
 
   const present = () => {

@@ -1829,10 +1829,12 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   fermeture pendant l'ouverture. La PWA suit la même séquence : modal normale à l'ouverture, puis vrai
   plein écran et paysage seulement après action utilisateur lorsque les API navigateur le permettent ;
   tout refus laisse le lecteur utilisable. Le desktop conserve la modal normale. Aucun changement
-  d'identité média ni de position de la fiche n'est introduit. L'immersion native est réservée aux
-  téléphones (plus petit côté < 600 dp) : le bridge indique s'il l'a réellement appliquée et le rendu
-  immersif de la modal suit cette réponse, jamais la seule plateforme. Une tablette ou un grand pliable
-  Android garde la modal normale, son bouton « Plein écran » et le plein écran Web de la PWA (#672).
+  d'identité média ni de position de la fiche n'est introduit. Sur Android, le plein écran passe toujours
+  par le bridge natif (la WebView Capacitor referme le plein écran Web) : il masque les barres système
+  sur tout appareil, mais n'impose le paysage qu'aux téléphones (plus petit côté < 600 dp) ; une tablette
+  ou un grand pliable garde son orientation, qui n'est pas modifiée à la sortie. Le bridge indique s'il a
+  réellement appliqué l'immersion et le rendu immersif de la modal suit cette réponse, jamais la seule
+  plateforme (#672).
 - **SEENIT-UX-020** — Règles visuelles durables du 06/11/2026 (`USR-2026-11-06-002`, `USR-2026-11-06-003`,
   et `USR-2026-11-08-001` pour le logo Télécharger : une flèche dans un cercle, celle du contrôle d'épisode du
   mode téléchargement, sur toute la fonction — onglet de navigation, fiches série et film, menu ⋮, onglet

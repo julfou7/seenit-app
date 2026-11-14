@@ -65,7 +65,7 @@ test('le lecteur partagé et le bridge Android conservent la pile Retour et rest
 test('SEENIT-UX-013 #672 le rendu immersif suit l’immersion réellement appliquée par le bridge, pas la plateforme', async () => {
   const bridge = (answer: unknown) => createTrailerPresentationQueue({ enter: async () => answer as { immersive?: boolean }, leave: async () => {} });
   assert.deepEqual(await startTrailerPresentation(bridge({ immersive: true })).ready, { immersive: true }, 'téléphone');
-  assert.deepEqual(await startTrailerPresentation(bridge({ immersive: false })).ready, { immersive: false }, 'tablette ou grand pliable');
+  assert.deepEqual(await startTrailerPresentation(bridge({ immersive: false })).ready, { immersive: false }, 'immersion refusée par le bridge');
   assert.deepEqual(await startTrailerPresentation(bridge(undefined)).ready, { immersive: false }, 'réponse absente : jamais immersif');
   const failing = createTrailerPresentationQueue({ enter: async () => { throw new Error('bridge'); }, leave: async () => {} });
   assert.deepEqual(await startTrailerPresentation(failing).ready, { immersive: false });
@@ -75,10 +75,13 @@ test('SEENIT-UX-013 #672 le rendu immersif suit l’immersion réellement appliq
   const plugin = readFileSync('android/app/src/main/java/com/seenit/app/SeenItTrailerPlugin.java', 'utf8');
   assert.doesNotMatch(modal, /if \(native\) setNativeImmersive\(true\)/, 'plus d’immersion forcée sur toute APK');
   assert.match(modal, /if \(native\) setNativeImmersive\(result\.immersive\);/);
-  assert.match(modal, /const native = supportsNativeTrailerImmersion\(\);/);
-  // Tablette (plus petit côté ≥ 600 dp) : plein écran Web dans le geste, comme la PWA.
-  assert.match(platform, /isNativeTrailer\(\) && typeof screen !== 'undefined' && Math\.min\(screen\.width, screen\.height\) < 600/);
-  assert.match(platform, /if \(supportsNativeTrailerImmersion\(\)\) return nativeQueue;/);
-  assert.match(plugin, /smallestScreenWidthDp < 600/);
+  // Revue Codex : la WebView Capacitor referme le plein écran Web ; Android passe toujours par le bridge.
+  assert.match(platform, /if \(isNativeTrailer\(\)\) return nativeQueue;/);
+  assert.doesNotMatch(platform, /requestFullscreen[\s\S]*supportsNativeTrailerImmersion/);
+  // Tablette : barres masquées, orientation ni imposée ni modifiée à la sortie.
+  assert.match(plugin, /if \(!active\) \{/);
+  assert.doesNotMatch(plugin, /!active && getActivity\(\)\.getResources\(\)\.getConfiguration\(\)\.smallestScreenWidthDp/);
+  assert.match(plugin, /orientationLocked = getActivity\(\)\.getResources\(\)\.getConfiguration\(\)\.smallestScreenWidthDp < 600;\s*if \(orientationLocked\) getActivity\(\)\.setRequestedOrientation\(ActivityInfo\.SCREEN_ORIENTATION_SENSOR_LANDSCAPE\);/);
+  assert.match(plugin, /if \(orientationLocked\) \{\s*getActivity\(\)\.setRequestedOrientation\(previousOrientation/);
   assert.match(plugin, /result\.put\("immersive", active\);\s*call\.resolve\(result\);/);
 });
