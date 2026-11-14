@@ -34,7 +34,9 @@ concurrency:
 
 jobs:
   validate:
-    name: Validate Change
+    # #84 : validation canonique en parallèle des shards navigateur ; le check requis « Validate Change »
+    # est porté par le job agrégateur `validate_gate`, qui exige le succès des deux.
+    name: Validate Change · canonique
     if: github.event_name != 'workflow_dispatch' || inputs.release_apk != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -45,6 +47,8 @@ jobs:
     outputs:
       delivery_mode: ${{ steps.delivery.outputs.DELIVERY_MODE }}
       dependencies_changed: ${{ steps.delivery.outputs.DEPENDENCIES_CHANGED }}
+      tree: ${{ steps.proof.outputs.tree }}
+      artifact_name: ${{ steps.proof.outputs.artifact_name }}
 
     steps:
       - name: Checkout Code
@@ -163,18 +167,15 @@ jobs:
           echo "[Validate Change] ✅ Documentation/processus stricte : workflows, SPEC et Changelog vérifiés."
           echo "Aucun code runtime, script, workflow, catalogue JSON ou dépendance n'est modifié."
 
-      - name: Run PWA Browser Quality Gate
-        if: steps.proof.outputs.skip_browser != 'true'
-        run: node scripts/pwa-browser-smoke.cjs
-
-      - name: Publish Validated Tree Proof
+      # La preuve d'arbre n'est publiée sous son nom définitif que par `validate_gate`, après les shards navigateur.
+      - name: Stage Pending Tree Proof
         if: success() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && steps.proof.outputs.tree != ''
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ steps.proof.outputs.artifact_name }}
+          name: SeenIt-Pending-Tree-${{ github.run_id }}
           path: quality-reports/validated-tree.json
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
 
       - name: Publish Quality Gate Evidence
         if: always()
@@ -720,3 +721,132 @@ jobs:
             echo "- release_run_id : ${{ github.run_id }}"
             echo "- release_head_sha : ${{ github.sha }}"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  browser:
+    # #84 : le smoke navigateur est limité par le CPU d'un runner (4 vCPU) ; chaque shard s'exécute sur sa
+    # propre machine, en parallèle de la validation canonique. Mêmes preuves et même décision de saut.
+    name: Validate Change · navigateur ${{ matrix.shard }}/2
+    if: github.event_name != 'workflow_dispatch' || inputs.release_apk != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: true
+      matrix:
+        shard: [1, 2]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22 with npm cache
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Resolve Trusted Staging Proof
+        id: staging_proof
+        if: github.event_name == 'pull_request'
+        run: node scripts/staging-validation-proof.cjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          SEENIT_PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+      - name: Resolve strict documentation scope
+        id: scope
+        if: steps.staging_proof.outputs.reused != 'true'
+        run: node scripts/validation-scope.cjs
+        env:
+          SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+
+      - name: Resolve Node Cache Identity
+        if: steps.staging_proof.outputs.reused != 'true' && steps.scope.outputs.docs_only != 'true'
+        id: runtime
+        run: |
+          echo "node_version=$(node -p 'process.versions.node.split(".")[0] + "-abi" + process.versions.modules')" >> "$GITHUB_OUTPUT"
+          echo "deps_hash=$(node scripts/dependency-cache-key.cjs)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Exact node_modules Cache
+        if: steps.staging_proof.outputs.reused != 'true' && steps.scope.outputs.docs_only != 'true'
+        id: node_modules_cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: seenit-node-modules-${{ runner.os }}-${{ runner.arch }}-node-${{ steps.runtime.outputs.node_version }}-${{ steps.runtime.outputs.deps_hash }}
+
+      - name: Install Dependencies on Cache Miss
+        if: steps.staging_proof.outputs.reused != 'true' && steps.scope.outputs.docs_only != 'true' && steps.node_modules_cache.outputs.cache-hit != 'true'
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Resolve Validated Tree Proof
+        id: proof
+        if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+        run: node scripts/validated-tree-proof.cjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SEENIT_VALIDATE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          SEENIT_STAGING_PROOF_REUSED: ${{ steps.staging_proof.outputs.reused }}
+          SEENIT_STAGING_PROOF_URL: ${{ steps.staging_proof.outputs.proof_url }}
+          SEENIT_DOCS_ONLY: ${{ steps.scope.outputs.docs_only }}
+
+      - name: Build PWA for Browser Quality Gate
+        if: steps.proof.outputs.skip_browser != 'true'
+        run: npx vite build
+
+      - name: Run PWA Browser Quality Gate
+        if: steps.proof.outputs.skip_browser != 'true'
+        run: node scripts/pwa-browser-smoke.cjs
+        env:
+          SEENIT_PWA_SHARD: ${{ matrix.shard }}/2
+
+      - name: Publish Browser Quality Evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: SeenIt-Quality-Gates-${{ github.run_id }}-browser-${{ matrix.shard }}
+          path: quality-reports
+          if-no-files-found: warn
+          retention-days: 30
+
+  validate_gate:
+    # Seul check requis par la protection de `main` : vert uniquement si la validation canonique et tous
+    # les shards navigateur sont verts. Il publie ensuite la preuve d'arbre réutilisable (#85).
+    name: Validate Change
+    needs: [validate, browser]
+    if: always() && (github.event_name != 'workflow_dispatch' || inputs.release_apk != true)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      - name: Require canonical and browser validations
+        run: |
+          echo "Validation canonique : ${{ needs.validate.result }} ; navigateur : ${{ needs.browser.result }}"
+          if [ "${{ needs.validate.result }}" != 'success' ] || [ "${{ needs.browser.result }}" != 'success' ]; then
+            echo "::error title=Validate Change::Validation canonique (${{ needs.validate.result }}) ou navigateur (${{ needs.browser.result }}) non verte."
+            exit 1
+          fi
+
+      - name: Download Pending Tree Proof
+        if: (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.validate.outputs.tree != ''
+        uses: actions/download-artifact@v8
+        with:
+          name: SeenIt-Pending-Tree-${{ github.run_id }}
+          path: quality-reports
+
+      - name: Publish Validated Tree Proof
+        if: success() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') && needs.validate.outputs.tree != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ needs.validate.outputs.artifact_name }}
+          path: quality-reports/validated-tree.json
+          if-no-files-found: error
+          retention-days: 14

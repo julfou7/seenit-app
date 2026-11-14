@@ -557,6 +557,18 @@ function buildLaneGroups(config) {
   ];
 }
 
+function parseShard(value) {
+  const raw = String(value ?? '').trim();
+  if (!raw) return { index: 1, count: 1 };
+  const match = /^([1-9]\d*)\/([1-9]\d*)$/.exec(raw);
+  if (!match || Number(match[1]) > Number(match[2])) throw new Error(`SEENIT_PWA_SHARD invalide : « ${raw} » (attendu k/n, 1 ≤ k ≤ n).`);
+  return { index: Number(match[1]), count: Number(match[2]) };
+}
+
+function selectShardLanes(groups, { index, count }) {
+  return groups.filter((_, lane) => lane % count === index - 1);
+}
+
 function resolveLaneCount(value, max) {
   const parsed = Number.parseInt(String(value ?? ''), 10);
   if (!Number.isFinite(parsed)) return max;
@@ -661,7 +673,10 @@ async function main() {
     // l'ordre historique ; SEENIT_PWA_LANES=1 rejoue exactement la séquence d'origine sur un seul client.
     // SEENIT_PWA_ONLY=mediaDetail,home : rejoue localement quelques harnais seulement (jamais en CI).
     const only = String(process.env.SEENIT_PWA_ONLY || '').split(',').map(key => key.trim()).filter(Boolean);
-    const groups = buildLaneGroups(config).map(tasks => only.length ? tasks.filter(([key]) => only.includes(key)) : tasks).filter(tasks => tasks.length > 0);
+    // #84 : SEENIT_PWA_SHARD=k/n exécute les couloirs d'indice ≡ k-1 (mod n) sur un runner dédié ; l'union
+    // des n shards couvre exactement tous les couloirs, chacun toujours dans son ordre historique.
+    const shard = parseShard(process.env.SEENIT_PWA_SHARD);
+    const groups = selectShardLanes(buildLaneGroups(config), shard).map(tasks => only.length ? tasks.filter(([key]) => only.includes(key)) : tasks).filter(tasks => tasks.length > 0);
     if (only.length && process.env.CI) throw new Error('SEENIT_PWA_ONLY est réservé au diagnostic local.');
     const lanes = resolveLaneCount(process.env.SEENIT_PWA_LANES, groups.length);
     const plan = lanes === 1 ? [groups.flat()] : groups;
@@ -698,6 +713,7 @@ async function main() {
       homePerformance: merged.homePerformance,
       homeUnseen: merged.homeUnseen,
       lanes,
+      shard: `${shard.index}/${shard.count}`,
       timings,
     };
     const homeReport = merged.home;
@@ -742,6 +758,8 @@ if (require.main === module) {
 module.exports = {
   runLane,
   buildLaneGroups,
+  parseShard,
+  selectShardLanes,
   resolveLaneCount,
   CdpClient,
   findNamedButton,

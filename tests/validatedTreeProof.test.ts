@@ -153,12 +153,43 @@ test('#85 câblage du workflow : lecture seule, après installation, smoke condi
   const at = (label: string) => { const index = job.indexOf(label); assert.ok(index >= 0, label); return index; };
   assert.ok(at('Install Dependencies on Cache Miss') < at('Resolve Validated Tree Proof'), 'le contrat de version a besoin des dépendances');
   assert.ok(at('Resolve Validated Tree Proof') < at('Validate Change Canonical'));
-  assert.ok(at('Run PWA Browser Quality Gate') < at('Publish Validated Tree Proof'), 'la preuve n’est publiée qu’après le smoke');
   assert.match(job, /if: github\.event_name == 'push' \|\| github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch'\n {8}run: node scripts\/validated-tree-proof\.cjs/);
   assert.match(job, /SEENIT_VALIDATED_TREE_PROOF: \$\{\{ steps\.proof\.outputs\.reused == 'true' && steps\.proof\.outputs\.tree \|\| '' \}\}/);
-  assert.match(job, /- name: Run PWA Browser Quality Gate\n {8}if: steps\.proof\.outputs\.skip_browser != 'true'/);
-  assert.match(job, /- name: Publish Validated Tree Proof\n {8}if: success\(\) && \(github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch'\) && steps\.proof\.outputs\.tree != ''/);
-  assert.match(job, /name: \$\{\{ steps\.proof\.outputs\.artifact_name \}\}/);
+  // #84 : le canonique ne publie qu'une preuve en attente ; le smoke tourne sur des runners dédiés.
+  assert.doesNotMatch(job, /Run PWA Browser Quality Gate|Publish Validated Tree Proof/);
+  assert.match(job, /- name: Stage Pending Tree Proof\n {8}if: success\(\) && \(github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch'\) && steps\.proof\.outputs\.tree != ''/);
+  assert.match(job, /name: SeenIt-Pending-Tree-\$\{\{ github\.run_id \}\}/);
+
+  const browser = workflow.slice(workflow.indexOf('\n  browser:'), workflow.indexOf('\n  validate_gate:'));
+  assert.match(browser, /shard: \[1, 2\]/);
+  assert.match(browser, /permissions:\n {6}contents: read\n {6}actions: read\n/);
+  const inBrowser = (label: string) => { const index = browser.indexOf(label); assert.ok(index >= 0, label); return index; };
+  assert.ok(inBrowser('Install Dependencies on Cache Miss') < inBrowser('Resolve Validated Tree Proof'));
+  assert.ok(inBrowser('Resolve Validated Tree Proof') < inBrowser('Build PWA for Browser Quality Gate'));
+  assert.match(browser, /- name: Build PWA for Browser Quality Gate\n {8}if: steps\.proof\.outputs\.skip_browser != 'true'/);
+  assert.match(browser, /- name: Run PWA Browser Quality Gate\n {8}if: steps\.proof\.outputs\.skip_browser != 'true'\n {8}run: node scripts\/pwa-browser-smoke\.cjs\n {8}env:\n {10}SEENIT_PWA_SHARD: \$\{\{ matrix\.shard \}\}\/2/);
+
+  const gate = workflow.slice(workflow.indexOf('\n  validate_gate:'));
+  assert.match(gate, /\n {4}name: Validate Change\n {4}needs: \[validate, browser\]\n {4}if: always\(\)/, 'seul check requis, toujours évalué');
+  assert.match(gate, /needs\.validate\.result \}\}" != 'success' \] \|\| \[ "\$\{\{ needs\.browser\.result \}\}" != 'success'/);
+  assert.ok(gate.indexOf('Require canonical and browser validations') < gate.indexOf('Publish Validated Tree Proof'), 'la preuve n’est publiée qu’après le smoke');
+  assert.match(gate, /- name: Publish Validated Tree Proof\n {8}if: success\(\) && \(github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch'\) && needs\.validate\.outputs\.tree != ''/);
+  assert.match(gate, /name: \$\{\{ needs\.validate\.outputs\.artifact_name \}\}/);
+  assert.doesNotMatch(gate, /actions: write|contents: write/);
+});
+
+test('#84 les shards navigateur couvrent exactement tous les couloirs, chacun dans son ordre', () => {
+  const smoke = require('../scripts/pwa-browser-smoke.cjs');
+  const config = JSON.parse(readFileSync('docs/specifications/quality-gates.json', 'utf8'));
+  const groups = smoke.buildLaneGroups(config);
+  const keys = (lanes: Array<Array<[string, unknown]>>) => lanes.flat().map(([key]) => key);
+  const first = smoke.selectShardLanes(groups, smoke.parseShard('1/2'));
+  const second = smoke.selectShardLanes(groups, smoke.parseShard('2/2'));
+  assert.deepEqual(first, [groups[0], groups[2]]);
+  assert.deepEqual(second, [groups[1], groups[3]]);
+  assert.deepEqual([...keys(first), ...keys(second)].sort(), keys(groups).sort(), 'union exacte, sans doublon');
+  assert.deepEqual(smoke.selectShardLanes(groups, smoke.parseShard(undefined)), groups, 'sans shard : tous les couloirs');
+  for (const invalid of ['0/2', '3/2', '1', 'a/b']) assert.throws(() => smoke.parseShard(invalid), /SEENIT_PWA_SHARD invalide/);
 });
 
 test('SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés dans l’ordre historique', () => {

@@ -202,6 +202,12 @@ test('#85 la PR vérifie la preuve staging avant toute validation coûteuse et g
   assert.match(job, /Validate Change Canonical\n {8}if: steps\.staging_proof\.outputs\.reused != 'true' && steps\.scope\.outputs\.docs_only != 'true'/);
   assert.match(job, /SEENIT_STAGING_PROOF_REUSED: \$\{\{ steps\.staging_proof\.outputs\.reused \}\}/);
   assert.match(job, /SEENIT_DOCS_ONLY: \$\{\{ steps\.scope\.outputs\.docs_only \}\}/);
-  assert.match(job, /Run PWA Browser Quality Gate\n {8}if: steps\.proof\.outputs\.skip_browser != 'true'/);
-  assert.match(job, /Publish Validated Tree Proof\n {8}if: success\(\) && \(github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch'\) && steps\.proof\.outputs\.tree != ''/);
+  assert.match(job, /Stage Pending Tree Proof\n {8}if: success\(\) && \(github\.event_name == 'pull_request' \|\| github\.event_name == 'workflow_dispatch'\) && steps\.proof\.outputs\.tree != ''/);
+  // #84 : les shards navigateur rejouent la même preuve staging et la même décision de saut.
+  const browser = workflow.slice(workflow.indexOf('\n  browser:'), workflow.indexOf('\n  validate_gate:'));
+  assert.ok(browser.indexOf('Resolve Trusted Staging Proof') < browser.indexOf('Restore Exact node_modules Cache'));
+  assert.match(browser, /Restore Exact node_modules Cache\n {8}if: steps\.staging_proof\.outputs\.reused != 'true' && steps\.scope\.outputs\.docs_only != 'true'/);
+  assert.match(browser, /SEENIT_STAGING_PROOF_REUSED: \$\{\{ steps\.staging_proof\.outputs\.reused \}\}/);
+  assert.match(browser, /Run PWA Browser Quality Gate\n {8}if: steps\.proof\.outputs\.skip_browser != 'true'/);
+  assert.doesNotMatch(browser, /actions\/cache\/save@/, 'les shards ne réécrivent jamais le cache');
 });

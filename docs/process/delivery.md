@@ -132,6 +132,13 @@ branche à jour ou si `main` n'est plus protégée, aucun merge ne doit contourn
 sans preuve exacte repasse par la validation complète. Le job n'obtient que `actions: read` en plus de
 `contents: read`.
 
+Depuis #84, le check requis **Validate Change** est un job agrégateur : il n'est vert que si la validation
+canonique (`Validate Change · canonique`) et les deux shards navigateur (`Validate Change · navigateur 1/2`
+et `2/2`), exécutés en parallèle sur des runners distincts, sont verts. Lui seul publie la preuve d'arbre
+réutilisable. Le smoke étant limité par le CPU d'un runner, multiplier les couloirs sur une même machine
+ne fait rien gagner (mesure PR #999) ; seuls des runners supplémentaires réduisent la durée murale.
+Chaque shard (`SEENIT_PWA_SHARD=k/n`) exécute les couloirs d'indice ≡ k-1 (mod n).
+
 Le smoke navigateur s'exécute en **quatre couloirs** Chromium isolés : un profil et un stockage par couloir,
 avec focus émulé. Chaque couloir suit l'ordre historique : rendu → clavier → actions #180 → dialogues,
 diffuseurs, cartes, historique, navigation ; TV → recherche → minuterie 18c (horloge virtuelle en

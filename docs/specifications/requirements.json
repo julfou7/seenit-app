@@ -3530,6 +3530,10 @@
         },
         {
           "file": "tests/validatedTreeProof.test.ts",
+          "contains": "#84 les shards navigateur couvrent exactement tous les couloirs, chacun dans son ordre"
+        },
+        {
+          "file": "tests/validatedTreeProof.test.ts",
           "contains": "SEENIT-QUALITY-013 sans preuve exacte et de confiance, la validation complète est rejouée"
         },
         {

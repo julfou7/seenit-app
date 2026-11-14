@@ -2274,7 +2274,9 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   `SEENIT-RELEASE-001` uniquement) dont le parent porte une validation verte garde la validation
   canonique et réutilise le smoke navigateur du parent. Toute erreur, absence ou ambiguïté de preuve,
   l'audit planifié et un dispatch rejouent la validation complète : l'absence de protection de branche
-  n'ouvre aucun chemin non validé. Le smoke navigateur s'exécute en quatre couloirs Chromium isolés
+  n'ouvre aucun chemin non validé. Le check requis `Validate Change` agrège la validation canonique et deux shards
+  navigateur exécutés en parallèle sur des runners distincts ; il n'est vert que si tous le sont et lui seul
+  publie la preuve d'arbre. Le smoke navigateur s'exécute en quatre couloirs Chromium isolés
   (profil et stockage propres), chacun dans l'ordre historique, et une condition attendue n'échoue qu'à
   l'expiration de son délai, jamais sur un élément pas encore rendu. Quand une APK terrain est prévue dès
   la demande, la version est préparée dans la PR du correctif pour ne pas rejouer un second cycle.
