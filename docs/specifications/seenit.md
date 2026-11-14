@@ -24,50 +24,6 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
 
 ## 2. Règles de plateforme
 
-- **SEENIT-TV-001** — Le launcher Samsung reste séparé du runtime mobile, compatible ES5/Tizen 4.0
-  et fidèle aux idées V4 : trois destinations TV, Films, Sport ; réglages sous l'accueil et dans l'en-tête,
-  favoris par profil, bibliothèque et sources détectées. Les marques reconnues utilisent leur SVG local homogène, puis l'icône native
-  et un monogramme générique en secours. Les variantes portant exactement le même nom ne produisent
-  qu'une tuile : épingle explicite prioritaire, sinon installation utilisateur locale avant composant
-  intégré, choix stable par ID à égalité. Tous les IDs restent inventoriés et les variantes restent en
-  vue avancée ; le regroupement d'affichage ne devient jamais une table d'IDs de lancement universels.
-  Les composants techniques restent dans Système ; Apple TV et Paramount+ découverts
-  sont ajoutables comme toute autre app. Les profils sont centrés et le thème choisi
-  couvre fiches, dialogues et messages. OK rend la fiche sans attendre une synchronisation ;
-  les calques cinéma utilisent des positions compatibles Tizen 4. Le prochain match
-  reste visible sur la tuile Sport ; les accès réglages n'annoncent aucune destination
-  native non prise en charge.
-  Une variante d'app confirmée peut être choisie explicitement pour cette TV, entre
-  IDs utilisateur réellement inventoriés de même nom ; ce choix local est partagé entre
-  profils, sans table universelle et sans modifier leurs favoris.
-  Toute app utilisateur découverte peut devenir favorite par profil local. « Rouvrir » mémorise seulement
-  les ouvertures réussies, jamais un visionnage Netflix partagé. Invité ne persiste rien. La bibliothèque
-  conserve l'inventaire système mais borne son DOM à 18 apps. Au masquage, images hors écran et timers
-  sont libérés ; RAM/stockage sont lus sans root ni fermeture des autres apps. Les réglages Samsung
-  passent par une cible vérifiée ; Retour à l'accueil demande confirmation avant de quitter SeenIt.
-  Appairage du compte, Home natif et terrain sont suivis dans #295 ; aucun historique SeenIt n'est écrit
-  sans profil certain. La [décision V4](tv-samsung-launcher-v4.md) remplace la composition
-  [V2 historique](tv-samsung-launcher-v2.md). HDMI conserve le descripteur natif pour setSource.
-  L'accueil expose jusqu'à quatre sources détectées, dont tous les HDMI remontés sur la TV terrain,
-  avec accès à la liste complète. Les cartes Sport affichent les logos fournis avec les identités
-  explicites des deux équipes, puis leurs initiales si l'image manque ; aucun logo n'est résolu par
-  rapprochement de noms. L'audit RAM/services reste en lecture seule, sans arrêt ou désactivation
-  automatique ni gain chiffré déduit du seul inventaire d'applications.
-
-- **SEENIT-TV-002** — QR d'association HTTPS canonique sans secret dans l'URL, approbation explicite
-  par compte Firebase authentifié, code/secret aléatoires expirables et session TV restreinte à
-  sa lecture/révocation. Les autres profils restent locaux ; aucun visionnage n'est créé par le
-  lancement d'une app. Hash serveur, quotas, expiration/révocation, cache isolé et arrêt des requêtes
-  hors écran sont couverts par les TNR. Contrat : [launcher TV V4](tv-samsung-launcher-v4.md).
-
-- **SEENIT-TV-003** — Le calendrier Sport doit être utile sans dépenser un euro : fixtures gratuites
-  normalisées par le backend existant, cache six heures sans polling live, Monaco/France et sélection
-  locale par profil. Sources structurées gratuites en priorité lorsque disponibles, repli officiel
-  Monaco/FFF sans clé ; aucun fournisseur payant ni secret dans le WGT. Date/heure locale, équipes,
-  compétition, stade et programmation provisoire sont conservés. Score/live optionnels hors MVP,
-  sans spoiler ; retirer les matchs passés sans chercher de résultat. Pas de diffuseur/action supposés.
-  Voir [le contrat V4](tv-samsung-launcher-v4.md), #738.
-
 - **SEENIT-PLATFORM-001** — La PWA canonique servie depuis `seenit.ai.studio` conserve les routes
   SeenIt relatives au même domaine. L'APK et tout preview AI Studio dont un label d'hôte commence
   par `ais-dev-*` ciblent explicitement `https://seenit.ai.studio` pour les routes `/api/*` afin de

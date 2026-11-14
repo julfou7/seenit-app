@@ -168,7 +168,7 @@ test('SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés d
   assert.equal(groups.length, 4);
   assert.deepEqual(groups.flat().map(([key]) => key), [
     'viewports', 'accessibility', 'componentActions', 'dialogs', 'providers', 'seriesCards', 'history', 'navbar',
-    'tv', 'searchKeyboard', 'watchNext',
+    'searchKeyboard', 'watchNext',
     'homeV4', 'homeTerrain221', 'homeTerrain222', 'homeTerrain223', 'mediaDetail', 'downloads', 'homeTerrain224', 'homeTerrain226', 'homeTerrain227', 'home', 'homePerformance', 'homeUnseen',
   ], 'SEENIT_PWA_LANES=1 rejoue exactement la séquence historique');
   assert.equal(groups[1].at(-1)?.[0], 'watchNext', 'l’horloge virtuelle 18c reste la dernière de son client');
@@ -182,7 +182,7 @@ test('SEENIT-QUALITY-013 le smoke navigateur tourne en quatre couloirs isolés d
   assert.match(source, /--user-data-dir=\$\{userDataDir\}/, 'un profil, donc un stockage, par couloir');
   assert.match(source, /Emulation\.setFocusEmulationEnabled', \{ enabled: true \}/);
   assert.match(source, /timings\[key\] = /, 'chaque harnais publie sa durée');
-  for (const file of ['history', 'home-a-voir', 'home-terrain220', 'home-terrain221', 'home-terrain222', 'home-terrain223', 'home-terrain224', 'home-terrain226', 'home-terrain227', 'navbar', 'provider', 'search-keyboard', 'series-card', 'tv', 'watch-next']) {
+  for (const file of ['history', 'home-a-voir', 'home-terrain220', 'home-terrain221', 'home-terrain222', 'home-terrain223', 'home-terrain224', 'home-terrain226', 'home-terrain227', 'navbar', 'provider', 'search-keyboard', 'series-card', 'watch-next']) {
     const harness = readFileSync(`scripts/${file}-browser-checks.cjs`, 'utf8');
     assert.match(harness, /const poll = \(client, expression\) => evaluate\(client, expression\)\.catch\(\(\) => false\);/, file);
     assert.match(harness, /await poll\(/, `${file} attend sans échouer sur un élément pas encore rendu`);

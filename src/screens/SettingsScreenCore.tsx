@@ -524,7 +524,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
 
       await signInWithPopup(auth, googleAuthProvider);
     } catch (err) {
-      console.error("Erreur d'authentification Google in settings :", err);
+      appLogger.error('system', "Erreur d'authentification Google dans les réglages", err);
     }
   };
 
@@ -980,9 +980,6 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
               tone={notificationPermission === 'granted' ? 'ok' : notificationPermission === 'denied' ? 'error' : 'warn'} dot
               onClick={notificationPermission === 'granted' ? undefined : () => setPage('notifs')} />
           </SettingsGroup>
-          <SettingsGroup title="SeenIt TV" foot="La dissociation se fait depuis la TV. Rien n’est effacé de ton compte.">
-            <SettingsRow icon={Tv} label="Associer une TV" sub="Ouvre SeenIt TV, scanne le QR code affiché, puis confirme sur ce téléphone." />
-          </SettingsGroup>
         </>
       ),
     },
@@ -1080,7 +1077,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
 
         <SettingsGroup title="Connexions">
           <SettingsRow icon={Server} label="Plex" sub={plexState.text} tone={plexState.tone} dot={Boolean(plexState.tone)} onClick={() => setPage('plex')} />
-          <SettingsRow icon={MonitorSmartphone} label="Appareils" sub={`${isNative ? 'Ce téléphone' : 'Ce navigateur'} · SeenIt TV par QR code`} onClick={() => setPage('devices')} />
+          <SettingsRow icon={MonitorSmartphone} label="Appareils" sub={isNative ? 'Ce téléphone' : 'Ce navigateur'} onClick={() => setPage('devices')} />
         </SettingsGroup>
 
         <SettingsGroup>

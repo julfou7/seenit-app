@@ -21,7 +21,6 @@ const { buildDownloadsHarness, testDownloadsHarness } = require('./downloads-bro
 const { testHomePerformanceHarness } = require('./home-performance-browser-checks.cjs');
 const { testHomeUnseenHarness } = require('./home-unseen-browser-checks.cjs');
 const { buildNavbarHarness, testNavbarHarness } = require('./navbar-browser-checks.cjs');
-const { buildTvHarness, testTvHarness, fulfillTvFixtureImage } = require('./tv-browser-checks.cjs');
 
 const { buildSearchKeyboardHarness, testSearchKeyboardHarness } = require('./search-keyboard-browser-checks.cjs');
 
@@ -533,7 +532,6 @@ function buildLaneGroups(config) {
       ['navbar', client => testNavbarHarness(client, root)],
     ],
     [
-      ['tv', client => testTvHarness(client, root)],
       ['searchKeyboard', client => testSearchKeyboardHarness(client, root)],
       // L'horloge virtuelle de la minuterie 18c reste la dernière vérification de son client CDP.
       ['watchNext', client => testWatchNextHarness(client, root)],
@@ -610,7 +608,6 @@ async function launchBrowser() {
       client.send('Emulation.setFocusEmulationEnabled', { enabled: true }),
     ]);
     client.on('Fetch.requestPaused', async event => {
-      if (await fulfillTvFixtureImage(client, event, root)) return;
       const url = new URL(event.request.url);
       const local = (url.hostname === '127.0.0.1' || url.hostname === 'localhost') && url.port === '4173';
       if (local || url.protocol === 'data:' || url.protocol === 'blob:') {
@@ -641,7 +638,6 @@ async function main() {
     await buildHistoryHarness(root);
     await buildWatchNextHarness(root);
     await buildNavbarHarness(root);
-    await buildTvHarness(root);
 
     await buildSearchKeyboardHarness(root);
     await buildHomeHarness(root);
@@ -675,7 +671,6 @@ async function main() {
       seriesCards: merged.seriesCards,
       history: merged.history,
       navbar: merged.navbar,
-      tv: merged.tv,
 
       searchKeyboard: merged.searchKeyboard,
       watchNext: merged.watchNext,

@@ -56,7 +56,8 @@ test('Réglages · états réels uniquement', () => {
   assert.match(core, /getPlexLastSyncTimestamp\(user\?\.uid\)/);
   assert.match(core, /'plex_last_sync_report_v1'/);
   assert.match(core, /tone: Date\.now\(\) - plexLastSync < PLEX_FRESH_MS \? 'ok' : 'warn'/);
-  assert.match(core, /La dissociation se fait depuis la TV/);
+  // #295 : SeenIt TV abandonné le 14/11/2026, plus aucune association TV dans les Réglages.
+  assert.doesNotMatch(core, /SeenIt TV|Associer une TV|La dissociation se fait depuis la TV/);
   assert.doesNotMatch(core, /TV du salon|Galaxy S25|julian@exemple/);
 });
 

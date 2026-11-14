@@ -4,25 +4,6 @@ Notifications import #801 : [affiche, cache privé et contrôle natif du 6 novem
 
 Téléchargements : [refonte prototype et matrice du backlog du 5 novembre](./downloads-2026-11-05.md), #861.
 
-TV V4 : [correctifs et limites des retours du28octobre](./tv-retours-2026-10-28.md), #295 / #738,
-fiches, calques Tizen4, thèmes, bibliothèque, installation0.4.3 et Netflix non validé.
-
-TV Sport : [calendrier gratuit sans score obligatoire](./tv-sport-gratuit-2026-10-28.md), #738, sources officielles, cache et limites.
-
-TV V4 : [préparation de livraison du27octobre](./tv-v4-livraison-2026-10-27.md), #295, validations et limites explicites.
-
-TV V4 : [références Flix-Home, Luma et Free My TV](./tv-v4-references-2026-10-27.md),
-27 octobre 2026, #295 : idées retenues, limites Samsung et échecs terrain Netflix.
-
-TV Samsung : [vérifications hors TV du firmware1400.2](./tv-usb-1400.2-2026-10-27/README.md),
-27octobre2026, #295 : bilan, sources figées et empreintes vérifiées ; root non réalisé.
-
-TV Samsung : [RAM et services facultatifs du26octobre2026](./tv-ram-services-2026-10-26.md),
-  relevés matériels0.2.1/2565685 et0.2.2/c556037, #295, AirPlay/HbbTV désactivés, gains RAM non démontrés et vérification du root conditionnel.
-
-TV Samsung : [conformité maquettes et cycle mémoire du26octobre2026](./tv-maquettes-2026-10-26.md),
-baselines2f151398/919a109, #295/#738, premier terrain V2 KO ; diagnostic natif et correctif0.2.1 en cours.
-
 Terrain230 : [Non vu historique et recherche au clavier](./terrain230-non-vu-clavier-2026-10-27.md),
 baseline701054d, #729/#774 ; mutation sans fournisseur, scénario tactile et clavier Explorer.
 

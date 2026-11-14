@@ -98,7 +98,7 @@ test('SEENIT-QUALITY-001 un chunk supprimé répond 404 au lieu de servir index.
   assert.equal(manifest.headers.get('etag'), null, 'pas d’ETag taille+date trompeur sur un fichier public non hashé');
   assert.equal(manifest.headers.get('last-modified'), null);
 
-  const deepLink = await fetch(app.url('/tv/connect'));
+  const deepLink = await fetch(app.url('/moi/liste'));
   assert.equal(deepLink.status, 200);
   assert.match(await deepLink.text(), /index-CaM0KRHI\.js/);
 });
@@ -106,6 +106,6 @@ test('SEENIT-QUALITY-001 un chunk supprimé répond 404 au lieu de servir index.
 test('SEENIT-QUALITY-001 distingue une route de l’application d’un fichier', () => {
   assert.equal(isSeenItFileRequestPath('/assets/index-DMRssWPr.js'), true);
   assert.equal(isSeenItFileRequestPath('/icon-192.png'), true);
-  assert.equal(isSeenItFileRequestPath('/tv/connect'), false);
+  assert.equal(isSeenItFileRequestPath('/moi/liste'), false);
   assert.equal(isSeenItFileRequestPath('/'), false);
 });

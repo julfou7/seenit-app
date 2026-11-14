@@ -24,7 +24,7 @@ export interface SeenItCheckButtonProps {
 
 /**
  * SeenIt Signature Cinema TV Action Button
- * Replaces generic circle checkboxes with the iconic SeenIt TV & validation check glyph.
+ * Replaces generic circle checkboxes with the iconic SeenIt validation check glyph.
  */
 export function SeenItCheckButton({
   onClick,

@@ -1,69 +1,5 @@
 # SeenIt — Référence fonctionnelle canonique
 
-## Extension Samsung TV — V4, 27 octobre 2026 (#295)
-
-Le runtime isolé `tv-samsung/` présente trois grandes destinations TV/TNT, Films et Sport,
-huit favoris maximum sur la rangée, Ajouter/Toutes, puis les sources réellement détectées.
-La roue mène aux réglages de la partie basse, sous un en-tête fixe. Retour remonte d'abord
-l'accueil avant de proposer de quitter. Les apparences Brume/Crépuscule/Auto sont conservées.
-Les profils sont centrés, avec marque et police locales ; l'en-tête montre heure, profil
-et réglages. Brume et Crépuscule couvrent aussi fiches et messages. La tuile Sport montre
-le prochain événement sans clic. Les composants techniques reconnus restent dans Système,
-Apple TV/Paramount+ détectés sont ajoutables. Les réglages indisponibles proposent le chemin
-Samsung sans promettre un faux accès direct.
-L'inventaire complet garde USER/SYSTEM/UNKNOWN et toutes les variantes, sans table d'IDs
-universelle. Une épingle explicite conserve son ID ; Milo n'affiche que sa sélection locale,
-Invité ne persiste rien. Les anciennes épingles ne sont pas effacées par la limite V4.
-Le menu d'une variante utilisateur peut retenir sa version pour cette TV : choix
-explicite entre IDs inventoriés de même nom, partagé entre profils, favoris conservés.
-Une cible supprimée ou système n'est jamais utilisée. Netflix a été confirmé à l'écran
-le28octobre avec sa variante native ; aucun ID matériel n'est ajouté au code de lancement.
-
-Le compte adulte s'associe par QR : consentement explicite du téléphone authentifié, code
-valable dix minutes, session TV limitée à trente jours. La TV ne reçoit aucun jeton Firebase,
-consulte uniquement une liste bornée et n'écrit aucun visionnage. Les autres profils restent
-locaux. Dissociation confirmée, cache privé effacé et révocation rejouée si le réseau manque.
-Les images, timers et requêtes de pairing s'arrêtent hors premier plan. L'absence d'association
-ou de réseau laisse le launcher et ses apps utilisables.
-
-Films & séries reprend le contenu du compte, sans rangée d'apps : grand visuel du titre
-sélectionné, métadonnées réelles, Pour toi/Séries/Films et rail paysage de quatre contenus
-par page. Le focus change le hero sans reconstruire le rail, OK ouvre une fiche en lecture
-seule et Retour conserve le focus. Les chemins TMDB et URLs TMDB complètes enregistrés par
-le mobile sont normalisés ; un visuel absent conserve sa place. Aucun « Reprendre » ou
-« Épisodes » de maquette n'est promis sans contrat de lecture implémenté. Les apps restent
-sur Home et Toutes les apps. Hors écran : cinq images maximum libérées et aucune requête
-de métadonnées supplémentaire pour réparer les visuels existants.
-
-HDMI transmet le descripteur natif Tizen exact, sans reconstruction JS. Les réglages natifs
-utilisent un handler découvert ; sans handler exploitable, expliquer la touche Réglages/Home
-plutôt que lancer aveuglément un menu système. Un callback d'app accepté ne prouve pas
-l'affichage : Netflix noir depuis le launcher reste un écart terrain, malgré son fonctionnement
-via Samsung. Le basculement Home natif et le gain RAM global restent
-suivis séparément ; aucun root ni faux calendrier. Les logos des équipes viennent des données
-explicites avec initiales en secours. Voir [la référence V4](tv-samsung-launcher-v4.md).
-
-Le calendrier Sport gratuit (#738) consomme `/api/tv/sport` : le backend existant normalise
-les calendriers officiels Monaco/FFF, cache six heures, sans clé dans le WGT, sans nouveau
-service payant ni résultat obligatoire. Sélection locale indépendante par profil, six cartes
-par page, heure locale et programmation provisoire explicites, logos de source et initiales
-si absents. La tuile Sport anticipe le prochain match. Les événements passés disparaissent
-sans récupérer de score. Les concepts live/score restent optionnels hors MVP ; aucune app ou
-chaîne n'est suggérée comme diffuseur sans preuve gratuite fiable et lancement réel testé.
-
-Dernière vérification : 14 septembre 2026
-Mise à jour ciblée À voir : 23 octobre 2026, corrections de conformité maquettes et gestes (#729).
-Mise à jour ciblée Moi : 30 octobre 2026, refonte de l'onglet selon la maquette « SeenIt Moi » ([intégration](../design/moi-2026-10-30.md)).
-Baseline observée avant correction : **1.4.150**, `main` `6189bafed525fb510c1a81c87a04e19c01f92393`
-Plateformes : **PWA Web** et **APK Android Capacitor**
-Statut : composante obligatoire de la SPEC SeenIt
-
-Ce document explique ce que fait SeenIt, où vit chaque fonction et comment les parcours s'articulent.
-Les invariants détaillés et la machine d'états autoritative restent dans [`seenit.md`](./seenit.md).
-Le processus de livraison reste dans [`../process/delivery.md`](../process/delivery.md). Un agent ne
-doit jamais déduire une nouvelle règle depuis le seul comportement accidentel du code : les écarts
-connus sont listés à la fin et reliés à GitHub Issues.
-
 ## 1. Produit, vocabulaire et sources de vérité
 
 SeenIt est l'application personnelle de suivi de films et séries de son propriétaire. Le même compte
@@ -1221,8 +1157,7 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
 - **Connexions → Plex** (point vert si synchro de moins de 24 h, orange sinon) → compte et titres
   reconnus, « Synchroniser maintenant », serveurs du dernier bilan de synchro, synchro complète et
   déconnexion confirmée ; association et annulation inchangées ;
-- **Connexions → Appareils** → ce téléphone ou ce navigateur et son autorisation de notifications,
-  association SeenIt TV par QR code confirmée sur le téléphone ; la dissociation se fait depuis la TV ;
+- **Connexions → Appareils** → ce téléphone ou ce navigateur et son autorisation de notifications ;
 - **Application** (badge « Mise à jour » si une version est disponible) → version installée ou à
   installer avec progression, « Vérifier les mises à jour », Nouveautés (historique des changelogs),
   Badges animés, **Fonctionnalités → Téléchargements** (interrupteur désactivé par défaut, sans URL ni

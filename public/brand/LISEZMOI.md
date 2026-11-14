@@ -18,13 +18,6 @@ Référence visuelle complète : page « SeenIt Marque », section Tour 13.
 - `seenit-notification-24.svg` : icône de notification, blanc plein.
 - `favicon-32.png`, `favicon-16.png`.
 
-## tv/
-- `seenit-tv-logo-sombre`, `seenit-tv-logo-blanc` : logo SeenIt TV (écran 9e + « seenit.tv »), pour l'en-tête du launcher.
-- `samsung-icone-512x423.png` : icône Samsung (PNG RGB, sans transparence).
-- `samsung-logo-1920x1080.png` (transparent) + `samsung-fond-1920x1080.png` : la paire 1920 × 1080 demandée par la Seller Office.
-- `androidtv-banniere-320x180.png` (xhdpi) et `-640x360.png` (xxxhdpi) : bannière Google TV / Chromecast, avec le texte comme l'exige Google.
-- `androidtv-icone-160.png` / `-320.png` : icône de lanceur Android TV.
-
 ## Règles
 - Couleurs : or #E5A93D (actif, « it », point), dégradé or #FFF2B8 → #F5C518 → #E5A93D → #B37812 réservé au symbole, nuit #08080C, texte #F4F4F5.
 - Police : Plus Jakarta Sans 800, interlettrage −5 %. Le logotype est livré en tracés (licence OFL de la police).
@@ -46,7 +39,3 @@ Référence visuelle complète : page « SeenIt Marque », section Tour 13.
 ## Navigation
 - À voir (cartes en cours), Explorer (boussole), Moi (silhouette) : trait 2 px, glyphes 28 px, cible 44 px.
 - Actif : glyphe plein or et point or sous le libellé. Inactif : #71717A.
-
-## Sources (tailles TV)
-- Samsung : https://developer.samsung.com/smarttv/design/app-icons-and-screenshots.html
-- Android TV / Google TV : https://developer.android.com/design/ui/tv/guides/system/tv-app-icon-guidelines
