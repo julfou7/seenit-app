@@ -37,6 +37,8 @@ interface GitHubReleasePayload {
   published_at?: unknown;
   html_url?: unknown;
   assets?: unknown;
+  draft?: unknown;
+  prerelease?: unknown;
 }
 
 export function normalizeSemanticVersion(input: unknown): string | null {
@@ -157,6 +159,25 @@ function toReleaseNotesEntry(release: SeenItReleaseInfo): SeenItReleaseNotesEntr
   };
 }
 
+/**
+ * Notes d'une release officielle pour l'historique (#312). Seule la dernière release garde son APK :
+ * les précédentes sont lues sans binaire, mais toujours avec le tag sémantique exact du dépôt SeenIt.
+ * L'installation, elle, passe uniquement par parseSeenItRelease et son APK vérifié.
+ */
+export function parseSeenItReleaseNotes(payload: unknown): SeenItReleaseNotesEntry | null {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+  const release = payload as GitHubReleasePayload;
+  if (release.draft === true || release.prerelease === true) return null;
+  const version = normalizeSemanticVersion(release.tag_name);
+  if (!version || String(release.tag_name) !== `v${version}`) return null;
+  return {
+    version,
+    releaseNotes: typeof release.body === 'string' ? release.body : '',
+    publishedAt: typeof release.published_at === 'string' ? release.published_at : '',
+    htmlUrl: `https://github.com/${SEENIT_GITHUB_REPOSITORY}/releases/tag/v${version}`
+  };
+}
+
 export function selectSeenItReleaseHistory(
   payloads: unknown[],
   installedVersion: string,
@@ -166,11 +187,11 @@ export function selectSeenItReleaseHistory(
 
   const releasesByVersion = new Map<string, SeenItReleaseNotesEntry>();
   for (const payload of payloads) {
-    const release = parseSeenItRelease(payload);
+    const release = parseSeenItReleaseNotes(payload);
     if (!release) continue;
     if (compareSemanticVersions(release.version, installedVersion) <= 0) continue;
     if (compareSemanticVersions(release.version, targetVersion) > 0) continue;
-    releasesByVersion.set(release.version, toReleaseNotesEntry(release));
+    releasesByVersion.set(release.version, release);
   }
 
   return [...releasesByVersion.values()].sort((left, right) =>
@@ -181,9 +202,9 @@ export function selectSeenItReleaseHistory(
 export function selectSeenItCompleteReleaseHistory(payloads: unknown[]): SeenItReleaseNotesEntry[] {
   const releasesByVersion = new Map<string, SeenItReleaseNotesEntry>();
   for (const payload of payloads) {
-    const release = parseSeenItRelease(payload);
+    const release = parseSeenItReleaseNotes(payload);
     if (!release) continue;
-    releasesByVersion.set(release.version, toReleaseNotesEntry(release));
+    releasesByVersion.set(release.version, release);
   }
 
   return [...releasesByVersion.values()].sort((left, right) =>

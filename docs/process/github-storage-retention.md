@@ -6,10 +6,10 @@ Statut : extension opérationnelle de `docs/process/delivery.md` et de `docs/spe
 
 Cette section clarifie et rend explicite l'invariant déjà appliqué par la maintenance de #668 : les gros binaires générés ne constituent jamais l'historique durable de SeenIt.
 
-- **Règle active : GitHub conserve exactement une seule version distribuable, la dernière GitHub Release officielle.**
-- Une conservation temporaire de **deux releases au maximum** n'est admissible que si le même changement introduit un besoin opérationnel explicite et documenté **et** un mécanisme technique d'exemption compris par la purge, couvert par un TNR. Sans cette protection implémentée et validée, la deuxième release est interdite.
-- Toute exemption future doit être retirée dès que son besoin disparaît ; elle ne doit jamais devenir une accumulation historique.
-- Le flux APK canonique actuel télécharge sa baseline N avant de publier N+1 : il ne nécessite donc **pas** de conserver deux releases après publication. La cible actuelle reste exactement **1 release**.
+- **Règle active : GitHub conserve exactement une seule version distribuable, la dernière GitHub Release officielle.** Elle seule garde son APK et son `.sha256`.
+- **Historique des notes (#312, `USR-2026-11-14-005`) :** les **10 dernières** GitHub Releases officielles, la release protégée comprise, sont conservées pour leurs notes, qui alimentent Réglages → Historique des versions. Les 9 précédentes perdent leurs binaires (`/releases/assets/{id}`) mais gardent leur objet Release ; au-delà de 10, la release entière est supprimée. Une release sans APK n'est jamais distribuable : l'application ne l'installe pas.
+- Toute exemption qui conserverait un second binaire exige un besoin opérationnel documenté et un TNR dans le même changement ; elle ne doit jamais devenir une accumulation historique.
+- Le flux APK canonique actuel télécharge sa baseline N avant de publier N+1 : il ne nécessite donc **pas** de conserver deux APK après publication. La cible actuelle reste exactement **1 APK**.
 - Les tags Git et commits restent conservés : ils portent l'historique et la traçabilité sans dupliquer les APK.
 - Les artefacts Actions suivent les durées bornées définies ci-dessous ; aucun nouveau producteur ne doit introduire une conservation longue de binaires sans justification documentée dans ce fichier.
 
@@ -19,10 +19,10 @@ SeenIt conserve la traçabilité Git sans conserver indéfiniment les gros binai
 
 ## Releases officielles
 
-- En régime normal, une seule GitHub Release officielle est conservée : la dernière release stable retournée par GitHub, ou la release exacte du SHA publié pendant le post-traitement d'une nouvelle release.
+- En régime normal, la release protégée est la dernière release stable retournée par GitHub, ou la release exacte du SHA publié pendant le post-traitement d'une nouvelle release. Elle garde ses binaires ; les 9 releases antérieures les plus récentes gardent seulement leurs notes.
 - La purge ne commence jamais tant qu'une release à préserver n'est pas prouvée.
 - Lors du post-traitement d'une nouvelle APK, le SHA `main` publié protège la release correspondante avant toute suppression. Cela évite qu'un éventuel délai de mise à jour de `releases/latest` protège encore N au lieu de N+1.
-- Une fois N+1 effectivement publiée, les objets GitHub Release plus anciens et leurs assets sont supprimés. Une éventuelle exception à deux releases n'existe que si une exemption technique dédiée est d'abord implémentée et testée dans le même changement.
+- Une fois N+1 effectivement publiée, les binaires de N sont supprimés et la release la plus ancienne au-delà des 10 conservées est supprimée avec ses notes. Les binaires sont purgés avant les releases ; le tout reste borné par `MAX_DELETIONS_PER_RUN`.
 - **Les tags Git ne sont jamais supprimés par cette maintenance.** Ils restent disponibles pour l'historique, les comparaisons, les notes de version et les diagnostics.
 - Le smoke N → N+1 télécharge sa baseline **avant** la publication de N+1 ; la purge post-release n'affaiblit donc pas `SEENIT-APK-003`.
 
@@ -69,5 +69,7 @@ Les suppressions exigent explicitement `SEENIT_STORAGE_APPLY=true`. Une exécuti
 ## État opérationnel au 17 octobre 2026
 
 La purge historique de #668 est achevée. GitHub ne conserve plus qu'une seule release officielle, `v1.4.210`, et le dernier passage de maintenance a ramené à **0** le reliquat d'anciennes releases et d'artefacts reconnus dépassant leur durée de rétention. Les tags et commits Git historiques ont été conservés.
+
+Mise à jour du 14 novembre 2026 (#312) : la cible passe à 10 releases de notes pour une seule APK. Les notes supprimées avant cette date (jusqu'à `v1.4.308`) ne sont pas reconstruites ; l'historique se remplit à chaque nouvelle release.
 
 La maintenance quotidienne et le post-traitement des nouvelles releases continuent d'appliquer automatiquement cette politique. Le volume de stockage n'est pas traité comme une preuve de la cause du précédent flag anti-abus : ce lien ne peut être confirmé que par GitHub Support.

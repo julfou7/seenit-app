@@ -1177,8 +1177,9 @@ restent disponibles et l'installation n'est pas bloquée. Les textes emploient l
 l'interface et ne montrent pas les identifiants Plex, UID, noms de cache, fichiers, tests ou détails
 de CI réservés aux preuves techniques.
 
-La ligne Nouveautés de l'écran Application charge indépendamment toutes les releases officielles
-disponibles, de la plus récente à la plus ancienne. Cette consultation reste paginée et bornée ; une panne
+La ligne Nouveautés de l'écran Application charge indépendamment les releases officielles conservées
+(les 10 dernières ; seule la plus récente garde son APK), de la plus récente à la plus ancienne. Chaque
+badge « Version x.y.z » défile avec ses notes. Cette consultation reste paginée et bornée ; une panne
 partielle conserve l'historique officiel déjà obtenu ou la dernière version connue.
 
 Une fois l'APK téléchargée et vérifiée, SeenIt affiche une notification locale « Mise à jour

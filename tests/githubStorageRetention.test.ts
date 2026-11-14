@@ -5,27 +5,39 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const {
   DAY_MS,
+  RELEASE_NOTES_KEPT,
   buildStoragePlan,
   retentionPolicyForArtifact
 } = require('../scripts/prune-github-storage.cjs');
 const { runMaintenance, resolveProtectedRelease, MAX_DELETIONS_PER_RUN, MUTATION_DELAY_MS } = require('../scripts/prune-github-storage.cjs');
 
-test('garde uniquement la release protégée sans planifier de suppression de tag', () => {
-  const latest = { id: 208, tag_name: 'v1.4.208', assets: [{ size: 13_000_000 }] };
-  const old = { id: 207, tag_name: 'v1.4.207', assets: [{ size: 12_000_000 }] };
-  const older = { id: 206, tag_name: 'v1.4.206', assets: [{ size: 11_000_000 }] };
-
-  const plan = buildStoragePlan({
-    protectedRelease: latest,
-    releases: [older, latest, old],
-    artifacts: [],
-    nowMs: Date.UTC(2026, 9, 13)
+test('#312 garde les notes des 10 dernières releases, le binaire de la seule release protégée, sans toucher aux tags', () => {
+  assert.equal(RELEASE_NOTES_KEPT, 10);
+  const release = (id: number) => ({
+    id, tag_name: `v1.4.${id}`, published_at: new Date(Date.UTC(2026, 9, 1) + id * DAY_MS).toISOString(),
+    assets: [{ id: id * 10, name: `SeenIt-v1.4.${id}.apk`, size: 1_000_000 }, { id: id * 10 + 1, name: 'x.sha256', size: 86 }]
   });
+  const latest = release(212);
+  const older = Array.from({ length: 12 }, (_, index) => release(200 + index)); // 200..211
 
-  assert.deepEqual(plan.releasesToDelete.map((release: { id: number }) => release.id), [206, 207]);
-  assert.equal(plan.protectedReleaseId, 208);
-  assert.equal(plan.estimatedBytes.releases, 23_000_000);
+  const plan = buildStoragePlan({ protectedRelease: latest, releases: [...older, latest], artifacts: [], nowMs: Date.UTC(2026, 9, 13) });
+
+  // 212 protégée + 211..203 en notes seules = 10 releases ; 200..202 supprimées entièrement.
+  assert.deepEqual(plan.releasesToDelete.map((entry: { id: number }) => entry.id), [200, 201, 202]);
+  const strippedTags = [...new Set(plan.assetsToDelete.map((asset: { releaseTag: string }) => asset.releaseTag))];
+  assert.deepEqual(strippedTags, Array.from({ length: 9 }, (_, index) => `v1.4.${211 - index}`));
+  assert.equal(plan.assetsToDelete.some((asset: { id: number }) => asset.id === 2120 || asset.id === 2121), false, 'la release protégée garde son APK');
+  assert.equal(plan.estimatedBytes.assets, 9 * 1_000_086);
+  assert.equal(plan.protectedReleaseId, 212);
   assert.equal(Object.hasOwn(plan, 'tagsToDelete'), false);
+});
+
+test('#312 sous 10 releases, aucune release n’est supprimée mais les anciens APK le sont', () => {
+  const latest = { id: 208, tag_name: 'v1.4.208', assets: [{ id: 81, size: 13 }] };
+  const old = { id: 207, tag_name: 'v1.4.207', assets: [{ id: 71, size: 12 }] };
+  const plan = buildStoragePlan({ protectedRelease: latest, releases: [old, latest], artifacts: [] });
+  assert.deepEqual(plan.releasesToDelete, []);
+  assert.deepEqual(plan.assetsToDelete.map((asset: { id: number }) => asset.id), [71]);
 });
 
 test('refuse de purger les releases si la release protégée manque dans une collection non vide', () => {
@@ -78,11 +90,12 @@ test('supprime seulement les artefacts SeenIt ayant dépassé leur fenêtre', ()
 test('préserve les publications plus récentes, brouillons et préreleases pendant une purge retardée', () => {
   const protectedRelease = { id: 208, tag_name: 'v1.4.208', published_at: '2026-10-01T12:00:00Z' };
   const plan = buildStoragePlan({ protectedRelease, releases: [protectedRelease,
-    { id: 207, published_at: '2026-09-30T12:00:00Z' },
+    ...Array.from({ length: 10 }, (_, index) => ({ id: 197 + index, published_at: `2026-09-${String(20 + index).padStart(2, '0')}T12:00:00Z` })),
     { id: 209, published_at: '2026-10-02T12:00:00Z' },
     { id: 210, draft: true }, { id: 211, prerelease: true }, { id: 212 }
   ] });
-  assert.deepEqual(plan.releasesToDelete.map((release: { id: number }) => release.id), [207]);
+  // 197..206 sont antérieures : les 9 plus récentes gardent leurs notes, seule 197 est supprimée.
+  assert.deepEqual(plan.releasesToDelete.map((release: { id: number }) => release.id), [197]);
 });
 
 test('la maintenance sérialise et borne les suppressions réelles, puis conserve le travail restant', async () => {
@@ -104,7 +117,8 @@ test('la maintenance sérialise et borne les suppressions réelles, puis conserv
     assert.equal(deleted.includes('/releases/208'), false);
     assert.equal(delays.length, MAX_DELETIONS_PER_RUN - 1);
     assert.ok(delays.every(value => value === MUTATION_DELAY_MS));
-    assert.equal(result.remaining, 120 - MAX_DELETIONS_PER_RUN);
+    // 120 anciennes : 9 gardent leurs notes (sans binaire ici), 111 restent à supprimer.
+    assert.equal(result.remaining, 111 - MAX_DELETIONS_PER_RUN);
   } finally {
     if (apply === undefined) delete process.env.SEENIT_STORAGE_APPLY;
     else process.env.SEENIT_STORAGE_APPLY = apply;
