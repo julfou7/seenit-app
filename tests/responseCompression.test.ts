@@ -89,5 +89,10 @@ test('SEENIT-COST-001 les assets texte immuables sont servis en gzip avec revali
   const image = await server.raw('/assets/logo-Ab12.png', { 'Accept-Encoding': 'gzip' });
   assert.equal(image.headers['content-encoding'], undefined, 'les images déjà compressées restent servies telles quelles');
   assert.equal((await server.raw('/assets/absent-X.js', { 'Accept-Encoding': 'gzip' })).status, 404);
+  // Revue Codex #996 : un nom absent n'est pas mémorisé ; s'il apparaît ensuite, il est servi.
+  writeFileSync(path.join(root, 'assets', 'absent-X.js'), script);
+  const appeared = await server.raw('/assets/absent-X.js', { 'Accept-Encoding': 'gzip' });
+  assert.equal(appeared.status, 200);
+  assert.equal(appeared.headers['content-encoding'], 'gzip');
   assert.equal((await server.raw('/assets/..%2Findex.html', { 'Accept-Encoding': 'gzip' })).status, 404);
 });

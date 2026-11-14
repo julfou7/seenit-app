@@ -50,21 +50,22 @@ export function createSeenItFrontendRouter(distPath: string): Router {
 
   // SEENIT-COST-001 : assets hashés immuables, compressés une seule fois puis servis depuis la mémoire.
   const assetsPath = path.join(distPath, 'assets');
-  const gzippedAssets = new Map<string, { body: Buffer; etag: string } | null>();
+  // Seules les compressions réussies sont mémorisées : leur nombre est borné par le build.
+  // Un nom absent n'ajoute rien, sinon des requêtes anonymes feraient croître la mémoire sans fin.
+  const gzippedAssets = new Map<string, { body: Buffer; etag: string }>();
   router.get('/assets/:file', (req, res, next) => {
     const file = req.params.file;
     if (!/^[\w.-]+$/.test(file) || !isCompressibleAssetPath(file) || !acceptsGzip(req)) { next(); return; }
     let entry = gzippedAssets.get(file);
-    if (entry === undefined) {
+    if (!entry) {
       try {
         const body = gzipBuffer(readFileSync(path.join(assetsPath, file)));
         entry = { body, etag: computeSeenItContentEtag(body) };
+        gzippedAssets.set(file, entry);
       } catch {
-        entry = null;
+        next(); return;
       }
-      gzippedAssets.set(file, entry);
     }
-    if (!entry) { next(); return; }
     res.setHeader('Cache-Control', SEENIT_HASHED_ASSET_CACHE_CONTROL);
     res.setHeader('ETag', entry.etag);
     res.vary('Accept-Encoding');
