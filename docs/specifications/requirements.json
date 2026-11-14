@@ -1679,6 +1679,41 @@
       ]
     },
     {
+      "id": "SEENIT-PLEX-013",
+      "title": "Couverture Plex d'une série en un seul appel, sans fausse complétude ni épisode non prouvé",
+      "targets": [
+        "backend",
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 une série partielle expose ses épisodes exacts en un seul appel allLeaves"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 une liste illisible ou tronquée ne produit jamais une couverture inventée"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 un film garde une disponibilité binaire, sans appel de couverture"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 sémantique aucun / inconnu / partiel / disponible, jamais « complet »"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 un épisode n’est annoncé sur Plex qu’avec la preuve de cet épisode précis"
+        },
+        {
+          "file": "tests/plexSeriesCoverage.test.ts",
+          "contains": "SEENIT-PLEX-013 une série reconstruite par la synchro relit sa couverture une fois, depuis une fiche seulement"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-PLEX-012",
       "title": "Synchro Plex bornée, parallèle dans l'ordre d'origine, avec vrai pourcentage et panneau compact",
       "targets": [

@@ -62,6 +62,8 @@ export interface WhereToWatchProvider {
   logo_path?: string | null;
   isPlex?: boolean;
   serverName?: string;
+  /** #255 : couverture d'une série sur Plex (« 1 épisode sur 34 »), absente si inconnue. */
+  plexCoverage?: string | null;
 }
 
 /**
@@ -74,7 +76,7 @@ export function WhereToWatchCard({ providers, loading, userPlatforms, title, fal
     {providers.map((provider, index) => {
       if (provider.isPlex) return <button type="button" key={`plex-${index}`} onClick={() => onOpenPlex(provider)} className="flex items-center gap-3 min-h-[60px] pl-2.5 pr-3.5 py-2 border-t border-white/[0.06] text-left active:bg-white/5">
         <span className="w-11 h-11 rounded-[11px] overflow-hidden bg-[#1F2326] shrink-0 flex items-center justify-center"><img src={PLEX_LOGO_SVG} alt="" className="w-full h-full object-cover" /></span>
-        <span className="flex-1 min-w-0 flex flex-col gap-0.5"><span className="text-[15px] font-bold text-white">Plex</span><span className="text-[12px] text-zinc-400 truncate">{provider.serverName ? `Sur ${provider.serverName}` : 'Sur ton serveur'}</span></span>
+        <span className="flex-1 min-w-0 flex flex-col gap-0.5"><span className="text-[15px] font-bold text-white">Plex</span><span className="text-[12px] text-zinc-400 truncate">{provider.serverName ? `Sur ${provider.serverName}` : 'Sur ton serveur'}{provider.plexCoverage ? ` · ${provider.plexCoverage}` : ''}</span></span>
         <span className="text-[12px] font-bold text-[#E5A93D]">Lire</span>
       </button>;
       const subscribed = userPlatforms.includes(provider.provider_id);

@@ -13,6 +13,13 @@ export interface PlexAvailabilityResult {
   year: number | null;
   ratingKey: string;
   plexUrl: string;
+  /**
+   * #255 : couverture d'une série sur ce serveur, issue d'un seul appel `allLeaves` (jamais un appel par
+   * épisode). Absente si la liste n'a pas pu être lue : la couverture reste alors inconnue.
+   */
+  episodeCount?: number;
+  /** Épisodes présents, `saison:épisode` (saison 0 = spéciaux), triés. */
+  episodes?: string[];
 }
 
 interface PlexConnection {
@@ -65,7 +72,7 @@ function extractItems(data: any): any[] {
   if (Array.isArray(data?.MediaContainer?.Metadata)) return data.MediaContainer.Metadata;
   if (Array.isArray(data?.Metadata)) return data.Metadata;
   const hubs = Array.isArray(data?.MediaContainer?.Hub) ? data.MediaContainer.Hub : [];
-  return hubs.flatMap((hub: any) => Array.isArray(hub?.Metadata) ? hub.Metadata : []);
+  return hubs.flatMap((hub: { Metadata?: unknown }) => Array.isArray(hub?.Metadata) ? hub.Metadata : []);
 }
 
 function normalizeImdbId(value: unknown): string | null {
@@ -122,6 +129,9 @@ function formatResult(server: PlexServerResource, item: any): PlexAvailabilityRe
     originalTitle: item.originalTitle || null,
     year: Number.isFinite(Number(item.year)) ? Number(item.year) : null,
     ratingKey,
+    ...(String(item?.type || '').toLowerCase() === 'show' && Number.isInteger(Number(item.leafCount)) && Number(item.leafCount) >= 0
+      ? { episodeCount: Number(item.leafCount) }
+      : {}),
     plexUrl: serverId
       ? `https://app.plex.tv/desktop/#!/server/${serverId}/details?key=${encodeURIComponent(`/library/metadata/${ratingKey}`)}`
       : 'https://app.plex.tv/desktop'
@@ -204,6 +214,46 @@ async function findFastExactMatch(options: {
   }
 }
 
+const MAX_COVERAGE_EPISODES = 3000;
+
+/**
+ * #255 : lit en un seul appel la liste des épisodes présents d'une série exacte. Un échec, un timeout ou une
+ * réponse illisible laisse la couverture inconnue (jamais « indisponible » ni « complète »).
+ */
+export async function attachEpisodeCoverage(
+  result: PlexAvailabilityResult,
+  options: { baseUri: string; serverToken: string; request: typeof fetch; outerSignal?: AbortSignal; timeoutMs: number }
+): Promise<PlexAvailabilityResult> {
+  const payload = await fetchPlexJson(
+    options.request,
+    `${options.baseUri}/library/metadata/${encodeURIComponent(result.ratingKey)}/allLeaves`,
+    options.serverToken,
+    options.timeoutMs,
+    options.outerSignal
+  );
+  const container = payload?.MediaContainer;
+  if (!container || !Array.isArray(container.Metadata)) return result;
+  const episodes = new Set<string>();
+  for (const item of container.Metadata) {
+    if (String(item?.type || '').toLowerCase() !== 'episode') continue;
+    const season = Number(item.parentIndex);
+    const episode = Number(item.index);
+    // Revue Codex #1001 : un épisode illisible rend la liste non exhaustive ; elle n'est alors pas publiée.
+    if (!Number.isInteger(season) || season < 0 || !Number.isInteger(episode) || episode < 0) return result;
+    episodes.add(`${season}:${episode}`);
+  }
+  const declared = Number(container.totalSize ?? container.size);
+  // Liste tronquée par le serveur : le décompte reste celui de Plex, sans liste d'épisodes non prouvée.
+  if (Number.isFinite(declared) && declared > container.Metadata.length) return result;
+  if (episodes.size > MAX_COVERAGE_EPISODES) return { ...result, episodeCount: episodes.size };
+  const sorted = [...episodes].sort((a, b) => {
+    const [as, ae] = a.split(':').map(Number);
+    const [bs, be] = b.split(':').map(Number);
+    return as - bs || ae - be;
+  });
+  return { ...result, episodeCount: sorted.length, episodes: sorted };
+}
+
 async function queryConnection(options: {
   server: PlexServerResource;
   uri: string;
@@ -224,6 +274,10 @@ async function queryConnection(options: {
   } = options;
   const baseUri = uri.replace(/\/+$/, '');
 
+  const withCoverage = (result: PlexAvailabilityResult | null) => result && mediaType === 'tv'
+    ? attachEpisodeCoverage(result, { baseUri, serverToken, request, outerSignal, timeoutMs: inventoryTimeoutMs })
+    : result;
+
   const fastResult = await findFastExactMatch({
     server,
     baseUri,
@@ -234,7 +288,7 @@ async function queryConnection(options: {
     outerSignal,
     fastTimeoutMs
   });
-  if (fastResult) return fastResult;
+  if (fastResult) return withCoverage(fastResult);
 
   if (outerSignal.aborted) return null;
   const deadline = Date.now() + inventoryBudgetMs;
@@ -269,7 +323,7 @@ async function queryConnection(options: {
       for (const item of items) {
         if (!isExactIdentityMatch(item, identity, mediaType)) continue;
         const result = formatResult(server, item);
-        if (result) return result;
+        if (result) return withCoverage(result);
       }
 
       const totalSize = Number(payload?.MediaContainer?.totalSize ?? payload?.MediaContainer?.size);

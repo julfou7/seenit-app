@@ -7,6 +7,8 @@ import { auth } from '../../lib/firebase';
 import { appLogger } from '../../store/logStore';
 import { authenticatedFetch, getAuthenticatedHeaders } from '../../lib/apiAuth';
 import { buildNativeBackendAttempts, executeBackendAttempts } from '../../lib/nativeBackendRetry';
+import { needsPlexSeriesCoverage, readPlexEpisodeCoverage } from './plexSeriesCoverage';
+export { isPlexEpisodePresent } from './plexSeriesCoverage';
 import { resolveSeenItApiCandidates } from '../../lib/seenitApi';
 import { getStoredPlexToken } from './plexStorage';
 import { replacePlexUserCache } from './plexAvailabilityCache';
@@ -28,6 +30,12 @@ export interface PlexMediaInfo {
   watchUrl?: string;
   title?: string;
   year?: number;
+  /** #255 : nombre d'épisodes présents sur le serveur (série uniquement), absent si inconnu. */
+  episodeCount?: number;
+  /** #255 : épisodes présents `saison:épisode` ; absent = couverture par épisode inconnue. */
+  episodes?: string[];
+  /** #255 : date de la dernière lecture réseau de couverture (série) ; absente = jamais lue. */
+  coverageCheckedAt?: number;
   lastChecked: number;
 }
 
@@ -157,7 +165,10 @@ async function performPlexAvailabilityCheck(params: {
   // Cache policy: Positive cache = 24h, Negative cache = 30s.
   // Un full scan reconstruit les entrées positives connues, donc une fiche peut
   // généralement répondre ici sans requête réseau supplémentaire.
-  if (!forceRefresh && cached) {
+  // #255 (revue Codex #1001) : la synchro reconstruit les entrées positives sans couverture. Une fiche
+  // ouverte en mode réseau lit alors une fois la couverture de la série, puis la garde avec l'entrée.
+  const needsSeriesCoverage = needsPlexSeriesCoverage(cached, mediaType, shouldRunPlexAvailabilityNetwork(networkMode));
+  if (!forceRefresh && cached && !needsSeriesCoverage) {
     const isPositiveValid = cached.available && (now - cached.lastChecked < 24 * 60 * 60 * 1000);
     const isNegativeValid = !cached.available && (now - cached.lastChecked < 30 * 1000);
     if (isPositiveValid || isNegativeValid) {
@@ -282,6 +293,8 @@ async function performPlexAvailabilityCheck(params: {
               : (typeof data.plexUrl === 'string' ? data.plexUrl : undefined),
             title: typeof data.title === 'string' ? data.title : undefined,
             year: typeof data.year === 'number' ? data.year : undefined,
+            ...readPlexEpisodeCoverage(data),
+            ...(mediaType === 'tv' ? { coverageCheckedAt: Date.now() } : {}),
             lastChecked: Date.now()
           };
           store.setMediaAvailability(key, info);
@@ -299,8 +312,8 @@ async function performPlexAvailabilityCheck(params: {
       if (status > 0) {
         appLogger.warn('plex', `[Plex Availability] Backend a répondu HTTP ${status}; le cache Plex n'est pas modifié.`);
       }
-    } catch (error: any) {
-      appLogger.warn('plex', `[Plex Availability] Backend unique indisponible : ${error?.message || error}`);
+    } catch (error) {
+      appLogger.warn('plex', `[Plex Availability] Backend unique indisponible : ${error instanceof Error ? error.message : String(error)}`);
     }
 
     const newerCached = usePlexAvailabilityStore.getState().getMediaAvailability(key);

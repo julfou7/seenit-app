@@ -23,6 +23,7 @@ import { appLogger } from '../store/logStore';
 import { EpisodeDetailSkeleton, EpisodeHeaderBlock, EpisodeNavRow, EpisodePlannerCard, ReactionRow, SeasonCurveCard, SpoilerSynopsis } from './mediaDetail/episodeSections';
 import { useMediaPresence } from '../hooks/useMediaPresence';
 import { openPlexWatchUrl } from '../features/plex/syncPlex';
+import { isPlexEpisodePresent } from '../features/plex/plexAvailability';
 import { type EpisodeDetailData } from './episodeDetailTypes';
 import {
   canStartEpisodeSwipeFromTarget,
@@ -879,7 +880,10 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
     else void tmdb.getWatchProviders(Number(showTmdbId), 'tv').then(result => apply(result.ok ? result.value : null));
     return () => { cancelled = true; };
   }, [showTmdbId]);
-  const plexAvailable = Boolean(presence.plexInfo?.available);
+  // #255 : avec la liste exacte des épisodes du serveur, Plex n'est proposé que pour un épisode présent.
+  // Liste inconnue (ancien cache, lecture échouée) : comportement antérieur, sans conclusion d'absence.
+  const plexEpisodePresence = isPlexEpisodePresent(presence.plexInfo, currentSeason, Number(currentEpisode?.episode_number));
+  const plexAvailable = Boolean(presence.plexInfo?.available) && plexEpisodePresence !== false;
   const originRow = originalBroadcasterRow(providersPayload, (tmdb.peekRenderableMediaDetails(Number(showTmdbId), 'tv') as { homepage?: string | null } | null)?.homepage);
   const watchProviders: WhereToWatchProvider[] = [...streamingProviders, ...(plexAvailable ? [{ provider_id: 999999, provider_name: 'Plex', isPlex: true, serverName: presence.plexInfo?.serverName }] : [])];
   const openPlex = () => { void openPlexWatchUrl(activeShow || { tmdbId: showTmdbId, imdbId: activeShow?.imdbId, title: activeShow?.title || tmdbShowTitle, mediaType: 'tv' }); };
