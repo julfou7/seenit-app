@@ -72,6 +72,21 @@ function validateAgentRemoteWorkflowContract(content) {
   return errors;
 }
 
+/**
+ * #511 : un workflow qui supprime des objets GCS prouve d'abord, sans rien modifier, que son identité
+ * possède `storage.objects.delete` (API testIamPermissions). Sinon il échoue avant la première suppression
+ * au lieu de tenter chaque objet puis de laisser une preuve post-opération incomplète.
+ */
+function validateDestructiveStoragePreflight(content) {
+  const deletion = content.search(/\bgcloud\s+storage\s+rm\b|\bgsutil\s+(?:-m\s+)?rm\b/);
+  if (deletion === -1) return [];
+  const preflight = content.search(/\/iam\/testPermissions\?[^\n]*permissions=storage\.objects\.delete/);
+  if (preflight === -1 || preflight > deletion) {
+    return ['une suppression GCS doit être précédée du préflight testIamPermissions incluant storage.objects.delete'];
+  }
+  return [];
+}
+
 function validateWorkflowPolicy(workflowDir = DEFAULT_WORKFLOW_DIR) {
   const files = listWorkflowFiles(workflowDir);
   const errors = [];
@@ -98,6 +113,7 @@ function validateWorkflowPolicy(workflowDir = DEFAULT_WORKFLOW_DIR) {
     if (file === 'agent-remote-validate.yml') {
       errors.push(...validateAgentRemoteWorkflowContract(content));
     }
+    errors.push(...validateDestructiveStoragePreflight(content).map(message => `${file} : ${message}.`));
   }
 
   for (const expected of ALLOWED_WORKFLOWS) {
@@ -162,6 +178,7 @@ module.exports = {
   WORKFLOW_WRITE_PERMISSIONS,
   containsForbiddenGitMutation,
   findWritePermissions,
+  validateDestructiveStoragePreflight,
   listWorkflowFiles,
   parseActionlintVersion,
   resolveActionlint,

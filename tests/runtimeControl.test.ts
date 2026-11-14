@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { readDocText } from './helpers/docText.ts';
 
 const workflow = fs.readFileSync('.github/workflows/runtime-control.yml', 'utf8');
 const deployWorkflow = fs.readFileSync('.github/workflows/deploy-backend.yml', 'utf8');
-const documentation = fs.readFileSync('docs/process/runtime-control.md', 'utf8');
-const agents = fs.readFileSync('AGENTS.md', 'utf8');
+const documentation = readDocText('docs/process/runtime-control.md');
+const agents = readDocText('AGENTS.md');
 
 test('le contrôle PWA connector-only est borné au propriétaire et à l issue runtime', () => {
   assert.match(workflow, /github\.event\.issue\.number == 57/);

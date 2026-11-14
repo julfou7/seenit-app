@@ -319,6 +319,10 @@ Les TNR `tests/**/*.test.ts` sont exécutés directement par `node --test`. Tout
 
 Le préflight sans dépendances bloque cette classe d'erreur avant le cache `node_modules`, l'installation npm, TypeScript et les tests unitaires. Un agent qui ajoute un TNR vérifie cette résolution avant le premier push ; la CI confirme la règle mais ne sert pas à découvrir un `ERR_MODULE_NOT_FOUND` déterministe.
 
+### Assertions documentaires des TNR
+
+Un TNR qui vérifie une phrase de `AGENTS.md`, d'une SPEC, d'un process ou d'un registre lit le document avec `readDocText` (ou `normalizeDocText`) de `tests/helpers/docText.ts` : un simple reflow Markdown ne doit pas faire échouer un contrat (#497). Les mots, leur ordre et la ponctuation restent vérifiés strictement. Garder la lecture brute uniquement quand l'assertion porte réellement sur la structure en lignes (`^`, `\n`, tableau, bloc de code).
+
 `docs/specifications/functional-reference.md` est la carte produit vivante. Toute fonction ajoutée, retirée, déplacée ou dont le résultat observable change doit y être répercutée dans la même livraison. Un comportement du code qui contredit la SPEC n'est pas une nouvelle règle implicite : ouvrir ou mettre à jour une issue priorisée, puis corriger le code ou obtenir une décision produit explicite.
 
 ## 4. Contrat APK immuable
