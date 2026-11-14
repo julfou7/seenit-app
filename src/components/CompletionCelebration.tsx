@@ -15,9 +15,16 @@ export function CompletionCelebration() {
   useEffect(() => {
     if (!current) return;
     const timer = setTimeout(dismiss, AUTO_DISMISS_MS);
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') dismiss(); };
-    window.addEventListener('keydown', onKey);
-    return () => { clearTimeout(timer); window.removeEventListener('keydown', onKey); };
+    // Revue Codex #1014 : capture sur window (avant DialogLayer, qui capture sur document) ; Échap ferme
+    // la célébration seule et l'événement est consommé, la fiche Série reste ouverte (un niveau à la fois).
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      dismiss();
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => { clearTimeout(timer); window.removeEventListener('keydown', onKey, true); };
   }, [current, dismiss]);
 
   if (!current) return null;

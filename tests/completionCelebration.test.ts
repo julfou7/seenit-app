@@ -64,4 +64,8 @@ test('#436 textes, store et branchement sur le marquage individuel uniquement', 
   const layer = Number(popup.match(/data-celebration-layer="" className="[^"]*z-\[(\d+)\]/)?.[1]);
   const mediaLayer = Number(readFileSync('src/App.tsx', 'utf8').match(/z-\[(1[5-9]\d)\]/)?.[1] || 150);
   assert.ok(layer > mediaLayer, `célébration z-${layer} au-dessus de la fiche z-${mediaLayer}`);
+  // Revue Codex #1014 : Échap ferme la célébration avant le gestionnaire de la fiche (capture window), une seule couche.
+  assert.match(popup, /window\.addEventListener\('keydown', onKey, true\)/);
+  assert.match(popup, /event\.stopImmediatePropagation\(\);\n\s*dismiss\(\);/);
+  assert.match(readFileSync('src/components/ui/DialogLayer.tsx', 'utf8'), /document\.addEventListener\('keydown'/, 'DialogLayer écoute sur document : window capture passe avant');
 });
