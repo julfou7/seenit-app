@@ -37,8 +37,24 @@ test('SEENIT-NOTIFICATION-003 et #443 appliquent le même contain au post-import
     /Math\.min\([\s\S]*?targetWidth \/ \(float\) source\.getWidth\(\)[\s\S]*?targetHeight \/ \(float\) source\.getHeight\(\)/
   );
   assert.doesNotMatch(plexWorker, /Bitmap\.createScaledBitmap\(/);
-  assert.ok(plexWorker.includes('if (poster == null) return;'));
-  assert.ok(plexWorker.includes('applyPoster(builder, NotificationPosterCache.read(context, message.get("posterUrl")), compactText)'));
-  assert.ok(plexWorker.includes('applyPoster(builder, poster, "La copie exacte est maintenant indexée par Plex.")'));
+  assert.ok(plexWorker.includes('if (poster == null && backdrop == null) return;'));
+  assert.match(plexWorker, /applyPoster\(\s*builder,\s*NotificationPosterCache\.read\(context, message\.get\("posterUrl"\)\),\s*NotificationPosterCache\.read\(context, message\.get\("backdropUrl"\)\),\s*compactText\s*\)/);
+  assert.ok(plexWorker.includes('applyPoster(builder, poster, backdrop, "La copie exacte est maintenant indexée par Plex.")'));
   assert.ok(plexWorker.includes('.setStyle(new NotificationCompat.BigTextStyle().bigText(compactText))'));
+});
+
+test('#443 décision du 06/11 : notification développée en image paysage, affiche entière en petit', () => {
+  const applyPoster = plexWorker.slice(plexWorker.indexOf('private static void applyPoster('), plexWorker.indexOf('private static Bitmap fillLandscape('));
+  // Repliée : l'affiche reste en contain ; développée : le backdrop prime, l'affiche n'est qu'un repli.
+  assert.match(applyPoster, /if \(poster != null\) builder\.setLargeIcon\(fitPosterInside\(poster, 160, 160\)\)/);
+  assert.match(applyPoster, /backdrop != null\s*\?\s*fillLandscape\(backdrop, 512, 288\)\s*:\s*fitPosterInside\(poster, 512, 288\)/);
+  assert.match(applyPoster, /\.bigLargeIcon\(\(Bitmap\) null\)/, 'un seul grand visuel en état développé');
+  // Cover sans étirement : même échelle sur les deux axes, la plus grande des deux.
+  const fill = plexWorker.slice(plexWorker.indexOf('private static Bitmap fillLandscape('));
+  assert.match(fill, /Math\.max\([\s\S]*?targetWidth \/ \(float\) source\.getWidth\(\)[\s\S]*?targetHeight \/ \(float\) source\.getHeight\(\)/);
+  // L'image paysage suit le même transport que l'affiche : URL TMDB bornée, cache privé, aucun octet dans WorkManager.
+  assert.match(plexWorker, /\.putString\("backdropUrl", NotificationPosterCache\.allowed\(message\.get\("backdropUrl"\)\)/);
+  assert.match(plexWorker, /"posterUrl", "backdropUrl" \}/, 'le reçu enrichi transmet aussi l’image paysage');
+  const cache = readFileSync('android/app/src/main/java/com/seenit/app/NotificationPosterCache.java', 'utf8');
+  assert.match(cache, /\/t\/p\/\(w342\|w780\)\//);
 });

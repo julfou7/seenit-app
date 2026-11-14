@@ -52,7 +52,7 @@ export async function deliverDownloadWebhookPresentation({
   traceId?: string;
   resolvePoster?: (tmdbId: number, mediaType: string) => Promise<string | undefined>;
   /** Affiche et titre de la fiche TMDB fr-FR (SEENIT-DOWNLOAD-022) ; prime sur `resolvePoster`. */
-  resolveMedia?: (tmdbId: number, mediaType: string) => Promise<{ posterUrl?: string; title?: string } | undefined>;
+  resolveMedia?: (tmdbId: number, mediaType: string) => Promise<{ posterUrl?: string; backdropUrl?: string; title?: string } | undefined>;
 }): Promise<{
   delivered: number;
   invalidTokensRemoved: number;
@@ -68,7 +68,7 @@ export async function deliverDownloadWebhookPresentation({
   // Fiche indisponible : le titre de Sonarr/Radarr reste ; la livraison n'attend jamais plus que la lecture bornée.
   const tmdbId = Number(input.data.tmdbId);
   const mediaType = input.data.mediaType;
-  let media: { posterUrl?: string; title?: string } | undefined;
+  let media: { posterUrl?: string; backdropUrl?: string; title?: string } | undefined;
   if (tmdbId > 0 && (mediaType === 'movie' || mediaType === 'tv')) {
     try {
       media = resolveMedia ? await resolveMedia(tmdbId, mediaType)
@@ -90,12 +90,14 @@ export async function deliverDownloadWebhookPresentation({
   // Sur Android capable, un seul signal data-only haute priorité affiche immédiatement
   // le reçu d'import local puis met à jour cette même notification après preuve Plex.
   // Les APK legacy et la PWA conservent le reçu FCM visible classique.
-  const posterUrl = media?.posterUrl;
+  // #443 : l'image paysage de la même fiche sert à la notification développée ; l'affiche reste la petite image.
+  const { posterUrl, backdropUrl } = media ?? {};
   const [plexCheckDelivery, androidLegacyDelivery, webDelivery] = await Promise.all([
     sendPush(uid, null, {
       ...presentation.plexAvailabilityData,
       ownerUidHash,
       ...(posterUrl ? { posterUrl } : {}),
+      ...(backdropUrl ? { backdropUrl } : {}),
       ...(traceId ? { traceId } : {}),
     }, {
       platform: 'android',

@@ -24,7 +24,7 @@ test('SEENIT-NOTIFICATION-003 #801 branche le cache privé et le contrôle natif
   const nativeContract = readFileSync('android/app/src/androidTest/java/com/seenit/app/ImportNotificationImageContract.java', 'utf8');
   const upgrade = readFileSync('android/app/src/androidTest/java/com/seenit/app/UpgradeContractInstrumentedTest.java', 'utf8');
   assert.match(server, /resolveMedia: resolveDownloadNotificationMedia/);
-  assert.match(worker, /applyPoster\(builder, NotificationPosterCache\.read\(context, message\.get\("posterUrl"\)\), compactText\)/);
+  assert.match(worker, /applyPoster\(\s*builder,\s*NotificationPosterCache\.read\(context, message\.get\("posterUrl"\)\),/);
   assert.match(worker, /attempt <= 3 && NotificationPosterCache\.warm/);
   assert.match(worker, /postImportNotification\(getApplicationContext\(\), receipt, true\)/);
   assert.match(worker, /if \(updateOnly && !visible\) return/);
@@ -115,7 +115,7 @@ test('SEENIT-NOTIFICATION-003 présente une notification média cohérente et un
   assert.doesNotMatch(worker, /✅|🚀/u);
   assert.ok(worker.includes('notificationId(eventKey, mediaType, tmdbId, season, episode)'));
   assert.equal((worker.match(/notificationId\(eventKey, mediaType, tmdbId, season, episode\)/g) || []).length >= 2, true);
-  assert.ok(worker.includes('builder.setLargeIcon(largeIcon)'));
+  assert.ok(worker.includes('builder.setLargeIcon(fitPosterInside(poster, 160, 160))'));
   assert.ok(worker.includes('fitPosterInside(poster, 160, 160)'));
   assert.ok(worker.includes('fitPosterInside(poster, 512, 288)'));
   assert.ok(worker.includes('.bigLargeIcon((Bitmap) null)'));

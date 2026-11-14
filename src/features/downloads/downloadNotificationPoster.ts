@@ -1,7 +1,12 @@
 import { getTmdbLocalizedTitle } from '../shows/mediaTitle.ts';
 
-/** Affiche et titre de la fiche TMDB fr-FR d'une notification de téléchargement. */
-export interface DownloadNotificationMedia { posterUrl?: string; title?: string }
+/**
+ * Affiche, image paysage et titre de la fiche TMDB fr-FR d'une notification de téléchargement.
+ * #443 (décision du 06/11) : la notification développée montre l'image paysage (backdrop) de la même fiche ;
+ * l'affiche reste la petite image de la notification repliée.
+ */
+export interface DownloadNotificationMedia { posterUrl?: string; backdropUrl?: string; title?: string }
+const TMDB_IMAGE_PATH = /^\/[A-Za-z0-9_-]+\.(?:jpg|png|webp)$/;
 type ResolverOptions = { apiKey?: () => string | undefined; request?: typeof fetch; now?: () => number };
 
 /**
@@ -26,6 +31,7 @@ export function createDownloadNotificationMediaResolver({
     if (inFlight.size >= 8) return {};
     const pending = (async () => {
       let url: string | undefined;
+      let backdropUrl: string | undefined;
       let title: string | undefined;
       try {
         const secret = apiKey()?.trim();
@@ -52,16 +58,18 @@ export function createDownloadNotificationMediaResolver({
         } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
         const data: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         if (data && typeof data === 'object') {
-          const item = data as { id?: unknown; poster_path?: unknown };
-          if (item.id === tmdbId && typeof item.poster_path === 'string' && !item.poster_path.includes(secret) && /^\/[A-Za-z0-9_-]+\.(?:jpg|png|webp)$/.test(item.poster_path)) {
-            url = `https://image.tmdb.org/t/p/w342${item.poster_path}`;
-          }
+          const item = data as { id?: unknown; poster_path?: unknown; backdrop_path?: unknown };
+          const imagePath = (path: unknown) => item.id === tmdbId && typeof path === 'string' && !path.includes(secret) && TMDB_IMAGE_PATH.test(path) ? path : undefined;
+          const posterPath = imagePath(item.poster_path);
+          const backdropPath = imagePath(item.backdrop_path);
+          if (posterPath) url = `https://image.tmdb.org/t/p/w342${posterPath}`;
+          if (backdropPath) backdropUrl = `https://image.tmdb.org/t/p/w780${backdropPath}`;
           // Même identité exacte que l'affiche ; jamais un texte qui contiendrait la clé.
           const localized = item.id === tmdbId ? getTmdbLocalizedTitle(data, mediaType as 'movie' | 'tv')?.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim() : undefined;
           if (localized && !localized.includes(secret)) title = localized.slice(0, 180);
         }
       } catch { /* Le reçu et sa vérification Plex restent indépendants de l'image et du titre. */ }
-      const media: DownloadNotificationMedia = { ...(url ? { posterUrl: url } : {}), ...(title ? { title } : {}) };
+      const media: DownloadNotificationMedia = { ...(url ? { posterUrl: url } : {}), ...(backdropUrl ? { backdropUrl } : {}), ...(title ? { title } : {}) };
       cache.delete(key);
       cache.set(key, { media, expires: now() + (url || title ? 86_400_000 : 30_000) });
       while (cache.size > 128) cache.delete(cache.keys().next().value!);

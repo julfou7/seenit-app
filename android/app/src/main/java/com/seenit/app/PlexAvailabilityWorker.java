@@ -80,6 +80,7 @@ public class PlexAvailabilityWorker extends Worker {
             .putString("eventKey", eventKey)
             .putString("traceId", traceId)
             .putString("posterUrl", NotificationPosterCache.allowed(message.get("posterUrl")) ? message.get("posterUrl") : "")
+            .putString("backdropUrl", NotificationPosterCache.allowed(message.get("backdropUrl")) ? message.get("backdropUrl") : "")
             .build();
 
         Constraints constraints = new Constraints.Builder()
@@ -134,9 +135,12 @@ public class PlexAvailabilityWorker extends Worker {
         try {
             // Le visuel public n'est pas une preuve Plex. Enrichir le reçu avant toute recherche PMS.
             String posterUrl = getInputData().getString("posterUrl");
-            if (attempt <= 3 && NotificationPosterCache.warm(getApplicationContext(), posterUrl)) {
+            String backdropUrl = getInputData().getString("backdropUrl");
+            // #443 : affiche et image paysage sont préchauffées toutes deux (« | » n'interrompt pas l'évaluation).
+            if (attempt <= 3 && NotificationPosterCache.warm(getApplicationContext(), posterUrl)
+                | NotificationPosterCache.warm(getApplicationContext(), backdropUrl)) {
                 Map<String, String> receipt = new HashMap<>();
-                for (String key : new String[] { "ownerUidHash", "title", "mediaType", "eventKey", "posterUrl" }) {
+                for (String key : new String[] { "ownerUidHash", "title", "mediaType", "eventKey", "posterUrl", "backdropUrl" }) {
                     receipt.put(key, getInputData().getString(key));
                 }
                 receipt.put("tmdbId", String.valueOf(tmdbId));
@@ -431,7 +435,12 @@ public class PlexAvailabilityWorker extends Worker {
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS);
 
-        applyPoster(builder, NotificationPosterCache.read(context, message.get("posterUrl")), compactText);
+        applyPoster(
+            builder,
+            NotificationPosterCache.read(context, message.get("posterUrl")),
+            NotificationPosterCache.read(context, message.get("backdropUrl")),
+            compactText
+        );
         return builder;
     }
 
@@ -468,7 +477,8 @@ public class PlexAvailabilityWorker extends Worker {
 
         Bitmap poster = fetchPosterBitmap(match);
         if (poster == null) poster = NotificationPosterCache.read(context, getInputData().getString("posterUrl"));
-        applyPoster(builder, poster, "La copie exacte est maintenant indexée par Plex.");
+        Bitmap backdrop = NotificationPosterCache.read(context, getInputData().getString("backdropUrl"));
+        applyPoster(builder, poster, backdrop, "La copie exacte est maintenant indexée par Plex.");
 
         String discoverUrl = resolvePlexDiscoverUrl(plexToken, tmdbId, mediaType);
         if (discoverUrl != null) {
@@ -493,16 +503,41 @@ public class PlexAvailabilityWorker extends Worker {
         }
     }
 
-    private static void applyPoster(NotificationCompat.Builder builder, Bitmap poster, String summary) {
-        if (poster == null) return;
-        Bitmap largeIcon = fitPosterInside(poster, 160, 160);
-        Bitmap bigPicture = fitPosterInside(poster, 512, 288);
-        builder.setLargeIcon(largeIcon);
+    /**
+     * #443 (décision du 06/11) : repliée, l'affiche entière en petit ; développée, l'image paysage
+     * du média remplit le cadre 512×288 sans bandes. Sans image paysage, l'affiche entière y est
+     * centrée (contain). Sans aucune image, la notification reste textuelle.
+     */
+    private static void applyPoster(NotificationCompat.Builder builder, Bitmap poster, Bitmap backdrop, String summary) {
+        if (poster == null && backdrop == null) return;
+        if (poster != null) builder.setLargeIcon(fitPosterInside(poster, 160, 160));
+        Bitmap bigPicture = backdrop != null
+            ? fillLandscape(backdrop, 512, 288)
+            : fitPosterInside(poster, 512, 288);
         builder.setStyle(new NotificationCompat.BigPictureStyle()
             .bigPicture(bigPicture)
             .bigLargeIcon((Bitmap) null)
             .setSummaryText(summary));
-        poster.recycle();
+        if (poster != null) poster.recycle();
+        if (backdrop != null) backdrop.recycle();
+    }
+
+    /** Image paysage recadrée au centre pour remplir le cadre (cover), jamais étirée. */
+    private static Bitmap fillLandscape(Bitmap source, int targetWidth, int targetHeight) {
+        Bitmap output = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(output);
+        canvas.drawColor(0xFF18181B);
+        float scale = Math.max(
+            targetWidth / (float) source.getWidth(),
+            targetHeight / (float) source.getHeight()
+        );
+        float width = source.getWidth() * scale;
+        float height = source.getHeight() * scale;
+        float left = (targetWidth - width) / 2f;
+        float top = (targetHeight - height) / 2f;
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        canvas.drawBitmap(source, null, new RectF(left, top, left + width, top + height), paint);
+        return output;
     }
 
     private static PendingIntent buildSeenItPendingIntent(
