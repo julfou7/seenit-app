@@ -169,8 +169,12 @@ test('SEENIT-QUALITY-004 ouvre proactivement une issue d’amélioration continu
   assert.match(normalizedAgents, /idée purement spéculative[\s\S]*doublon exact[\s\S]*contrainte externe/i);
   assert.match(normalizedBootstrap, /idée purement spéculative[\s\S]*doublon exact[\s\S]*contrainte externe/i);
   assert.match(normalizedSpec, /idée purement spéculative[\s\S]*doublon exact[\s\S]*contrainte externe/i);
-  assert.match(requestRegistry, /USR-2026-09-21-014/);
-  assert.match(requestRegistry, /issue #496/);
+  // #631 : l'identifiant et l'issue sont vérifiés sur la même ligne du registre ; USR-2026-09-21-014 est
+  // la règle des transitions de fiche, la règle d'amélioration continue (#496) est USR-2026-09-21-015.
+  assert.match(requestRegistry, /^\| USR-2026-09-21-015 \|[^\n]*SEENIT-QUALITY-004[^\n]*issue #496[^\n]*\| active \|$/m);
+  assert.doesNotMatch(requestRegistry, /^\| USR-2026-09-21-014 \|[^\n]*issue #496/m);
+  const ids = [...requestRegistry.matchAll(/^\| (USR-\d{4}-\d{2}-\d{2}-\d{3}) \|/gm)].map(match => match[1]);
+  assert.equal(ids.filter(id => id === 'USR-2026-09-21-014' || id === 'USR-2026-09-21-015').length, 2, 'chaque identifiant reste unique');
 });
 
 test('SEENIT-QUALITY-004 exige un reçu pré-acquisition avant tout clone local', () => {
