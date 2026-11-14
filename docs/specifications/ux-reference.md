@@ -346,25 +346,3 @@ Les notifications confirment « ✅ Import terminé », puis
 
 
 Retour terrain225 du25/10/2026 (#729), prioritaire sur les regroupements antérieurs : un visionnage = une ligne, sans ×N ni plage d’épisodes, même pour une saison marquée en une fois. Périodes, totaux, heure et actions par épisode conservés. Navigation : centres du pictogramme et du texte identiques sur tous les écrans. Vu : anneau progressif760ms puis coche240ms, tampon puis reprise ; réduction des animations immédiate. Splash : huit segments160ms, anneau1280ms, coche1640ms, signature1860ms/300ms puis lecture complète pendant1540ms ; durée3700ms et fondu500ms inchangés. Référentiel détaillé : docs/design/marque-2026-10-25.md.
-
-
-### SeenIt TV V4 — 27 octobre 2026 (#295)
-
-Trois destinations visuelles, rangée d'apps générique, sources natives et réglages en partie
-basse. En-tête fixe, Retour remonte la Home avant de quitter, focus visible et mouvement réduit.
-Compte/QR réservé à l'association explicite d'un profil adulte ; aucun visionnage attribué
-par un simple lancement d'app. Référence : [TV V4](tv-samsung-launcher-v4.md).
-
-Films & séries, terrain28/10 : grand fond du contenu actif et rail paysage, sans apps.
-Pour toi/Séries/Films filtrent localement ; quatre cartes/page. Déplacer le focus actualise
-le grand visuel, OK consulte le détail et Retour restaure la carte. Sans image, garder une
-carte stable ; sans association, proposer le QR du profil. Aucun contenu/progrès fictif ni
-CTA de lecture exacte sans implémentation prouvée. Référence : maquette V3-06 fournie.
-
-Sport, MVP gratuit du28/10 (#738) : sélectionner les équipes localement, calendrier six
-cartes/page, heure locale et horaire provisoire explicites, sans résultat. OK sur une carte
-donne stade/source/information de diffusion ; aucune ouverture supposée. Précédents/Suivants
-et Actualiser restent accessibles à la télécommande. Retour retrouve la tuile Sport, sans
-modifier les équipes choisies. La Home anticipe le prochain match sans suivi live.
-
-Moi (`SEENIT-PROFILE-001`) : page unique ; carte « Ton année » avec boutons 46 px, ligne « séries laissées en route » de 68 px, filtre Tout · Séries · Films de 44 px, étagères défilantes avec « Tout voir » (44 px), lignes de section de 52 px ; chaque sous-page a un bouton retour rond de 44 px. Dans Mes chiffres, chaque mois du cadran est un bouton de 46 × 44 px et le centre revient au total.

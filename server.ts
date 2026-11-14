@@ -22,9 +22,6 @@ interface PlexSyncEntry { raw: PlexRawItem; source: string; sourceKind: string; 
 const plexGuidValues = (value: unknown): string[] => Array.isArray(value) ? value.map((entry: unknown) => typeof entry === 'string' ? entry : String((entry as { id?: unknown } | null)?.id || '')).filter(Boolean) : [];
 const isPlexOwned = (owned: unknown) => owned === true || owned === 1 || owned === '1';
 const PLEX_DELTA_COLLECT_DEADLINE_MS = 40_000;
-import { registerTvPairingRoutes } from './src/features/tv/tvPairingRoutes.ts';
-import { registerTvSportRoutes } from './src/features/tv/tvSport.ts';
-import { createFirestoreTvLinkStore, readTvLibrary } from './src/features/tv/tvPairingFirestore.ts';
 import { processReleaseUpdateNotificationRequest } from "./src/features/release/releaseUpdatePushBackend.ts";
 import { DecodedIdToken } from "firebase-admin/auth";
 import dns from "node:dns/promises";
@@ -616,11 +613,6 @@ async function startServer() {
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   // SEENIT-COST-001 : Cloud Run ne compresse pas ; chaque octet servi vers l'Europe est facturé.
   app.use('/api', createJsonGzipMiddleware());
-  registerTvPairingRoutes(app, {
-    store: createFirestoreTvLinkStore(adminDb), authenticate: requireAuth, rateLimit,
-    library: uid => readTvLibrary(adminDb, uid),
-  });
-  registerTvSportRoutes(app, rateLimit);
   registerMediaProviderRoutes(app, {
     authenticate: requireAuth,
     parentalEvidence: {
@@ -742,7 +734,7 @@ async function startServer() {
       /**
        * Extrait les GUID externes d'un résultat Plex.
        */
-      const extractGuids = (item: any) => {
+      const extractGuids = (item: { Guid?: unknown; guids?: unknown; guid?: string; grandparentGuid?: string; parentGuid?: string } | null | undefined) => {
         const tmdbIds = new Set<number>();
         const imdbIds = new Set<string>();
         const tvdbIds = new Set<number>();
