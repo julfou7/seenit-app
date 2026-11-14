@@ -1,11 +1,19 @@
 import React, { createContext, useContext, useLayoutEffect, useRef, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { dialogStack } from '../../features/navigation/dialogStack';
+import { forgetDialogEntry, markDialogEntryOrphaned, skipOrphanedDialogEntry } from '../../features/navigation/dialogHistoryOrphans';
 
 const DialogDepth = createContext(0);
 const FOCUSABLE = 'button, a[href], input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])';
 const surfaces = new Map<string, HTMLElement>();
 const inertBefore = new Map<HTMLElement, boolean>();
+
+// #640 : écouteur unique, enregistré avant ceux des écrans, qui saute l'entrée d'un dialogue déjà fermé.
+if (typeof window !== 'undefined') {
+  window.addEventListener('popstate', () => {
+    skipOrphanedDialogEntry(window.history.state, id => surfaces.has(id), () => window.history.back());
+  });
+}
 
 function activeSurface() {
   const id = dialogStack.top()?.id;
@@ -107,9 +115,13 @@ export function DialogLayer({ onDismiss, label, historyMode = 'local', canDismis
     const previousState = window.history.state || {};
     if (historyMode === 'local' && window.history.state?.seenitDialog !== id) {
       const state = { ...previousState, seenitDialog: id };
-      if (previousState.seenitDialog && !surfaces.has(previousState.seenitDialog)) window.history.replaceState(state, '');
-      else window.history.pushState(state, '');
+      if (previousState.seenitDialog && !surfaces.has(previousState.seenitDialog)) {
+        forgetDialogEntry(previousState.seenitDialog);
+        window.history.replaceState(state, '');
+      } else window.history.pushState(state, '');
     }
+    // Vrai dès que l'entrée de ce dialogue a quitté le sommet par un Retour (et non par une navigation empilée).
+    let leftByHistory = false;
     const remove = dialogStack.add({ id, depth, close: () => {
       if (!canDismissRef.current) {
         dialogStack.acknowledge(id);
@@ -121,6 +133,7 @@ export function DialogLayer({ onDismiss, label, historyMode = 'local', canDismis
     surfaces.set(id, surface);
     setRegistered(true);
     const onPop = () => {
+      if (window.history.state?.seenitDialog !== id) leftByHistory = true;
       if (historyMode === 'local' && window.history.state?.seenitDialog !== id && dialogStack.top()?.id === id) {
         if (canDismissRef.current) dismissRef.current();
         else window.history.pushState({ ...previousState, seenitDialog: id }, '');
@@ -172,6 +185,8 @@ export function DialogLayer({ onDismiss, label, historyMode = 'local', canDismis
       queueMicrotask(() => {
         if (surfaces.has(id)) return;
         if (historyMode === 'local' && window.history.state?.seenitDialog === id) window.history.back();
+        // #640 : une destination a été empilée au-dessus de l'entrée encore présente ; elle sera sautée au Retour.
+        else if (historyMode === 'local' && !leftByHistory) markDialogEntryOrphaned(id);
         if (wasTop) {
           const next = activeSurface();
           if (trigger?.isConnected && !trigger.closest('[inert]') && (!next || next.contains(trigger))) trigger.focus({ preventScroll: true });

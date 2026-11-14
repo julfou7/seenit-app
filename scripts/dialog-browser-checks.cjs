@@ -119,6 +119,12 @@ async function testDialogHarness(client, root) {
     await check(client, '!document.getElementById("sheet") && !document.getElementById("origin-person").inert && document.activeElement.id === "person-open-media"', 'Retour restaure la personne et son focus');
     await key(client, 'Escape');
     await check(client, '!document.querySelector("[data-dialog-blocking=true]")', 'la personne d’origine se ferme sans quitter l’onglet');
+    // #640 : l'aperçu navigue puis se ferme ; un seul Retour depuis la fiche revient au niveau d'origine.
+    const beforePreview = await evaluate(client, 'navigation.currentEntry.index');
+    await click(client, 'open-preview'); await click(client, 'preview-open-media');
+    await check(client, '!document.getElementById("preview") && document.getElementById("sheet")', 'l’aperçu laisse la place à la fiche');
+    await evaluate(client, 'window.__dialogBack()'); await delay(200);
+    await check(client, `!document.getElementById("sheet") && navigation.currentEntry.index === ${beforePreview} && !history.state?.seenitDialog`, '#640 un seul Retour depuis la fiche ouverte par l’aperçu, sans niveau invisible');
     reports.push({ viewport: viewport.id, status: 'pass', bounds });
   }
   return reports;
