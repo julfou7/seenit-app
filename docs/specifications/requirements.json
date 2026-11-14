@@ -379,6 +379,10 @@
         },
         {
           "file": "tests/downloadPrototype.test.ts",
+          "contains": "SEENIT-DOWNLOAD-013 #293 la variante HD Light ou Standard reste visible dans la file et le choix s’explique"
+        },
+        {
+          "file": "tests/downloadPrototype.test.ts",
           "contains": "SEENIT-DOWNLOAD-013 C411 transmet Referer dès le premier appel et distingue panne et catalogue vide"
         },
         {
