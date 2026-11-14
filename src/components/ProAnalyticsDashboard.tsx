@@ -40,6 +40,7 @@ import { summarizeSeriesFate, type SeriesFateEntry } from '../features/profile/p
 import { imageUrl } from '../features/watchlist/seriesCardPresentation';
 import { MonthDial } from './profile/MonthDial';
 import { useReveal } from './profile/useReveal';
+import { useStagedMount } from './profile/useStagedMount';
 
 const PROFILE_MONTH_SHORT_LOWER = ['janv', 'févr', 'mars', 'avr', 'mai', 'juin', 'juil', 'août', 'sept', 'oct', 'nov', 'déc'];
 const delay = (ms: number) => ({ '--delay': `${ms}ms` }) as CSSProperties;
@@ -72,7 +73,9 @@ export function ProAnalyticsDashboard({
   onFate?: () => void;
   onOpen?: (tmdbId: number, mediaType: 'tv' | 'movie') => void;
 }) {
-  const { data, loading, contributions } = useProAnalytics(shows, libraryReady);
+  // Retour terrain v1.4.307 : le cadran se monte seul ; le reste arrive par paliers une fois son introduction finie.
+  const level = useStagedMount(5);
+  const { data, loading, contributions } = useProAnalytics(shows, libraryReady && level >= 3);
   const scope = useMemo(() => scopeProfileViewings(shows, since), [shows, since]);
   const { viewings, imports } = scope;
   const yearTotals = useMemo(() => listProfileYearTotals(viewings), [viewings]);
@@ -100,28 +103,29 @@ export function ProAnalyticsDashboard({
     const actors = contributionOf(show)?.actors;
     return actors?.length ? actors.slice(0, 3).map(actor => ({ id: actor.id, name: actor.name, profile_path: actor.profile_path })) : leadCastFromDetails(details(show), show.mediaType);
   };
-  const rhythm = useMemo(() => buildProfileRhythm(viewings, now), [viewings]);
+  const later = <T,>(step: number, items: T[]): T[] => level >= step ? items : [];
+  const rhythm = useMemo(() => buildProfileRhythm(later(1, viewings), now), [viewings, level >= 1]);
   // Retour terrain v1.4.294 : journée type, jours d'affilée et nuits ignorent les rattrapages marqués d'un coup.
-  const liveViewings = useMemo(() => viewings.filter(viewing => !viewing.catchUp), [viewings]);
-  const typicalDay = useMemo(() => buildTypicalDay(yearViewings.filter(viewing => !viewing.catchUp)), [yearViewings]);
+  const liveViewings = useMemo(() => later(1, viewings).filter(viewing => !viewing.catchUp), [viewings, level >= 1]);
+  const typicalDay = useMemo(() => buildTypicalDay(later(1, yearViewings).filter(viewing => !viewing.catchUp)), [yearViewings, level >= 1]);
   const streaks = useMemo(() => buildProfileStreaks(liveViewings, now), [liveViewings]);
-  const appointments = useMemo(() => buildProfileAppointments(liveViewings, now), [liveViewings]);
-  const weeks = useMemo(() => buildWeeklyTrend(viewings, now), [viewings]);
-  const insights = buildProfileInsights(viewings, now, genreOf);
-  const genres = buildGenreShares(yearViewings, now, genreOf);
-  const reactions = useMemo(() => buildProfileReactions(shows), [shows]);
-  const leads = buildLeadActors(yearViewings, shows, leadsOf);
-  const fallbackLeads = data?.topActors.slice(0, 3) ?? [];
-  const badges = useMemo(() => data ? buildTieredBadges({
+  const appointments = useMemo(() => buildProfileAppointments(later(2, liveViewings), now), [liveViewings, level >= 2]);
+  const weeks = useMemo(() => buildWeeklyTrend(later(1, viewings), now), [viewings, level >= 1]);
+  const insights = useMemo(() => buildProfileInsights(later(1, viewings), now, genreOf), [viewings, showsById, contributions, level >= 1]);
+  const genres = useMemo(() => buildGenreShares(later(2, yearViewings), now, genreOf), [yearViewings, showsById, contributions, level >= 2]);
+  const reactions = useMemo(() => level >= 4 ? buildProfileReactions(shows) : null, [shows, level >= 4]);
+  const leads = useMemo(() => buildLeadActors(later(5, yearViewings), shows, leadsOf), [yearViewings, shows, contributions, level >= 5]);
+  const fallbackLeads = level >= 5 ? data?.topActors.slice(0, 3) ?? [] : [];
+  const badges = useMemo(() => data && level >= 5 ? buildTieredBadges({
     centenaire: data.totalEpisodesSeen + data.totalMoviesSeen,
     night_owl: countNightViewings(liveViewings),
     big_screen: data.totalMoviesSeen,
     binge_master: data.completedTvCount,
-  }) : [], [data, liveViewings]);
-  const fateSummary = useMemo(() => summarizeSeriesFate(fate), [fate]);
+  }) : [], [data, liveViewings, level >= 5]);
+  const fateSummary = useMemo(() => summarizeSeriesFate(level >= 4 ? fate : []), [fate, level >= 4]);
   const importNote = formatProfileImportNote(imports, year);
   const scopeNote = formatProfileScopeNote(scope, year);
-  const undatedNote = useMemo(() => formatProfileUndatedNote(countUndatedProfileViewings(shows)), [shows]);
+  const undatedNote = useMemo(() => level >= 5 ? formatProfileUndatedNote(countUndatedProfileViewings(shows)) : null, [shows, level >= 5]);
 
   const isCurrentYear = rolling || year === new Date(now).getFullYear();
   // SEENIT-PROFILE-006 : la période commence au plus tôt le jour où SeenIt a commencé à suivre les visionnages.
@@ -178,13 +182,13 @@ export function ProAnalyticsDashboard({
       </Reveal>
 
       {/* 2. Trois repères */}
-      <Reveal className="moi-tiles" label="Trois repères">
+      {level >= 1 && <Reveal className="moi-tiles" label="Trois repères">
         {() => <>
           <div className="moi-tile moi-pop" style={delay(100)}><span>Rythme</span><strong>{formatProfileHours(rhythm.perWeekMinutes)}</strong><small>par semaine</small>{rhythm.change !== null && <em data-trend={rhythm.change >= 0 ? 'up' : 'down'}>{rhythm.change >= 0 ? '▲' : '▼'} {Math.abs(rhythm.change)} %</em>}</div>
           {typicalDay && <div className="moi-tile moi-pop" style={delay(210)}><span>Journée type</span><strong>{formatProfileHours(typicalDay.minutes)}</strong><small>{typicalDay.titles} {typicalDay.titles > 1 ? 'titres' : 'titre'}</small><em>{typicalDay.days} {typicalDay.days > 1 ? 'jours' : 'jour'}</em></div>}
           <div className="moi-tile moi-pop" style={delay(320)}><span>D’affilée</span><strong>{streaks.current} {streaks.current > 1 ? 'jours' : 'jour'}</strong><small>en cours</small><em>record {streaks.record}</em></div>
         </>}
-      </Reveal>
+      </Reveal>}
 
       {/* 3. Tendances */}
       {weeks.some(week => week.minutes > 0) && <Reveal label="Tendances">
@@ -224,7 +228,7 @@ export function ProAnalyticsDashboard({
       </Reveal>}
 
       {/* 4. Ce que tu regardes */}
-      {stats.minutes > 0 && <Reveal label="Ce que tu regardes">
+      {level >= 2 && stats.minutes > 0 && <Reveal label="Ce que tu regardes">
         {() => <>
           <Head title="Ce que tu regardes" />
           <div className="moi-split moi-grow-x" role="img" aria-label={`Séries ${seriesShare} % du temps, films ${100 - seriesShare} %`} style={delay(100)}>
@@ -242,7 +246,7 @@ export function ProAnalyticsDashboard({
       </Reveal>}
 
       {/* 5. Quand tu regardes */}
-      <Reveal label="Quand tu regardes">
+      {level >= 3 && <Reveal label="Quand tu regardes">
         {() => <>
           <Head title="Quand tu regardes" note={stats.punch.source === 'plex' ? 'heures de lecture Plex' : 'heure des Vu'} />
           <p className="moi-note">{stats.punch.slot ? <>Ton créneau : <b className="moi-glow-text">{formatProfilePunchSlot(stats.punch.slot)}</b></> : 'Les heures apparaissent dès qu’un visionnage est daté à la minute.'}</p>
@@ -261,10 +265,10 @@ export function ProAnalyticsDashboard({
             ))}
           </div>
         </>}
-      </Reveal>
+      </Reveal>}
 
       {/* 6. Où tu regardes */}
-      {stats.minutes > 0 && <Reveal label="Où tu regardes">
+      {level >= 3 && stats.minutes > 0 && <Reveal label="Où tu regardes">
         {() => <>
           <Head title="Où tu regardes" note="part du temps" />
           {stats.platforms.map((platform, index) => (
@@ -310,7 +314,7 @@ export function ProAnalyticsDashboard({
       </Reveal>}
 
       {/* 9. Tes têtes d'affiche */}
-      {(leads.length > 0 || fallbackLeads.length > 0) ? <Reveal label="Tes têtes d’affiche">
+      {level >= 5 && ((leads.length > 0 || fallbackLeads.length > 0) ? <Reveal label="Tes têtes d’affiche">
         {() => <>
           <Head title="Tes têtes d’affiche" note={leads.length > 0 ? 'rôles principaux' : 'titres vus'} />
           {leads.length > 0 ? leads.map((person, index) => (
@@ -327,10 +331,10 @@ export function ProAnalyticsDashboard({
           ))}
           {loading && <small className="moi-note">mise à jour…</small>}
         </>}
-      </Reveal> : loading && <section className="moi-card"><Head title="Tes têtes d’affiche" /><span className="moi-loading"><Loader2 size={13} className="animate-spin text-[#E5A93D]" />Calcul en cours…</span></section>}
+      </Reveal> : loading && <section className="moi-card"><Head title="Tes têtes d’affiche" /><span className="moi-loading"><Loader2 size={13} className="animate-spin text-[#E5A93D]" />Calcul en cours…</span></section>)}
 
       {/* 10. Badges à niveaux */}
-      <Reveal label="Badges">
+      {level >= 5 && <Reveal label="Badges">
         {() => <>
           <Head title="Badges" note="prochain palier" />
           {data ? <div className="moi-badges">
@@ -343,9 +347,9 @@ export function ProAnalyticsDashboard({
             ))}
           </div> : <span className="moi-loading"><Loader2 size={13} className="animate-spin text-[#E5A93D]" />Calcul en cours…</span>}
         </>}
-      </Reveal>
+      </Reveal>}
 
-      {(scopeNote || importNote || undatedNote) && <p className="moi-import">{[scopeNote, importNote, undatedNote].filter(Boolean).join(' · ')}</p>}
+      {level >= 5 && (scopeNote || importNote || undatedNote) && <p className="moi-import">{[scopeNote, importNote, undatedNote].filter(Boolean).join(' · ')}</p>}
     </div>
   );
 }
