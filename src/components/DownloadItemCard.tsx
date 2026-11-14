@@ -8,6 +8,7 @@ import { truncateDownloadProgressPercent } from '../features/downloads/downloadP
 import { downloadGroup, downloadProblem } from '../features/downloads/downloadGroups';
 import { availabilityHint } from '../features/downloads/downloadAvailability';
 import { getReleaseAudio } from '../features/downloads/releaseAudio';
+import { releaseVariantLabel } from '../features/downloads/releaseQuality';
 const AlternativeReleaseModal = lazy(() => import('./AlternativeReleaseModal').then(module => ({ default: module.AlternativeReleaseModal })));
 const DownloadModal = lazy(() => import('./DownloadModal').then(module => ({ default: module.DownloadModal })));
 
@@ -30,9 +31,11 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
   const problem = downloadProblem(item.errorMessage || item.statusText);
   const id = item.tmdbId || library?.tmdbId;
   const audio = getReleaseAudio(item.releaseTitle).label;
-  const scope = isTv ? subTitle : ['Film', item.quality].filter(Boolean).join(' · ');
+  // #293 : la variante choisie (HD Light ou Standard) reste visible dans la file, d'après la release envoyée.
+  const variant = releaseVariantLabel(item.releaseTitle);
+  const scope = isTv ? subTitle : ['Film', item.quality, variant].filter(Boolean).join(' · ');
   // Carte « En cours » v2 (design validé le 09/11) : langues et reçu passent dans le détail déplié.
-  const meta = [isTv ? item.quality : '', item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
+  const meta = [isTv ? item.quality : '', isTv ? variant : '', item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
   const received = item.size > 0 && Number(item.sizeleft) >= 0 ? `${formatBytes(Math.max(0, item.size - Number(item.sizeleft)))} sur ${formatBytes(item.size)}` : '';
   const label = attention ? problem.title : waiting ? (item.availability?.reason === 'no_release' ? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier') : group === 'cancelled' ? 'Annulé' : group === 'completed' ? 'Terminé' : item.importState === 'pending' && progress >= 100 ? 'Transfert terminé · import à confirmer' : item.status === 'searching' ? 'Recherche en cours…' : item.status === 'submitting' ? 'Envoi au client' : item.status === 'stalled' ? 'En attente de sources' : item.status === 'paused' ? 'En pause' : item.status === 'queued' ? 'En file d’attente' : null;
   const showTrack = group === 'active' && !(item.importState === 'pending' && progress >= 100) && (label === null || progress > 0);

@@ -714,6 +714,9 @@ rien si le décompte est inconnu ; jamais « complet ». Sur une fiche **épisod
 épisode précis est sur le serveur (quand la liste est connue), et **Lire** ouvre directement cet épisode
 dans Plex. Ton propre serveur est toujours prioritaire sur un serveur partagé. Les films ne changent pas.
 
+Téléchargements (#293) : le choix de version propose « HD Light · fichier plus léger » ou « Standard · meilleure
+qualité », et chaque carte de la file indique la variante réellement envoyée (HD Light ou Standard).
+
 La section **« Où regarder »** est un repère stable : son titre reste toujours affiché et n'est jamais
 remplacé par un skeleton. Tant que Plex et/ou les diffuseurs TMDB sont en résolution, la fiche utilise le
 libellé unique **« Recherche Plex & streaming… »**. Les diffuseurs résolus sont conservés dans un cache
