@@ -1787,6 +1787,18 @@
           "contains": "SEENIT-COST-001 respecte les clients Plex qui refusent la compression"
         },
         {
+          "file": "tests/responseCompression.test.ts",
+          "contains": "SEENIT-COST-001 les réponses JSON de l’API sont servies en gzip"
+        },
+        {
+          "file": "tests/responseCompression.test.ts",
+          "contains": "SEENIT-COST-001 les assets texte immuables sont servis en gzip avec revalidation"
+        },
+        {
+          "file": "tests/backendDeploymentWorkflow.test.ts",
+          "contains": "SEENIT-COST-001 stage la source Cloud Build dans la région du build avec repli explicite"
+        },
+        {
           "file": "tests/firestoreMigration.test.ts",
           "contains": "SEENIT-COST-001 transfère le quota gratuit vers default sans stockage permanent"
         }

@@ -1907,7 +1907,10 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   connector / Direct VPC hérité tant qu'aucune dépendance privée explicitement validée ne l'exige.
   Après promotion et smoke production, les images Artifact Registry du package `seenit-app` et les
   archives source du bucket Cloud Build sont traitées comme des artefacts régénérables et purgées via
-  un build sans source ; Cloud Run conserve sa copie importée de l'image déployée. Un budget reste une
+  un build sans source ; Cloud Run conserve sa copie importée de l'image déployée. L'archive source est
+  stagée dans un bucket de la région du build (pas de réplication multi-région). Cloud Run ne compressant
+  pas les réponses, le serveur sert en gzip toute réponse JSON `/api` d'au moins 1 Kio et les assets texte
+  hashés du frontend aux clients qui l'acceptent, sans jamais recompresser une réponse déjà encodée. Un budget reste une
   alerte et jamais un hard cap. Toute migration de région exige d'abord la preuve de la localisation
   Firestore afin de ne pas déplacer le coût vers du trafic inter-région. Tant que le listener temps réel
   de la bibliothèque est actif, le cycle normal login/focus/synchronisation ne lance aucun refetch complet

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import express, { type Request, type Response, type Router } from 'express';
+import { acceptsGzip, gzipBuffer, isCompressibleAssetPath } from './responseCompression.ts';
 
 // Les assets Vite de dist/assets portent un hash de contenu : une URL donnée ne change jamais.
 export const SEENIT_HASHED_ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable';
@@ -46,6 +47,31 @@ export function createSeenItFrontendRouter(distPath: string): Router {
   };
 
   router.get(['/', '/index.html'], sendShell);
+
+  // SEENIT-COST-001 : assets hashés immuables, compressés une seule fois puis servis depuis la mémoire.
+  const assetsPath = path.join(distPath, 'assets');
+  const gzippedAssets = new Map<string, { body: Buffer; etag: string } | null>();
+  router.get('/assets/:file', (req, res, next) => {
+    const file = req.params.file;
+    if (!/^[\w.-]+$/.test(file) || !isCompressibleAssetPath(file) || !acceptsGzip(req)) { next(); return; }
+    let entry = gzippedAssets.get(file);
+    if (entry === undefined) {
+      try {
+        const body = gzipBuffer(readFileSync(path.join(assetsPath, file)));
+        entry = { body, etag: computeSeenItContentEtag(body) };
+      } catch {
+        entry = null;
+      }
+      gzippedAssets.set(file, entry);
+    }
+    if (!entry) { next(); return; }
+    res.setHeader('Cache-Control', SEENIT_HASHED_ASSET_CACHE_CONTROL);
+    res.setHeader('ETag', entry.etag);
+    res.vary('Accept-Encoding');
+    if (req.headers['if-none-match'] === entry.etag) { res.status(304).end(); return; }
+    res.setHeader('Content-Encoding', 'gzip');
+    res.type(path.extname(file)).send(entry.body);
+  });
 
   router.use('/assets', express.static(path.join(distPath, 'assets'), {
     index: false,
