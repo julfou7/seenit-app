@@ -1,11 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { readDocText } from './helpers/docText.ts';
 
 const spec = readFileSync('docs/specifications/seenit.md', 'utf8');
 const requirementsSource = readFileSync('docs/specifications/requirements.json', 'utf8');
-const delivery = readFileSync('docs/process/delivery.md', 'utf8');
-const runbook = readFileSync('docs/process/play-protect-sideload.md', 'utf8');
+const delivery = readDocText('docs/process/delivery.md');
+const runbook = readDocText('docs/process/play-protect-sideload.md');
 const contract = JSON.parse(readFileSync('docs/specifications/android-contract.json', 'utf8'));
 
 test('SEENIT-APK-006 distingue la vérification développeur de la réputation Play Protect hors Play', () => {
