@@ -42,6 +42,7 @@ import {
 } from '../features/downloads/downloadLifecycle';
 import { sortDownloadsByAddedAt } from '../features/downloads/downloadPresentation';
 import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
+import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGuard';
 import { getStableDownloadRenderKey } from '../features/downloads/downloadPosterStability';
 import { useTabShortcut } from '../features/navigation/useTabShortcut';
 
@@ -51,6 +52,9 @@ interface Props {
 }
 
 type ViewMode = 'downloads' | 'search';
+
+/** Séries dont les attentes sont en cours de relance (revue Codex #1054 : jamais deux lots concurrents). */
+const retryingSeries = new Set<string>();
 
 export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const {
@@ -265,11 +269,20 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     const { launchArrEpisodeBatch } = await import('../features/downloads/downloadLaunch');
     const seasons = new Map<number, typeof episodes>();
     for (const launch of episodes) seasons.set(launch.season!, [...(seasons.get(launch.season!) || []), launch]);
-    for (const [season, group] of seasons) {
-      const first = group[0];
-      await launchArrEpisodeBatch({ title: first.title, tmdbId: first.tmdbId, tvdbId: first.tvdbId, imdbId: first.imdbId, posterPath: first.posterPath, qualityPreference: first.qualityPreference,
-        season, episodes: group.map(launch => launch.episode!).sort((a, b) => a - b), readConfig: () => useDownloadConfigStore.getState(), skip: () => false,
-        notify: (episode, action, toastType = 'download') => showToast({ title: first.title, subtitle: `S${season} | E${episode}`, action, posterPath: first.posterPath }, toastType) });
+    // Revue Codex #1054 : une seule relance à la fois par série ; un épisode déjà relancé (demande active) est sauté.
+    const seriesKey = String(episodes[0].tmdbId);
+    if (retryingSeries.has(seriesKey)) return;
+    retryingSeries.add(seriesKey);
+    try {
+      for (const [season, group] of seasons) {
+        const first = group[0];
+        await launchArrEpisodeBatch({ title: first.title, tmdbId: first.tmdbId, tvdbId: first.tvdbId, imdbId: first.imdbId, posterPath: first.posterPath, qualityPreference: first.qualityPreference,
+          season, episodes: group.map(launch => launch.episode!).sort((a, b) => a - b), readConfig: () => useDownloadConfigStore.getState(),
+          skip: episode => hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, { mediaType: 'tv', tmdbId: Number(first.tmdbId), seasonNumber: season, episodeNumber: episode }),
+          notify: (episode, action, toastType = 'download') => showToast({ title: first.title, subtitle: `S${season} | E${episode}`, action, posterPath: first.posterPath }, toastType) });
+      }
+    } finally {
+      retryingSeries.delete(seriesKey);
     }
   };
 

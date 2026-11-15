@@ -25,4 +25,7 @@ test('Programmés : une seule carte par série, épisodes demandés depuis SeenI
   assert.match(screen, /const \{ launchArrEpisodeBatch \} = await import\('\.\.\/features\/downloads\/downloadLaunch'\);/);
   assert.match(screen, /season, episodes: group\.map\(launch => launch\.episode!\)\.sort\(\(a, b\) => a - b\)/);
   assert.match(screen, /onRetryWatchingGroup=\{items => void handleRetryWaitingGroup\(items\)\}/);
+  // Revue Codex #1054 : jamais deux lots concurrents, un épisode déjà relancé est sauté.
+  assert.match(screen, /if \(retryingSeries\.has\(seriesKey\)\) return;/);
+  assert.match(screen, /skip: episode => hasActiveDownloadInScope\(useLiveDownloadStore\.getState\(\)\.downloads, \{ mediaType: 'tv', tmdbId: Number\(first\.tmdbId\), seasonNumber: season, episodeNumber: episode \}\)/);
 });
