@@ -15,7 +15,7 @@ import { useBackendHealth } from '../features/settings/serviceHealth';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
-import { cn } from '../lib/utils';
+import { cn, getTodayStr } from '../lib/utils';
 import { CsvImporter } from '../components/CsvImporter';
 import { useToastStore } from '../store/toastStore';
 import { useSyncStore, type PlexSyncStatus } from '../store/syncStore';
@@ -61,7 +61,9 @@ import { usePlexAvailabilityStore } from '../features/plex/plexAvailability';
 import { readUserScopedJson, subscribeUserScopedStorageField, writeUserScopedJson } from '../lib/userIsolation';
 import { resolveNotificationMediaVisual } from '../features/notifications/notificationMedia';
 import { sendMediaReminderNotification } from '../features/notifications/mediaReminderNotification';
-import { buildNotificationTestSample, type NotificationTestType } from '../features/notifications/notificationTestSample';
+import { buildNotificationTestSample } from '../features/notifications/notificationTestSample';
+import { buildTvReleaseNotification } from '../features/notifications/tvReleaseNotification';
+import { getNotificationProvider } from '../features/notifications/notificationProvider';
 const NotificationSettings = registerPlugin<{ open(): Promise<void>; openChannel(options: { channelId: string }): Promise<void> }>('SeenItNotificationSettings');
 
 const STREAMING_PLATFORMS = [
@@ -76,12 +78,6 @@ const STREAMING_PLATFORMS = [
   { id: 239, name: 'Arte', short: 'AR', tile: '#2a1410', ink: '#fdba74' }
 ];
 
-const NOTIFICATION_TESTS: { type: NotificationTestType; label: string; sub: string }[] = [
-  { type: 'release_today_tv', label: 'Test · nouvel épisode', sub: 'Série de ta liste' },
-  { type: 'season_d7', label: 'Test · nouvelle saison', sub: 'Rappel J-7' },
-  { type: 'movie_theater', label: 'Test · sortie au cinéma', sub: 'Film de ta liste' },
-  { type: 'movie_dvd_vod', label: 'Test · sortie DVD / VOD', sub: 'Aperçu, aucune date inventée' },
-];
 
 const describeError = (error: unknown) => error instanceof Error ? error.message : String(error);
 
@@ -105,7 +101,6 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
   const [animatedBadges, setAnimatedBadges] = useAnimatedBadges();
   const [page, setPage] = useState<SettingsPage | null>(null);
   const [confirm, setConfirm] = useState<'logout' | 'plexout' | null>(null);
-  const [showNotificationTests, setShowNotificationTests] = useState(false);
   const [showCsvImport, setShowCsvImport] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>('unknown');
   const [avatarFailed, setAvatarFailed] = useState(false);
@@ -539,52 +534,35 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
     await signOut(auth);
   };
 
-  const triggerTestNotif = async (type: NotificationTestType) => {
-    const sample = buildNotificationTestSample(shows, type);
-    if (!sample) {
-      showToast("🧪 Test · Aucun média du bon type n'est disponible.", "info");
+  // Retour du 15/11 : une seule notification de test, construite par le code du vrai rappel « nouvel épisode »
+  // (même texte, mêmes images, même catégorie, même « ✓ Vu ») sur une série de la liste.
+  const triggerTestNotif = async () => {
+    const sample = buildNotificationTestSample(shows, 'release_today_tv');
+    if (!sample?.episodeSample) {
+      showToast("🧪 Test · Aucune série avec un épisode à voir dans ta liste.", "info");
       return;
     }
-
     try {
-      const mediaVisual = await resolveNotificationMediaVisual(sample.posterUrl, sample.richImageUrl);
-      const sent = await sendMediaReminderNotification(sample.notificationTitle, {
-        body: sample.body,
-        badge: 'https://seenit.app/icon-192.png',
-        ...mediaVisual,
-        summaryText: sample.summaryText,
-        detailText: sample.detailText,
-        allowMarkWatched: sample.allowMarkWatched,
-        showId: sample.show.id,
-        tmdbId: sample.show.tmdbId,
-        mediaType: sample.show.mediaType,
-        season: sample.season,
-        episode: sample.episode,
-        tag: `test_notification_${type}`,
-        renotify: true,
-        vibrate: [150, 80, 150, 80, 250],
-        data: sample.data,
+      const todayStr = getTodayStr();
+      const built = buildTvReleaseNotification({
+        show: sample.show,
+        released: { ...sample.episodeSample, air_date: todayStr },
+        todayStr,
+        provider: getNotificationProvider(sample.show, readUserScopedJson<number[]>(auth.currentUser?.uid, 'platforms', [])),
+        isSpecificReminder: false,
       });
-
+      const mediaVisual = await resolveNotificationMediaVisual(built.iconUrl, built.imageUrl);
+      const sent = await sendMediaReminderNotification(built.title, { ...built.options, ...mediaVisual, tag: 'test_notification_release_today_tv' });
       if (!sent) {
         showToast("🧪 Test · Échec d'envoi de la notification.", "error");
         return;
       }
-
-      const hasVisual = Boolean(mediaVisual.icon || mediaVisual.image);
-      const testMode = sample.isUpcoming ? 'prochain événement' : 'Aperçu';
-      showToast(
-        hasVisual
-          ? `🧪 Test · ${testMode} avec visuel : ${sample.show.title}`
-          : `🧪 Test · ${testMode} · fallback texte : ${sample.show.title}`,
-        hasVisual ? 'success' : 'info'
-      );
+      showToast(`🧪 Test · notification envoyée : ${sample.show.title}`, 'success');
     } catch (error) {
       appLogger.warn('system', 'Test de notification impossible', error);
       showToast("🧪 Test · Impossible d'envoyer la notification.", "error");
     }
   };
-
   const handleCheckUpdates = async () => {
     showToast("Vérification des mises à jour...", "info");
     try {
@@ -930,11 +908,8 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
             </SettingsGroup>
           )}
           <SettingsGroup>
-            <SettingsRow icon={FlaskConical} label="Envoyer une notification test" sub="Avec un titre de ta liste" chevron={false}
-              expanded={showNotificationTests} onClick={() => setShowNotificationTests(value => !value)} />
-            {showNotificationTests && NOTIFICATION_TESTS.map(test => (
-              <SettingsRow key={test.type} label={test.label} sub={test.sub} chevron={false} onClick={() => void triggerTestNotif(test.type)} />
-            ))}
+            <SettingsRow icon={FlaskConical} label="Envoyer une notification test" sub="Nouvel épisode d’une série de ta liste" chevron={false}
+              onClick={() => void triggerTestNotif()} />
           </SettingsGroup>
         </>
       ),

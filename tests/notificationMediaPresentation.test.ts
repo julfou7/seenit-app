@@ -20,7 +20,7 @@ test('SEENIT-NOTIFICATION-002 affiche un visuel média et aucun emoji textuel', 
   assert.match(reminderSource, /resolveNotificationMediaVisual\(iconUrl, tvImageUrl\)/,
     'les séries doivent préparer affiche et visuel épisode avant la notification');
 
-  assert.match(reminderSource, /episodeCopy\.summaryText/,
+  assert.match(reminderSource, /built\.options\.summaryText/,
     'le titre média reste séparé du contexte détaillé du nouvel épisode');
   assert.match(reminderSource, /buildTvSeasonReminderSummary\(upcoming\)/,
     'le rappel saison doit construire un contexte qui contient son numéro');

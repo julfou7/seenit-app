@@ -196,12 +196,16 @@ test('SEENIT-NOTIFICATION-002 TNR #106 : une affiche absente reste absente', () 
 test('SEENIT-NOTIFICATION-005 TNR #106 : Settings réutilise le pipeline natif', () => {
   const source = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
 
-  assert.match(source, /buildNotificationTestSample\(shows, type\)/);
-  assert.match(source, /resolveNotificationMediaVisual\(sample\.posterUrl, sample\.richImageUrl\)/);
-  assert.match(source, /const sent = await sendMediaReminderNotification\(sample\.notificationTitle/);
-  assert.match(source, /const hasVisual = Boolean\(mediaVisual\.icon \|\| mediaVisual\.image\)/);
+  // Retour du 15/11 : le test choisit la série puis passe par le code du vrai rappel « nouvel épisode ».
+  assert.match(source, /buildNotificationTestSample\(shows, 'release_today_tv'\)/);
+  assert.match(source, /buildTvReleaseNotification\(\{/);
+  assert.match(source, /resolveNotificationMediaVisual\(built\.iconUrl, built\.imageUrl\)/);
+  assert.match(source, /const sent = await sendMediaReminderNotification\(built\.title, \{ \.\.\.built\.options/);
   assert.match(source, /🧪 Test ·/);
-  assert.match(source, /fallback texte/);
-  assert.match(source, /allowMarkWatched: sample\.allowMarkWatched/);
   assert.doesNotMatch(source, /\bsendNativeNotification\b/);
+  assert.doesNotMatch(source, /NOTIFICATION_TESTS|triggerTestNotif\(test\.type\)/, 'une seule notification de test');
+  // Le vrai rappel passe par la même construction.
+  const hook = readFileSync('src/hooks/useRemindersNotifier.ts', 'utf8');
+  assert.match(hook, /const built = buildTvReleaseNotification\(\{ show: s, released: upcoming, todayStr, provider, isSpecificReminder: Boolean\(isSpecificReminder\) \}\);/);
+  assert.match(hook, /sendMediaReminderNotification\(built\.title, \{ \.\.\.built\.options, \.\.\.builtVisual, tag: notificationTag, scheduleDate \}\)/);
 });
