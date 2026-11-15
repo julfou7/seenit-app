@@ -156,6 +156,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   );
   const waitingDownloads = useMemo(() => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'active' && isPreTransferRequest(item)), 'asc'), [downloads]);
   const watchedRequests = useMemo(() => sortDownloadsByAddedAt(downloads.filter(isWatchedWaitingRequest), 'asc'), [downloads]);
+  // Retour terrain du 15/11 : ce qui est déjà en cours ou en recherche n'est pas répété dans « Programmés ».
+  const queuedDownloads = useMemo(() => [...activeDownloads, ...waitingDownloads], [activeDownloads, waitingDownloads]);
   const cancelledDownloads = useMemo(
     () => sortDownloadsByAddedAt(downloads.filter(item => downloadGroup(item) === 'cancelled'), 'desc'),
     [downloads]
@@ -448,7 +450,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
             {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
-            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} onRemoveWatching={handleRemove} />}
+            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} />}
             <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
             {/* SEENIT-DOWNLOAD-023 : ni téléchargés ni programmés — aucun titre de Sonarr/Radarr invisible. */}
             <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />
