@@ -7,7 +7,7 @@ import { getPlexSyncRetryAt } from '../features/plex/plexSyncRetry';
 import { useEffect, useRef } from 'react';
 import { reconcileArchive, reconcileSeriesStatus, selectFinishedShowsToRecheck } from '../features/shows/seriesRevival';
 import { buildSeasonProgressEvidence, needsSeasonProgressRefresh, hasSeasonReleaseDue } from '../features/shows/seasonProgressEvidence';
-import { mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
+import { readEffectiveNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { lastAutoSyncRun, writeAutoSyncRun } from '../lib/autoSyncThrottle';
 import { db, auth, sendNativeNotification } from '../lib/firebase';
@@ -402,7 +402,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         // Retour terrain du 15/11 (#443) : l'actualité développée montre l'image paysage de la série, l'affiche
         // reste la vignette ; sans image paysage connue, l'affiche entière reste le repli.
         const newsVisual = buildNewsNotificationVisual(showToSync.posterPath, showToSync.backdropPath || details.backdrop_path);
-        const allowNews = mergeNotificationPreferences(readUserScopedJson(userUid, 'notifications', null)).news
+        const allowNews = readEffectiveNotificationPreferences(readUserScopedJson(userUid, 'notifications', null), Capacitor.getPlatform()).news
           && !showToSync.isArchived && showToSync.status !== 'dropped' && showToSync.notificationsEnabled !== false;
         // Notification pour les saisons renouvelées
         if (allowNews && showToSync.tmdbStatus && (showToSync.tmdbStatus === 'Ended' || showToSync.tmdbStatus === 'Canceled') && details.status === 'Returning Series') {
@@ -694,7 +694,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
         series_ended: isEnded
       };
     } else {
-      const futureEpisodes: any[] = [];
+      const futureEpisodes: Array<Record<string, unknown> & { season_number: number; episode_number: number; air_date: string }> = [];
       for (const s of seasonsCache) {
         for (const ep of s.episodes || []) {
           if (ep.air_date && ep.air_date >= todayStr) {

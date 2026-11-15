@@ -7,9 +7,9 @@ import { effectiveNotificationPreferences, mergeNotificationPreferences, readEff
 
 test('SEENIT-NOTIFICATION-006 #402 sur Android, les canaux système sont la seule autorité des rappels', () => {
   const stored = { release_today_tv: false, season_d7: false, movie_theater: false, movie_dvd_vod: false, news: false };
-  // Android : les anciens « non » ne filtrent plus (le canal décide), les actualités restent un choix SeenIt.
+  // Android : les anciens « non » ne filtrent plus (la catégorie décide), actualités comprises depuis le 15/11.
   assert.deepEqual(readEffectiveNotificationPreferences(stored, 'android'),
-    { release_today_tv: true, season_d7: true, movie_theater: true, movie_dvd_vod: true, news: false });
+    { release_today_tv: true, season_d7: true, movie_theater: true, movie_dvd_vod: true, news: true });
   // PWA et web : les interrupteurs SeenIt restent l'autorité.
   assert.deepEqual(readEffectiveNotificationPreferences(stored, 'web'), stored);
   assert.deepEqual(effectiveNotificationPreferences(mergeNotificationPreferences(stored), false), stored);
@@ -20,9 +20,13 @@ test('SEENIT-NOTIFICATION-006 #402 sur Android, les canaux système sont la seul
     assert.doesNotMatch(source, /mergeNotificationPreferences\(/, file);
   }
   const settings = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
-  assert.match(settings, /\{isAndroid \? \(\s*<SettingsGroup title="Séries et films"/);
-  assert.match(settings, /channelId: 'seenit_episodes'[^\n]*label: 'Épisodes et saisons'/);
-  assert.match(settings, /channelId: 'seenit_movies'[^\n]*label: 'Films'/);
+  // Décision du 15/11 (« fais simple ») : une seule ligne Android ouvre la page des catégories SeenIt.
+  assert.match(settings, /\{isAndroid \? \(\s*<SettingsGroup foot="Son, vibration ou coupure, type par type\.">\s*<SettingsRow icon=\{Smartphone\} label="Catégories de notification"[^>]*\s*onClick=\{\(\) => \{ void NotificationSettings\.open\(\)/);
+  assert.doesNotMatch(settings, /ANDROID_MEDIA_CHANNELS|label="Réglages Android"/);
+  assert.match(settings, /\{!isAndroid && \(\s*<SettingsGroup title="Autres alertes" foot="Réglées par le navigateur\.">/);
+  // Les actualités suivent aussi la plateforme : catégorie Android, interrupteur en PWA.
+  const worker = readFileSync('src/hooks/useDetailsSyncWorker.ts', 'utf8');
+  assert.match(worker, /readEffectiveNotificationPreferences\(readUserScopedJson\(userUid, 'notifications', null\), Capacitor\.getPlatform\(\)\)\.news/);
 });
 import { isObsoleteMediaAlert, isSameVisibleMediaAlert } from '../src/features/notifications/notificationLifecycle.ts';
 import { buildTvEpisodeReminderCopy } from '../src/features/notifications/tvReminderCopy.ts';

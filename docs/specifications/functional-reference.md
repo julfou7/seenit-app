@@ -1163,11 +1163,11 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
   gardé 30 jours ; pastille de secours si un logo manque), un toucher par plateforme ;
 - **Notifications** (nombre activé, rappels à 09:00) → état réel de l'autorisation sur l'appareil avec
   « Autoriser les notifications », interrupteurs Séries (nouvel épisode, nouvelle saison J-7,
-  actualités) et Films (cinéma, DVD/VOD) en PWA ; dans l'APK Android (#402), ces quatre interrupteurs
-  sont remplacés par les canaux système « Épisodes et saisons » et « Films » (chaque ligne ouvre son
-  canal), l'interrupteur Actualités restant, puis **Autres alertes** sans préférence SeenIt (Rappels,
-  Téléchargements et Plex, Mise à jour de SeenIt) : chaque ligne ouvre son canal Android, réglages
-  Android, et « Envoyer une notification test » qui déplie les quatre tests existants. Dans les
+  actualités) et Films (cinéma, DVD/VOD) en PWA, puis **Autres alertes** réglées par le navigateur ;
+  dans l'APK Android (#402, simplifié le 15/11), une seule ligne « Catégories de notification » ouvre la
+  page Android des catégories SeenIt, où chaque type se coupe ou se règle (épisodes et saisons, films,
+  actualités, rappels, téléchargements, mises à jour) : aucun interrupteur SeenIt n'y filtre plus, les
+  actualités comprises. « Envoyer une notification test » déplie les quatre tests existants. Dans les
   catégories de notification Android de l'APK (ménage du 15/11), la catégorie de secours de Firebase
   « Miscellaneous » est supprimée au démarrage ; Firebase la recrée seulement si une notification serveur
   arrive avant sa catégorie SeenIt. Celle de la bibliothèque de notifications, recréée à chaque démarrage,
