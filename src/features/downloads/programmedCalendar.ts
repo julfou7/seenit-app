@@ -6,8 +6,8 @@ import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
 
 type DownloadConfig = ReturnType<typeof useDownloadConfigStore.getState>;
 type ArrImage = { coverType?: string; remoteUrl?: string; url?: string };
-type CalendarEpisode = { id?: number; seriesId?: number; seasonNumber?: number; episodeNumber?: number; title?: string; airDateUtc?: string; airDate?: string; monitored?: boolean; hasFile?: boolean; series?: { title?: string; tmdbId?: number; tvdbId?: number; monitored?: boolean; qualityProfileId?: number; images?: ArrImage[] } };
-type CalendarMovie = { id?: number; title?: string; tmdbId?: number; monitored?: boolean; hasFile?: boolean; isAvailable?: boolean; qualityProfileId?: number; digitalRelease?: string; physicalRelease?: string; inCinemas?: string; images?: ArrImage[] };
+type CalendarEpisode = { id?: number; seriesId?: number; seasonNumber?: number; episodeNumber?: number; title?: string; airDateUtc?: string; airDate?: string; monitored?: boolean; hasFile?: boolean; series?: { title?: string; tmdbId?: number; tvdbId?: number; monitored?: boolean; qualityProfileId?: number; images?: ArrImage[]; added?: string } };
+type CalendarMovie = { id?: number; title?: string; tmdbId?: number; monitored?: boolean; hasFile?: boolean; isAvailable?: boolean; qualityProfileId?: number; digitalRelease?: string; physicalRelease?: string; inCinemas?: string; images?: ArrImage[]; added?: string };
 
 /** Retour terrain du 08/11 : la date d'un film dit de quelle sortie il s'agit (seule une version numérique ou
  * physique se télécharge ; une sortie au cinéma seule ne donne pas encore de version). */
@@ -20,8 +20,8 @@ export type ProgrammedQuality = string;
  * propriétaire du 09/11, `USR-2026-11-09-009`). `inCinemasPast` : film sorti en salle sans date numérique connue.
  */
 export type ProgrammedItem =
-  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean }
-  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; inCinemasPast?: boolean };
+  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; addedAt?: number }
+  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; inCinemasPast?: boolean; addedAt?: number };
 
 /** `movieQuality` : libellé de qualité d'un profil Radarr de ce serveur (revue Codex #933 : films ajoutés hors calendrier). */
 export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[]; movieQuality?: (profileId?: number) => ProgrammedQuality | undefined }
@@ -58,6 +58,8 @@ const readProfiles = async (io: CalendarIo, url: string, apiKey: string): Promis
 };
 const headersFor = (apiKey: string) => ({ 'X-Api-Key': apiKey, 'Content-Type': 'application/json', Accept: 'application/json' });
 const iso = (time: number) => new Date(time).toISOString();
+/** Date d'ajout dans Sonarr (série) ou Radarr (film), pour l'ordre « ajouté récemment » (retour du 15/11). */
+const addedAt = (value?: string) => { const time = value ? Date.parse(value) : NaN; return Number.isFinite(time) ? { addedAt: time } : {}; };
 /** Page `wanted/missing` (Sonarr v4, Radarr v5) : `{ records: [...] }` ; toute autre réponse est une panne. */
 const wantedRecords = <T,>(page: unknown): T[] | null => {
   const records = (page as { records?: unknown } | null)?.records;
@@ -92,7 +94,7 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
         seen.add(entry.id);
         const profileId = Number(entry.series?.qualityProfileId) || undefined;
         const date = entry.airDateUtc || entry.airDate;
-        result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }), ...(date && Date.parse(date) < now ? { wanted: true } : {}) });
+        result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }), ...(date && Date.parse(date) < now ? { wanted: true } : {}), ...addedAt(entry.series?.added) });
       }
     }, () => { result.failures.push('Sonarr'); }));
   }
@@ -113,7 +115,7 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
         const profileId = Number(movie.qualityProfileId) || undefined;
         // Sans sortie à venir : disponible selon Radarr → recherché ; sinon sorti en salle, version pas encore annoncée.
         const extra = release.date ? {} : movie.isAvailable === true ? { wanted: true } : release.inCinemasPast ? { inCinemasPast: true } : {};
-        result.items.push({ kind: 'movie', id: movie.id, tmdbId: movie.tmdbId || undefined, title: movie.title || 'Film', date: release.date, dateKind: release.kind, posterUrl: poster(movie.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.radarr1080pProfileId, uhd: config.radarr4kProfileId }), ...extra });
+        result.items.push({ kind: 'movie', id: movie.id, tmdbId: movie.tmdbId || undefined, title: movie.title || 'Film', date: release.date, dateKind: release.kind, posterUrl: poster(movie.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.radarr1080pProfileId, uhd: config.radarr4kProfileId }), ...extra, ...addedAt(movie.added) });
       }
     }, () => { result.failures.push('Radarr'); }));
   }
