@@ -11,14 +11,17 @@ test('#664 Relancer la recherche d’une attente : même identité TMDB, même p
     { mediaType: 'tv', title: 'Dexter : Résurrection', tmdbId: 259909, tvdbId: 4, imdbId: undefined, posterPath: '/p.jpg', season: 2, episode: 1, qualityPreference: '4k' });
   const movie = waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'La Guerre des mondes', movieTitle: 'La Guerre des mondes', tmdbId: 755898, quality: '1080p' });
   assert.deepEqual([movie?.title, movie?.season, movie?.episode, movie?.qualityPreference], ['La Guerre des mondes', undefined, undefined, '1080p']);
+  // Revue Codex #1051 : attente créée depuis la fiche, qualité gardée seulement dans le titre de release.
+  assert.equal(waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'Film', movieTitle: 'Film', tmdbId: 7, releaseTitle: 'Film • 4K' })?.qualityPreference, '4k');
+  assert.equal(waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'Film', movieTitle: 'Film', tmdbId: 7 }), null, 'qualité inconnue : jamais devinée');
   // Sans identité TMDB ou hors attente : rien n'est relancé, jamais de recherche par titre.
-  assert.equal(waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'Sans identité' }), null);
-  assert.equal(waitingRetryLaunch({ ...base, status: 'downloading', mediaType: 'movie', title: 'En cours', tmdbId: 1 }), null);
+  assert.equal(waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'Sans identité', quality: '4K' }), null);
+  assert.equal(waitingRetryLaunch({ ...base, status: 'downloading', mediaType: 'movie', title: 'En cours', tmdbId: 1, quality: '4K' }), null);
 
   // Câblage réel : menu ⋯ de la carte en attente → lancement de la fiche (qui remplace l'attente du même périmètre).
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
   assert.match(section, /\{onRetry && <button type="button" disabled=\{busy !== null\} onClick=\{onRetry\}><RotateCw size=\{15\} aria-hidden="true" \/>Relancer la recherche<\/button>\}/);
-  assert.match(section, /onRetryWatching \? \(\) => \{ setMenu\(null\); onRetryWatching\(entry\); \} : undefined/);
+  assert.match(section, /onRetryWatching && waitingRetryLaunch\(entry\) \? \(\) => \{ setMenu\(null\); onRetryWatching\(entry\); \} : undefined/);
   const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
   assert.match(screen, /const launch = waitingRetryLaunch\(item\);[\s\S]*?await launchArrDownload\(\{ \.\.\.launch, config: useDownloadConfigStore\.getState\(\)/);
   assert.match(screen, /onRetryWatching=\{item => void handleRetryWaiting\(item\)\}/);

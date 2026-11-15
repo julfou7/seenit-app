@@ -5,6 +5,7 @@ import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useShowsStore } from '../store/showsStore';
 import { hideSeenWanted, seenWatchedRequest } from '../features/downloads/wantedSeen';
+import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
 import { changeProgrammedQuality, dayTime, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
@@ -214,7 +215,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const radarrId = item?.kind === 'movie' ? item.id : details?.id;
     cards.push({ key: `w${entry.id}`, addedAt: Number(entry.addedAt) || undefined, data: { 'data-programmed-request': entry.id }, name, isTv, poster: posterUrl(entry.posterPath), meta: meta(requestScope(entry), quality), pill,
       open: () => entry.tmdbId && onShowClick?.(entry.tmdbId, entry.mediaType), canOpen: Boolean(entry.tmdbId && onShowClick),
-      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }, undefined, onRetryWatching ? () => { setMenu(null); onRetryWatching(entry); } : undefined) : null });
+      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }, undefined, onRetryWatching && waitingRetryLaunch(entry) ? () => { setMenu(null); onRetryWatching(entry); } : undefined) : null });
   }
   for (const group of series.values()) {
     const first = group[0];

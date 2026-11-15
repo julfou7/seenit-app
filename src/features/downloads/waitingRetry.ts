@@ -10,6 +10,11 @@ import type { ArrDownloadLaunch } from './downloadLaunch';
  */
 export function waitingRetryLaunch(item: LiveDownloadItem): Omit<ArrDownloadLaunch, 'config' | 'notify'> | null {
   if (item.status !== 'waiting' || !(Number(item.tmdbId) > 0)) return null;
+  // Revue Codex #1051 : une attente créée depuis la fiche garde sa qualité dans `releaseTitle` (« … • 4K ») ;
+  // une qualité inconnue n'est jamais devinée (relancer en 1080p remplacerait le profil 4K du média).
+  const qualityText = item.quality || item.releaseTitle || '';
+  const qualityPreference = /4k|2160/i.test(qualityText) ? '4k' as const : /1080/.test(qualityText) ? '1080p' as const : null;
+  if (!qualityPreference) return null;
   const isTv = item.mediaType === 'tv';
   const season = isTv && Number.isFinite(item.seasonNumber) ? Number(item.seasonNumber) : undefined;
   return {
@@ -21,6 +26,6 @@ export function waitingRetryLaunch(item: LiveDownloadItem): Omit<ArrDownloadLaun
     posterPath: item.posterPath,
     season,
     episode: season !== undefined && Number.isFinite(item.episodeNumber) ? Number(item.episodeNumber) : undefined,
-    qualityPreference: /4k|2160/i.test(item.quality || '') ? '4k' : '1080p',
+    qualityPreference,
   };
 }
