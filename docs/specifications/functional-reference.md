@@ -1000,7 +1000,9 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   sur 515,7 Go »), et toujours dans Réglages → Connexions (une ligne par disque, rouge sous 2 Go). Depuis la
   v1.4.319, un même disque vu par Sonarr et Radarr (même lecteur, même taille totale) n'apparaît qu'une fois, et une
   carte « À régler » qui parle d'indexers propose « Retester les indexers » : Sonarr/Radarr retestent tous leurs
-  indexers (ceux qui répondent sont réactivés) et SeenIt nomme ceux qui restent en échec, à réparer dans Prowlarr. Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
+  indexers (ceux qui répondent sont réactivés) et SeenIt nomme ceux qui restent en échec, à réparer dans Prowlarr.
+  Depuis la v1.4.320, un épisode recherché par Sonarr a un bouton « Relancer la recherche » sur sa ligne, et un film
+  recherché l'a dans son menu ⋯ (même chemin que la fiche, qualité affichée, jamais en double). Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
   les épisodes demandés depuis SeenIt la rejoignent (sorties à venir puis recherchés) et gardent leur demande (✕ d'une
   ligne = annuler l'attente, « Relancer la recherche » dans ⋯). La section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni

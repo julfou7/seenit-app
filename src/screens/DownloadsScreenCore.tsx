@@ -1,7 +1,7 @@
 import { DialogLayer } from '../components/ui/DialogLayer';
 import { DownloadItemCard } from '../components/DownloadItemCard';
 import { SeasonDownloadCard } from '../components/SeasonDownloadCard';
-import { ProgrammedSection } from '../components/ProgrammedSection';
+import { ProgrammedSection, type ProgrammedSearchTarget } from '../components/ProgrammedSection';
 import { RecentImportsRail, useRecentImports, useUndecidedTitles } from '../components/RecentImportsRail';
 import { coveredByRecentImport } from '../features/downloads/recentImports';
 import { undecidedOutsideQueue } from '../features/downloads/arrCoverage';
@@ -56,6 +56,8 @@ type ViewMode = 'downloads' | 'search';
 
 /** Séries dont les attentes sont en cours de relance (revue Codex #1054 : jamais deux lots concurrents). */
 const retryingSeries = new Set<string>();
+/** Recherchés de Programmés en cours de relance, par périmètre (revue Codex #1061). */
+const searchingProgrammed = new Set<string>();
 
 export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const {
@@ -259,6 +261,29 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     if (!launch) return;
     const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
     await launchArrDownload({ ...launch, config: useDownloadConfigStore.getState(), notify: (action, toastType = 'download') => showToast({ title: launch.title, action, posterPath: item.posterPath }, toastType) });
+  };
+
+  // Retour terrain du 15/11 (« relancer le E01 en premier, impossible ») : un recherché de Sonarr/Radarr se relance
+  // depuis Programmés par le chemin de la fiche (même identité TMDB, même périmètre, qualité affichée).
+  const handleSearchProgrammed = async (target: ProgrammedSearchTarget) => {
+    const qualityPreference = /4k|2160/i.test(target.quality || '') ? '4k' as const : /1080/.test(target.quality || '') ? '1080p' as const : null;
+    if (!qualityPreference) { showToast({ title: target.title, action: 'Qualité inconnue : utilise « Choisir une version ».', posterPath: target.posterPath }, 'info'); return; }
+    if (hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, { mediaType: target.mediaType, tmdbId: target.tmdbId, seasonNumber: target.season, episodeNumber: target.episode })) {
+      showToast({ title: target.title, action: 'Déjà en cours de téléchargement.', posterPath: target.posterPath }, 'info');
+      return;
+    }
+    // Revue Codex #1061 : verrou synchrone par périmètre avant tout `await` — deux appuis rapprochés ne lancent qu'une recherche.
+    const scopeKey = [target.mediaType, target.tmdbId, target.season ?? '', target.episode ?? ''].join(':');
+    if (searchingProgrammed.has(scopeKey)) return;
+    searchingProgrammed.add(scopeKey);
+    try {
+      const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
+      await launchArrDownload({ config: useDownloadConfigStore.getState(), mediaType: target.mediaType, title: target.title, tmdbId: target.tmdbId, tvdbId: target.tvdbId, posterPath: target.posterPath,
+        season: target.season, episode: target.episode, qualityPreference,
+        notify: (action, toastType = 'download') => showToast({ title: target.title, subtitle: target.season !== undefined && target.episode !== undefined ? `S${target.season} | E${target.episode}` : undefined, action, posterPath: target.posterPath }, toastType) });
+    } finally {
+      searchingProgrammed.delete(scopeKey);
+    }
   };
 
   // Retour du 15/11 (v1.4.318) : retester les indexers de Sonarr/Radarr depuis la carte, résultat nommé.
@@ -518,7 +543,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
             {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
-            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} onRetryWatching={item => void handleRetryWaiting(item)} onRetryWatchingGroup={items => void handleRetryWaitingGroup(items)} onForgetWatching={removeDownload} />}
+            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} onRetryWatching={item => void handleRetryWaiting(item)} onRetryWatchingGroup={items => void handleRetryWaitingGroup(items)} onForgetWatching={removeDownload} onSearchProgrammed={target => void handleSearchProgrammed(target)} />}
             <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
             {/* SEENIT-DOWNLOAD-023 : ni téléchargés ni programmés — aucun titre de Sonarr/Radarr invisible. */}
             <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />
