@@ -174,7 +174,9 @@ export async function sendMediaReminderNotification(
       largeBody: detailText || options.body || '',
       // BigPicture utilise encore summaryText pour le texte développé ; le type
       // passe désormais exclusivement par subText.
-      summaryText: attachments && detailText ? detailText : undefined,
+      // Retour terrain du 15/11 (Actualité « Loups garous ») : sans détail, le corps reste lisible une fois
+      // la notification développée en BigPicture au lieu de ne laisser que le titre.
+      summaryText: attachments ? (detailText || options.body || undefined) : undefined,
       subText: options.summaryText,
       id: resolvedId,
       ...(schedule ? { schedule } : {}),
