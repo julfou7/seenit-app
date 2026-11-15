@@ -56,6 +56,8 @@ type ViewMode = 'downloads' | 'search';
 
 /** Séries dont les attentes sont en cours de relance (revue Codex #1054 : jamais deux lots concurrents). */
 const retryingSeries = new Set<string>();
+/** Recherchés de Programmés en cours de relance, par périmètre (revue Codex #1061). */
+const searchingProgrammed = new Set<string>();
 
 export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const {
@@ -270,10 +272,18 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
       showToast({ title: target.title, action: 'Déjà en cours de téléchargement.', posterPath: target.posterPath }, 'info');
       return;
     }
-    const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
-    await launchArrDownload({ config: useDownloadConfigStore.getState(), mediaType: target.mediaType, title: target.title, tmdbId: target.tmdbId, tvdbId: target.tvdbId, posterPath: target.posterPath,
-      season: target.season, episode: target.episode, qualityPreference,
-      notify: (action, toastType = 'download') => showToast({ title: target.title, subtitle: target.season !== undefined && target.episode !== undefined ? `S${target.season} | E${target.episode}` : undefined, action, posterPath: target.posterPath }, toastType) });
+    // Revue Codex #1061 : verrou synchrone par périmètre avant tout `await` — deux appuis rapprochés ne lancent qu'une recherche.
+    const scopeKey = [target.mediaType, target.tmdbId, target.season ?? '', target.episode ?? ''].join(':');
+    if (searchingProgrammed.has(scopeKey)) return;
+    searchingProgrammed.add(scopeKey);
+    try {
+      const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
+      await launchArrDownload({ config: useDownloadConfigStore.getState(), mediaType: target.mediaType, title: target.title, tmdbId: target.tmdbId, tvdbId: target.tvdbId, posterPath: target.posterPath,
+        season: target.season, episode: target.episode, qualityPreference,
+        notify: (action, toastType = 'download') => showToast({ title: target.title, subtitle: target.season !== undefined && target.episode !== undefined ? `S${target.season} | E${target.episode}` : undefined, action, posterPath: target.posterPath }, toastType) });
+    } finally {
+      searchingProgrammed.delete(scopeKey);
+    }
   };
 
   // Retour du 15/11 (v1.4.318) : retester les indexers de Sonarr/Radarr depuis la carte, résultat nommé.

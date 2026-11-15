@@ -16,4 +16,7 @@ test('Programmés : un épisode ou un film recherché se relance, par le chemin 
   assert.match(screen, /if \(hasActiveDownloadInScope\(useLiveDownloadStore\.getState\(\)\.downloads, \{ mediaType: target\.mediaType, tmdbId: target\.tmdbId, seasonNumber: target\.season, episodeNumber: target\.episode \}\)\)/);
   assert.match(screen, /await launchArrDownload\(\{ config: useDownloadConfigStore\.getState\(\), mediaType: target\.mediaType, title: target\.title, tmdbId: target\.tmdbId/);
   assert.match(screen, /onSearchProgrammed=\{target => void handleSearchProgrammed\(target\)\}/);
+  // Revue Codex #1061 : verrou posé avant le premier `await`, levé à la fin.
+  assert.match(screen, /if \(searchingProgrammed\.has\(scopeKey\)\) return;\n\s+searchingProgrammed\.add\(scopeKey\);\n\s+try \{\n\s+const \{ launchArrDownload \} = await import/);
+  assert.match(screen, /\} finally \{\n\s+searchingProgrammed\.delete\(scopeKey\);/);
 });
