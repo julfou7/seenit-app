@@ -115,4 +115,6 @@ export const executeGet = async (url: string) => {
 };
 // Recherche de versions (disque plein, retour du 15/11) : même faux serveur que les lectures ordinaires.
 export const executeArrInteractiveGet = (url: string) => executeGet(url);
+// « Retester les indexers » (retour du 15/11) : aucun appel réseau réel dans le smoke.
+export const executePost = async () => { throw new Error('réseau réel interdit'); };
 export const executePut = async (url: string, body: { monitored?: boolean; qualityProfileId?: number }) => { if (body.monitored === false) telemetry.unmonitored.push(url); if (body.qualityProfileId) telemetry.qualities.push(`${url}:${body.qualityProfileId}`); return body; };

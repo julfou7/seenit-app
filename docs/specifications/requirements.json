@@ -1824,6 +1824,10 @@
           "contains": "Programmés : jour de diffusion de la chaîne, et disque plein prouvé par les règles de Sonarr/Radarr"
         },
         {
+          "file": "tests/indexerRetest.test.ts",
+          "contains": "retester les indexers : test lancé, indexers encore en échec nommés, aucun réglage modifié"
+        },
+        {
           "file": "tests/episodeProgramming.test.ts",
           "contains": "SEENIT-DOWNLOAD-014 #879 programmer surveille seulement les épisodes à venir demandés, sans rien rechercher"
         },
