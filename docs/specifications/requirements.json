@@ -3978,7 +3978,7 @@
         },
         {
           "file": "tests/reglagesMoi.test.ts",
-          "contains": "SEENIT-NOTIFICATION-006 les Réglages ouvrent le canal Android exact, limité aux canaux SeenIt"
+          "contains": "SEENIT-NOTIFICATION-006 les Réglages ouvrent la page des catégories Android ; le bridge reste limité aux canaux SeenIt"
         }
       ]
     },

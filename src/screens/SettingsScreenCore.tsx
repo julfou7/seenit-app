@@ -91,11 +91,6 @@ const ANDROID_ALERTS = [
   { channelId: 'seenit_downloads', icon: DownloadMark, label: 'Téléchargements et Plex', sub: 'Import terminé, disponible dans Plex, échec' },
   { channelId: 'seenit_updates', icon: Package, label: 'Mise à jour de SeenIt', sub: 'Nouvelle version disponible ou téléchargée' },
 ] as const;
-// #402 : sur Android, ces canaux remplacent les quatre interrupteurs Séries/Films (épisode, saison, cinéma, VOD).
-const ANDROID_MEDIA_CHANNELS = [
-  { channelId: 'seenit_episodes', icon: Tv, label: 'Épisodes et saisons', sub: 'Nouvel épisode le jour J, nouvelle saison 7 jours avant' },
-  { channelId: 'seenit_movies', icon: Film, label: 'Films', sub: 'Sortie au cinéma et en DVD / VOD, le jour J' },
-] as const;
 
 type SettingsPage = 'plats' | 'notifs' | 'plex' | 'devices' | 'compte' | 'app';
 type NotificationPermissionState = 'granted' | 'denied' | 'prompt' | 'unknown';
@@ -900,7 +895,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
         <>
           {notificationPermission === 'granted' ? (
             <SettingsCard tile={<Check size={20} strokeWidth={3} />} tone="ok" title={`Autorisées sur ${devicePlace}`}
-              sub={isAndroid ? 'Son, vibration et masquage se règlent par type dans Android.' : 'Le navigateur affiche les rappels même app fermée.'}
+              sub={isAndroid ? 'Chaque type se coupe ou se règle dans les catégories Android.' : 'Le navigateur affiche les rappels même app fermée.'}
               status="Rappels envoyés à 09:00" />
           ) : (
             <SettingsCard tile={<Bell size={20} />} tone={notificationPermission === 'denied' ? 'error' : undefined}
@@ -910,14 +905,13 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
               <button type="button" className="reg-primary" onClick={() => void handleRequestNotifications()}>Autoriser les notifications</button>
             </SettingsCard>
           )}
-          {/* #402 : sur Android, une seule autorité — les canaux système ; les interrupteurs restent pour la PWA. */}
+          {/* #402, décision du 15/11 (« fais simple ») : sur Android, une seule ligne ouvre la page des catégories
+              SeenIt ; tout s'y règle (épisodes, films, actualités, rappels, téléchargements…). La PWA garde ses
+              interrupteurs. */}
           {isAndroid ? (
-            <SettingsGroup title="Séries et films" foot="Coupés ou réglés dans Android, catégorie par catégorie.">
-              {ANDROID_MEDIA_CHANNELS.map(channel => (
-                <SettingsRow key={channel.channelId} icon={channel.icon} label={channel.label} sub={channel.sub}
-                  onClick={() => { void NotificationSettings.openChannel({ channelId: channel.channelId }).catch(() => showToast('Réglages Android indisponibles.', 'error')); }} />
-              ))}
-              <SettingsRow icon={Newspaper} label="Actualités" sub="Renouvellements, annulations, saisons annoncées" toggle={notificationPrefs.news} onClick={() => void handleToggleNotif('news', !notificationPrefs.news)} />
+            <SettingsGroup foot="Son, vibration ou coupure, type par type.">
+              <SettingsRow icon={Smartphone} label="Catégories de notification" sub="Épisodes, films, actualités, rappels, téléchargements, mises à jour"
+                onClick={() => { void NotificationSettings.open().catch(() => showToast('Réglages Android indisponibles.', 'error')); }} />
             </SettingsGroup>
           ) : <>
           <SettingsGroup title="Séries">
@@ -930,17 +924,12 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
             <SettingsRow icon={Film} label="Sortie DVD / VOD" sub="Le jour J, si la date est connue" toggle={notificationPrefs.movie_dvd_vod} onClick={() => void handleToggleNotif('movie_dvd_vod', !notificationPrefs.movie_dvd_vod)} />
           </SettingsGroup>
           </>}
-          <SettingsGroup title="Autres alertes" foot={isAndroid ? 'Coupées ou réglées dans Android, type par type.' : 'Réglées par le navigateur.'}>
-            {ANDROID_ALERTS.map(alert => (
-              <SettingsRow key={alert.channelId} icon={alert.icon} label={alert.label} sub={alert.sub}
-                onClick={isAndroid ? () => { void NotificationSettings.openChannel({ channelId: alert.channelId }).catch(() => showToast('Réglages Android indisponibles.', 'error')); } : undefined} />
-            ))}
-          </SettingsGroup>
+          {!isAndroid && (
+            <SettingsGroup title="Autres alertes" foot="Réglées par le navigateur.">
+              {ANDROID_ALERTS.map(alert => <SettingsRow key={alert.channelId} icon={alert.icon} label={alert.label} sub={alert.sub} />)}
+            </SettingsGroup>
+          )}
           <SettingsGroup>
-            {isAndroid && (
-              <SettingsRow icon={Smartphone} label="Réglages Android" sub="Son et vibration par type"
-                onClick={() => { void NotificationSettings.open().catch(() => showToast('Réglages Android indisponibles.', 'error')); }} />
-            )}
             <SettingsRow icon={FlaskConical} label="Envoyer une notification test" sub="Avec un titre de ta liste" chevron={false}
               expanded={showNotificationTests} onClick={() => setShowNotificationTests(value => !value)} />
             {showNotificationTests && NOTIFICATION_TESTS.map(test => (

@@ -17,7 +17,8 @@ export function effectiveNotificationPreferences(
   androidChannels: boolean,
 ): typeof DEFAULT_NOTIFICATION_PREFS {
   if (!androidChannels) return prefs;
-  return { ...prefs, release_today_tv: true, season_d7: true, movie_theater: true, movie_dvd_vod: true };
+  // Décision du 15/11 : sur Android, les actualités se règlent aussi dans leur catégorie (« Actualités et reprises »).
+  return { ...prefs, release_today_tv: true, season_d7: true, movie_theater: true, movie_dvd_vod: true, news: true };
 }
 
 /** Préférences effectives de l'appareil courant (#402). */

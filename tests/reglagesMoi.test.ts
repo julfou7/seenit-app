@@ -74,9 +74,10 @@ const plugin = readFileSync('android/app/src/main/java/com/seenit/app/SeenItNoti
 const navCss = readFileSync('src/components/bottomNav.css', 'utf8');
 const logos = readFileSync('src/features/providers/platformLogos.ts', 'utf8');
 
-test('SEENIT-NOTIFICATION-006 les Réglages ouvrent le canal Android exact, limité aux canaux SeenIt', () => {
-  for (const channel of ['seenit_reminders', 'seenit_downloads', 'seenit_updates']) assert.match(core, new RegExp(`channelId: '${channel}'`));
-  assert.match(core, /NotificationSettings\.openChannel\(\{ channelId: alert\.channelId \}\)/);
+test('SEENIT-NOTIFICATION-006 les Réglages ouvrent la page des catégories Android ; le bridge reste limité aux canaux SeenIt', () => {
+  // Décision du 15/11 : une seule ligne « Catégories de notification » ouvre la page Android de SeenIt.
+  assert.match(core, /label="Catégories de notification"[^>]*\s*onClick=\{\(\) => \{ void NotificationSettings\.open\(\)/);
+  assert.doesNotMatch(core, /NotificationSettings\.openChannel\(/);
   assert.match(plugin, /public void openChannel\(PluginCall call\)/);
   assert.match(plugin, /Settings\.ACTION_CHANNEL_NOTIFICATION_SETTINGS/);
   assert.match(plugin, /channelId\.matches\("seenit_\[a-z\]\{2,20\}"\)/, 'seuls les canaux SeenIt sont ouverts');
