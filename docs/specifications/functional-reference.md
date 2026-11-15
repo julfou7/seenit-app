@@ -1188,9 +1188,11 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
   « Miscellaneous » est supprimée au démarrage ; Firebase la recrée seulement si une notification serveur
   arrive avant sa catégorie SeenIt. Celle de la bibliothèque de notifications, recréée à chaque démarrage,
   s'affiche « Autres » au lieu de « Default », avec l'importance choisie par l'utilisateur ;
-- **Connexions → Serveur SeenIt** (#404, « météo » des services) : point vert « Opérationnel » seulement si
-  `/api/health` répond `status: ok`, orange si la réponse dépasse 2,5 s, rouge si injoignable ; sondé au
-  plus une fois toutes les 5 minutes, sans contacter TMDB/TVDB/OMDb depuis l'appareil ;
+- **Connexions → intégrations** (#403/#404, « météo » des services ; depuis la v1.4.315 plus de ligne
+  « Serveur SeenIt ») : sous Plex, une ligne par intégration configurée (Sonarr, Radarr, qBittorrent, C411),
+  testée pour de vrai comme « Tester » des réglages Téléchargements : point vert « Opérationnel », rouge
+  « Injoignable · vérifie sa configuration » ; au plus un test toutes les 5 minutes par configuration, aucune clé
+  affichée ; une intégration non configurée n'a pas de ligne ;
 - **Connexions → Plex** (point vert si synchro de moins de 24 h, orange sinon) → compte et titres
   reconnus, « Synchroniser maintenant », serveurs du dernier bilan de synchro, synchro complète et
   déconnexion confirmée ; association et annulation inchangées ;
