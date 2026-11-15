@@ -9,7 +9,10 @@ import {
   readWatchProviderCache,
   retainWatchProviderCacheEntry,
   writeWatchProviderCache,
+  recordWatchProviderPayload,
+  WATCH_PROVIDER_CACHE_STORAGE_KEY,
 } from '../src/features/providers/watchProviderCache.ts';
+import { readFileSync } from 'node:fs';
 
 class MemoryStorage {
   private values = new Map<string, string>();
@@ -115,4 +118,36 @@ test('SEENIT-PERF-001 protège les diffuseurs suivis des évictions Explorer', (
     null,
     'promouvoir une entrée ne doit jamais renouveler artificiellement son horodatage',
   );
+});
+
+test('#641 des pannes répétées ne rajeunissent pas une copie périmée ; elle expire à sept jours', () => {
+  const storage = new MemoryStorage();
+  const t0 = 10_000_000;
+  const payload = { results: { FR: { flatrate: [{ provider_name: 'Ancien' }] } } };
+  writeWatchProviderCache(7, 'movie', payload, { storage, now: t0, defer: false });
+  // Même enchaînement que la façade tmdbCore (succès réseau absent → copie périmée) puis la carte (hook).
+  const facadeAfterNetworkFailure = (now: number) => readWatchProviderCache(7, 'movie', { storage, now, allowStale: true })?.data ?? null;
+  for (const day of [1, 3, 5, 6.9]) {
+    const now = t0 + day * 86_400_000;
+    const stale = facadeAfterNetworkFailure(now);
+    assert.ok(stale, `jour ${day} : stale-if-error toujours servi`);
+    recordWatchProviderPayload(7, 'movie', stale, { storage, now, defer: false, retention: 'library' });
+    const entry = readWatchProviderCache(7, 'movie', { storage, now, allowStale: true });
+    assert.equal(entry?.timestamp, t0, `jour ${day} : l’âge réel est conservé`);
+    assert.equal(entry?.fresh, false, `jour ${day} : jamais redevenue fraîche`);
+  }
+  assert.equal(facadeAfterNetworkFailure(t0 + WATCH_PROVIDER_CACHE_STALE_MAX_AGE_MS), null, 'au-delà de sept jours : plus de copie servie');
+
+  // Une copie absente reste enregistrée normalement, et la rétention bibliothèque est conservée.
+  recordWatchProviderPayload(8, 'tv', payload, { storage, now: t0, defer: false, retention: 'library' });
+  assert.equal(readWatchProviderCache(8, 'tv', { storage, now: t0 })?.timestamp, t0);
+  const stored = JSON.parse(storage.getItem(WATCH_PROVIDER_CACHE_STORAGE_KEY) || '{}');
+  assert.equal(stored[getWatchProviderCacheKey(7, 'movie')].retention, 'library', 'la carte bibliothèque garde sa rétention sans changer l’âge');
+
+  // Câblage de production : la façade sert la copie périmée sur panne, la carte n'écrit plus directement.
+  const core = readFileSync('src/features/shows/tmdbCore.ts', 'utf8');
+  assert.match(core, /return stalePersistent \? ok\(stalePersistent\.data\) : result;/);
+  const hook = readFileSync('src/hooks/usePassiveWatchProvider.ts', 'utf8');
+  assert.match(hook, /recordWatchProviderPayload\(numericTmdbId, mediaType, res\.value, \{/);
+  assert.doesNotMatch(hook, /writeWatchProviderCache\(/);
 });
