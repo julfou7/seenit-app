@@ -29,6 +29,19 @@ test('retester les indexers : test lancé, indexers encore en échec nommés, au
   assert.ok(!isAllowedServiceProxyPath('http://nas:8989/api/v3/indexer/1', 'PUT'), 'aucun réglage d’indexer modifiable');
   // Revue Codex #1059 : un test refusé (proxy, droits, délai) n'est jamais présenté comme une réactivation.
   await assert.rejects(retest.retestIndexers(config, 'tv', { ...io([]), post: async () => { throw new Error('Erreur HTTP 403'); } }, now), /Le test des indexers n’a pas pu être lancé \(Erreur HTTP 403\)/);
+  // Retour du 15/11 (v1.4.319, « Erreur HTTP 404 ») : Sonarr sans `indexerstatus` — santé revérifiée puis lue.
+  const noStatus = (health: unknown[]) => {
+    const seen: string[] = [];
+    return { seen, io: { post: async (url: string, body: unknown) => { seen.push(`POST ${url} ${JSON.stringify(body)}`); return {}; },
+      get: async (url: string) => { seen.push(`GET ${url}`); if (url.endsWith('/indexerstatus')) throw new Error('Erreur HTTP 404'); return url.endsWith('/indexer') ? [{ id: 1, name: 'C411 (Prowlarr)' }] : health; } } };
+  };
+  const paused = noStatus([{ source: 'IndexerSearchCheck', type: 'warning', message: 'All search-capable indexers are temporarily unavailable due to recent indexer errors' }]);
+  const stillPaused = await retest.retestIndexers(config, 'tv', paused.io, now, { wait: async () => undefined });
+  assert.ok(paused.seen.includes('POST http://nas:8989/api/v3/command {"name":"CheckHealth"}') && paused.seen.at(-1) === 'GET http://nas:8989/api/v3/health');
+  assert.ok(paused.seen.every(call => isAllowedServiceProxyPath(call.split(' ')[1], call.split(' ')[0])));
+  assert.match(retest.describeIndexerRetest(stillPaused).text, /^Tous les indexers sont en pause/);
+  const healthy = await retest.retestIndexers(config, 'tv', noStatus([]).io, now, { wait: async () => undefined });
+  assert.deepEqual(retest.describeIndexerRetest(healthy), { text: 'Indexers réactivés : relance la recherche.', ok: true });
   // Bouton visible seulement sur une carte « À régler » qui parle d'indexers.
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
   assert.match(card, /toFix && onTestIndexers && \/indexer\/i\.test\(/);
