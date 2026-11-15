@@ -78,7 +78,8 @@ const DISK_FULL = /disk is full|not enough free space|no space left|space left o
 export function diskFullRejection(releases: readonly ArrRelease[], preference?: '1080p' | '4k'): boolean {
   return releases.some(release => {
     const reasons = Array.isArray(release.rejections) ? release.rejections.map(String) : [];
-    return release.approved !== true && reasons.some(reason => DISK_FULL.test(reason))
+    // Revue Codex #1043 : seul le disque doit bloquer ; un autre refus (langue, profil) resterait bloquant.
+    return release.approved !== true && reasons.length > 0 && reasons.every(reason => DISK_FULL.test(reason))
       && isCompatibleArrRelease({ ...release, approved: true }, preference);
   });
 }

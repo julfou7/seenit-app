@@ -89,6 +89,8 @@ test('disque plein : une version refusée faute de place devient une panne nomm�
 
   // Refus d'une autre nature (qualité, taille) : la règle « aucune release » reste inchangée.
   assert.equal(diskFullRejection([{ approved: false, title: 'x.1080p', quality: { quality: { name: 'WEBDL-1080p', resolution: 1080 } }, rejections: ['Size too large'] }], '1080p'), false);
+  // Revue Codex #1043 : refusée aussi pour la langue, la version resterait bloquée une fois le disque libéré.
+  assert.equal(diskFullRejection([{ approved: false, title: 'x.1080p', quality: { quality: { name: 'WEBDL-1080p', resolution: 1080 } }, rejections: ['Not enough free space', 'Language is not wanted'] }], '1080p'), false);
   // Disque plein seulement sur une autre qualité que celle demandée : pas de conclusion disque.
   assert.equal(diskFullRejection([{ approved: false, title: 'x.2160p', quality: { quality: { name: 'WEBDL-2160p', resolution: 2160 } }, rejections: ['Not enough free space'] }], '1080p'), false);
 });
