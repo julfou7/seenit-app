@@ -183,7 +183,7 @@ test('SEENIT-DOWNLOAD-020 Programmés : vue compacte par défaut, détaillée au
   assert.match(section, /aria-label="Programmés en compact" aria-pressed=\{compact\}/);
   assert.match(section, /aria-label="Programmés en détaillé" aria-pressed=\{!compact\}/);
   assert.match(section, /\{card\.episodes && episodesOpen\(card\) && card\.episodes\.rows\}/, 'compact : épisodes repliés jusqu’au chevron');
-  assert.match(section, /item\.wanted \? `Sorti \$\{pastDayLabel\(item\.date\)\} · recherché` : programmedDateLabel\(item\.date\)/, 'un recherché dit sa vraie date de sortie');
+  assert.match(section, /item\.wanted \? `Sorti \$\{pastDayLabel\(item\.date\)\} · \$\{item\.diskFull \? 'disque plein' : 'recherché'\}` : programmedDateLabel\(item\.date\)/, 'un recherché dit sa vraie date de sortie et, le cas échéant, le disque plein');
   assert.match(readFileSync('src/screens/downloads.css', 'utf8'), /\.programmed-compact__title \{[^}]*overflow-wrap:anywhere/, 'titre entier en compact');
   // Retour terrain du 09/11 : « supprime Sonarr et Radarr sous le titre, y a pas besoin ».
   assert.match(section, /meta: meta\('Série', first\.quality, /);
@@ -201,4 +201,36 @@ test('SEENIT-DOWNLOAD-020 détaillé : les épisodes se replient, repliés par d
   assert.match(section, /className="programmed__episodes-toggle" aria-expanded=\{episodesOpen\(card\)\}/);
   assert.match(section, /if \(open\) return `Masquer \$\{target\}`;\n\s+return `Voir \$\{target\}\$\{wanted \? ` · \$\{wanted\} recherché\$\{wanted > 1 \? 's' : ''\}` : ''\}`;/, '« Voir les 9 épisodes · 8 recherchés » / « Masquer les 9 épisodes »');
   assert.match(readFileSync('src/screens/downloads.css', 'utf8'), /\.programmed__episodes-toggle \{[^}]*min-height:44px/, 'cible de 44 px');
+});
+
+// Retour terrain du 15/11 (Dexter : Résurrection) : S02E03 diffusé dimanche soir aux États-Unis affichait « Sortie
+// demain » en France, et les épisodes recherchés bloqués par un disque plein disaient « pas encore de version ».
+test('Programmés : jour de diffusion de la chaîne, et disque plein prouvé par les règles de Sonarr/Radarr', async () => {
+  const sunday = new Date(2026, 10, 15, 15, 16).getTime();
+  const roots = [{ path: '/data/series', freeSpace: 900 * 1024 * 1024 }];
+  const rules = (free: number) => async (url: string) => {
+    if (url.includes('/calendar')) return url.startsWith('http://sonarr') ? [
+      { id: 3, seriesId: 8, seasonNumber: 2, episodeNumber: 3, airDate: '2026-11-15', airDateUtc: '2026-11-16T02:00:00Z', monitored: true, series: { title: 'Dexter : Résurrection', monitored: true, qualityProfileId: 4, path: '/data/series/Dexter Resurrection', runtime: 55 } },
+    ] : [];
+    if (url.includes('wanted/missing')) return { records: url.startsWith('http://sonarr') ? [
+      { id: 1, seriesId: 8, seasonNumber: 2, episodeNumber: 1, airDate: '2026-11-01', airDateUtc: '2026-11-02T02:00:00Z', monitored: true, series: { title: 'Dexter : Résurrection', monitored: true, qualityProfileId: 4, path: '/data/series/Dexter Resurrection', runtime: 55 } },
+    ] : [] };
+    if (url.endsWith('/rootfolder')) return roots.map(root => ({ ...root, freeSpace: free }));
+    if (url.endsWith('/config/mediamanagement')) return { minimumFreeSpaceWhenImporting: 100, skipFreeSpaceCheckWhenImporting: false };
+    if (url.endsWith('/qualitydefinition')) return [{ quality: { id: 18 }, minSize: 35 }, { quality: { id: 19 }, minSize: 35 }];
+    if (url.endsWith('/qualityprofile')) return [{ id: 4, name: '4K', items: [{ allowed: true, quality: { id: 18 } }, { allowed: false, quality: { id: 1 } }, { name: 'WEB 2160p', allowed: true, items: [{ allowed: false, quality: { id: 19 } }] }] }];
+    throw new Error(url);
+  };
+  const urls: string[] = [];
+  const full = await calendar.fetchProgrammedCalendar(config, { now: sunday, io: { get: async (url: string) => { urls.push(url); return rules(900 * 1024 * 1024)(url); }, put: async () => undefined } });
+  const byId = new Map(full.items.map(item => [item.id, item as Item & { wanted?: boolean; diskFull?: boolean }]));
+  assert.equal(calendar.programmedDateLabel(byId.get(3)?.date, sunday), "Aujourd'hui", 'jour de la chaîne, pas le lendemain UTC');
+  assert.equal(byId.get(3)?.wanted, undefined, 'pas encore diffusé : pas recherché');
+  assert.deepEqual([byId.get(1)?.wanted, byId.get(1)?.diskFull], [true, true], '900 Mo libres : même la plus petite version 4K (55 min × 35 Mo) est refusée');
+  assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), 'lectures acceptées par le proxy PWA');
+  // Assez de place : recherché ordinaire. Règles illisibles : rien n'est prouvé.
+  const roomy = await calendar.fetchProgrammedCalendar(config, { now: sunday, io: { get: rules(500 * 1024 * 1024 * 1024), put: async () => undefined } });
+  assert.equal((roomy.items.find(item => item.id === 1) as { diskFull?: boolean }).diskFull, undefined);
+  const unknown = await calendar.fetchProgrammedCalendar(config, { now: sunday, io: { get: async (url: string) => url.endsWith('/rootfolder') ? Promise.reject(new Error('503')) : rules(0)(url), put: async () => undefined } });
+  assert.equal((unknown.items.find(item => item.id === 1) as { diskFull?: boolean }).diskFull, undefined);
 });

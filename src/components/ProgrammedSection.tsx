@@ -37,13 +37,16 @@ export function watchedMoviePill(details: WatchedMovie | undefined): string {
 }
 /** Décision du 09/11 (`USR-2026-11-09-009`) : sorti, surveillé, sans fichier — Sonarr/Radarr le cherchent encore. */
 export const WANTED_PILL = 'Recherché · pas encore de version';
+/** Retour terrain du 15/11 : un recherché que Sonarr/Radarr ne peuvent pas télécharger faute de place le dit. */
+export const DISK_FULL_PILL = 'Disque plein · libère de l’espace';
+const wantedPill = (item: { diskFull?: boolean }) => item.diskFull ? DISK_FULL_PILL : WANTED_PILL;
 /** Pastille d'un film du calendrier ou recherché : sa sortie, sinon la raison exacte. */
-export function programmedMoviePill(movie: Pick<MovieItem, 'date' | 'dateKind' | 'wanted' | 'inCinemasPast'>): string {
+export function programmedMoviePill(movie: Pick<MovieItem, 'date' | 'dateKind' | 'wanted' | 'diskFull' | 'inCinemasPast'>): string {
   if (movie.date) return releasePill(movie.date, movie.dateKind);
-  if (movie.wanted) return WANTED_PILL;
+  if (movie.wanted) return wantedPill(movie);
   return movie.inCinemasPast ? 'Déjà au cinéma · sortie numérique pas encore annoncée' : 'Date à venir';
 }
-const itemPill = (item: EpisodeItem) => item.wanted ? WANTED_PILL : releasePill(item.date);
+const itemPill = (item: EpisodeItem) => item.wanted ? wantedPill(item) : releasePill(item.date);
 /** Jour de sortie passé d'un épisode recherché (« sam. 31 oct. »). */
 const pastDayLabel = (date?: string) => date ? new Date(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
 
@@ -217,7 +220,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const wantedCount = group.filter(item => item.wanted).length;
     cards.push({ key: `s${first.seriesId}`, addedAt: Math.max(...group.map(item => item.addedAt ?? -Infinity)) > -Infinity ? Math.max(...group.map(item => item.addedAt ?? -Infinity)) : undefined, data: { 'data-programmed-series': first.seriesId }, name: first.seriesTitle, isTv: true, poster: first.posterUrl,
       meta: meta('Série', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`),
-      pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : WANTED_PILL,
+      pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : wantedPill({ diskFull: group.some(item => item.diskFull) }),
       open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
       actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => void cancel(group, first.seriesTitle), group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation'),
       episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, count: group.length, wanted: wantedCount, rows: <ul className="download-season__rows">
@@ -225,7 +228,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
           <span className="download-season__code">{code(item)}</span>
           <span className="programmed__row-text">
             <span className="programmed__row-title" data-untitled={isUntitledEpisode(item) || undefined}>{isUntitledEpisode(item) ? 'Titre à venir' : item.title}</span>
-            <span className="programmed__row-date" data-wanted={item.wanted || undefined}>{item.wanted ? `Sorti ${pastDayLabel(item.date)} · recherché` : programmedDateLabel(item.date)}</span>
+            <span className="programmed__row-date" data-wanted={item.wanted || undefined}>{item.wanted ? `Sorti ${pastDayLabel(item.date)} · ${item.diskFull ? 'disque plein' : 'recherché'}` : programmedDateLabel(item.date)}</span>
           </span>
           {rowCancel(item, `${first.seriesTitle} ${code(item)}`)}
         </li>)}

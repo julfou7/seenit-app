@@ -50,7 +50,7 @@ export function isAllowedServiceProxyPath(rawUrl: string, method: string): boole
   // Le proxy n'accepte cette suppression qu'avec `deleteFiles=false` explicite : jamais d'effacement de fichier.
   if (method === 'DELETE' && /^\/api\/v3\/(?:series|movie)\/\d+$/.test(pathname)) return search.get('deleteFiles') === 'false' && search.getAll('deleteFiles').length === 1;
   const allowed: Array<{ method: string; path: RegExp }> = [
-    { method: 'GET', path: /^\/api\/v3\/(?:system\/status|qualityprofile|rootfolder|health|indexer|config\/indexer|series(?:\/lookup)?|episode|movie(?:\/lookup)?|queue|history(?:\/since)?|calendar|wanted\/missing|release|parse|notification(?:\/schema)?)$/ },
+    { method: 'GET', path: /^\/api\/v3\/(?:system\/status|qualityprofile|qualitydefinition|rootfolder|health|indexer|config\/indexer|config\/mediamanagement|series(?:\/lookup)?|episode|movie(?:\/lookup)?|queue|history(?:\/since)?|calendar|wanted\/missing|release|parse|notification(?:\/schema)?)$/ },
     // Lecture d'une ressource par identifiant (programmation, déprogrammation, nettoyage de pack) : GET seul.
     { method: 'GET', path: /^\/api\/v3\/(?:series|episode|movie)\/\d+$/ },
     { method: 'POST', path: /^\/api\/v3\/(?:series|movie|command|release(?:\/push)?|notification)$/ },
