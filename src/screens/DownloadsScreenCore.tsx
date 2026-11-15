@@ -41,6 +41,7 @@ import {
   failDownloadRequest
 } from '../features/downloads/downloadLifecycle';
 import { sortDownloadsByAddedAt } from '../features/downloads/downloadPresentation';
+import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
 import { getStableDownloadRenderKey } from '../features/downloads/downloadPosterStability';
 import { useTabShortcut } from '../features/navigation/useTabShortcut';
 
@@ -244,6 +245,14 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
       return;
     }
     void performRemove(item);
+  };
+
+  // #664 : « Relancer la recherche » d'une demande en attente, par le chemin de lancement de la fiche.
+  const handleRetryWaiting = async (item: LiveDownloadItem) => {
+    const launch = waitingRetryLaunch(item);
+    if (!launch) return;
+    const { launchArrDownload } = await import('../features/downloads/downloadLaunch');
+    await launchArrDownload({ ...launch, config: useDownloadConfigStore.getState(), notify: (action, toastType = 'download') => showToast({ title: launch.title, action, posterPath: item.posterPath }, toastType) });
   };
 
   const handleClearAll = async (section: 'completed' | 'cancelled' | 'error') => {
@@ -450,7 +459,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
             {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
-            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} />}
+            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} onRetryWatching={item => void handleRetryWaiting(item)} />}
             <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
             {/* SEENIT-DOWNLOAD-023 : ni téléchargés ni programmés — aucun titre de Sonarr/Radarr invisible. */}
             <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />

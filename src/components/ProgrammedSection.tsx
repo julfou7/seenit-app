@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, Clock3, Film, MoreHorizontal, Tv, X } from 'lucide-react';
+import { ChevronDown, Clock3, Film, MoreHorizontal, RotateCw, Tv, X } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useShowsStore } from '../store/showsStore';
 import { hideSeenWanted, seenWatchedRequest } from '../features/downloads/wantedSeen';
+import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
 import { changeProgrammedQuality, dayTime, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
@@ -96,7 +97,7 @@ const posterUrl = (path?: string | null) => !path ? null : path.startsWith('http
  * annulation). La liste vient de l'état Sonarr/Radarr synchronisé (SEENIT-DOWNLOAD-016) : la section ne lit
  * rien elle-même, et chaque action resynchronise cet état et la fiche concernée.
  */
-export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], queued = [], onRemoveWatching }: { refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void }) {
+export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], queued = [], onRemoveWatching, onRetryWatching }: { refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void }) {
   // Les identifiants viennent d'un serveur précis : la copie synchronisée est liée au compte et au serveur.
   const scope = programmedScope(useDownloadConfigStore());
   const snapshot = useArrSnapshot();
@@ -183,7 +184,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   }
   const rowCancel = (item: EpisodeItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => void cancel([item], label)} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel programmed__cancel--icon"><X size={18} aria-hidden="true" /></button>;
   /** Menu ⋯ de chaque carte (retour terrain du 08/11 : « toujours les 3 petits points pour changer la qualité »). */
-  const cardMenu = (key: string, label: string, quality: string | undefined, onQuality: ((preference: '1080p' | '4k') => void) | null, onCancel: () => void, cancelLabel = 'Annuler la programmation') => {
+  const cardMenu = (key: string, label: string, quality: string | undefined, onQuality: ((preference: '1080p' | '4k') => void) | null, onCancel: () => void, cancelLabel = 'Annuler la programmation', onRetry?: () => void) => {
     const open = menu === key;
     return { open, button: <button type="button" className="download-card__more" aria-label={`Actions pour ${label}`} aria-expanded={open} onClick={() => setMenu(open ? null : key)}><MoreHorizontal size={20} /></button>,
       panel: open && <div className="download-card__actions programmed__menu" data-programmed-menu={key}>
@@ -191,6 +192,8 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
           <span>Qualité</span>
           {(['1080p', '4k'] as const).map(choice => <button key={choice} type="button" disabled={busy !== null} aria-pressed={qualityChoice(quality) === choice} onClick={() => qualityChoice(quality) !== choice && onQuality(choice)}>{choice === '4k' ? '4K' : '1080p'}</button>)}
         </div>}
+        {/* #664 : relancer tout de suite la recherche d'une demande en attente. */}
+        {onRetry && <button type="button" disabled={busy !== null} onClick={onRetry}><RotateCw size={15} aria-hidden="true" />Relancer la recherche</button>}
         <button type="button" disabled={busy !== null} onClick={onCancel}><X size={15} aria-hidden="true" />{cancelLabel}</button>
       </div> };
   };
@@ -210,9 +213,11 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const quality = item?.quality || details?.quality || entry.quality;
     const pill = item ? item.kind === 'movie' ? programmedMoviePill(item) : itemPill(item) : isTv ? 'Pas encore de version' : watchedMoviePill(Number(entry.tmdbId) in watchedMovies ? details : undefined);
     const radarrId = item?.kind === 'movie' ? item.id : details?.id;
+    // Revue Codex #1051 : la relance reprend la qualité affichée (synchronisée, éventuellement changée via ⋯).
+    const retryEntry = quality ? { ...entry, quality } : entry;
     cards.push({ key: `w${entry.id}`, addedAt: Number(entry.addedAt) || undefined, data: { 'data-programmed-request': entry.id }, name, isTv, poster: posterUrl(entry.posterPath), meta: meta(requestScope(entry), quality), pill,
       open: () => entry.tmdbId && onShowClick?.(entry.tmdbId, entry.mediaType), canOpen: Boolean(entry.tmdbId && onShowClick),
-      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }) : null });
+      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }, undefined, onRetryWatching && waitingRetryLaunch(retryEntry) ? () => { setMenu(null); onRetryWatching(retryEntry); } : undefined) : null });
   }
   for (const group of series.values()) {
     const first = group[0];

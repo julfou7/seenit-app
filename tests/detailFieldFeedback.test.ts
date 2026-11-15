@@ -38,7 +38,7 @@ test('SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente
   assert.match(screen, /downloadGroup\(item\) === 'active' && !isPreTransferRequest\(item\)/);
   assert.match(screen, /downloadGroup\(item\) === 'attention' \|\| \(downloadGroup\(item\) === 'waiting' && !isWatchedWaitingRequest\(item\)\)/);
   assert.match(screen, /const waitingDownloads = useMemo\(\(\) => sortDownloadsByAddedAt\(downloads\.filter\(item => downloadGroup\(item\) === 'active' && isPreTransferRequest\(item\)\), 'asc'\), \[downloads\]\);/);
-  assert.match(screen, /<ProgrammedSection refreshKey=\{programmedRefresh\} onShowClick=\{onShowClick\} watching=\{watchedRequests\} queued=\{queuedDownloads\} onRemoveWatching=\{handleRemove\} \/>/);
+  assert.match(screen, /<ProgrammedSection refreshKey=\{programmedRefresh\} onShowClick=\{onShowClick\} watching=\{watchedRequests\} queued=\{queuedDownloads\} onRemoveWatching=\{handleRemove\} onRetryWatching=\{item => void handleRetryWaiting\(item\)\} \/>/);
   // Revue de #907 : annuler une attente surveillée recharge Programmés (l'entrée du calendrier masquée ne revient pas).
   assert.match(screen, /const transitions = `\$\{activeDownloads\.length\}:\$\{completedDownloads\.length\}:\$\{errorDownloads\.length\}:\$\{watchedRequests\.map\(item => item\.id\)\.join\(','\)\}`;/);
   assert.match(screen, /if \(lastTransitions\.current === transitions\) return;[\s\S]{0,80}setProgrammedRefresh\(key => key \+ 1\);/);
