@@ -31,11 +31,17 @@ export function parseDiskRules(rootFolders: unknown, mediaManagement: unknown, d
   };
 }
 
-const normalize = (path: string) => path.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+/** Revue Codex #1049 : la casse compte sur un serveur Linux ; seuls les chemins Windows (lecteur ou `\`) l'ignorent. */
+const normalize = (path: string) => {
+  const windows = /^[a-z]:[\\/]|\\/i.test(path);
+  const slashed = path.replace(/\\/g, '/').replace(/\/+$/, '');
+  return windows ? slashed.toLowerCase() : slashed;
+};
 
 /** Vrai seulement si chaque version acceptable serait refusée faute de place. */
-export function proveDiskFull(rules: DiskRules | null, target: { path?: string; runtime?: number; profileId?: number }): boolean {
-  if (!rules || rules.skip || !target.path || !target.profileId) return false;
+export function proveDiskFull(rules: DiskRules | null, target: { path?: string; runtime?: number; profileId?: number; special?: boolean }): boolean {
+  // Revue Codex #1049 : Sonarr n'applique pas de taille minimale aux spéciaux (saison 0) ; rien n'y est prouvable.
+  if (!rules || rules.skip || target.special || !target.path || !target.profileId) return false;
   const path = normalize(target.path);
   const root = rules.roots.filter(entry => path === normalize(entry.path) || path.startsWith(`${normalize(entry.path)}/`)).sort((a, b) => b.path.length - a.path.length)[0];
   const qualities = rules.profileQualities.get(target.profileId);

@@ -215,7 +215,7 @@ test('Programmés : jour de diffusion de la chaîne, et disque plein prouvé par
     if (url.includes('wanted/missing')) return { records: url.startsWith('http://sonarr') ? [
       { id: 1, seriesId: 8, seasonNumber: 2, episodeNumber: 1, airDate: '2026-11-01', airDateUtc: '2026-11-02T02:00:00Z', monitored: true, series: { title: 'Dexter : Résurrection', monitored: true, qualityProfileId: 4, path: '/data/series/Dexter Resurrection', runtime: 55 } },
       // Revue Codex #1049 : la durée de l'épisode prime sur celle de la série (20 min × 35 Mo tiennent dans 900 Mo).
-      { id: 2, runtime: 20, seriesId: 8, seasonNumber: 0, episodeNumber: 1, airDate: '2026-11-01', airDateUtc: '2026-11-02T02:00:00Z', monitored: true, series: { title: 'Dexter : Résurrection', monitored: true, qualityProfileId: 4, path: '/data/series/Dexter Resurrection', runtime: 55 } },
+      { id: 2, runtime: 20, seriesId: 8, seasonNumber: 2, episodeNumber: 2, airDate: '2026-11-01', airDateUtc: '2026-11-02T02:00:00Z', monitored: true, series: { title: 'Dexter : Résurrection', monitored: true, qualityProfileId: 4, path: '/data/series/Dexter Resurrection', runtime: 55 } },
     ] : [] };
     if (url.endsWith('/rootfolder')) return roots.map(root => ({ ...root, freeSpace: free }));
     if (url.endsWith('/config/mediamanagement')) return { minimumFreeSpaceWhenImporting: 100, skipFreeSpaceCheckWhenImporting: false };
@@ -230,6 +230,13 @@ test('Programmés : jour de diffusion de la chaîne, et disque plein prouvé par
   assert.equal(byId.get(3)?.wanted, undefined, 'pas encore diffusé : pas recherché');
   assert.deepEqual([byId.get(1)?.wanted, byId.get(1)?.diskFull], [true, true], '900 Mo libres : même la plus petite version 4K (55 min × 35 Mo) est refusée');
   assert.deepEqual([byId.get(2)?.wanted, byId.get(2)?.diskFull], [true, undefined], 'épisode court : une version tient, rien n’est prouvé');
+  // Revue Codex #1049 : spécial (pas de taille minimale chez Sonarr) et casse des chemins Linux.
+  const { parseDiskRules, proveDiskFull } = await import('../src/features/downloads/arrDiskSpace.ts');
+  const disk = parseDiskRules([{ path: '/data/TV', freeSpace: 100 * 1024 * 1024 }, { path: '/data/tv', freeSpace: 10_000 * 1024 * 1024 }], { minimumFreeSpaceWhenImporting: 100 }, [{ quality: { id: 18 }, minSize: 35 }], [{ id: 4, items: [{ allowed: true, quality: { id: 18 } }] }]);
+  assert.equal(proveDiskFull(disk, { path: '/data/tv/Show', runtime: 55, profileId: 4 }), false, 'la bonne racine, casse comprise');
+  assert.equal(proveDiskFull(disk, { path: '/data/TV/Show', runtime: 55, profileId: 4 }), true);
+  assert.equal(proveDiskFull(disk, { path: '/data/TV/Show', runtime: 55, profileId: 4, special: true }), false, 'spécial : rien de prouvé');
+  assert.equal(proveDiskFull(parseDiskRules([{ path: 'D:\\Series', freeSpace: 0 }], { minimumFreeSpaceWhenImporting: 100 }, [], [{ id: 4, items: [{ allowed: true, quality: { id: 1 } }] }]), { path: 'd:\\series\\Show', runtime: 55, profileId: 4 }), true, 'chemin Windows : casse ignorée');
   assert.match(readFileSync('src/components/ProgrammedSection.tsx', 'utf8'), /const pastDayLabel = \(date\?: string\) => date \? new Date\(dayTime\(date\)\)/, 'revue Codex #1049 : date passée lue comme un jour local');
   assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), 'lectures acceptées par le proxy PWA');
   // Assez de place : recherché ordinaire. Règles illisibles : rien n'est prouvé.

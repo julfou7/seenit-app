@@ -113,7 +113,7 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
         const date = entry.airDate || entry.airDateUtc;
         const airedAt = entry.airDateUtc || entry.airDate;
         const wanted = Boolean(airedAt && Date.parse(airedAt) < now);
-        const diskFull = wanted && proveDiskFull(disk, { path: entry.series?.path, runtime: Number(entry.runtime) > 0 ? entry.runtime : entry.series?.runtime, profileId });
+        const diskFull = wanted && proveDiskFull(disk, { path: entry.series?.path, runtime: Number(entry.runtime) > 0 ? entry.runtime : entry.series?.runtime, profileId, special: Number(entry.seasonNumber) === 0 });
         result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }), ...(wanted ? { wanted: true } : {}), ...(diskFull ? { diskFull: true } : {}), ...addedAt(entry.series?.added) });
       }
     }, () => { result.failures.push('Sonarr'); }));
