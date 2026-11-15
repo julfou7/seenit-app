@@ -1,3 +1,5 @@
+import type { WatchProviderResults } from '../../utils/providerLogos';
+
 // #965 retour v1.4.300 : v2 porte l'attribution d'origine (Canal+) des séries. Une copie v1, écrite avant, en est
 // dépourvue et restait « fraîche » 6 h (utilisable 7 jours) : la carte n'affichait alors aucun diffuseur.
 export const WATCH_PROVIDER_CACHE_STORAGE_KEY = 'seenit_watch_providers_v2';
@@ -9,8 +11,15 @@ export const WATCH_PROVIDER_CACHE_MAX_ENTRIES = 400;
 export const WATCH_PROVIDER_LIBRARY_CACHE_MAX_ENTRIES = 240;
 export const WATCH_PROVIDER_CACHE_IDLE_TIMEOUT_MS = 2_000;
 
+/** Réponse TMDB « où regarder » telle que stockée (région FR) et attribution d'origine (#965). */
+export interface WatchProviderPayload {
+  results?: WatchProviderResults;
+  originalBroadcaster?: unknown;
+  [key: string]: unknown;
+}
+
 export interface WatchProviderCacheEntry {
-  data: any;
+  data: WatchProviderPayload;
   timestamp: number;
   fresh: boolean;
 }
@@ -198,7 +207,8 @@ export function writeWatchProviderCache(
     ? 'library'
     : undefined;
   store[key] = {
-    data: compactWatchProviderPayload(data),
+    // Réponse TMDB « où regarder » : seule la forme déclarée par WatchProviderPayload est lue ensuite.
+    data: compactWatchProviderPayload(data) as WatchProviderPayload,
     timestamp: now,
     ...(retention ? { retention } : {}),
   };
@@ -206,6 +216,25 @@ export function writeWatchProviderCache(
   const defer = options.defer ?? options.storage === undefined;
   if (defer) schedulePersist(storage, store, now);
   else persistStore(storage, store, now);
+}
+
+/**
+ * #641 : une carte enregistre la réponse reçue sans jamais rajeunir une copie déjà présente. La façade
+ * TMDB écrit seule un succès réseau ; une panne lui fait renvoyer la copie périmée (stale-if-error), qui
+ * ne doit pas redevenir « fraîche » ni dépasser sept jours à force de pannes. Seule la rétention
+ * bibliothèque est ajoutée à une copie existante.
+ */
+export function recordWatchProviderPayload(
+  id: number,
+  type: 'tv' | 'movie',
+  data: unknown,
+  options: { now?: number; storage?: StorageLike | null; defer?: boolean; retention?: 'library' | 'discovery' } = {}
+): void {
+  if (readWatchProviderCache(id, type, { allowStale: true, now: options.now, storage: options.storage })) {
+    if (options.retention === 'library') retainWatchProviderCacheEntry(id, type, options);
+    return;
+  }
+  writeWatchProviderCache(id, type, data, options);
 }
 
 export function retainWatchProviderCacheEntry(

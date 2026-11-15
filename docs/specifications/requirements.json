@@ -2320,7 +2320,7 @@
         },
         {
           "file": "tests/tvReminderCopy.test.ts",
-          "contains": "SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le prochain épisode à voir et le compteur de l’accueil"
+          "contains": "SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le prochain épisode à voir et son propre compteur de reprise"
         }
       ]
     },
@@ -3053,6 +3053,10 @@
           "contains": "SEENIT-UX-014 le jour de sortie : « Aujourd’hui », jamais « Ce soir » sans heure connue"
         },
         {
+          "file": "tests/watchlistCarouselUx.test.ts",
+          "contains": "#712 remplace les rails séries par la liste 18c et donne un snap aux tickets films"
+        },
+        {
           "file": "tests/episodeReminderBell.test.ts",
           "contains": "SEENIT-UX-014 carte en pause sans ligne sous le titre ; retour en vue horizontale sans marge ajoutée"
         },
@@ -3550,6 +3554,19 @@
         {
           "file": "tests/validatedTreeProof.test.ts",
           "contains": "SEENIT-QUALITY-013 la validation de candidate du contrôleur #102 sert de preuve et saute le smoke d’une version seule"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-QUALITY-014",
+      "title": "Préflight de permission avant toute suppression Cloud Storage",
+      "targets": [
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/workflowPolicy.test.ts",
+          "contains": "SEENIT-QUALITY-014 #511 toute suppression GCS est précédée du préflight testIamPermissions storage.objects.delete"
         }
       ]
     },

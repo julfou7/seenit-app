@@ -1,0 +1,18 @@
+# #654 : sources et artefacts canoniques (JSON, SPEC, snapshots) restent en LF dans l'arbre de travail,
+# quel que soit core.autocrlf (checkout Windows), comme le comparent test:spec et les TNR de source.
+* text=auto eol=lf
+
+# Script Windows du wrapper Gradle : conservé octet pour octet (CRLF).
+*.bat -text
+
+# Binaires : jamais convertis.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.jar binary
+*.p12 binary
+*.keystore binary
+*.jks binary

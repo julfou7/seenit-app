@@ -298,12 +298,12 @@ function devtoolsPort(browserWsUrl) {
   return Number(url.port);
 }
 
-async function createPageWebSocket(port) {
+async function createPageTarget(port) {
   const response = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' });
   if (!response.ok) throw new Error(`Création onglet CDP impossible : HTTP ${response.status}`);
   const target = await response.json();
   if (!target.webSocketDebuggerUrl) throw new Error('webSocketDebuggerUrl absent pour l’onglet CDP.');
-  return target.webSocketDebuggerUrl;
+  return target;
 }
 
 /**
@@ -313,6 +313,7 @@ async function createPageWebSocket(port) {
  */
 const CDP_SEND_TIMEOUT_MS = 60_000;
 const LANE_TASK_TIMEOUT_MS = 240_000;
+let ISOLATED_CLOSE_TIMEOUT_MS = 5_000;
 
 class CdpClient {
   constructor(url) {
@@ -505,7 +506,7 @@ async function runKeyboardAndAccessibilityChecks(client, minTouchTargetCssPx) {
 
 /**
  * Couloirs indépendants, chacun dans l'ordre historique. Les dépendances d'état restent dans un même
- * couloir : rendu → clavier → actions #180 ; minuterie 18c (horloge virtuelle) en dernier de son client ;
+ * couloir : rendu → clavier → actions #180 ; minuterie 18c (horloge virtuelle) dans son propre onglet ;
  * terrains Accueil 220–223 ; terrains 224–227 puis À voir, performance et jamais commencées.
  */
 function buildLaneGroups(config) {
@@ -533,8 +534,8 @@ function buildLaneGroups(config) {
     ],
     [
       ['searchKeyboard', client => testSearchKeyboardHarness(client, root)],
-      // L'horloge virtuelle de la minuterie 18c reste la dernière vérification de son client CDP.
-      ['watchNext', client => testWatchNextHarness(client, root)],
+      // #722 : l'horloge virtuelle de la minuterie 18c tourne dans un onglet neuf ; l'ordre reste libre.
+      ['watchNext', client => testWatchNextHarness(client, root), { isolatedClock: true }],
     ],
     [
       ['homeV4', client => testTerrain220Harness(client, root)],
@@ -561,18 +562,48 @@ function resolveLaneCount(value, max) {
   return Math.min(max, Math.max(1, parsed));
 }
 
-async function runLane(client, tasks, timings, label, taskTimeoutMs = LANE_TASK_TIMEOUT_MS) {
+/**
+ * #722 : un harnais marqué `isolatedClock` (horloge virtuelle CDP) tourne dans un onglet neuf, refermé ensuite.
+ * Le budget d'horloge virtuelle expiré laisse sinon l'onglet en pause et bloque le harnais suivant du client.
+ */
+async function runLane(client, tasks, timings, label, taskTimeoutMs = LANE_TASK_TIMEOUT_MS, openIsolatedClient) {
   const results = {};
-  for (const [key, task] of tasks) {
+  for (const [key, task, options] of tasks) {
     const started = Date.now();
     let timer;
+    let isolated;
+    let finished = false;
+    let closed = false;
+    // Fermeture bornée elle aussi : un Chromium muet ne doit jamais bloquer le watchdog (revue #1035).
+    const closeIsolated = async () => {
+      if (!isolated || closed) return;
+      closed = true;
+      let closeTimer;
+      await Promise.race([
+        Promise.resolve(isolated.close()).catch(() => undefined),
+        new Promise(resolve => { closeTimer = setTimeout(resolve, ISOLATED_CLOSE_TIMEOUT_MS); }),
+      ]);
+      clearTimeout(closeTimer);
+    };
     try {
       const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`harnais bloqué depuis ${taskTimeoutMs} ms`)), taskTimeoutMs); });
-      results[key] = await Promise.race([task(client), deadline]);
+      // L'ouverture de l'onglet isolé fait partie du travail surveillé : un blocage reste un échec nommé (revue #1035).
+      const work = (async () => {
+        if (options?.isolatedClock && openIsolatedClient) {
+          isolated = await openIsolatedClient();
+          // Onglet obtenu après l'expiration du délai : refermé aussitôt.
+          if (finished) { await closeIsolated(); throw new Error('onglet isolé ouvert après expiration'); }
+        }
+        return task(isolated ? isolated.client : client);
+      })();
+      work.catch(() => undefined);
+      results[key] = await Promise.race([work, deadline]);
     } catch (error) {
       error.message = `${key} (${label}) : ${error.message}`;
       throw error;
     } finally {
+      finished = true;
+      await closeIsolated();
       clearTimeout(timer);
       timings[key] = Math.round((Date.now() - started) / 100) / 10;
     }
@@ -593,11 +624,31 @@ async function launchBrowser() {
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
   const close = () => { client?.close(); if (!chrome.killed) chrome.kill('SIGTERM'); };
   let client;
+  let openPage;
   try {
     const browserWs = await listenForDevtools(chrome);
-    const pageWs = await createPageWebSocket(devtoolsPort(browserWs));
-    client = new CdpClient(pageWs);
-    await client.connect();
+    const port = devtoolsPort(browserWs);
+    client = await preparePageClient(await createPageTarget(port));
+    openPage = async () => {
+      const target = await createPageTarget(port);
+      const page = await preparePageClient(target);
+      return { client: page, close: async () => {
+        page.close();
+        await fetch(`http://127.0.0.1:${port}/json/close/${target.id}`, { signal: AbortSignal.timeout(ISOLATED_CLOSE_TIMEOUT_MS) }).catch(() => undefined);
+      } };
+    };
+  } catch (error) {
+    close();
+    throw error;
+  }
+  return { client, close, openPage };
+}
+
+/** Même préparation pour l'onglet principal d'un couloir et un onglet isolé (#722). */
+async function preparePageClient(target) {
+  const client = new CdpClient(target.webSocketDebuggerUrl);
+  await client.connect();
+  try {
     await Promise.all([
       client.send('Page.enable'),
       client.send('Runtime.enable'),
@@ -617,10 +668,10 @@ async function launchBrowser() {
       }
     });
   } catch (error) {
-    close();
+    client.close();
     throw error;
   }
-  return { client, close };
+  return client;
 }
 
 async function main() {
@@ -663,7 +714,7 @@ async function main() {
     const plan = lanes === 1 ? [groups.flat()] : groups;
     browsers = await Promise.all(plan.map(() => launchBrowser()));
     const timings = {};
-    const results = await Promise.all(plan.map((tasks, index) => runLane(browsers[index].client, tasks, timings, `couloir ${index + 1}`)));
+    const results = await Promise.all(plan.map((tasks, index) => runLane(browsers[index].client, tasks, timings, `couloir ${index + 1}`, undefined, browsers[index].openPage)));
     const merged = Object.assign({}, ...results);
     const report = {
       dialogs: merged.dialogs,
@@ -736,6 +787,7 @@ if (require.main === module) {
 
 module.exports = {
   runLane,
+  setIsolatedCloseTimeoutForTests: ms => { ISOLATED_CLOSE_TIMEOUT_MS = ms; },
   buildLaneGroups,
   resolveLaneCount,
   CdpClient,

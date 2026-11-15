@@ -20,3 +20,35 @@ test('SEENIT-QUALITY-013 #934 un appel DevTools ou un harnais bloqué échoue vi
   assert.ok('downloads' in timings && 'rapide' in timings, 'durées relevées même en échec');
   assert.deepEqual(await smoke.runLane(client, [['rapide', async () => 'ok']], {}, 'couloir 1', 1000), { rapide: 'ok' });
 });
+
+// #722 : la minuterie 18c (horloge virtuelle CDP) tourne dans un onglet neuf ; l'ordre des harnais reste libre.
+test('SEENIT-QUALITY-013 #722 un harnais à horloge virtuelle reçoit un onglet isolé, refermé ensuite', async () => {
+  const main = { id: 'principal' };
+  const opened: string[] = [];
+  const openIsolatedClient = async () => { const page = { id: `isolé-${opened.length + 1}` }; opened.push(`ouvert ${page.id}`); return { client: page, close: async () => { opened.push(`fermé ${page.id}`); } }; };
+  const run = smoke.runLane as unknown as (client: unknown, tasks: unknown[], timings: Record<string, number>, label: string, timeout?: number, open?: typeof openIsolatedClient) => Promise<Record<string, unknown>>;
+  const seen = await run(main, [
+    ['avant', async (client: { id: string }) => client.id],
+    ['minuterie', async (client: { id: string }) => client.id, { isolatedClock: true }],
+    ['après', async (client: { id: string }) => client.id],
+  ], {}, 'couloir unique', 1000, openIsolatedClient);
+  assert.deepEqual(seen, { avant: 'principal', minuterie: 'isolé-1', après: 'principal' });
+  assert.deepEqual(opened, ['ouvert isolé-1', 'fermé isolé-1'], 'onglet isolé refermé avant le harnais suivant');
+  await assert.rejects(run(main, [['minuterie', async () => { throw new Error('rouge'); }, { isolatedClock: true }]], {}, 'c', 1000, openIsolatedClient), /minuterie \(c\) : rouge/);
+  assert.equal(opened.at(-1), opened.at(-2)!.replace('ouvert', 'fermé'), 'refermé même en échec');
+  // Revue #1035 : une ouverture d'onglet bloquée reste dans le délai surveillé ; l'onglet tardif est refermé.
+  const late: string[] = [];
+  const slowOpen = async () => { await new Promise(resolve => setTimeout(resolve, 40)); late.push('ouvert'); return { client: { id: 'tard' }, close: async () => { late.push('fermé'); } }; };
+  await assert.rejects(run(main, [['minuterie', async () => 'jamais', { isolatedClock: true }]], {}, 'c', 10, slowOpen), /minuterie \(c\) : harnais bloqué depuis 10 ms/);
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.deepEqual(late, ['ouvert', 'fermé'], 'onglet ouvert après le délai : refermé');
+  // Revue #1035 : une fermeture d'onglet muette est bornée et ne bloque pas le watchdog.
+  (smoke as unknown as { setIsolatedCloseTimeoutForTests: (ms: number) => void }).setIsolatedCloseTimeoutForTests(20);
+  const hangingClose = async () => ({ client: { id: 'muet' }, close: () => new Promise<void>(() => {}) });
+  const startedAt = Date.now();
+  await assert.rejects(run(main, [['minuterie', () => new Promise(() => {}), { isolatedClock: true }]], {}, 'c', 10, hangingClose), /harnais bloqué depuis 10 ms/);
+  assert.ok(Date.now() - startedAt < 500, 'le watchdog rend la main malgré une fermeture muette');
+  const groups = (smoke as unknown as { buildLaneGroups: (config: unknown) => Array<Array<[string, unknown, { isolatedClock?: boolean }?]>> })
+    .buildLaneGroups({ pwa: { minTouchTargetCssPx: 44, viewports: [] } }).flat();
+  assert.equal(groups.find(([key]) => key === 'watchNext')?.[2]?.isolatedClock, true);
+});

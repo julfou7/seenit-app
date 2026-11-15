@@ -2258,6 +2258,12 @@ Le détail opérationnel des triggers, classes et jobs est maintenu dans `docs/p
   (profil et stockage propres), chacun dans l'ordre historique, et une condition attendue n'échoue qu'à
   l'expiration de son délai, jamais sur un élément pas encore rendu. Quand une APK terrain est prévue dès
   la demande, la version est préparée dans la PR du correctif pour ne pas rejouer un second cycle.
+- **SEENIT-QUALITY-014** — Un workflow qui supprime des objets Cloud Storage (`gcloud storage rm`,
+  `gsutil rm`) prouve d'abord, sans rien modifier, que son identité possède `storage.objects.delete`
+  (API `testIamPermissions`, avec la lecture nécessaire). Permission absente : aucune suppression n'est
+  tentée et le journal nomme le rôle minimal et le périmètre exact à accorder (#511). Le jeton d'accès
+  utilisé est masqué. `validate:workflows` refuse tout workflow dont la suppression GCS n'est pas
+  précédée de ce préflight.
 
 Une modification est terminée lorsque les validations applicables à sa classe sont vertes, son test
 ciblé existe si le comportement change, toute règle durable/zone sensible est reflétée dans la SPEC et
