@@ -23,7 +23,7 @@ export function parseDiskRules(rootFolders: unknown, mediaManagement: unknown, d
   if (!Array.isArray(rootFolders) || !Array.isArray(definitions) || !Array.isArray(profiles) || !mediaManagement || typeof mediaManagement !== 'object') return null;
   const config = mediaManagement as { minimumFreeSpaceWhenImporting?: number; skipFreeSpaceCheckWhenImporting?: boolean };
   return {
-    roots: (rootFolders as Array<{ path?: string; freeSpace?: number }>).filter(root => root.path && Number.isFinite(root.freeSpace)).map(root => ({ path: String(root.path), freeSpace: Number(root.freeSpace) })),
+    roots: parseRoots(rootFolders),
     minFreeMb: Number(config.minimumFreeSpaceWhenImporting) || 0,
     skip: config.skipFreeSpaceCheckWhenImporting === true,
     minMbPerMinute: new Map((definitions as Array<{ quality?: { id?: number }; minSize?: number }>).filter(entry => Number(entry.quality?.id) >= 0).map(entry => [Number(entry.quality!.id), Number(entry.minSize) || 0])),
@@ -38,12 +38,33 @@ const normalize = (path: string) => {
   return windows ? slashed.toLowerCase() : slashed;
 };
 
+export function parseRoots(rootFolders: unknown): DiskRules['roots'] {
+  return Array.isArray(rootFolders) ? (rootFolders as Array<{ path?: string; freeSpace?: number }>).filter(root => root.path && Number.isFinite(root.freeSpace)).map(root => ({ path: String(root.path), freeSpace: Number(root.freeSpace) })) : [];
+}
+const rootFor = (roots: DiskRules['roots'], target: string) => {
+  const path = normalize(target);
+  return roots.filter(entry => path === normalize(entry.path) || path.startsWith(`${normalize(entry.path)}/`)).sort((a, b) => b.path.length - a.path.length)[0];
+};
+
+/**
+ * Retour terrain du 15/11 (v1.4.317, « c'est bien un problème de place » : 1,2 Go libres sur D:) : quand aucune
+ * preuve n'est possible (taille minimale à 0 dans Radarr, indexers en pause), l'espace libre réel du dossier du
+ * titre est montré tel que Sonarr/Radarr le donnent, dès qu'il passe sous 10 Go. C'est un constat chiffré, pas
+ * une cause déclarée.
+ */
+export const LOW_DISK_BYTES = 10 * 1024 ** 3;
+export function lowFreeSpace(roots: DiskRules['roots'], path?: string): number | undefined {
+  const root = path ? rootFor(roots, path) : undefined;
+  return root && root.freeSpace < LOW_DISK_BYTES ? root.freeSpace : undefined;
+}
+/** « 1,2 Go » */
+export const formatFreeSpace = (bytes: number) => `${(Math.max(0, bytes) / 1024 ** 3).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go`;
+
 /** Vrai seulement si chaque version acceptable serait refusée faute de place. */
 export function proveDiskFull(rules: DiskRules | null, target: { path?: string; runtime?: number; profileId?: number; special?: boolean }): boolean {
   // Revue Codex #1049 : Sonarr n'applique pas de taille minimale aux spéciaux (saison 0) ; rien n'y est prouvable.
   if (!rules || rules.skip || target.special || !target.path || !target.profileId) return false;
-  const path = normalize(target.path);
-  const root = rules.roots.filter(entry => path === normalize(entry.path) || path.startsWith(`${normalize(entry.path)}/`)).sort((a, b) => b.path.length - a.path.length)[0];
+  const root = rootFor(rules.roots, target.path);
   const qualities = rules.profileQualities.get(target.profileId);
   if (!root || !qualities?.length) return false;
   const runtime = Number(target.runtime) > 0 ? Number(target.runtime) : 0;

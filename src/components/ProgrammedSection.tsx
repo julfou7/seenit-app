@@ -7,6 +7,7 @@ import { useShowsStore } from '../store/showsStore';
 import { hideSeenWanted, seenWatchedRequest } from '../features/downloads/wantedSeen';
 import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
 import { DialogLayer } from './ui/DialogLayer';
+import { formatFreeSpace } from '../features/downloads/arrDiskSpace';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
 import { changeProgrammedQuality, dayTime, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
@@ -41,9 +42,11 @@ export function watchedMoviePill(details: WatchedMovie | undefined): string {
 export const WANTED_PILL = 'Recherché · pas encore de version';
 /** Retour terrain du 15/11 : un recherché que Sonarr/Radarr ne peuvent pas télécharger faute de place le dit. */
 export const DISK_FULL_PILL = 'Disque plein · libère de l’espace';
-const wantedPill = (item: { diskFull?: boolean }) => item.diskFull ? DISK_FULL_PILL : WANTED_PILL;
+/** Retour du 15/11 (v1.4.317) : sans preuve, l'espace libre réel est montré quand il est bas (« 1,2 Go libres »). */
+export const lowDiskPill = (freeSpace: number) => `Disque presque plein · ${formatFreeSpace(freeSpace)} libres`;
+const wantedPill = (item: { diskFull?: boolean; freeSpace?: number }) => item.diskFull ? DISK_FULL_PILL : item.freeSpace !== undefined ? lowDiskPill(item.freeSpace) : WANTED_PILL;
 /** Pastille d'un film du calendrier ou recherché : sa sortie, sinon la raison exacte. */
-export function programmedMoviePill(movie: Pick<MovieItem, 'date' | 'dateKind' | 'wanted' | 'diskFull' | 'inCinemasPast'>): string {
+export function programmedMoviePill(movie: Pick<MovieItem, 'date' | 'dateKind' | 'wanted' | 'diskFull' | 'freeSpace' | 'inCinemasPast'>): string {
   if (movie.date) return releasePill(movie.date, movie.dateKind);
   if (movie.wanted) return wantedPill(movie);
   return movie.inCinemasPast ? 'Déjà au cinéma · sortie numérique pas encore annoncée' : 'Date à venir';
@@ -244,7 +247,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const requests = group.map(item => requestFor.get(item.id)).filter((entry): entry is LiveDownloadItem => Boolean(entry)).map(entry => first.quality ? { ...entry, quality: first.quality } : entry).filter(entry => waitingRetryLaunch(entry));
     cards.push({ key: `s${first.seriesId}`, addedAt: Math.max(...group.map(item => item.addedAt ?? -Infinity)) > -Infinity ? Math.max(...group.map(item => item.addedAt ?? -Infinity)) : undefined, data: { 'data-programmed-series': first.seriesId }, name: first.seriesTitle, isTv: true, poster: first.posterUrl,
       meta: meta('Série', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`),
-      pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : wantedPill({ diskFull: group.some(item => item.diskFull) }),
+      pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : wantedPill({ diskFull: group.some(item => item.diskFull), freeSpace: group.find(item => item.freeSpace !== undefined)?.freeSpace }),
       open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
       actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => { setMenu(null); if (group.some(item => requestFor.has(item.id))) setConfirming({ group, title: first.seriesTitle }); else void cancelEpisodes(group, first.seriesTitle); }, group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation', onRetryWatchingGroup && requests.length ? () => { setMenu(null); onRetryWatchingGroup(requests); } : undefined),
       episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, count: group.length, wanted: wantedCount, rows: <ul className="download-season__rows">
@@ -252,7 +255,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
           <span className="download-season__code">{code(item)}</span>
           <span className="programmed__row-text">
             <span className="programmed__row-title" data-untitled={isUntitledEpisode(item) || undefined}>{isUntitledEpisode(item) ? 'Titre à venir' : item.title}</span>
-            <span className="programmed__row-date" data-wanted={item.wanted || undefined}>{item.wanted ? `Sorti ${pastDayLabel(item.date)} · ${item.diskFull ? 'disque plein' : 'recherché'}` : programmedDateLabel(item.date)}</span>
+            <span className="programmed__row-date" data-wanted={item.wanted || undefined}>{item.wanted ? `Sorti ${pastDayLabel(item.date)} · ${item.diskFull ? 'disque plein' : item.freeSpace !== undefined ? 'disque presque plein' : 'recherché'}` : programmedDateLabel(item.date)}</span>
           </span>
           {rowCancel(item, `${first.seriesTitle} ${code(item)}`)}
         </li>)}

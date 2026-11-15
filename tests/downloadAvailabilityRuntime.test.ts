@@ -130,7 +130,19 @@ test('SEENIT-DOWNLOAD-015 vrai chemin Radarr : une alerte de santé hors indexer
   Object.assign(blocked.state, { health: [{ source: 'IndexerLongTermStatusCheck', type: 'error', message: 'Indexers unavailable due to failures for more than 6 hours: YggAPI' }] });
   const unconfirmed = await blocked.runtime.searchAndDownloadInRadarr({ ...watch, title: movieInput.title, qualityProfileId: 1 });
   assert.equal(unconfirmed.failureCode, undefined, 'indexer en panne : jamais une fausse absence');
-  assert.match(unconfirmed.message, /Indexers en défaut : Indexers unavailable due to failures for more than 6 hours: YggAPI/);
+  // Retour terrain du 15/11 (v1.4.317) : l'alerte est traduite, l'indexer en cause reste nommé.
+  assert.match(unconfirmed.message, /^Indexers en échec depuis plus de 6 h : YggAPI\. Vérifie-les dans Prowlarr ou dans Sonarr\/Radarr, puis relance la recherche\.$/);
+});
+
+test('retour du 15/11 (v1.4.317) : les alertes d’indexers de Sonarr/Radarr sont en français avec quoi faire', async () => {
+  const { indexerHealthMessage } = await import('../src/features/downloads/downloadNoRelease.ts');
+  assert.match(indexerHealthMessage('All search-capable indexers are temporarily unavailable due to recent indexer errors'), /^Tous les indexers sont en pause après des erreurs récentes\. Vérifie-les dans Prowlarr/);
+  assert.equal(indexerHealthMessage('Indexers unavailable due to failures: C411, YggAPI'), 'Indexers en échec : C411, YggAPI. Vérifie-les dans Prowlarr ou dans Sonarr/Radarr, puis relance la recherche.');
+  assert.match(indexerHealthMessage('No indexers available with Automatic Search enabled, Sonarr will not provide any automatic search results'), /^Aucun indexer n’a la recherche activée/);
+  // Sonarr du propriétaire (15/11) : tous les indexers en échec, RSS en pause.
+  assert.match(indexerHealthMessage('All indexers are unavailable due to failures'), /^Tous les indexers sont en échec : Sonarr\/Radarr ne peuvent trouver aucune version\./);
+  assert.match(indexerHealthMessage('All rss-capable indexers are temporarily unavailable due to recent indexer errors'), /^Tous les indexers sont en pause/);
+  assert.equal(indexerHealthMessage('Something new'), 'Indexers en défaut : Something new', 'alerte inconnue : citée telle quelle');
 });
 
 test('le téléchargement futur exige RSS actif, surveillance confirmée et compte exact', async () => {

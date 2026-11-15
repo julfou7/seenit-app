@@ -48,7 +48,21 @@ export function indexerHealthProblem(health: readonly unknown[]): string | null 
     && (/indexer/i.test(String(item.source ?? '')) || (!item.source && item.type === 'error')));
   if (!blocking.length) return null;
   const detail = blocking.map(item => String(item.message ?? '').trim()).find(Boolean);
-  return detail ? `Indexers en défaut : ${detail}` : 'Les indexers signalent un problème ; la recherche ne peut pas être confirmée.';
+  return detail ? indexerHealthMessage(detail) : 'Les indexers signalent un problème ; la recherche ne peut pas être confirmée.';
+}
+
+/**
+ * Retour terrain du 15/11 (v1.4.317, Dexter S02E03) : le message de santé de Sonarr/Radarr s'affichait en anglais
+ * (« All search-capable indexers are temporarily unavailable… »). Les alertes d'indexer connues sont traduites avec
+ * ce qu'il faut faire ; une alerte inconnue reste citée telle quelle, jamais réinterprétée.
+ */
+export function indexerHealthMessage(detail: string): string {
+  if (/all indexers are unavailable due to failures/i.test(detail)) return 'Tous les indexers sont en échec : Sonarr/Radarr ne peuvent trouver aucune version. Vérifie-les dans Prowlarr ou dans Sonarr/Radarr (Indexers), puis relance la recherche.';
+  if (/all (?:search|rss)-capable indexers are temporarily unavailable/i.test(detail)) return 'Tous les indexers sont en pause après des erreurs récentes. Vérifie-les dans Prowlarr ou dans Sonarr/Radarr, puis relance la recherche : ils sont aussi réessayés automatiquement.';
+  const named = /indexers unavailable due to failures(?: for more than (\d+) hours)?:\s*(.+)$/i.exec(detail);
+  if (named) return `Indexers en échec${named[1] ? ` depuis plus de ${named[1]} h` : ''} : ${named[2].trim()}. Vérifie-les dans Prowlarr ou dans Sonarr/Radarr, puis relance la recherche.`;
+  if (/no indexers available with (?:automatic|interactive) search enabled/i.test(detail)) return 'Aucun indexer n’a la recherche activée dans Sonarr/Radarr : active-la, puis relance la recherche.';
+  return `Indexers en défaut : ${detail}`;
 }
 
 /** Un tableau vide peut aussi venir d'indexers désactivés ou en panne. */
