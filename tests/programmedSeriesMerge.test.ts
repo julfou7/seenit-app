@@ -15,4 +15,8 @@ test('Programmés : une seule carte par série, épisodes demandés depuis SeenI
   assert.match(section, /if \(request\) await onForgetWatching\?\.\(request\);/, 'annuler la série retire aussi les demandes SeenIt');
   assert.match(section, /onRetryWatching && requests\.length \? \(\) => \{ setMenu\(null\); requests\.forEach\(onRetryWatching\); \} : undefined/);
   assert.match(readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8'), /onForgetWatching=\{removeDownload\}/);
+  // Revue Codex #1054 : annuler une série avec des attentes SeenIt reste confirmé ; « Garder » ne change rien.
+  assert.match(section, /onClick=\{confirmText \? \(\) => setConfirming\(key\) : onCancel\}/);
+  assert.match(section, /<button type="button" onClick=\{\(\) => setConfirming\(null\)\}>Garder<\/button>/);
+  assert.match(section, /group\.some\(item => requestFor\.has\(item\.id\)\) \? `« \$\{first\.seriesTitle\} » : les épisodes en attente ne seront plus surveillés/);
 });

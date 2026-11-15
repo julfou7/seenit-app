@@ -113,6 +113,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   const failures = snapshot?.programmed?.failures || [];
   const [busy, setBusy] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState<string | null>(null);
   const [layout, setLayout] = useState<ProgrammedLayout>(() => readUserScopedJson<ProgrammedLayout>(auth.currentUser?.uid, LAYOUT_FIELD, 'compact') === 'detailed' ? 'detailed' : 'compact');
   // Choix explicite d'ouvrir ou de replier les épisodes, par vue (`compact:s5`, `detailed:s5`). Un choix fait reste
   // tel quel même si le nombre d'épisodes change ensuite (annulation) ; sans choix, l'état par défaut s'applique.
@@ -194,8 +195,15 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   };
   const rowCancel = (item: EpisodeItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => { const request = requestFor.get(item.id); if (request && onRemoveWatching) onRemoveWatching(request); else void cancel([item], label); }} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel programmed__cancel--icon"><X size={18} aria-hidden="true" /></button>;
   /** Menu ⋯ de chaque carte (retour terrain du 08/11 : « toujours les 3 petits points pour changer la qualité »). */
-  const cardMenu = (key: string, label: string, quality: string | undefined, onQuality: ((preference: '1080p' | '4k') => void) | null, onCancel: () => void, cancelLabel = 'Annuler la programmation', onRetry?: () => void) => {
+  const cardMenu = (key: string, label: string, quality: string | undefined, onQuality: ((preference: '1080p' | '4k') => void) | null, onCancel: () => void, cancelLabel = 'Annuler la programmation', onRetry?: () => void, confirmText?: string) => {
     const open = menu === key;
+    // Revue Codex #1054 : une annulation qui retire des attentes SeenIt reste confirmée (« Garder » ne change rien).
+    if (open && confirmText && confirming === key) return { open, button: <button type="button" className="download-card__more" aria-label={`Actions pour ${label}`} aria-expanded onClick={() => { setConfirming(null); setMenu(null); }}><MoreHorizontal size={20} /></button>,
+      panel: <div className="download-card__actions programmed__menu" data-programmed-menu={key} role="alertdialog" aria-label={confirmText}>
+        <p className="programmed__confirm">{confirmText}</p>
+        <button type="button" onClick={() => setConfirming(null)}>Garder</button>
+        <button type="button" disabled={busy !== null} onClick={() => { setConfirming(null); onCancel(); }}><X size={15} aria-hidden="true" />{cancelLabel}</button>
+      </div> };
     return { open, button: <button type="button" className="download-card__more" aria-label={`Actions pour ${label}`} aria-expanded={open} onClick={() => setMenu(open ? null : key)}><MoreHorizontal size={20} /></button>,
       panel: open && <div className="download-card__actions programmed__menu" data-programmed-menu={key}>
         {onQuality && <div className="programmed__quality" role="group" aria-label={`Qualité de ${label}`}>
@@ -204,7 +212,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
         </div>}
         {/* #664 : relancer tout de suite la recherche d'une demande en attente. */}
         {onRetry && <button type="button" disabled={busy !== null} onClick={onRetry}><RotateCw size={15} aria-hidden="true" />Relancer la recherche</button>}
-        <button type="button" disabled={busy !== null} onClick={onCancel}><X size={15} aria-hidden="true" />{cancelLabel}</button>
+        <button type="button" disabled={busy !== null} onClick={confirmText ? () => setConfirming(key) : onCancel}><X size={15} aria-hidden="true" />{cancelLabel}</button>
       </div> };
   };
   // Retour terrain du 09/11 : « supprime Sonarr et Radarr sous le titre, y a pas besoin » — type, qualité, nombre.
@@ -241,7 +249,8 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
       meta: meta('Série', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`),
       pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : wantedPill({ diskFull: group.some(item => item.diskFull) }),
       open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
-      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => { setMenu(null); void cancelEpisodes(group, first.seriesTitle); }, group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation', onRetryWatching && requests.length ? () => { setMenu(null); requests.forEach(onRetryWatching); } : undefined),
+      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => { setMenu(null); void cancelEpisodes(group, first.seriesTitle); }, group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation', onRetryWatching && requests.length ? () => { setMenu(null); requests.forEach(onRetryWatching); } : undefined,
+        group.some(item => requestFor.has(item.id)) ? `« ${first.seriesTitle} » : les épisodes en attente ne seront plus surveillés. Les fichiers existants sont conservés.` : undefined),
       episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, count: group.length, wanted: wantedCount, rows: <ul className="download-season__rows">
         {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
           <span className="download-season__code">{code(item)}</span>
