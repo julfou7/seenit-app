@@ -52,7 +52,8 @@ export function describeIntegration(result: IntegrationResult): ServiceState {
 
 // Empreinte de la configuration testée (jamais conservée en clair) : un changement de serveur ou de clé relance le test.
 const fingerprint = (config: IntegrationConfig) => {
-  const text = JSON.stringify([config.sonarrUrl, config.sonarrApiKey, config.radarrUrl, config.radarrApiKey, config.qbittorrentUrl, config.qbittorrentUsername, config.qbittorrentPassword, config.c411ApiKey]);
+  // Revue Codex #1055 : activer ou désactiver Téléchargements change les lignes affichées, donc la portée.
+  const text = JSON.stringify([config.isHydrated === true, config.downloadsEnabled === true, config.sonarrUrl, config.sonarrApiKey, config.radarrUrl, config.radarrApiKey, config.qbittorrentUrl, config.qbittorrentUsername, config.qbittorrentPassword, config.c411ApiKey]);
   let hash = 0x811c9dc5;
   for (let index = 0; index < text.length; index++) hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
   return (hash >>> 0).toString(16);

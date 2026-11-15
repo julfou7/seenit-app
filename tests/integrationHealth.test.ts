@@ -36,5 +36,8 @@ test('#403 météo : une ligne par intégration configurée, testée pour de vra
   assert.equal(probes, 1);
   await health.readIntegrationHealth({ ...config, sonarrApiKey: 'autre' }, probe, () => clock);
   assert.equal(probes, 2);
+  // Revue Codex #1055 : activer ou désactiver Téléchargements relit la liste, jamais le résultat précédent.
+  await health.readIntegrationHealth({ ...config, downloadsEnabled: false }, probe, () => clock);
+  assert.equal(probes, 3);
   health.resetIntegrationHealthCache();
 });
