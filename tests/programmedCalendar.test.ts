@@ -227,7 +227,7 @@ test('Programmés : jour de diffusion de la chaîne, et disque plein prouvé par
   const full = await calendar.fetchProgrammedCalendar(config, { now: sunday, io: { get: async (url: string) => { urls.push(url); return rules(900 * 1024 * 1024)(url); }, put: async () => undefined } });
   const byId = new Map(full.items.map(item => [item.id, item as Item & { wanted?: boolean; diskFull?: boolean }]));
   assert.equal(calendar.programmedDateLabel(byId.get(3)?.date, sunday), "Aujourd'hui", 'jour de la chaîne, pas le lendemain UTC');
-  assert.equal(byId.get(3)?.wanted, undefined, 'pas encore diffusé : pas recherché');
+  assert.equal(byId.get(3)?.wanted, true, 'retour du 15/11 (v1.4.314) : sorti dès son jour de diffusion local');
   assert.deepEqual([byId.get(1)?.wanted, byId.get(1)?.diskFull], [true, true], '900 Mo libres : même la plus petite version 4K (55 min × 35 Mo) est refusée');
   assert.deepEqual([byId.get(2)?.wanted, byId.get(2)?.diskFull], [true, undefined], 'épisode court : une version tient, rien n’est prouvé');
   // Revue Codex #1049 : spécial (pas de taille minimale chez Sonarr) et casse des chemins Linux.
@@ -244,4 +244,45 @@ test('Programmés : jour de diffusion de la chaîne, et disque plein prouvé par
   assert.equal((roomy.items.find(item => item.id === 1) as { diskFull?: boolean }).diskFull, undefined);
   const unknown = await calendar.fetchProgrammedCalendar(config, { now: sunday, io: { get: async (url: string) => url.endsWith('/rootfolder') ? Promise.reject(new Error('503')) : rules(0)(url), put: async () => undefined } });
   assert.equal((unknown.items.find(item => item.id === 1) as { diskFull?: boolean }).diskFull, undefined);
+});
+
+// Retour terrain du 15/11 sur la v1.4.314 : « La Guerre des mondes » et S02E03 disponibles, sans « Disque plein » ;
+// les vraies versions sont plus grosses que la taille minimale du profil.
+test('Programmés : disque plein prouvé par les versions réellement proposées, avec lecture bornée', async () => {
+  const sunday = new Date(2026, 10, 15, 16, 31).getTime();
+  const reads: string[] = [];
+  const get = async (url: string) => {
+    if (url.includes('/calendar')) return url.startsWith('http://sonarr') ? [
+      { id: 3, seriesId: 8, seasonNumber: 2, episodeNumber: 3, airDate: '2026-11-15', airDateUtc: '2026-11-16T02:00:00Z', monitored: true, series: { title: 'Dexter : Résurrection', monitored: true, qualityProfileId: 4 } },
+    ] : [];
+    if (url.includes('wanted/missing')) return { records: url.startsWith('http://radarr') ? [
+      { id: 21, title: 'La Guerre des mondes', tmdbId: 755898, monitored: true, isAvailable: true, qualityProfileId: 6 },
+      { id: 22, title: 'Heartland', tmdbId: 1, monitored: true, isAvailable: true, qualityProfileId: 6 },
+    ] : [] };
+    if (url.endsWith('/qualityprofile')) return [{ id: 4, name: 'UHD' }, { id: 6, name: 'HD-1080p' }];
+    if (url.includes('/api/v3/release?')) {
+      reads.push(url);
+      const disk = { approved: false, rejections: ['Not enough free space'], protocol: 'torrent', seeders: 20 };
+      if (url.endsWith('episodeId=3')) return [{ ...disk, title: 'Dexter.Resurrection.S02E03.2160p.WEB-DL', quality: { quality: { name: 'WEBDL-2160p', resolution: 2160 } } }];
+      if (url.endsWith('movieId=21')) return [{ ...disk, title: 'La.Guerre.des.mondes.2025.1080p.WEB-DL', quality: { quality: { name: 'WEBDL-1080p', resolution: 1080 } } }];
+      return [];
+    }
+    throw new Error(url);
+  };
+  const io = { get, put: async () => undefined };
+  const first = await calendar.fetchProgrammedCalendar({ ...config, sonarr4kProfileId: 4, radarr1080pProfileId: 6 }, { now: sunday, io });
+  const flags = (items: Item[]) => items.map(item => `${item.id}:${(item as { wanted?: boolean }).wanted ? 'recherché' : '-'}:${(item as { diskFull?: boolean }).diskFull ? 'plein' : '-'}`).sort();
+  assert.deepEqual(flags(first.items), ['21:recherché:plein', '22:recherché:-', '3:recherché:plein'], 'S02E03 sorti le jour même ; disque prouvé par les versions ; Heartland sans version reste recherché');
+  assert.ok(reads.every(url => isAllowedServiceProxyPath(url, 'GET')), 'lecture des versions acceptée par le proxy PWA');
+  // Synchronisation suivante, moins de 3 h après : rien n'est relu, le résultat est repris.
+  reads.length = 0;
+  const again = await calendar.fetchProgrammedCalendar({ ...config, sonarr4kProfileId: 4, radarr1080pProfileId: 6 }, { now: sunday + 60_000, io, previous: first.items });
+  assert.deepEqual([reads.length, flags(again.items)], [0, flags(first.items)]);
+  // Au-delà, une relecture a lieu (au plus 8 titres par synchronisation).
+  const later = await calendar.fetchProgrammedCalendar({ ...config, sonarr4kProfileId: 4, radarr1080pProfileId: 6 }, { now: sunday + 4 * 3_600_000, io, previous: again.items });
+  assert.equal(reads.length, 3);
+  assert.deepEqual(flags(later.items), flags(first.items));
+  const source = readFileSync('src/features/downloads/programmedCalendar.ts', 'utf8');
+  assert.match(source, /export const RELEASE_CHECKS_PER_SYNC = 8;/);
+  assert.match(source, /due\.slice\(0, RELEASE_CHECKS_PER_SYNC\)/);
 });

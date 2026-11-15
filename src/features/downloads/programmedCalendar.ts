@@ -4,6 +4,7 @@ import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
 import { resolveEffectiveQualityProfileId, type QualityProfileSummary } from './qualityProfileSelection';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
 import { parseDiskRules, proveDiskFull, type DiskRules } from './arrDiskSpace';
+import { diskFullRejection, type ArrRelease } from './downloadNoRelease';
 
 type DownloadConfig = ReturnType<typeof useDownloadConfigStore.getState>;
 type ArrImage = { coverType?: string; remoteUrl?: string; url?: string };
@@ -21,8 +22,8 @@ export type ProgrammedQuality = string;
  * propriétaire du 09/11, `USR-2026-11-09-009`). `inCinemasPast` : film sorti en salle sans date numérique connue.
  */
 export type ProgrammedItem =
-  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; addedAt?: number }
-  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; inCinemasPast?: boolean; addedAt?: number };
+  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; releaseCheckedAt?: number; addedAt?: number }
+  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; releaseCheckedAt?: number; inCinemasPast?: boolean; addedAt?: number };
 
 /** `movieQuality` : libellé de qualité d'un profil Radarr de ce serveur (revue Codex #933 : films ajoutés hors calendrier). */
 export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[]; movieQuality?: (profileId?: number) => ProgrammedQuality | undefined }
@@ -78,6 +79,39 @@ const readDiskRules = async (io: CalendarIo, base: string, apiKey: string): Prom
  * le jour affiché est le jour de diffusion de la chaîne (`airDate`), comme sur le reste de l'app ; l'heure UTC
  * (`airDateUtc`) ne sert qu'à savoir si l'épisode est déjà sorti. Une date seule est lue comme un jour local.
  */
+/**
+ * Retour terrain du 15/11 sur la v1.4.314 (« La Guerre des mondes » et S02E03 disponibles mais sans « Disque
+ * plein ») : la preuve par la taille minimale du profil ne voit pas un disque qui garde un peu de place, alors
+ * que les vraies versions sont plus grosses. Pour un recherché, SeenIt lit donc les versions réellement proposées
+ * par Sonarr/Radarr (comme au lancement, `diskFullRejection`) : une version de la qualité demandée refusée pour le
+ * seul espace disque prouve le blocage. Pour ménager les indexeurs : au plus `RELEASE_CHECKS_PER_SYNC` titres par
+ * synchronisation, chacun relu au plus toutes les `RELEASE_CHECK_TTL_MS` ; entre deux lectures, le dernier résultat
+ * (gardé avec la copie) est repris. Une lecture en échec ne prouve rien et sera retentée.
+ */
+export const RELEASE_CHECK_TTL_MS = 3 * 3_600_000;
+export const RELEASE_CHECKS_PER_SYNC = 8;
+const qualityPreference = (quality?: string) => /4k|2160/i.test(quality || '') ? '4k' as const : /1080/.test(quality || '') ? '1080p' as const : undefined;
+export async function checkWantedReleases(items: ProgrammedItem[], previous: readonly ProgrammedItem[], now: number, read: (item: ProgrammedItem) => Promise<unknown>): Promise<void> {
+  const prior = new Map(previous.map(item => [`${item.kind}:${item.id}`, item]));
+  const due: ProgrammedItem[] = [];
+  for (const item of items) {
+    if (!item.wanted) continue;
+    const before = prior.get(`${item.kind}:${item.id}`);
+    if (before?.releaseCheckedAt && now - before.releaseCheckedAt < RELEASE_CHECK_TTL_MS) {
+      item.releaseCheckedAt = before.releaseCheckedAt;
+      if (before.diskFull) item.diskFull = true;
+    } else if (!item.diskFull) due.push(item);
+  }
+  // Les plus anciennement vérifiés d'abord : chaque recherché finit par être relu.
+  due.sort((a, b) => (prior.get(`${a.kind}:${a.id}`)?.releaseCheckedAt || 0) - (prior.get(`${b.kind}:${b.id}`)?.releaseCheckedAt || 0));
+  await Promise.all(due.slice(0, RELEASE_CHECKS_PER_SYNC).map(async item => {
+    const releases = await read(item).catch(() => null);
+    if (!Array.isArray(releases)) return;
+    item.releaseCheckedAt = now;
+    if (diskFullRejection(releases as ArrRelease[], qualityPreference(item.quality))) item.diskFull = true;
+  }));
+}
+
 export const dayTime = (date: string) => {
   const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   return day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])).getTime() : Date.parse(date);
@@ -89,7 +123,7 @@ export const dayTime = (date: string) => {
  * sans fichier, dont la série est elle-même surveillée, sont listés. Une source injoignable est rendue
  * dans `failures`, jamais confondue avec « rien de programmé ».
  */
-export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Date.now(), days = 120, io = defaultIo }: { now?: number; days?: number; io?: CalendarIo } = {}): Promise<ProgrammedCalendar> {
+export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Date.now(), days = 120, io = defaultIo, previous = [] }: { now?: number; days?: number; io?: CalendarIo; previous?: readonly ProgrammedItem[] } = {}): Promise<ProgrammedCalendar> {
   const result: ProgrammedCalendar = { items: [], failures: [] };
   if (!isDownloadFeatureEnabled(config)) return result;
   const range = `start=${encodeURIComponent(iso(now))}&end=${encodeURIComponent(iso(now + days * 86_400_000))}&unmonitored=false`;
@@ -112,7 +146,8 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
         const profileId = Number(entry.series?.qualityProfileId) || undefined;
         const date = entry.airDate || entry.airDateUtc;
         const airedAt = entry.airDateUtc || entry.airDate;
-        const wanted = Boolean(airedAt && Date.parse(airedAt) < now);
+        // Retour terrain du 15/11 (S02E03 « Sortie aujourd'hui » alors que disponible) : sorti dès son jour de diffusion local.
+        const wanted = Boolean(airedAt && Date.parse(airedAt) < now) || Boolean(entry.airDate && dayTime(entry.airDate) <= now);
         const diskFull = wanted && proveDiskFull(disk, { path: entry.series?.path, runtime: Number(entry.runtime) > 0 ? entry.runtime : entry.series?.runtime, profileId, special: Number(entry.seasonNumber) === 0 });
         result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }), ...(wanted ? { wanted: true } : {}), ...(diskFull ? { diskFull: true } : {}), ...addedAt(entry.series?.added) });
       }
@@ -141,6 +176,12 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
     }, () => { result.failures.push('Radarr'); }));
   }
   await Promise.all(tasks);
+  await checkWantedReleases(result.items, previous, now, item => {
+    const isEpisode = item.kind === 'episode';
+    const url = isEpisode ? config.sonarrUrl : config.radarrUrl;
+    const apiKey = isEpisode ? config.sonarrApiKey : config.radarrApiKey;
+    return url && apiKey ? io.get(`${cleanUrl(url)}/api/v3/release?${isEpisode ? 'episodeId' : 'movieId'}=${item.id}`, headersFor(apiKey)) : Promise.resolve(null);
+  });
   result.items = sortProgrammedItems(result.items);
   return result;
 }

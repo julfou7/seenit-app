@@ -100,7 +100,8 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       set({ syncing: true });
       const watchedIds = get().watchedIds;
       const [programmed, imports, watched] = await Promise.all([
-        fetchProgrammedCalendar(config).catch(() => ({ items: [], failures: ['Sonarr/Radarr'] })),
+        // Dernière copie (même portée) : les vérifications de versions récentes sont reprises, pas refaites.
+        fetchProgrammedCalendar(config, { previous: get().snapshot?.key === key ? get().snapshot?.programmed?.items : [] }).catch(() => ({ items: [], failures: ['Sonarr/Radarr'] })),
         fetchRecentImports(config).catch((): RecentImports => ({ items: [], failures: ['Sonarr/Radarr'], pending: [] })),
         // Revue Codex #918 : les détails d'un film suivi appartiennent à la même copie (même compte, même
         // serveur) et sont relus à chaque synchronisation ; une lecture échouée est retentée à la suivante.
