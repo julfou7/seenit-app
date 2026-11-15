@@ -1,5 +1,5 @@
 import { cleanUrl, executeGet } from '../../services/sonarrRadarr';
-import { executePut } from '../../services/sonarrRadarrTransport';
+import { executeArrInteractiveGet, executePut } from '../../services/sonarrRadarrTransport';
 import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
 import { resolveEffectiveQualityProfileId, type QualityProfileSummary } from './qualityProfileSelection';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
@@ -33,6 +33,8 @@ export interface CalendarIo {
   put: (url: string, body: unknown, headers: Record<string, string>) => Promise<unknown>;
 }
 const defaultIo: CalendarIo = { get: executeGet, put: executePut };
+/** Recherche de versions : même transport long que le lancement (jusqu'à 90 s). */
+const releaseIo: CalendarIo = { get: executeArrInteractiveGet, put: executePut };
 
 const poster = (images?: ArrImage[]) => images?.find(image => image.coverType === 'poster')?.remoteUrl;
 
@@ -89,9 +91,9 @@ const readDiskRules = async (io: CalendarIo, base: string, apiKey: string): Prom
  * (gardé avec la copie) est repris. Une lecture en échec ne prouve rien et sera retentée.
  */
 export const RELEASE_CHECK_TTL_MS = 3 * 3_600_000;
-export const RELEASE_CHECKS_PER_SYNC = 8;
+export const RELEASE_CHECKS_PER_SYNC = 4;
 const qualityPreference = (quality?: string) => /4k|2160/i.test(quality || '') ? '4k' as const : /1080/.test(quality || '') ? '1080p' as const : undefined;
-export async function checkWantedReleases(items: ProgrammedItem[], previous: readonly ProgrammedItem[], now: number, read: (item: ProgrammedItem) => Promise<unknown>): Promise<void> {
+export async function checkWantedReleases(items: ProgrammedItem[], previous: readonly ProgrammedItem[], now: number, read: (item: ProgrammedItem) => Promise<unknown>, limit = RELEASE_CHECKS_PER_SYNC): Promise<void> {
   const prior = new Map(previous.map(item => [`${item.kind}:${item.id}`, item]));
   // Revue Codex #1053 : une preuve ne vaut que pour la qualité et le profil vérifiés ; un changement la refait.
   const scopeOf = (item: ProgrammedItem) => `${item.profileId || ''}|${item.quality || ''}`;
@@ -109,21 +111,23 @@ export async function checkWantedReleases(items: ProgrammedItem[], previous: rea
   }
   // Les plus anciennement tentés d'abord : chaque recherché finit par être relu, même si d'autres échouent.
   due.sort((a, b) => (a.releaseAttemptAt || 0) - (b.releaseAttemptAt || 0));
-  await Promise.all(due.slice(0, RELEASE_CHECKS_PER_SYNC).map(async item => {
+  // Retour terrain du 15/11 (v1.4.315, « timeout ») : une recherche de versions peut durer jusqu'à 90 s ; les
+  // lectures se font une par une pour ne pas saturer les indexers. L'appelant ne les attend pas pour afficher.
+  for (const item of due.slice(0, limit)) {
     item.releaseAttemptAt = now;
     const releases = await read(item).catch(() => null);
-    if (!Array.isArray(releases)) return;
+    if (!Array.isArray(releases)) continue;
     item.releaseCheckedAt = now;
     item.releaseScope = scopeOf(item);
     if (diskFullRejection(releases as ArrRelease[], qualityPreference(item.quality))) item.diskFull = true;
-  }));
+  }
 }
 
 /**
  * Lecture des versions proposées pour un recherché (`checkWantedReleases`). Revue Codex #1053 : appelée par la
  * synchronisation après la consolidation de la liste (titres hors de la première page compris).
  */
-export const wantedReleaseReader = (config: DownloadConfig, io: CalendarIo = defaultIo) => (item: ProgrammedItem): Promise<unknown> => {
+export const wantedReleaseReader = (config: DownloadConfig, io: CalendarIo = releaseIo) => (item: ProgrammedItem): Promise<unknown> => {
   const isEpisode = item.kind === 'episode';
   const url = isEpisode ? config.sonarrUrl : config.radarrUrl;
   const apiKey = isEpisode ? config.sonarrApiKey : config.radarrApiKey;

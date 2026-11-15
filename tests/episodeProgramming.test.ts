@@ -11,7 +11,7 @@ const bundle = await build({ entryPoints: ['src/features/downloads/episodeProgra
     builder.onResolve({ filter: /\/(?:sonarrRadarr|sonarrRadarrTransport|firebase|qualityProfileSelection|downloadFeatureVisibility)$/ }, args => ({ path: args.path.split('/').at(-1) || '', namespace: 'ports' }));
     builder.onLoad({ filter: /.*/, namespace: 'ports' }, args => ({ contents: args.path === 'sonarrRadarr'
       ? 'export const cleanUrl=u=>String(u).replace(/\\/+$/,"");export const executeGet=async()=>{throw new Error("réseau réel interdit")};export const fetchQualityProfiles=async()=>[];export const searchAndDownloadInSonarr=async()=>{throw new Error("réseau réel interdit")};'
-      : args.path === 'sonarrRadarrTransport' ? 'export const executePut=async()=>{throw new Error("réseau réel interdit")};'
+      : args.path === 'sonarrRadarrTransport' ? 'export const executePut=async()=>{throw new Error("réseau réel interdit")};export const executeArrInteractiveGet=executePut;'
       : args.path === 'firebase' ? 'export const auth={currentUser:null};'
       : args.path === 'qualityProfileSelection' ? 'export const resolveEffectiveQualityProfileId=(profiles,q)=>profiles.find(p=>p.name===(q==="4k"?"Ultra-HD":"HD-1080p"))?.id;'
       : 'export const isDownloadFeatureEnabled=c=>c.downloadsEnabled===true;' }));

@@ -9,6 +9,7 @@ import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope
 import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
 import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
 import { isSafeMagnetLink } from '../features/downloads/magnetLink';
+import { ARR_RELEASE_TIMEOUT_MS } from '../features/downloads/downloadServiceTimeout';
 
 export interface SonarrRadarrConfig {
   sonarrUrl?: string;
@@ -159,8 +160,8 @@ export async function executeGet(url: string, headers: Record<string, string> = 
           throw new Error(`Accès refusé (${directRes.status}) : Clé API incorrecte`);
         }
         throw new Error(`Erreur HTTP ${directRes.status}`);
-      } catch (directErr: any) {
-        if (directErr?.message?.includes('Accès refusé')) throw directErr;
+      } catch (directErr: unknown) {
+        if (directErr instanceof Error && directErr.message.includes('Accès refusé')) throw directErr;
         throw new Error(
           "PWA Web : L'accès aux IP locales est restreint. Utilisez l'APK Android sur Wi-Fi."
         );
@@ -749,13 +750,13 @@ export async function testServiceConnection(
 
 async function executeArrInteractiveWeb(method: 'GET' | 'POST', url: string, headers: Record<string, string>, body?: unknown): Promise<unknown> {
   if (isLocalNetworkUrl(url)) {
-    const response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(30_000) });
+    const response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(ARR_RELEASE_TIMEOUT_MS) });
     if (!response.ok) throw new Error(`Erreur HTTP ${response.status}`);
     return response.json();
   }
   const response = await authenticatedFetch('/api/service-proxy', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ targetUrl: url, method, headers, body }), signal: AbortSignal.timeout(35_000)
+    body: JSON.stringify({ targetUrl: url, method, headers, body }), signal: AbortSignal.timeout(ARR_RELEASE_TIMEOUT_MS + 5_000)
   });
   const result = await response.json();
   if (!response.ok || !result.ok || result.error) throw new Error(result.message || result.error || `Erreur proxy ${response.status}`);
@@ -771,7 +772,8 @@ export async function executeArrInteractiveGet(url: string, headers: Record<stri
       url,
       headers: normHeaders,
       connectTimeout: 10000,
-      readTimeout: 30000
+      // Retour terrain du 15/11 : les indexers peuvent dépasser 30 s (« timeout »).
+      readTimeout: ARR_RELEASE_TIMEOUT_MS
     });
     if (response.status >= 200 && response.status < 300) {
       let data = response.data;

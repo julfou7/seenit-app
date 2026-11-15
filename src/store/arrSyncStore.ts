@@ -72,6 +72,8 @@ function persistArrSnapshot(snapshot: ArrSnapshot): void {
   try { writeUserScopedJson(uid, PERSISTED_FIELD, stored); } catch { /* Une copie non gardée n'empêche jamais l'affichage. */ }
 }
 let inFlight: { key: string; promise: Promise<void> } | null = null;
+/** Une seule vérification de versions à la fois (indexers ménagés, jamais deux lots concurrents). */
+let releaseChecking = false;
 let sequence = 0;
 
 export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
@@ -112,15 +114,32 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       // SEENIT-DOWNLOAD-022 : titres, affiches et notes de la fiche TMDB en français, comme le reste de l'app.
       // SEENIT-DOWNLOAD-023 : chaque titre de Sonarr/Radarr à un endroit (Téléchargés, Programmés ou À décider).
       const coverage = coverArrLibrary(programmed, imports.pending);
-      // Retour terrain du 15/11 (v1.4.314) : « Disque plein » prouvé par les versions proposées, sur la liste complète
-      // (revue Codex #1053) ; la dernière copie de cette portée garde les vérifications récentes, non refaites.
-      if (coverage.programmed) await checkWantedReleases(coverage.programmed.items, get().snapshot?.key === key ? get().snapshot?.programmed?.items || [] : [], Date.now(), wantedReleaseReader(config));
-      if (arrSyncKey() !== key || id !== sequence) return;
       const labelled = await localizeArrLists({ programmed: coverage.programmed, imports, undecided: coverage.undecided }, tmdbArrLabelSource);
       if (arrSyncKey() !== key || id !== sequence) return;
+      // Retour terrain du 15/11 (v1.4.314) : « Disque plein » prouvé par les versions proposées, sur la liste complète
+      // (revue Codex #1053) ; la dernière copie de cette portée garde les vérifications récentes, non refaites.
+      // Retour du 15/11 (v1.4.315, « timeout ») : une recherche de versions peut durer 90 s ; les listes s'affichent
+      // tout de suite (résultats récents repris), la vérification se poursuit puis met la copie à jour.
+      const previous = get().snapshot?.key === key ? get().snapshot?.programmed?.items || [] : [];
+      const items = labelled.programmed?.items;
+      // Vérification déjà en cours : les résultats récents sont repris, aucune nouvelle lecture n'est lancée.
+      const checks = items ? checkWantedReleases(items, previous, Date.now(), wantedReleaseReader(config), releaseChecking ? 0 : undefined) : null;
+      const reading = Boolean(checks) && !releaseChecking;
       const snapshot = { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() };
       set({ snapshot });
       persistArrSnapshot(snapshot);
+      if (checks && reading) {
+        releaseChecking = true;
+        void checks.catch(() => undefined).finally(() => {
+          releaseChecking = false;
+          const latest = get().snapshot;
+          // Seule la copie vérifiée est mise à jour ; une relecture plus récente l'a déjà remplacée sinon.
+          if (arrSyncKey() !== key || latest?.programmed?.items !== items || !latest.programmed) return;
+          const updated = { ...latest, programmed: { ...latest.programmed, items: [...items] } };
+          set({ snapshot: updated });
+          persistArrSnapshot(updated);
+        });
+      }
     })().finally(() => {
       if (inFlight?.promise === promise) inFlight = null;
       set({ syncing: false });
