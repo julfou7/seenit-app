@@ -22,6 +22,8 @@ export interface NotificationTestSample {
   season?: number;
   episode?: number;
   notificationTitle: string;
+  /** Épisode retenu, construit ensuite par le code du vrai rappel (retour du 15/11). */
+  episodeSample?: EpisodeSample;
   summaryText: string;
   body: string;
   detailText?: string;
@@ -143,6 +145,7 @@ function buildSample(
       season,
       episode: episodeNumber,
       notificationTitle: show.title,
+      episodeSample: episode,
       summaryText: 'Nouvel épisode',
       body: `S${sNum} | E${eNum}${episodeName} disponible aujourd’hui.`,
       detailText: 'Un nouvel épisode est prêt dans ta liste À voir.',

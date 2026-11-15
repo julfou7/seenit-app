@@ -38,7 +38,7 @@ test('Réglages · aucune fonction historique ne disparaît', () => {
     /onClick=\{\(\) => handleTogglePlatform\(platform\.id\)\}/,
     /handleToggleNotif\('release_today_tv'/, /handleToggleNotif\('season_d7'/, /handleToggleNotif\('news'/,
     /handleToggleNotif\('movie_theater'/, /handleToggleNotif\('movie_dvd_vod'/,
-    /triggerTestNotif\(test\.type\)/, /NotificationSettings\.open\(\)/, /void handleRequestNotifications\(\)/,
+    /triggerTestNotif\(\)/, /NotificationSettings\.open\(\)/, /void handleRequestNotifications\(\)/,
     /onClick=\{handlePlexLogin\}/, /onClick=\{handleCancelPlexLogin\}/, /handlePlexSync\(true\)/, /handlePlexSync\(false\)/,
     /void handlePlexLogout\(\)/,
     /void handleBackupToCloud\(\)/, /void handleRestoreFromCloud\(\)/, /onClick=\{handleLogin\}/,
