@@ -11,6 +11,7 @@ function Harness() {
   const [external, setExternal] = useState(false);
   const [replacement, setReplacement] = useState(false);
   const [originPerson, setOriginPerson] = useState(false);
+  const [preview, setPreview] = useState(false);
   const [tab, setTab] = useState('profile');
   const [subview, setSubview] = useState(true);
   useEffect(() => {
@@ -46,6 +47,13 @@ function Harness() {
       window.history.pushState({ tab, selectedShow: null, isOriginPerson: true }, '');
       setOriginPerson(true);
     }}>Ouvrir une personne depuis l’onglet</button>
+    <button id="open-preview" onClick={() => setPreview(true)}>Ouvrir l’aperçu</button>
+    {/* #640 : comme PreviewModal, l'aperçu ouvre la fiche (onShowClick) puis se ferme (onClose) dans le même geste. */}
+    {preview && <DialogLayer id="preview" label="Aperçu" onDismiss={() => setPreview(false)} className="fixed inset-0 bg-black/80 p-4">
+      <button id="preview-open-media" onClick={() => {
+        window.history.pushState({ tab, selectedShow: { id: 7 } }, ''); setSheet(true); setPreview(false);
+      }}>Voir la fiche</button>
+    </DialogLayer>}
     {originPerson && <DialogLayer id="origin-person" label="Personne depuis l’onglet" historyMode="external" onDismiss={() => window.history.back()} className="fixed inset-0 bg-zinc-950 p-4">
       <button id="person-open-media" onClick={() => {
         window.history.pushState({ tab, selectedShow: { id: 42 } }, ''); setSheet(true);

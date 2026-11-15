@@ -7,8 +7,8 @@ import {
 } from '../features/providers/watchProviderRequestPolicy';
 import {
   readWatchProviderCache,
+  recordWatchProviderPayload,
   retainWatchProviderCacheEntry,
-  writeWatchProviderCache,
 } from '../features/providers/watchProviderCache';
 import {
   arePassiveProviderStatesEqual,
@@ -255,7 +255,8 @@ export function usePassiveWatchProvider({
 
         // Le payload TMDB public est stable et peut survivre aux démontages de cartes.
         // La disponibilité Plex reste dans son cache UID séparé et n'est jamais persistée ici.
-        writeWatchProviderCache(numericTmdbId, mediaType, res.value, {
+        // #641 : une copie périmée renvoyée après une panne garde son âge réel.
+        recordWatchProviderPayload(numericTmdbId, mediaType, res.value, {
           retention: retainInLibraryCache ? 'library' : 'discovery',
         });
         applyAuthoritativeTmdbPayload(res.value);
