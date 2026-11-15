@@ -11,7 +11,8 @@ import { registerPlugin } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { DEFAULT_NOTIFICATION_PREFS, mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { Capacitor } from '@capacitor/core';
-import { useBackendHealth } from '../features/settings/serviceHealth';
+import { describeIntegration, useIntegrationHealth } from '../features/settings/integrationHealth';
+import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { FirebaseAuthentication } from '@capacitor-firebase/authentication';
@@ -611,7 +612,7 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
   };
 
   const isNative = Capacitor.isNativePlatform();
-  const backendHealth = useBackendHealth();
+  const integrationHealth = useIntegrationHealth(useDownloadConfigStore());
   const isAndroid = Capacitor.getPlatform() === 'android';
   const devicePlace = isNative ? 'ce téléphone' : 'ce navigateur';
   const avatarUrl = getProfileAvatarUrl(user);
@@ -1060,8 +1061,9 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
 
         {/* #404 : météo des services — chaque point vient d'un signal réel et daté, jamais d'un simple jeton. */}
         <SettingsGroup title="Connexions" foot="État vérifié à l’ouverture des Réglages.">
-          <SettingsRow icon={Cloud} label="Serveur SeenIt" sub={backendHealth.text} tone={backendHealth.tone} dot />
+          {/* #403 (retour du 15/11) : les intégrations elles-mêmes, pas le serveur SeenIt. */}
           <SettingsRow icon={Server} label="Plex" sub={plexState.text} tone={plexState.tone} dot={Boolean(plexState.tone)} onClick={() => setPage('plex')} />
+          {integrationHealth.map(result => { const state = describeIntegration(result); return <SettingsRow key={result.key} icon={Download} label={result.label} sub={state.text} tone={state.tone} dot />; })}
           <SettingsRow icon={MonitorSmartphone} label="Appareils" sub={isNative ? 'Ce téléphone' : 'Ce navigateur'} onClick={() => setPage('devices')} />
         </SettingsGroup>
 
