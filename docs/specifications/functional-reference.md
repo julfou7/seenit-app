@@ -707,11 +707,17 @@ swipes de suppression/abandon sur les cartes.
 - Suivre sans visionner crée « À voir ».
 - Marquer un épisode vu/non vu met à jour `seenEpisodes`, `episodeRecords`, `lastWatchedAt` et le
   prochain épisode à voir.
-- #436 : depuis la fiche Série, un marquage individuel qui fait passer une saison de « au moins un
+- #436 : depuis la fiche Série ou le bouton « Vu » d'une carte de l'accueil (depuis le 15/11), un
+  marquage individuel qui fait passer une saison de « au moins un
   épisode diffusé non vu » à « tous vus » affiche une courte célébration non bloquante « Saison N
   terminée ! » (ou « Série terminée ! » s'il ne reste rien à voir et que TMDB déclare la série finie).
   Ni le numéro du final, ni « Tout marquer vu », ni un décochage ne la déclenchent ; animation coupée
   par `prefers-reduced-motion`.
+- Retour terrain du 15/11 : un même épisode n'est marqué qu'une fois à la fois (un tap répété pendant les
+  lectures TMDB est ignoré ; la carte garde son animation « Vu »). Une carte « Continuer à regarder » à
+  jour affiche « S03 · à jour » seulement si un épisode est annoncé dans la même saison, sinon
+  « S03 · saison vue » ; sans épisode annoncé, « Suite pas encore annoncée » (« Prochain épisode annoncé,
+  date à venir » si un épisode est annoncé sans date à venir).
 - Marquer une saison cible uniquement les épisodes déjà diffusés lorsque TMDB les distingue.
 - Une série complète devient `completed`; si TMDB la déclare Ended/Canceled elle peut être archivée
   automatiquement.

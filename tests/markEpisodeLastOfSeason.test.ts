@@ -6,7 +6,7 @@ import type { Show } from '../src/types.ts';
 
 // Retour terrain du 15/11 (Lupin S03E07, dernier épisode) : aucune célébration depuis l'accueil, et il a
 // fallu taper quatre fois : rien ne bougeait pendant les lectures TMDB et chaque tap relançait un marquage.
-test('dernier épisode coché depuis l’accueil : vu tout de suite, un seul marquage, saison célébrée', async () => {
+test('dernier épisode coché depuis l’accueil : un seul marquage même si l’on tape plusieurs fois', async () => {
   const bundle = await build({ entryPoints: ['src/features/shows/markEpisodeWatched.ts'], bundle: true, write: false, platform: 'node', format: 'cjs',
     plugins: [{ name: 'last-episode-ports', setup(builder) {
       builder.onResolve({ filter: /firebase\/firestore|\/(?:showsStore|tmdb|toastStore|logStore|utils|firebase)$/ }, args => ({ path: args.path, namespace: 'ports' }));
@@ -34,7 +34,8 @@ test('dernier épisode coché depuis l’accueil : vu tout de suite, un seul mar
 
   const first = module.exports.markEpisodeWatched(ports.show, 3, 7);
   await new Promise(resolve => setTimeout(resolve, 0));
-  assert.ok(ports.show.seenEpisodes.includes('3x7'), 'vu à l’écran dès le tap, avant les lectures TMDB');
+  // Revue Codex #1044 : pas de mise à jour anticipée qui retirerait l'épisode suivant (et le bouton « Vu »).
+  assert.ok(!ports.show.seenEpisodes.includes('3x7'), 'la carte garde son état pendant les lectures TMDB');
   assert.equal(await module.exports.markEpisodeWatched(ports.show, 3, 7), false, 'un deuxième tap pendant le marquage est ignoré');
   release();
   assert.notEqual(await first, false);

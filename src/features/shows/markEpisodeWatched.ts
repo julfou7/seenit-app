@@ -12,7 +12,8 @@ import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 /**
  * Retour terrain du 15/11 (dernier épisode de Lupin coché en quatre fois) : les lectures TMDB précèdent
  * l'enregistrement ; sans retour visuel, chaque tap relançait un marquage en parallèle. Un même épisode n'est
- * marqué qu'une fois à la fois, et il passe « vu » à l'écran dès le tap.
+ * marqué qu'une fois à la fois ; la carte garde son animation « Vu » pendant le marquage (revue Codex #1044 :
+ * une mise à jour anticipée sans épisode suivant retirait le bouton).
  */
 const marksInFlight = new Set<string>();
 
@@ -72,8 +73,6 @@ async function markEpisodeWatchedOnce(
   const newSeenSet = new Set(prevSeenEpisodes);
   newSeenSet.add(epKey);
   const newSeenArray = Array.from(newSeenSet);
-  // Retour visuel immédiat ; l'épisode suivant et l'enregistrement arrivent ensuite (annulés en cas d'échec).
-  useShowsStore.getState().updateShowOptimistic(targetShow.id, { seenEpisodes: newSeenArray });
 
   let fetchedEpTitle: string | null = null;
   let seasonEpisodes: Array<{ episode_number: number; air_date?: string | null }> | null = null;
