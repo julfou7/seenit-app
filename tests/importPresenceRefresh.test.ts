@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { importsNeedingPresence } from '../src/features/downloads/importPresenceRefresh.ts';
+import { importsNeedingPresence, importsReferenceFrom } from '../src/features/downloads/importPresenceRefresh.ts';
 import { importedEpisodesLabel } from '../src/features/downloads/importedEpisodes.ts';
 
 const series = (episodes: Array<[number, number]>) => ({ kind: 'series' as const, key: 's7', arrId: 7, tmdbId: 259909, title: 'Dexter : Résurrection', date: 1, episodes: episodes.map(([season, episode]) => ({ season, episode })) });
@@ -9,18 +9,28 @@ const series = (episodes: Array<[number, number]>) => ({ kind: 'series' as const
 // Retour terrain du 15/11 (v1.4.320, Dexter S02) : E01 et E03 présents dans Sonarr, mais la fiche les montrait à
 // télécharger et la carte de saison proposait « Ajouter E1 » — présence restée en cache après l'import.
 test('un import nouveau rafraîchit la présence du titre, jamais en masse au premier lancement', () => {
-  const copy = (items: unknown[], failures: string[] = []) => ({ items: items as Parameters<typeof importsNeedingPresence>[1]['items'], failures });
-  assert.deepEqual(importsNeedingPresence(undefined, copy([series([[2, 1]])])), [], 'sans copie précédente : rien');
-  assert.deepEqual(importsNeedingPresence(copy([series([[2, 1]])]), copy([series([[2, 1]])])), [], 'rien de nouveau');
-  assert.deepEqual(importsNeedingPresence(copy([series([[2, 1]])]), copy([series([[2, 1], [2, 3]])])), [{ tmdbId: 259909, mediaType: 'tv' }], 'E03 importé : présence relue');
-  assert.deepEqual(importsNeedingPresence(copy([]), copy([{ kind: 'movie', key: 'm3', arrId: 3, tmdbId: 755898, title: 'Film', date: 5 }])), [{ tmdbId: 755898, mediaType: 'movie' }]);
-  // Revue Codex #1063 : une copie en panne n'est jamais comparée ; au plus 5 titres relus par synchronisation.
-  assert.deepEqual(importsNeedingPresence(copy([], ['Sonarr']), copy([series([[2, 1]])])), []);
-  assert.deepEqual(importsNeedingPresence(copy([]), copy([series([[2, 1]])], ['Radarr'])), []);
-  const many = Array.from({ length: 12 }, (_, index) => ({ kind: 'movie', key: `m${index}`, arrId: index, tmdbId: 1000 + index, title: 'Film', date: 1 }));
-  assert.equal(importsNeedingPresence(copy([]), copy(many)).length, 5);
+  type Copy = { items: Parameters<typeof importsNeedingPresence>[1]['items']; failures: string[] };
+  const copy = (items: unknown[], failures: string[] = []): Copy => ({ items: items as Copy['items'], failures });
+  const movie = (key: string, tmdbId: number, date = 1) => ({ kind: 'movie', key, arrId: tmdbId, tmdbId, title: 'Film', date });
+  const run = (previous: Copy | undefined, next: Copy) => importsNeedingPresence(importsReferenceFrom(previous), next).targets;
+  assert.deepEqual(run(undefined, copy([series([[2, 1]])])), [], 'sans référence : rien en masse');
+  assert.deepEqual(run(copy([series([[2, 1]])]), copy([series([[2, 1]])])), [], 'rien de nouveau');
+  assert.deepEqual(run(copy([series([[2, 1]])]), copy([series([[2, 1], [2, 3]])])), [{ tmdbId: 259909, mediaType: 'tv' }], 'E03 importé : présence relue');
+  assert.deepEqual(run(copy([]), copy([movie('m3', 755898, 5)])), [{ tmdbId: 755898, mediaType: 'movie' }]);
+  // Revues Codex #1063 : référence par source. Sonarr en panne : ses séries ne sont pas comparées, Radarr l'est.
+  const during = importsNeedingPresence(importsReferenceFrom(copy([series([[2, 1]]), movie('m3', 1)])), copy([movie('m3', 1), movie('m4', 2)], ['Sonarr']));
+  assert.deepEqual(during.targets, [{ tmdbId: 2, mediaType: 'movie' }], 'import Radarr pendant la panne Sonarr : jamais perdu');
+  // Retour de Sonarr : seule la vraie nouveauté (E03), pas toute la bibliothèque.
+  const after = importsNeedingPresence(during.reference, copy([series([[2, 1], [2, 3]]), movie('m3', 1), movie('m4', 2)]));
+  assert.deepEqual(after.targets, [{ tmdbId: 259909, mediaType: 'tv' }]);
+  // Au plus 5 relus ; les suivants le seront à la synchronisation d'après.
+  const many = Array.from({ length: 12 }, (_, index) => movie(`m${index}`, 1000 + index));
+  const first = importsNeedingPresence(importsReferenceFrom(copy([])), copy(many));
+  const second = importsNeedingPresence(first.reference, copy(many));
+  const third = importsNeedingPresence(second.reference, copy(many));
+  assert.deepEqual([first.targets.length, second.targets.length, third.targets.length], [5, 5, 2]);
   const store = readFileSync('src/store/arrSyncStore.ts', 'utf8');
-  assert.match(store, /const refreshes = labelled\.imports \? importsNeedingPresence\(previousImports, labelled\.imports\) : \[\];/);
+  assert.match(store, /const presence = labelled\.imports \? importsNeedingPresence\(importsReference\.value, labelled\.imports\) : null;/);
   assert.match(store, /refreshes\.reduce\(\(chain, target\) => chain\.then\(\(\) => useMediaPresenceStore\.getState\(\)\.checkPresence\(\{ \.\.\.target, forceRefresh: true \}\)\)/, 'une par une');
 });
 

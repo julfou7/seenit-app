@@ -6,7 +6,7 @@ import { useMediaPresenceStore } from './mediaPresenceStore';
 import { checkWantedReleases, fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, wantedReleaseReader, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
 import { fetchRecentImports, type ArrPendingTitle, type RecentImports } from '../features/downloads/recentImports';
 import { coverArrLibrary } from '../features/downloads/arrCoverage';
-import { importsNeedingPresence } from '../features/downloads/importPresenceRefresh';
+import { importsNeedingPresence, importsReferenceFrom, type ImportsReference } from '../features/downloads/importPresenceRefresh';
 import { localizeArrLists } from '../features/downloads/arrMediaLabels';
 import { tmdbArrLabelSource } from '../features/downloads/arrMediaSource';
 
@@ -75,6 +75,8 @@ function persistArrSnapshot(snapshot: ArrSnapshot): void {
 let inFlight: { key: string; promise: Promise<void> } | null = null;
 /** Une seule vérification de versions à la fois (indexers ménagés, jamais deux lots concurrents). */
 let releaseChecking = false;
+/** Référence des imports par source, pour la portée courante (revues Codex #1063). */
+let importsReference: { key: string; value: ImportsReference } | null = null;
 let sequence = 0;
 
 export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
@@ -128,12 +130,14 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       const reading = Boolean(checks) && !releaseChecking;
       // Retour terrain du 15/11 (v1.4.320) : un import nouveau depuis la copie précédente rafraîchit la présence du
       // titre (fiche, « Ajouter E… »), au lieu de garder un état « à télécharger » en cache.
-      const previousImports = get().snapshot?.key === key ? get().snapshot?.imports : undefined;
+      if (importsReference?.key !== key) importsReference = { key, value: importsReferenceFrom(get().snapshot?.key === key ? get().snapshot?.imports : undefined) };
       const snapshot = { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() };
       set({ snapshot });
       persistArrSnapshot(snapshot);
       // Revue Codex #1063 : relectures une par une, jamais en rafale.
-      const refreshes = labelled.imports ? importsNeedingPresence(previousImports, labelled.imports) : [];
+      const presence = labelled.imports ? importsNeedingPresence(importsReference.value, labelled.imports) : null;
+      if (presence) importsReference = { key, value: presence.reference };
+      const refreshes = presence?.targets || [];
       void refreshes.reduce((chain, target) => chain.then(() => useMediaPresenceStore.getState().checkPresence({ ...target, forceRefresh: true })).catch(() => undefined), Promise.resolve());
       if (checks && reading) {
         releaseChecking = true;
