@@ -214,6 +214,8 @@ test('Programmés : jour de diffusion de la chaîne, et disque plein prouvé par
     ] : [];
     if (url.includes('wanted/missing')) return { records: url.startsWith('http://sonarr') ? [
       { id: 1, seriesId: 8, seasonNumber: 2, episodeNumber: 1, airDate: '2026-11-01', airDateUtc: '2026-11-02T02:00:00Z', monitored: true, series: { title: 'Dexter : Résurrection', monitored: true, qualityProfileId: 4, path: '/data/series/Dexter Resurrection', runtime: 55 } },
+      // Revue Codex #1049 : la durée de l'épisode prime sur celle de la série (20 min × 35 Mo tiennent dans 900 Mo).
+      { id: 2, runtime: 20, seriesId: 8, seasonNumber: 0, episodeNumber: 1, airDate: '2026-11-01', airDateUtc: '2026-11-02T02:00:00Z', monitored: true, series: { title: 'Dexter : Résurrection', monitored: true, qualityProfileId: 4, path: '/data/series/Dexter Resurrection', runtime: 55 } },
     ] : [] };
     if (url.endsWith('/rootfolder')) return roots.map(root => ({ ...root, freeSpace: free }));
     if (url.endsWith('/config/mediamanagement')) return { minimumFreeSpaceWhenImporting: 100, skipFreeSpaceCheckWhenImporting: false };
@@ -227,6 +229,8 @@ test('Programmés : jour de diffusion de la chaîne, et disque plein prouvé par
   assert.equal(calendar.programmedDateLabel(byId.get(3)?.date, sunday), "Aujourd'hui", 'jour de la chaîne, pas le lendemain UTC');
   assert.equal(byId.get(3)?.wanted, undefined, 'pas encore diffusé : pas recherché');
   assert.deepEqual([byId.get(1)?.wanted, byId.get(1)?.diskFull], [true, true], '900 Mo libres : même la plus petite version 4K (55 min × 35 Mo) est refusée');
+  assert.deepEqual([byId.get(2)?.wanted, byId.get(2)?.diskFull], [true, undefined], 'épisode court : une version tient, rien n’est prouvé');
+  assert.match(readFileSync('src/components/ProgrammedSection.tsx', 'utf8'), /const pastDayLabel = \(date\?: string\) => date \? new Date\(dayTime\(date\)\)/, 'revue Codex #1049 : date passée lue comme un jour local');
   assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), 'lectures acceptées par le proxy PWA');
   // Assez de place : recherché ordinaire. Règles illisibles : rien n'est prouvé.
   const roomy = await calendar.fetchProgrammedCalendar(config, { now: sunday, io: { get: rules(500 * 1024 * 1024 * 1024), put: async () => undefined } });

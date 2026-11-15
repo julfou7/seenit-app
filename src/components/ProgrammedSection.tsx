@@ -7,7 +7,7 @@ import { useShowsStore } from '../store/showsStore';
 import { hideSeenWanted, seenWatchedRequest } from '../features/downloads/wantedSeen';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
-import { changeProgrammedQuality, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
+import { changeProgrammedQuality, dayTime, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
 import type { LiveDownloadItem } from '../services/sonarrRadarrLive';
 import { coveredBy, hideQueuedProgrammed, orderByRecentlyAdded } from '../features/downloads/programmedQueue';
 
@@ -48,7 +48,7 @@ export function programmedMoviePill(movie: Pick<MovieItem, 'date' | 'dateKind' |
 }
 const itemPill = (item: EpisodeItem) => item.wanted ? wantedPill(item) : releasePill(item.date);
 /** Jour de sortie passé d'un épisode recherché (« sam. 31 oct. »). */
-const pastDayLabel = (date?: string) => date ? new Date(date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+const pastDayLabel = (date?: string) => date ? new Date(dayTime(date)).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
 
 /** v1.4.284 (retour terrain du 09/11 : « une vue compacte ? la hauteur varie d'une série à l'autre ») : une ligne
  * de hauteur régulière par titre, épisodes repliés ; la vue détaillée reste au choix, mémorisée par compte. */

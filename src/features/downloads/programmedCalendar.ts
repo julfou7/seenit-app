@@ -7,7 +7,7 @@ import { parseDiskRules, proveDiskFull, type DiskRules } from './arrDiskSpace';
 
 type DownloadConfig = ReturnType<typeof useDownloadConfigStore.getState>;
 type ArrImage = { coverType?: string; remoteUrl?: string; url?: string };
-type CalendarEpisode = { id?: number; seriesId?: number; seasonNumber?: number; episodeNumber?: number; title?: string; airDateUtc?: string; airDate?: string; monitored?: boolean; hasFile?: boolean; series?: { title?: string; tmdbId?: number; tvdbId?: number; monitored?: boolean; qualityProfileId?: number; images?: ArrImage[]; added?: string; path?: string; runtime?: number } };
+type CalendarEpisode = { id?: number; runtime?: number; seriesId?: number; seasonNumber?: number; episodeNumber?: number; title?: string; airDateUtc?: string; airDate?: string; monitored?: boolean; hasFile?: boolean; series?: { title?: string; tmdbId?: number; tvdbId?: number; monitored?: boolean; qualityProfileId?: number; images?: ArrImage[]; added?: string; path?: string; runtime?: number } };
 type CalendarMovie = { id?: number; title?: string; tmdbId?: number; monitored?: boolean; hasFile?: boolean; isAvailable?: boolean; qualityProfileId?: number; digitalRelease?: string; physicalRelease?: string; inCinemas?: string; images?: ArrImage[]; added?: string; path?: string; runtime?: number };
 
 /** Retour terrain du 08/11 : la date d'un film dit de quelle sortie il s'agit (seule une version numérique ou
@@ -78,7 +78,7 @@ const readDiskRules = async (io: CalendarIo, base: string, apiKey: string): Prom
  * le jour affiché est le jour de diffusion de la chaîne (`airDate`), comme sur le reste de l'app ; l'heure UTC
  * (`airDateUtc`) ne sert qu'à savoir si l'épisode est déjà sorti. Une date seule est lue comme un jour local.
  */
-const dayTime = (date: string) => {
+export const dayTime = (date: string) => {
   const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   return day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])).getTime() : Date.parse(date);
 };
@@ -113,7 +113,7 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
         const date = entry.airDate || entry.airDateUtc;
         const airedAt = entry.airDateUtc || entry.airDate;
         const wanted = Boolean(airedAt && Date.parse(airedAt) < now);
-        const diskFull = wanted && proveDiskFull(disk, { path: entry.series?.path, runtime: entry.series?.runtime, profileId });
+        const diskFull = wanted && proveDiskFull(disk, { path: entry.series?.path, runtime: Number(entry.runtime) > 0 ? entry.runtime : entry.series?.runtime, profileId });
         result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }), ...(wanted ? { wanted: true } : {}), ...(diskFull ? { diskFull: true } : {}), ...addedAt(entry.series?.added) });
       }
     }, () => { result.failures.push('Sonarr'); }));
