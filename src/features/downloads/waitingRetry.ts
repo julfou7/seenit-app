@@ -1,5 +1,6 @@
 import type { LiveDownloadItem } from '../../services/sonarrRadarrLive';
 import type { ArrDownloadLaunch } from './downloadLaunch';
+import { downloadGroup } from './downloadGroups.ts';
 
 /**
  * #664 — retour du propriétaire du 15/11 : « un bouton retry pour forcer la nouvelle tentative ». Une demande en
@@ -9,7 +10,14 @@ import type { ArrDownloadLaunch } from './downloadLaunch';
  * Sans identité TMDB, rien n'est relancé : jamais de recherche par titre.
  */
 export function waitingRetryLaunch(item: LiveDownloadItem): Omit<ArrDownloadLaunch, 'config' | 'notify'> | null {
-  if (item.status !== 'waiting' || !(Number(item.tmdbId) > 0)) return null;
+  // Retour terrain du 15/11 (v1.4.316, « je suis bloqué, rien pour relancer ») : une demande « À régler » sans
+  // transfert (recherche impossible, timeout…) se relance aussi ; un vrai transfert en échec passe par « Choisir
+  // une version ».
+  // Revue Codex #1057 : `importState: 'pending'` est posé dès la demande (`beginDownloadRequest`) ; seul un
+  // identifiant, un chemin ou une progression prouvent un transfert.
+  const transferStarted = Boolean(item.downloadId || item.transferPath) || Number(item.progress) > 0;
+  const failedRequest = downloadGroup(item) === 'attention' && !transferStarted;
+  if ((item.status !== 'waiting' && !failedRequest) || !(Number(item.tmdbId) > 0)) return null;
   // Revue Codex #1051 : une attente créée depuis la fiche garde sa qualité dans `releaseTitle` (« … • 4K ») ;
   // une qualité inconnue n'est jamais devinée (relancer en 1080p remplacerait le profil 4K du média).
   const qualityText = item.quality || item.releaseTitle || '';
