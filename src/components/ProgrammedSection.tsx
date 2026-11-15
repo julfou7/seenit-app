@@ -194,7 +194,10 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   const cancelEpisodes = async (targets: readonly EpisodeItem[], label: string) => {
     const plain = targets.filter(item => !requestFor.has(item.id));
     if (plain.length) await cancel(plain, label);
-    for (const item of targets) { const request = requestFor.get(item.id); if (request) await onForgetWatching?.(request); }
+    // Revue Codex #1054 : une attente non annulée (Sonarr injoignable…) est signalée, jamais passée sous silence.
+    let kept = 0;
+    for (const item of targets) { const request = requestFor.get(item.id); if (request && onForgetWatching && await onForgetWatching(request) === false) kept++; }
+    if (kept) toast({ title: label, action: `${kept} attente${kept > 1 ? 's' : ''} non annulée${kept > 1 ? 's' : ''} : réessaie dans un instant.`, posterPath: targets[0]?.posterUrl || null }, 'error');
   };
   const rowCancel = (item: EpisodeItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => { const request = requestFor.get(item.id); if (request && onRemoveWatching) onRemoveWatching(request); else void cancel([item], label); }} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel programmed__cancel--icon"><X size={18} aria-hidden="true" /></button>;
   /** Menu ⋯ de chaque carte (retour terrain du 08/11 : « toujours les 3 petits points pour changer la qualité »). */

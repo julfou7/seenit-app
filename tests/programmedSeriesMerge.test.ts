@@ -13,7 +13,8 @@ test('Programmés : une seule carte par série, épisodes demandés depuis SeenI
   assert.match(section, /group\.sort\(\(a, b\) => a\.season - b\.season \|\| a\.episode - b\.episode\);/, 'épisodes dans l’ordre de la série');
   // La demande reste attachée à sa ligne : annuler l'épisode annule l'attente (avec confirmation).
   assert.match(section, /const request = requestFor\.get\(item\.id\); if \(request && onRemoveWatching\) onRemoveWatching\(request\); else void cancel\(\[item\], label\);/);
-  assert.match(section, /if \(request\) await onForgetWatching\?\.\(request\);/, 'annuler la série retire aussi les demandes SeenIt');
+  assert.match(section, /if \(request && onForgetWatching && await onForgetWatching\(request\) === false\) kept\+\+;/, 'annuler la série retire aussi les demandes SeenIt');
+  assert.match(section, /if \(kept\) toast\(\{ title: label, action: `\$\{kept\} attente/, 'revue Codex #1054 : un échec est signalé');
   assert.match(screen, /onForgetWatching=\{removeDownload\}/);
 
   // Revue Codex #1054 : annulation groupée confirmée par le dialogue commun (Échap, retour Android, focus sur Garder).
