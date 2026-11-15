@@ -183,7 +183,7 @@ test('SEENIT-DOWNLOAD-020 Programmés : vue compacte par défaut, détaillée au
   assert.match(section, /aria-label="Programmés en compact" aria-pressed=\{compact\}/);
   assert.match(section, /aria-label="Programmés en détaillé" aria-pressed=\{!compact\}/);
   assert.match(section, /\{card\.episodes && episodesOpen\(card\) && card\.episodes\.rows\}/, 'compact : épisodes repliés jusqu’au chevron');
-  assert.match(section, /item\.wanted \? `Sorti \$\{pastDayLabel\(item\.date\)\} · \$\{item\.diskFull \? 'disque plein' : 'recherché'\}` : programmedDateLabel\(item\.date\)/, 'un recherché dit sa vraie date de sortie et, le cas échéant, le disque plein');
+  assert.match(section, /item\.wanted \? `Sorti \$\{pastDayLabel\(item\.date\)\} · \$\{item\.diskFull \? 'disque plein' : item\.freeSpace !== undefined \? 'disque presque plein' : 'recherché'\}` : programmedDateLabel\(item\.date\)/, 'un recherché dit sa vraie date de sortie et, le cas échéant, le disque plein');
   assert.match(readFileSync('src/screens/downloads.css', 'utf8'), /\.programmed-compact__title \{[^}]*overflow-wrap:anywhere/, 'titre entier en compact');
   // Retour terrain du 09/11 : « supprime Sonarr et Radarr sous le titre, y a pas besoin ».
   assert.match(section, /meta: meta\('Série', first\.quality, /);
@@ -324,4 +324,28 @@ test('Programmés : les résultats de vérification sont reportés sur une copie
   assert.deepEqual([reads, newer[0].diskFull, newer[1].diskFull], [0, true, undefined]);
   const store = readFileSync('src/store/arrSyncStore.ts', 'utf8');
   assert.match(store, /const merged = latest\.programmed\.items\.map\(item => \(\{ \.\.\.item \}\)\);\n\s+void checkWantedReleases\(merged, items, Date\.now\(\), wantedReleaseReader\(config\), 0\);/);
+});
+
+// Retour terrain du 15/11 (v1.4.317, « c'est bien un problème de place », 1,2 Go libres sur D:) : taille minimale à 0
+// dans Radarr et indexers en pause, rien n'est prouvable ; l'espace libre réel est montré, chiffré, sous 10 Go.
+test('Programmés : espace libre réel montré quand il est bas, sans cause déclarée', async () => {
+  const gib = 1024 ** 3;
+  const get = (free: number) => async (url: string) => {
+    if (url.includes('/calendar')) return [];
+    if (url.includes('wanted/missing')) return { records: url.startsWith('http://radarr') ? [{ id: 21, title: 'La Guerre des mondes', tmdbId: 755898, monitored: true, isAvailable: true, qualityProfileId: 6, path: 'D:\\Films\\La Guerre des mondes (2025)', runtime: 91 }] : [] };
+    if (url.endsWith('/rootfolder')) return [{ path: 'D:\\Films', freeSpace: free }];
+    if (url.endsWith('/config/mediamanagement')) return { minimumFreeSpaceWhenImporting: 100 };
+    if (url.endsWith('/qualitydefinition')) return [{ quality: { id: 7 }, minSize: 0 }];
+    if (url.endsWith('/qualityprofile')) return [{ id: 6, name: 'HD-1080p', items: [{ allowed: true, quality: { id: 7 } }] }];
+    throw new Error(url);
+  };
+  const low = await calendar.fetchProgrammedCalendar(config, { now, io: { get: get(1.2 * gib), put: async () => undefined } });
+  const movie = low.items.find(item => item.id === 21) as Item & { diskFull?: boolean; freeSpace?: number };
+  assert.deepEqual([movie.diskFull, Math.round((movie.freeSpace || 0) / gib * 10) / 10], [undefined, 1.2], 'pas de preuve (taille minimale 0), espace bas montré');
+  const roomy = await calendar.fetchProgrammedCalendar(config, { now, io: { get: get(200 * gib), put: async () => undefined } });
+  assert.equal((roomy.items.find(item => item.id === 21) as { freeSpace?: number }).freeSpace, undefined, 'assez de place : rien de plus');
+  const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
+  assert.match(section, /export const lowDiskPill = \(freeSpace: number\) => `Disque presque plein · \$\{formatFreeSpace\(freeSpace\)\} libres`;/);
+  const { formatFreeSpace } = await import('../src/features/downloads/arrDiskSpace.ts');
+  assert.equal(formatFreeSpace(1.2 * gib), '1,2 Go');
 });

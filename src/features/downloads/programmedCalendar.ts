@@ -3,7 +3,9 @@ import { executeArrInteractiveGet, executePut } from '../../services/sonarrRadar
 import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
 import { resolveEffectiveQualityProfileId, type QualityProfileSummary } from './qualityProfileSelection';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
-import { parseDiskRules, proveDiskFull, type DiskRules } from './arrDiskSpace';
+import { lowFreeSpace, parseDiskRules, parseRoots, proveDiskFull, type DiskRules } from './arrDiskSpace';
+/** Espace libre réel du dossier d'un recherché, seulement s'il est bas (moins de 10 Go). */
+const lowDisk = (wanted: boolean, roots: DiskRules['roots'], path?: string) => { const free = wanted ? lowFreeSpace(roots, path) : undefined; return free === undefined ? {} : { freeSpace: free }; };
 import { diskFullRejection, type ArrRelease } from './downloadNoRelease';
 
 type DownloadConfig = ReturnType<typeof useDownloadConfigStore.getState>;
@@ -22,8 +24,8 @@ export type ProgrammedQuality = string;
  * propriétaire du 09/11, `USR-2026-11-09-009`). `inCinemasPast` : film sorti en salle sans date numérique connue.
  */
 export type ProgrammedItem =
-  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; releaseCheckedAt?: number; releaseAttemptAt?: number; releaseScope?: string; addedAt?: number }
-  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; releaseCheckedAt?: number; releaseAttemptAt?: number; releaseScope?: string; inCinemasPast?: boolean; addedAt?: number };
+  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; freeSpace?: number; releaseCheckedAt?: number; releaseAttemptAt?: number; releaseScope?: string; addedAt?: number }
+  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; freeSpace?: number; releaseCheckedAt?: number; releaseAttemptAt?: number; releaseScope?: string; inCinemasPast?: boolean; addedAt?: number };
 
 /** `movieQuality` : libellé de qualité d'un profil Radarr de ce serveur (revue Codex #933 : films ajoutés hors calendrier). */
 export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[]; movieQuality?: (profileId?: number) => ProgrammedQuality | undefined }
@@ -71,10 +73,10 @@ const wantedRecords = <T,>(page: unknown): T[] | null => {
 };
 const WANTED_PAGE = 'page=1&pageSize=100&monitored=true';
 /** Règles d'espace disque du serveur (voir `arrDiskSpace`) ; une lecture échouée ne prouve rien. */
-const readDiskRules = async (io: CalendarIo, base: string, apiKey: string): Promise<DiskRules | null> => {
+const readDiskRules = async (io: CalendarIo, base: string, apiKey: string): Promise<{ rules: DiskRules | null; roots: DiskRules['roots'] }> => {
   const read = (path: string) => io.get(`${base}/api/v3/${path}`, headersFor(apiKey)).catch(() => null);
   const [roots, management, definitions, profiles] = await Promise.all([read('rootfolder'), read('config/mediamanagement'), read('qualitydefinition'), read('qualityprofile')]);
-  return parseDiskRules(roots, management, definitions, profiles);
+  return { rules: parseDiskRules(roots, management, definitions, profiles), roots: parseRoots(roots) };
 };
 /**
  * Retour terrain du 15/11 (Dexter : Résurrection S02E03, « sortie demain » alors qu'elle sortait le jour même) :
@@ -170,8 +172,8 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
         const airedAt = entry.airDateUtc || entry.airDate;
         // Retour terrain du 15/11 (S02E03 « Sortie aujourd'hui » alors que disponible) : sorti dès son jour de diffusion local.
         const wanted = Boolean(airedAt && Date.parse(airedAt) < now) || Boolean(entry.airDate && dayTime(entry.airDate) <= now);
-        const diskFull = wanted && proveDiskFull(disk, { path: entry.series?.path, runtime: Number(entry.runtime) > 0 ? entry.runtime : entry.series?.runtime, profileId, special: Number(entry.seasonNumber) === 0 });
-        result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }), ...(wanted ? { wanted: true } : {}), ...(diskFull ? { diskFull: true } : {}), ...addedAt(entry.series?.added) });
+        const diskFull = wanted && proveDiskFull(disk.rules, { path: entry.series?.path, runtime: Number(entry.runtime) > 0 ? entry.runtime : entry.series?.runtime, profileId, special: Number(entry.seasonNumber) === 0 });
+        result.items.push({ kind: 'episode', id: entry.id, seriesId: Number(entry.seriesId) || 0, tmdbId: entry.series?.tmdbId || undefined, tvdbId: entry.series?.tvdbId || undefined, seriesTitle: entry.series?.title || 'Série', season: Number(entry.seasonNumber), episode: Number(entry.episodeNumber), title: entry.title || `Épisode ${entry.episodeNumber}`, date, posterUrl: poster(entry.series?.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.sonarr1080pProfileId, uhd: config.sonarr4kProfileId }), ...(wanted ? { wanted: true } : {}), ...(diskFull ? { diskFull: true } : {}), ...lowDisk(wanted && !diskFull, disk.roots, entry.series?.path), ...addedAt(entry.series?.added) });
       }
     }, () => { result.failures.push('Sonarr'); }));
   }
@@ -192,7 +194,7 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
         const release = movieRelease(movie, now);
         const profileId = Number(movie.qualityProfileId) || undefined;
         // Sans sortie à venir : disponible selon Radarr → recherché ; sinon sorti en salle, version pas encore annoncée.
-        const extra = release.date ? {} : movie.isAvailable === true ? { wanted: true, ...(proveDiskFull(disk, { path: movie.path, runtime: movie.runtime, profileId }) ? { diskFull: true } : {}) } : release.inCinemasPast ? { inCinemasPast: true } : {};
+        const extra = release.date ? {} : movie.isAvailable === true ? { wanted: true, ...(proveDiskFull(disk.rules, { path: movie.path, runtime: movie.runtime, profileId }) ? { diskFull: true } : lowDisk(true, disk.roots, movie.path)) } : release.inCinemasPast ? { inCinemasPast: true } : {};
         result.items.push({ kind: 'movie', id: movie.id, tmdbId: movie.tmdbId || undefined, title: movie.title || 'Film', date: release.date, dateKind: release.kind, posterUrl: poster(movie.images), profileId, quality: profileQualityLabel(profileId, profiles, { hd: config.radarr1080pProfileId, uhd: config.radarr4kProfileId }), ...extra, ...addedAt(movie.added) });
       }
     }, () => { result.failures.push('Radarr'); }));
