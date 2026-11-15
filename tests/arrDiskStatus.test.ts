@@ -22,7 +22,10 @@ test('espace disque de Sonarr/Radarr : un disque une fois, chiffres réels, lu �
     return url.includes(':8989') ? [{ path: 'D:\\Series', freeSpace: 1.2 * gib, totalSpace: 515.7 * gib }] : [{ path: 'D:\\Films', freeSpace: 1.2 * gib, totalSpace: 515.7 * gib }, { path: '/data/films', freeSpace: 300 * gib }];
   });
   assert.deepEqual(urls, ['http://nas:8989/api/v3/rootfolder', 'http://nas:7878/api/v3/rootfolder']);
-  assert.deepEqual(disks.map(entry => entry.label), ['D:', '/data/films'], 'même lecteur montré une fois, le plus plein d’abord');
+  assert.deepEqual(disks.map(entry => entry.label), ['D:', '/data/films'], 'même machine, même lecteur : montré une fois, le plus plein d’abord');
+  // Revue Codex #1058 : deux machines, chacune avec un lecteur D: — jamais fusionnés.
+  const twoHosts = await disk.fetchDiskStatus({ ...config, radarrUrl: 'http://autre:7878' }, async url => url.includes(':8989') ? [{ path: 'D:\\Series', freeSpace: 200 * gib }] : [{ path: 'D:\\Films', freeSpace: 1 * gib }]);
+  assert.deepEqual(twoHosts.map(entry => entry.label), ['D: · Radarr', 'D: · Sonarr']);
   assert.equal(disk.describeDisk(disks[0]), '1,2 Go libres sur 515,7 Go');
   assert.deepEqual(disks.map(disk.diskTone), ['error', 'ok']);
   assert.equal(disk.diskTone({ label: 'E:', freeSpace: 5 * gib }), 'warn');

@@ -18,21 +18,33 @@ const diskLabel = (path: string) => {
   return drive ? `${drive[1].toUpperCase()}:` : path.replace(/\/+$/, '') || '/';
 };
 
-export function mergeDisks(rootFolders: readonly unknown[]): DiskStatus[] {
-  const disks = new Map<string, DiskStatus>();
-  for (const root of rootFolders as Array<{ path?: string; freeSpace?: number; totalSpace?: number }>) {
-    if (!root?.path || !Number.isFinite(root.freeSpace)) continue;
-    const label = diskLabel(String(root.path));
-    if (!disks.has(label)) disks.set(label, { label, freeSpace: Number(root.freeSpace), ...(Number(root.totalSpace) > 0 ? { totalSpace: Number(root.totalSpace) } : {}) });
+export interface DiskSource { host: string; service: string; rootFolders: readonly unknown[] }
+/**
+ * Revue Codex #1058 : deux disques ne sont fusionnés que s'ils sont sur la même machine (même hôte) ; deux lecteurs
+ * « D: » de machines différentes restent distincts et sont nommés avec leur service (« D: · Radarr »).
+ */
+export function mergeDisks(sources: readonly DiskSource[]): DiskStatus[] {
+  const disks = new Map<string, DiskStatus & { service: string }>();
+  for (const source of sources) {
+    for (const root of source.rootFolders as Array<{ path?: string; freeSpace?: number; totalSpace?: number }>) {
+      if (!root?.path || !Number.isFinite(root.freeSpace)) continue;
+      const label = diskLabel(String(root.path));
+      const key = `${source.host}\n${label}`;
+      if (!disks.has(key)) disks.set(key, { label, service: source.service, freeSpace: Number(root.freeSpace), ...(Number(root.totalSpace) > 0 ? { totalSpace: Number(root.totalSpace) } : {}) });
+    }
   }
-  return [...disks.values()].sort((a, b) => a.freeSpace - b.freeSpace);
+  const all = [...disks.values()];
+  return all.map(({ service, ...disk }) => all.filter(other => other.label === disk.label).length > 1 ? { ...disk, label: `${disk.label} · ${service}` } : disk)
+    .sort((a, b) => a.freeSpace - b.freeSpace);
 }
+const hostOf = (url: string) => { try { return new URL(url).hostname.toLowerCase(); } catch { return url; } };
 
 export async function fetchDiskStatus(config: DiskConfig, read: Read = executeGet): Promise<DiskStatus[]> {
   if (!isDownloadFeatureEnabled(config as Parameters<typeof isDownloadFeatureEnabled>[0])) return [];
-  const sources = [[config.sonarrUrl, config.sonarrApiKey], [config.radarrUrl, config.radarrApiKey]].filter(([url, key]) => url?.trim() && key?.trim()) as Array<[string, string]>;
-  const lists = await Promise.all(sources.map(([url, key]) => read(`${cleanUrl(url)}/api/v3/rootfolder`, { 'X-Api-Key': key, Accept: 'application/json' }).then(list => Array.isArray(list) ? list : [], () => [])));
-  return mergeDisks(lists.flat());
+  const sources = [['Sonarr', config.sonarrUrl, config.sonarrApiKey], ['Radarr', config.radarrUrl, config.radarrApiKey]].filter(([, url, key]) => url?.trim() && key?.trim()) as Array<[string, string, string]>;
+  const lists = await Promise.all(sources.map(([service, url, key]) => read(`${cleanUrl(url)}/api/v3/rootfolder`, { 'X-Api-Key': key, Accept: 'application/json' })
+    .then(list => ({ host: hostOf(cleanUrl(url)), service, rootFolders: Array.isArray(list) ? list : [] }), () => ({ host: hostOf(cleanUrl(url)), service, rootFolders: [] }))));
+  return mergeDisks(lists);
 }
 
 export type DiskTone = 'ok' | 'warn' | 'error';
