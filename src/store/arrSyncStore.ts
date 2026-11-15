@@ -6,6 +6,7 @@ import { useMediaPresenceStore } from './mediaPresenceStore';
 import { checkWantedReleases, fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, wantedReleaseReader, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
 import { fetchRecentImports, type ArrPendingTitle, type RecentImports } from '../features/downloads/recentImports';
 import { coverArrLibrary } from '../features/downloads/arrCoverage';
+import { importsNeedingPresence } from '../features/downloads/importPresenceRefresh';
 import { localizeArrLists } from '../features/downloads/arrMediaLabels';
 import { tmdbArrLabelSource } from '../features/downloads/arrMediaSource';
 
@@ -125,9 +126,15 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       // Vérification déjà en cours : les résultats récents sont repris, aucune nouvelle lecture n'est lancée.
       const checks = items ? checkWantedReleases(items, previous, Date.now(), wantedReleaseReader(config), releaseChecking ? 0 : undefined) : null;
       const reading = Boolean(checks) && !releaseChecking;
+      // Retour terrain du 15/11 (v1.4.320) : un import nouveau depuis la copie précédente rafraîchit la présence du
+      // titre (fiche, « Ajouter E… »), au lieu de garder un état « à télécharger » en cache.
+      const previousImports = get().snapshot?.key === key ? get().snapshot?.imports?.items : undefined;
       const snapshot = { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() };
       set({ snapshot });
       persistArrSnapshot(snapshot);
+      for (const target of importsNeedingPresence(previousImports, labelled.imports?.items || [])) {
+        void useMediaPresenceStore.getState().checkPresence({ ...target, forceRefresh: true }).catch(() => undefined);
+      }
       if (checks && reading) {
         releaseChecking = true;
         void checks.catch(() => undefined).finally(() => {

@@ -43,6 +43,7 @@ import {
 import { sortDownloadsByAddedAt } from '../features/downloads/downloadPresentation';
 import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
 import { describeDisk, diskTone, useDiskStatus } from '../features/downloads/arrDiskStatus';
+import { formatFreeSpace } from '../features/downloads/arrDiskSpace';
 import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGuard';
 import { getStableDownloadRenderKey } from '../features/downloads/downloadPosterStability';
 import { useTabShortcut } from '../features/navigation/useTabShortcut';
@@ -67,6 +68,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   } = useLiveDownloadStore();
   const config = useDownloadConfigStore();
   const lowDisks = (useDiskStatus(config) || []).filter(disk => diskTone(disk) !== 'ok');
+  // Retour terrain du 15/11 (E02 téléchargé, import bloqué faute de place sur D:) : un import en attente le dit, chiffre réel.
+  const importDiskNote = lowDisks[0] ? `disque ${lowDisks[0].label} presque plein (${formatFreeSpace(lowDisks[0].freeSpace)} libres)` : undefined;
   const showToast = useToastStore(state => state.showToast);
   const screenRootRef = useRef<HTMLDivElement>(null);
   const searchRequestRef = useRef(0);
@@ -492,7 +495,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             className="download-swipe"
             actions={[{ label: isActive ? 'Annuler' : 'Retirer', ariaLabel: `${isActive ? 'Annuler le téléchargement de' : 'Retirer'} ${item.movieTitle || item.seriesTitle || item.title}`, icon: <Trash2 size={18} />, tone: 'rose', onSelect: () => handleRemove(item) }]}
           >
-            <DownloadItemCard item={item} onShowClick={onShowClick} onRemove={() => handleRemove(item)} onRetry={waitingRetryLaunch(item) ? () => void handleRetryFailed(item) : undefined} onTestIndexers={() => void handleTestIndexers(item)} testingIndexers={testingIndexers === item.mediaType} />
+            <DownloadItemCard item={item} onShowClick={onShowClick} onRemove={() => handleRemove(item)} onRetry={waitingRetryLaunch(item) ? () => void handleRetryFailed(item) : undefined} onTestIndexers={() => void handleTestIndexers(item)} testingIndexers={testingIndexers === item.mediaType} importDiskNote={importDiskNote} />
           </ActionSwipeCard>
         );
       })}

@@ -96,6 +96,7 @@
 .download-card--terminal { --dl-tint:oklch(.26 .02 250 / .45); }
 .download-card__retest { display:flex; align-items:center; justify-content:center; width:100%; min-height:44px; margin-top:10px; border-radius:12px; background:#ffffff0d; box-shadow:inset 0 0 0 1px #ffffff26; color:#f4f4f5; font-size:13.5px; font-weight:800; }
 .download-card__retest:disabled { opacity:.6; }
+.downloads-recent__episodes { margin:4px 2px 0; color:#a1a1aa; font-size:12px; font-weight:700; line-height:1.3; overflow-wrap:anywhere; }
 .downloads-disk { margin:4px 0 0; color:#fbbf24; font-size:13.5px; font-weight:700; }
 .downloads-disk[data-tone="error"] { color:#f87171; }
 .download-card__quick { display:flex; align-items:center; gap:10px; margin-top:10px; }

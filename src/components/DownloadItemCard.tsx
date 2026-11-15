@@ -12,7 +12,7 @@ import { releaseVariantLabel } from '../features/downloads/releaseQuality';
 const AlternativeReleaseModal = lazy(() => import('./AlternativeReleaseModal').then(module => ({ default: module.AlternativeReleaseModal })));
 const DownloadModal = lazy(() => import('./DownloadModal').then(module => ({ default: module.DownloadModal })));
 
-export function DownloadItemCard({ item, onShowClick, onRemove, onRetry, onTestIndexers, testingIndexers = false }: { item: LiveDownloadItem; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: () => void; onRetry?: () => void; onTestIndexers?: () => void; testingIndexers?: boolean }) {
+export function DownloadItemCard({ item, onShowClick, onRemove, onRetry, onTestIndexers, testingIndexers = false, importDiskNote }: { item: LiveDownloadItem; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: () => void; onRetry?: () => void; onTestIndexers?: () => void; testingIndexers?: boolean; importDiskNote?: string }) {
   const [choosingRelease, setChoosingRelease] = useState(false);
   const [choosingQuality, setChoosingQuality] = useState(false);
   const [details, setDetails] = useState(false);
@@ -37,7 +37,7 @@ export function DownloadItemCard({ item, onShowClick, onRemove, onRetry, onTestI
   // Carte « En cours » v2 (design validé le 09/11) : langues et reçu passent dans le détail déplié.
   const meta = [isTv ? item.quality : '', isTv ? variant : '', item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
   const received = item.size > 0 && Number(item.sizeleft) >= 0 ? `${formatBytes(Math.max(0, item.size - Number(item.sizeleft)))} sur ${formatBytes(item.size)}` : '';
-  const label = attention ? problem.title : waiting ? (item.availability?.reason === 'no_release' ? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier') : group === 'cancelled' ? 'Annulé' : group === 'completed' ? 'Terminé' : item.importState === 'pending' && progress >= 100 ? 'Téléchargé · import Plex en cours' : item.status === 'searching' ? 'Recherche en cours…' : item.status === 'submitting' ? 'Envoi au client' : item.status === 'stalled' ? 'En attente de sources' : item.status === 'paused' ? 'En pause' : item.status === 'queued' ? 'En file d’attente' : null;
+  const label = attention ? problem.title : waiting ? (item.availability?.reason === 'no_release' ? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier') : group === 'cancelled' ? 'Annulé' : group === 'completed' ? 'Terminé' : item.importState === 'pending' && progress >= 100 ? (importDiskNote ? `Téléchargé · import en attente : ${importDiskNote}` : 'Téléchargé · import Plex en cours') : item.status === 'searching' ? 'Recherche en cours…' : item.status === 'submitting' ? 'Envoi au client' : item.status === 'stalled' ? 'En attente de sources' : item.status === 'paused' ? 'En pause' : item.status === 'queued' ? 'En file d’attente' : null;
   const showTrack = group === 'active' && !(item.importState === 'pending' && progress >= 100) && (label === null || progress > 0);
   return <article className={`download-card${toFix ? ' download-card--attention' : ''}${terminal ? ' download-card--terminal' : ''}`} data-download-id={item.id}>
     <div className="download-card__head">
