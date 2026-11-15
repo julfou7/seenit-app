@@ -992,7 +992,9 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   sa diffusion par la chaîne, comme dans le reste de l'app (plus de « Sortie demain » le jour même). Depuis la
   v1.4.315, la preuve lit aussi les versions réellement proposées (comme au lancement) : une version de la qualité
   demandée refusée pour le seul espace disque suffit ; au plus 8 titres par synchronisation, chacun relu au plus
-  toutes les 3 h. Un épisode compte comme sorti dès son jour de diffusion local. La section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
+  toutes les 3 h. Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
+  les épisodes demandés depuis SeenIt la rejoignent (sorties à venir puis recherchés) et gardent leur demande (✕ d'une
+  ligne = annuler l'attente, « Relancer la recherche » dans ⋯). La section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni
   « Radarr » : « Film · 4K », « Série · 4K · 3 épisodes ». Depuis la v1.4.285, en détaillé, les épisodes d'une
   série se replient (« Voir les 9 épisodes · 8 recherchés » / « Masquer les 9 épisodes ») et sont repliés par

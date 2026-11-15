@@ -6,6 +6,7 @@ import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useShowsStore } from '../store/showsStore';
 import { hideSeenWanted, seenWatchedRequest } from '../features/downloads/wantedSeen';
 import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
+import { DialogLayer } from './ui/DialogLayer';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
 import { changeProgrammedQuality, dayTime, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
@@ -97,7 +98,7 @@ const posterUrl = (path?: string | null) => !path ? null : path.startsWith('http
  * annulation). La liste vient de l'état Sonarr/Radarr synchronisé (SEENIT-DOWNLOAD-016) : la section ne lit
  * rien elle-même, et chaque action resynchronise cet état et la fiche concernée.
  */
-export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], queued = [], onRemoveWatching, onRetryWatching }: { refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void }) {
+export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], queued = [], onRemoveWatching, onRetryWatching, onRetryWatchingGroup, onForgetWatching }: {refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void; onRetryWatchingGroup?: (items: LiveDownloadItem[]) => void; onForgetWatching?: (item: LiveDownloadItem) => Promise<unknown> }) {
   // Les identifiants viennent d'un serveur précis : la copie synchronisée est liée au compte et au serveur.
   const scope = programmedScope(useDownloadConfigStore());
   const snapshot = useArrSnapshot();
@@ -113,6 +114,9 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   const failures = snapshot?.programmed?.failures || [];
   const [busy, setBusy] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
+  // Revue Codex #1054 : annuler une série qui contient des attentes SeenIt reste confirmé, avec le dialogue commun
+  // (Échap et retour Android ferment sans effet, focus initial sur « Garder »).
+  const [confirming, setConfirming] = useState<{ group: EpisodeItem[]; title: string } | null>(null);
   const [layout, setLayout] = useState<ProgrammedLayout>(() => readUserScopedJson<ProgrammedLayout>(auth.currentUser?.uid, LAYOUT_FIELD, 'compact') === 'detailed' ? 'detailed' : 'compact');
   // Choix explicite d'ouvrir ou de replier les épisodes, par vue (`compact:s5`, `detailed:s5`). Un choix fait reste
   // tel quel même si le nombre d'épisodes change ensuite (annulation) ; sans choix, l'état par défaut s'applique.
@@ -176,13 +180,26 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   const series = new Map<number, EpisodeItem[]>();
   const movies: MovieItem[] = [];
   const covering = new Map<string, ProgrammedItem>();
+  // Retour terrain du 15/11 (« ça prend toute la page pour 4 épisodes ») : une série = une seule carte. Un épisode
+  // demandé depuis SeenIt rejoint la carte de sa série ; sa demande reste attachée à sa ligne (annulation, relance).
+  const requestFor = new Map<number, LiveDownloadItem>();
+  const merged = new Set<string>();
   for (const item of items) {
     const watched = watching.find(entry => coveredBy(item, entry));
+    if (watched && item.kind === 'episode') { requestFor.set(item.id, watched); merged.add(watched.id); series.set(item.seriesId, [...(series.get(item.seriesId) || []), item]); continue; }
     if (watched) { covering.set(watched.id, item); continue; }
     if (item.kind === 'movie') movies.push(item);
     else series.set(item.seriesId, [...(series.get(item.seriesId) || []), item]);
   }
-  const rowCancel = (item: EpisodeItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => void cancel([item], label)} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel programmed__cancel--icon"><X size={18} aria-hidden="true" /></button>;
+  const cancelEpisodes = async (targets: readonly EpisodeItem[], label: string) => {
+    const plain = targets.filter(item => !requestFor.has(item.id));
+    if (plain.length) await cancel(plain, label);
+    // Revue Codex #1054 : une attente non annulée (Sonarr injoignable…) est signalée, jamais passée sous silence.
+    let kept = 0;
+    for (const item of targets) { const request = requestFor.get(item.id); if (request && onForgetWatching && await onForgetWatching(request) === false) kept++; }
+    if (kept) toast({ title: label, action: `${kept} attente${kept > 1 ? 's' : ''} non annulée${kept > 1 ? 's' : ''} : réessaie dans un instant.`, posterPath: targets[0]?.posterUrl || null }, 'error');
+  };
+  const rowCancel = (item: EpisodeItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => { const request = requestFor.get(item.id); if (request && onRemoveWatching) onRemoveWatching(request); else void cancel([item], label); }} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel programmed__cancel--icon"><X size={18} aria-hidden="true" /></button>;
   /** Menu ⋯ de chaque carte (retour terrain du 08/11 : « toujours les 3 petits points pour changer la qualité »). */
   const cardMenu = (key: string, label: string, quality: string | undefined, onQuality: ((preference: '1080p' | '4k') => void) | null, onCancel: () => void, cancelLabel = 'Annuler la programmation', onRetry?: () => void) => {
     const open = menu === key;
@@ -206,6 +223,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   // Chaque carte est décrite une fois puis rendue en vue détaillée ou compacte (v1.4.284).
   const cards: ProgrammedCard[] = [];
   for (const entry of watching) {
+    if (merged.has(entry.id)) continue;
     const isTv = entry.mediaType === 'tv';
     const name = entry.movieTitle || entry.seriesTitle || entry.title;
     const item = covering.get(entry.id);
@@ -223,11 +241,12 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const first = group[0];
     const upcoming = group.filter(item => !item.wanted).map(item => item.date).filter((value): value is string => Boolean(value)).sort()[0];
     const wantedCount = group.filter(item => item.wanted).length;
+    const requests = group.map(item => requestFor.get(item.id)).filter((entry): entry is LiveDownloadItem => Boolean(entry)).map(entry => first.quality ? { ...entry, quality: first.quality } : entry).filter(entry => waitingRetryLaunch(entry));
     cards.push({ key: `s${first.seriesId}`, addedAt: Math.max(...group.map(item => item.addedAt ?? -Infinity)) > -Infinity ? Math.max(...group.map(item => item.addedAt ?? -Infinity)) : undefined, data: { 'data-programmed-series': first.seriesId }, name: first.seriesTitle, isTv: true, poster: first.posterUrl,
       meta: meta('Série', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`),
       pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : wantedPill({ diskFull: group.some(item => item.diskFull) }),
       open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
-      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => void cancel(group, first.seriesTitle), group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation'),
+      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => { setMenu(null); if (group.some(item => requestFor.has(item.id))) setConfirming({ group, title: first.seriesTitle }); else void cancelEpisodes(group, first.seriesTitle); }, group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation', onRetryWatchingGroup && requests.length ? () => { setMenu(null); onRetryWatchingGroup(requests); } : undefined),
       episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, count: group.length, wanted: wantedCount, rows: <ul className="download-season__rows">
         {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
           <span className="download-season__code">{code(item)}</span>
@@ -288,5 +307,18 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
         </button>}
         {card.episodes && episodesOpen(card) && card.episodes.rows}
       </article>)}
+    {confirming && <DialogLayer onDismiss={() => setConfirming(null)} label="Annuler l’attente" historyMode="local" role="alertdialog"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/75 p-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]"
+      onMouseDown={event => { if (event.target === event.currentTarget) setConfirming(null); }}>
+      <div aria-labelledby="cancel-series-title" aria-describedby="cancel-series-description" className="w-full max-w-sm max-h-full overflow-y-auto rounded-3xl border border-white/10 bg-zinc-950 p-5 shadow-2xl"
+        onKeyDown={event => { if (event.key === 'Escape') setConfirming(null); }}>
+        <h2 id="cancel-series-title" className="text-lg font-black text-white">Annuler l’attente ?</h2>
+        <p id="cancel-series-description" className="mt-2 text-sm leading-relaxed text-zinc-300">« {confirming.title} » : ces épisodes ne seront plus surveillés pour un téléchargement futur. Les fichiers existants seront conservés.</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => setConfirming(null)} data-dialog-initial-focus className="min-h-11 rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm font-bold text-zinc-200">Garder</button>
+          <button type="button" onClick={() => { const target = confirming; setConfirming(null); void cancelEpisodes(target.group, target.title); }} className="min-h-11 rounded-xl bg-red-500 px-4 text-sm font-black text-white">Annuler l’attente</button>
+        </div>
+      </div>
+    </DialogLayer>}
   </section>;
 }
