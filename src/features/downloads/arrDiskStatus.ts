@@ -9,7 +9,8 @@ import { formatFreeSpace, LOW_DISK_BYTES } from './arrDiskSpace';
  * ouverture (Réglages → Connexions, onglet Télécharger). Un même disque (même lecteur Windows, ou même dossier) n'est
  * montré qu'une fois. Une lecture en échec n'affiche rien plutôt qu'un chiffre faux. Aucune clé n'est affichée.
  */
-export interface DiskStatus { label: string; freeSpace: number; totalSpace?: number }
+/** `services` : Sonarr et/ou Radarr y ont un dossier racine (revue Codex #1063 : rattacher un import à son disque). */
+export interface DiskStatus { label: string; freeSpace: number; totalSpace?: number; services?: string[] }
 type DiskConfig = { isHydrated?: boolean; downloadsEnabled?: boolean; sonarrUrl?: string; sonarrApiKey?: string; radarrUrl?: string; radarrApiKey?: string };
 type Read = (url: string, headers: Record<string, string>) => Promise<unknown>;
 
@@ -31,7 +32,7 @@ const sameOrUnder = (path: string, parent: string) => {
  * taille totale, seule la même machine (même hôte) permet de fusionner.
  */
 export function mergeDisks(sources: readonly DiskSource[]): DiskStatus[] {
-  const disks = new Map<string, DiskStatus & { service: string; host: string }>();
+  const disks = new Map<string, DiskStatus & { service: string; host: string; services: string[] }>();
   for (const source of sources) {
     const volumes = (source.diskSpace || []) as RawDisk[];
     for (const root of source.rootFolders as RawDisk[]) {
@@ -44,7 +45,8 @@ export function mergeDisks(sources: readonly DiskSource[]): DiskStatus[] {
       const freeSpace = Number(root.freeSpace);
       const same = [...disks.entries()].find(([, other]) => other.label === label && (other.host === source.host
         || (totalSpace !== undefined && other.totalSpace === totalSpace && Math.abs(other.freeSpace - freeSpace) <= 64 * 1024 ** 2)));
-      if (!same) disks.set(`${source.host}\n${label}\n${disks.size}`, { label, host: source.host, service: source.service, freeSpace, ...(totalSpace ? { totalSpace } : {}) });
+      if (same) { if (!same[1].services.includes(source.service)) same[1].services.push(source.service); }
+      else disks.set(`${source.host}\n${label}\n${disks.size}`, { label, host: source.host, service: source.service, services: [source.service], freeSpace, ...(totalSpace ? { totalSpace } : {}) });
     }
   }
   const all = [...disks.values()];
@@ -63,6 +65,16 @@ export async function fetchDiskStatus(config: DiskConfig, read: Read = executeGe
     return { host: hostOf(cleanUrl(url)), service, rootFolders, diskSpace };
   }));
   return mergeDisks(lists);
+}
+
+/**
+ * Revue Codex #1063 : disque de destination d'un import, seulement s'il est certain — le service (Sonarr pour une
+ * série, Radarr pour un film) n'a qu'un seul disque — et presque plein. Sinon rien : l'avertissement global suffit.
+ */
+export function lowImportDisk(disks: readonly DiskStatus[], mediaType: 'tv' | 'movie'): DiskStatus | undefined {
+  const service = mediaType === 'tv' ? 'Sonarr' : 'Radarr';
+  const used = disks.filter(disk => disk.services?.includes(service));
+  return used.length === 1 && diskTone(used[0]) !== 'ok' ? used[0] : undefined;
 }
 
 export type DiskTone = 'ok' | 'warn' | 'error';

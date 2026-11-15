@@ -37,5 +37,6 @@ test('import en attente avec un disque presque plein : chiffre réel sur la cart
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
   assert.match(card, /importDiskNote \? `Téléchargé · import en attente : \$\{importDiskNote\}` : 'Téléchargé · import Plex en cours'/);
   const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
-  assert.match(screen, /const importDiskNote = lowDisks\[0\] \? `disque \$\{lowDisks\[0\]\.label\} presque plein \(\$\{formatFreeSpace\(lowDisks\[0\]\.freeSpace\)\} libres\)` : undefined;/);
+  assert.match(screen, /const disk = lowImportDisk\(disks, mediaType\); return disk \? `disque \$\{disk\.label\} presque plein \(\$\{formatFreeSpace\(disk\.freeSpace\)\} libres\)` : undefined;/);
+  assert.match(screen, /importDiskNote=\{importDiskNote\(item\.mediaType\)\}/);
 });
