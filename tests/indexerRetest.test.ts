@@ -24,7 +24,7 @@ test('retester les indexers : test lancé, indexers encore en échec nommés, au
   assert.deepEqual(calls, ['POST http://nas:8989/api/v3/indexer/testall', 'GET http://nas:8989/api/v3/indexer', 'GET http://nas:8989/api/v3/indexerstatus']);
   assert.ok(calls.every(call => isAllowedServiceProxyPath(call.split(' ')[1], call.split(' ')[0])), 'appels acceptés par le proxy PWA');
   assert.equal(retest.describeIndexerRetest(failing).text, 'Toujours en échec : YggAPI (Prowlarr). À vérifier dans Prowlarr ou dans Sonarr.');
-  const fixed = await retest.retestIndexers(config, 'movie', io([]), now);
+  const fixed = await retest.retestIndexers(config, 'movie', { ...io([]), post: async () => ({}) }, now);
   assert.deepEqual(retest.describeIndexerRetest(fixed), { text: 'Indexers réactivés : relance la recherche.', ok: true });
   assert.ok(!isAllowedServiceProxyPath('http://nas:8989/api/v3/indexer/1', 'PUT'), 'aucun réglage d’indexer modifiable');
   // Revue Codex #1059 : un test refusé (proxy, droits, délai) n'est jamais présenté comme une réactivation.
@@ -42,6 +42,12 @@ test('retester les indexers : test lancé, indexers encore en échec nommés, au
   assert.match(retest.describeIndexerRetest(stillPaused).text, /^Tous les indexers sont en pause/);
   const healthy = await retest.retestIndexers(config, 'tv', noStatus([]).io, now, { wait: async () => undefined });
   assert.deepEqual(retest.describeIndexerRetest(healthy), { text: 'Indexers réactivés : relance la recherche.', ok: true });
+  // Revue Codex #1060 : test en 400 (indexer invalide) ou revérification impossible : jamais « réactivés ».
+  const invalidIo = { ...noStatus([]).io, post: async (url: string) => { if (url.endsWith('/testall')) throw new Error('Erreur HTTP 400'); return {}; } };
+  const invalid = retest.describeIndexerRetest(await retest.retestIndexers(config, 'tv', invalidIo, now, { wait: async () => undefined }));
+  assert.deepEqual([invalid.ok, invalid.text], [false, 'Au moins un indexer a échoué au test. Vérifie-les dans Prowlarr ou dans Sonarr, puis relance la recherche.']);
+  const noRecheck = { ...noStatus([]).io, post: async (url: string) => { if (url.endsWith('/command')) throw new Error('Erreur HTTP 500'); return {}; } };
+  await assert.rejects(retest.retestIndexers(config, 'tv', noRecheck, now, { wait: async () => undefined }), /Sonarr n’a pas pu revérifier ses indexers/);
   // Bouton visible seulement sur une carte « À régler » qui parle d'indexers.
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
   assert.match(card, /toFix && onTestIndexers && \/indexer\/i\.test\(/);

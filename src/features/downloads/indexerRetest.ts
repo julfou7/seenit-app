@@ -15,6 +15,7 @@ export interface RetestIo { get: (url: string, headers: Record<string, string>) 
 // Tester tous les indexers peut être long : même transport que la recherche des versions (jusqu'à 90 s).
 const defaultIo: RetestIo = { get: executeGet, post: executeArrInteractivePost };
 
+const invalidProblem = (service: string) => `Au moins un indexer a échoué au test. Vérifie-les dans Prowlarr ou dans ${service}, puis relance la recherche.`;
 const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 export async function retestIndexers(config: RetestConfig, mediaType: 'tv' | 'movie', io: RetestIo = defaultIo, now = Date.now(), { wait = sleep, healthDelayMs = 3000 }: { wait?: (ms: number) => Promise<void>; healthDelayMs?: number } = {}): Promise<IndexerRetestResult> {
   const service = mediaType === 'tv' ? 'Sonarr' : 'Radarr';
@@ -25,11 +26,14 @@ export async function retestIndexers(config: RetestConfig, mediaType: 'tv' | 'mo
   const headers = { 'X-Api-Key': apiKey, Accept: 'application/json' };
   // Revue Codex #1059 : un test terminé avec des indexers invalides répond 400 (résultat de validation) ; tout autre
   // refus (proxy, délai, droits) veut dire que le test n'a pas eu lieu — jamais présenté comme une réactivation.
+  // Revue Codex #1060 : un 400 veut dire qu'au moins un indexer a échoué au test ; ce n'est jamais une réactivation.
+  let invalid = false;
   try {
     await io.post(`${base}/api/v3/indexer/testall`, {}, headers);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '';
-    if (!/\b400\b/.test(message)) throw new Error(`Le test des indexers n’a pas pu être lancé${message ? ` (${message})` : ''}. Réessaie dans un instant ou vérifie ${service}.`);
+    invalid = /\b400\b/.test(message);
+    if (!invalid) throw new Error(`Le test des indexers n’a pas pu être lancé${message ? ` (${message})` : ''}. Réessaie dans un instant ou vérifie ${service}.`);
   }
   const [indexers, statuses] = await Promise.all([io.get(`${base}/api/v3/indexer`, headers), io.get(`${base}/api/v3/indexerstatus`, headers).catch(() => null)]);
   if (!Array.isArray(indexers)) throw new Error(`${service} n’a pas rendu la liste de ses indexers.`);
@@ -38,15 +42,17 @@ export async function retestIndexers(config: RetestConfig, mediaType: 'tv' | 'mo
     const failing = (statuses as Array<{ indexerId?: number; providerId?: number; disabledTill?: string }>)
       .filter(status => status.disabledTill && Date.parse(status.disabledTill) > now)
       .map(status => names.get(Number(status.indexerId ?? status.providerId)) || `Indexer ${status.indexerId ?? status.providerId}`);
-    return { service, total: names.size, failing: [...new Set(failing)] };
+    return { service, total: names.size, failing: [...new Set(failing)], ...(invalid && !failing.length ? { problem: invalidProblem(service) } : {}) };
   }
   // Retour du 15/11 (v1.4.319, « Erreur HTTP 404 ») : ce Sonarr n'expose pas `indexerstatus`. SeenIt lui demande de
   // revérifier sa santé (commande CheckHealth), puis lit ses alertes d'indexers, traduites.
-  await io.post(`${base}/api/v3/command`, { name: 'CheckHealth' }, headers).catch(() => undefined);
+  // Revue Codex #1060 : sans revérification réussie, les alertes lues pourraient être anciennes : rien n'est conclu.
+  const rechecked = await io.post(`${base}/api/v3/command`, { name: 'CheckHealth' }, headers).then(() => true, () => false);
+  if (!rechecked) throw new Error(`${service} n’a pas pu revérifier ses indexers. Réessaie dans un instant.`);
   await wait(healthDelayMs);
   const health = await io.get(`${base}/api/v3/health`, headers);
   if (!Array.isArray(health)) throw new Error(`${service} n’a pas rendu l’état de ses indexers.`);
-  const problem = indexerHealthProblem(health);
+  const problem = indexerHealthProblem(health) || (invalid ? invalidProblem(service) : null);
   return { service, total: names.size, failing: [], ...(problem ? { problem } : {}) };
 }
 
