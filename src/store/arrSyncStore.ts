@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { auth } from '../lib/firebase';
+import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { useDownloadConfigStore } from './downloadConfigStore';
 import { useMediaPresenceStore } from './mediaPresenceStore';
 import { fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
@@ -42,6 +43,34 @@ interface ArrSyncState {
 
 /** Portée d'une copie : compte connecté + serveurs Sonarr/Radarr (adresse et clé) + réglage Téléchargements. */
 export const arrSyncKey = () => `${auth.currentUser?.uid || ''}\n${programmedScope(useDownloadConfigStore.getState())}`;
+
+/**
+ * Retour terrain du 15/11 : à l'ouverture, seules les demandes SeenIt s'affichaient, puis tout Programmés et
+ * Téléchargés apparaissait quelques secondes plus tard. La dernière copie est gardée sur l'appareil, par compte,
+ * et montrée tout de suite si elle appartient au même serveur ; la synchronisation la remplace ensuite sans saut.
+ * La portée contient les clés d'API : seule son empreinte est enregistrée, jamais la clé.
+ */
+const PERSISTED_FIELD = 'arr_snapshot_v1';
+export function arrScopeFingerprint(key: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index++) hash = Math.imul(hash ^ key.charCodeAt(index), 16777619);
+  return (hash >>> 0).toString(16);
+}
+type PersistedSnapshot = { scope: string; snapshot: Omit<ArrSnapshot, 'key'> };
+export function readPersistedArrSnapshot(key: string): ArrSnapshot | null {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+  const saved = readUserScopedJson<PersistedSnapshot | null>(uid, PERSISTED_FIELD, null);
+  return saved?.scope === arrScopeFingerprint(key) && saved.snapshot ? { ...saved.snapshot, key } : null;
+}
+function persistArrSnapshot(snapshot: ArrSnapshot): void {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return;
+  const { key, programmed, ...rest } = snapshot;
+  // `movieQuality` n'est utile que pendant la synchronisation : la copie gardée n'en a pas besoin.
+  const stored: PersistedSnapshot = { scope: arrScopeFingerprint(key), snapshot: { ...rest, programmed: programmed ? { items: programmed.items, failures: programmed.failures } : null } };
+  try { writeUserScopedJson(uid, PERSISTED_FIELD, stored); } catch { /* Une copie non gardée n'empêche jamais l'affichage. */ }
+}
 let inFlight: { key: string; promise: Promise<void> } | null = null;
 let sequence = 0;
 
@@ -62,8 +91,9 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
     const current = get().snapshot;
     if (current?.key === key && maxAgeMs > 0 && Date.now() - current.syncedAt < maxAgeMs) return;
     if (inFlight?.key === key) return inFlight.promise;
-    // Une copie d'une autre portée n'est jamais montrée, même le temps de la relecture.
-    if (current && current.key !== key) set({ snapshot: null });
+    // Une copie d'une autre portée n'est jamais montrée, même le temps de la relecture ; la dernière copie
+    // gardée pour cette portée l'est, en attendant la relecture.
+    if (!current || current.key !== key) set({ snapshot: readPersistedArrSnapshot(key) });
     const config = useDownloadConfigStore.getState();
     const id = ++sequence;
     const promise = (async () => {
@@ -84,7 +114,9 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       const coverage = coverArrLibrary(programmed, imports.pending);
       const labelled = await localizeArrLists({ programmed: coverage.programmed, imports, undecided: coverage.undecided }, tmdbArrLabelSource);
       if (arrSyncKey() !== key || id !== sequence) return;
-      set({ snapshot: { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() } });
+      const snapshot = { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() };
+      set({ snapshot });
+      persistArrSnapshot(snapshot);
     })().finally(() => {
       if (inFlight?.promise === promise) inFlight = null;
       set({ syncing: false });
@@ -105,7 +137,10 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
 export function useArrSnapshot(): ArrSnapshot | null {
   const snapshot = useArrSyncStore(state => state.snapshot);
   useDownloadConfigStore();
-  return snapshot && snapshot.key === arrSyncKey() ? snapshot : null;
+  const key = arrSyncKey();
+  if (snapshot && snapshot.key === key) return snapshot;
+  // Premier affichage, avant même la première relecture : la dernière copie gardée pour ce compte et ce serveur.
+  return readPersistedArrSnapshot(key);
 }
 
 /** Après une écriture de SeenIt dans Sonarr/Radarr (programmer, annuler, qualité, lancer). */
