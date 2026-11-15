@@ -6,6 +6,7 @@ import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useShowsStore } from '../store/showsStore';
 import { hideSeenWanted, seenWatchedRequest } from '../features/downloads/wantedSeen';
 import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
+import { DialogLayer } from './ui/DialogLayer';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
 import { changeProgrammedQuality, dayTime, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
@@ -97,7 +98,7 @@ const posterUrl = (path?: string | null) => !path ? null : path.startsWith('http
  * annulation). La liste vient de l'état Sonarr/Radarr synchronisé (SEENIT-DOWNLOAD-016) : la section ne lit
  * rien elle-même, et chaque action resynchronise cet état et la fiche concernée.
  */
-export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], queued = [], onRemoveWatching, onRetryWatching, onForgetWatching }: {refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void; onForgetWatching?: (item: LiveDownloadItem) => Promise<unknown> }) {
+export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], queued = [], onRemoveWatching, onRetryWatching, onRetryWatchingGroup, onForgetWatching }: {refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void; onRetryWatchingGroup?: (items: LiveDownloadItem[]) => void; onForgetWatching?: (item: LiveDownloadItem) => Promise<unknown> }) {
   // Les identifiants viennent d'un serveur précis : la copie synchronisée est liée au compte et au serveur.
   const scope = programmedScope(useDownloadConfigStore());
   const snapshot = useArrSnapshot();
@@ -113,7 +114,9 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   const failures = snapshot?.programmed?.failures || [];
   const [busy, setBusy] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
-  const [confirming, setConfirming] = useState<string | null>(null);
+  // Revue Codex #1054 : annuler une série qui contient des attentes SeenIt reste confirmé, avec le dialogue commun
+  // (Échap et retour Android ferment sans effet, focus initial sur « Garder »).
+  const [confirming, setConfirming] = useState<{ group: EpisodeItem[]; title: string } | null>(null);
   const [layout, setLayout] = useState<ProgrammedLayout>(() => readUserScopedJson<ProgrammedLayout>(auth.currentUser?.uid, LAYOUT_FIELD, 'compact') === 'detailed' ? 'detailed' : 'compact');
   // Choix explicite d'ouvrir ou de replier les épisodes, par vue (`compact:s5`, `detailed:s5`). Un choix fait reste
   // tel quel même si le nombre d'épisodes change ensuite (annulation) ; sans choix, l'état par défaut s'applique.
@@ -195,15 +198,8 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   };
   const rowCancel = (item: EpisodeItem, label: string) => <button type="button" disabled={busy !== null} onClick={() => { const request = requestFor.get(item.id); if (request && onRemoveWatching) onRemoveWatching(request); else void cancel([item], label); }} aria-label={`Annuler la programmation de ${label}`} className="programmed__cancel programmed__cancel--icon"><X size={18} aria-hidden="true" /></button>;
   /** Menu ⋯ de chaque carte (retour terrain du 08/11 : « toujours les 3 petits points pour changer la qualité »). */
-  const cardMenu = (key: string, label: string, quality: string | undefined, onQuality: ((preference: '1080p' | '4k') => void) | null, onCancel: () => void, cancelLabel = 'Annuler la programmation', onRetry?: () => void, confirmText?: string) => {
+  const cardMenu = (key: string, label: string, quality: string | undefined, onQuality: ((preference: '1080p' | '4k') => void) | null, onCancel: () => void, cancelLabel = 'Annuler la programmation', onRetry?: () => void) => {
     const open = menu === key;
-    // Revue Codex #1054 : une annulation qui retire des attentes SeenIt reste confirmée (« Garder » ne change rien).
-    if (open && confirmText && confirming === key) return { open, button: <button type="button" className="download-card__more" aria-label={`Actions pour ${label}`} aria-expanded onClick={() => { setConfirming(null); setMenu(null); }}><MoreHorizontal size={20} /></button>,
-      panel: <div className="download-card__actions programmed__menu" data-programmed-menu={key} role="alertdialog" aria-label={confirmText}>
-        <p className="programmed__confirm">{confirmText}</p>
-        <button type="button" onClick={() => setConfirming(null)}>Garder</button>
-        <button type="button" disabled={busy !== null} onClick={() => { setConfirming(null); onCancel(); }}><X size={15} aria-hidden="true" />{cancelLabel}</button>
-      </div> };
     return { open, button: <button type="button" className="download-card__more" aria-label={`Actions pour ${label}`} aria-expanded={open} onClick={() => setMenu(open ? null : key)}><MoreHorizontal size={20} /></button>,
       panel: open && <div className="download-card__actions programmed__menu" data-programmed-menu={key}>
         {onQuality && <div className="programmed__quality" role="group" aria-label={`Qualité de ${label}`}>
@@ -212,7 +208,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
         </div>}
         {/* #664 : relancer tout de suite la recherche d'une demande en attente. */}
         {onRetry && <button type="button" disabled={busy !== null} onClick={onRetry}><RotateCw size={15} aria-hidden="true" />Relancer la recherche</button>}
-        <button type="button" disabled={busy !== null} onClick={confirmText ? () => setConfirming(key) : onCancel}><X size={15} aria-hidden="true" />{cancelLabel}</button>
+        <button type="button" disabled={busy !== null} onClick={onCancel}><X size={15} aria-hidden="true" />{cancelLabel}</button>
       </div> };
   };
   // Retour terrain du 09/11 : « supprime Sonarr et Radarr sous le titre, y a pas besoin » — type, qualité, nombre.
@@ -249,8 +245,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
       meta: meta('Série', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`),
       pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : wantedPill({ diskFull: group.some(item => item.diskFull) }),
       open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
-      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => { setMenu(null); void cancelEpisodes(group, first.seriesTitle); }, group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation', onRetryWatching && requests.length ? () => { setMenu(null); requests.forEach(onRetryWatching); } : undefined,
-        group.some(item => requestFor.has(item.id)) ? `« ${first.seriesTitle} » : les épisodes en attente ne seront plus surveillés. Les fichiers existants sont conservés.` : undefined),
+      actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => { setMenu(null); if (group.some(item => requestFor.has(item.id))) setConfirming({ group, title: first.seriesTitle }); else void cancelEpisodes(group, first.seriesTitle); }, group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation', onRetryWatchingGroup && requests.length ? () => { setMenu(null); onRetryWatchingGroup(requests); } : undefined),
       episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, count: group.length, wanted: wantedCount, rows: <ul className="download-season__rows">
         {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
           <span className="download-season__code">{code(item)}</span>
@@ -311,5 +306,18 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
         </button>}
         {card.episodes && episodesOpen(card) && card.episodes.rows}
       </article>)}
+    {confirming && <DialogLayer onDismiss={() => setConfirming(null)} label="Annuler l’attente" historyMode="local" role="alertdialog"
+      className="fixed inset-0 z-[300] flex items-center justify-center bg-black/75 p-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-[max(16px,env(safe-area-inset-top))]"
+      onMouseDown={event => { if (event.target === event.currentTarget) setConfirming(null); }}>
+      <div aria-labelledby="cancel-series-title" aria-describedby="cancel-series-description" className="w-full max-w-sm max-h-full overflow-y-auto rounded-3xl border border-white/10 bg-zinc-950 p-5 shadow-2xl"
+        onKeyDown={event => { if (event.key === 'Escape') setConfirming(null); }}>
+        <h2 id="cancel-series-title" className="text-lg font-black text-white">Annuler l’attente ?</h2>
+        <p id="cancel-series-description" className="mt-2 text-sm leading-relaxed text-zinc-300">« {confirming.title} » : ces épisodes ne seront plus surveillés pour un téléchargement futur. Les fichiers existants seront conservés.</p>
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <button type="button" onClick={() => setConfirming(null)} data-dialog-initial-focus className="min-h-11 rounded-xl border border-white/10 bg-zinc-900 px-4 text-sm font-bold text-zinc-200">Garder</button>
+          <button type="button" onClick={() => { const target = confirming; setConfirming(null); void cancelEpisodes(target.group, target.title); }} className="min-h-11 rounded-xl bg-red-500 px-4 text-sm font-black text-white">Annuler l’attente</button>
+        </div>
+      </div>
+    </DialogLayer>}
   </section>;
 }
