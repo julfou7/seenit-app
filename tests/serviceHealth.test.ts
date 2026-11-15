@@ -50,7 +50,9 @@ test('#404 notifications et branchement dans Réglages → Connexions', () => {
   const core = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
   // #403 (retour du 15/11) : la météo montre les intégrations, plus le serveur SeenIt.
   assert.doesNotMatch(core, /label="Serveur SeenIt"/);
-  assert.match(core, /const integrationHealth = useIntegrationHealth\(useDownloadConfigStore\(\)\);/);
+  assert.match(core, /const integrationHealth = useIntegrationHealth\(downloadConfig\);/);
+  // Retour du 15/11 : espace libre des disques de Sonarr/Radarr, relu à chaque ouverture des Réglages.
+  assert.match(core, /diskStatus\?\.map\(disk => <SettingsRow key=\{disk\.label\} icon=\{HardDrive\} label=\{`Disque \$\{disk\.label\}`\} sub=\{describeDisk\(disk\)\} tone=\{diskTone\(disk\)\} dot \/>\)/);
   assert.match(core, /integrationHealth\.map\(result => \{ const state = describeIntegration\(result\); return <SettingsRow key=\{result\.key\} icon=\{Download\} label=\{result\.label\} sub=\{state\.text\} tone=\{state\.tone\} dot \/>; \}\)/);
   const health = readFileSync('src/features/settings/serviceHealth.ts', 'utf8');
   assert.doesNotMatch(health, /themoviedb|thetvdb|omdbapi|api_key/i, 'aucune API tierce ni clé sondée depuis le client');

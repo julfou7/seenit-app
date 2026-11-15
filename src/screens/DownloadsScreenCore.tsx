@@ -42,6 +42,7 @@ import {
 } from '../features/downloads/downloadLifecycle';
 import { sortDownloadsByAddedAt } from '../features/downloads/downloadPresentation';
 import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
+import { describeDisk, diskTone, useDiskStatus } from '../features/downloads/arrDiskStatus';
 import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGuard';
 import { getStableDownloadRenderKey } from '../features/downloads/downloadPosterStability';
 import { useTabShortcut } from '../features/navigation/useTabShortcut';
@@ -63,6 +64,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     clearAllDownloads
   } = useLiveDownloadStore();
   const config = useDownloadConfigStore();
+  const lowDisks = (useDiskStatus(config) || []).filter(disk => diskTone(disk) !== 'ok');
   const showToast = useToastStore(state => state.showToast);
   const screenRootRef = useRef<HTMLDivElement>(null);
   const searchRequestRef = useRef(0);
@@ -475,6 +477,8 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             </div>
           </div>
           <p className="downloads-subtitle">{subtitle}</p>
+          {/* Retour du 15/11 : disque de Sonarr/Radarr presque plein, relu à chaque ouverture de l'onglet. */}
+          {lowDisks.map(disk => <p key={disk.label} className="downloads-disk" data-tone={diskTone(disk)}>Disque {disk.label} · {describeDisk(disk)}</p>)}
         </header>}
 
       <div className="downloads-content flex-1 overflow-y-auto px-4 py-3.5">

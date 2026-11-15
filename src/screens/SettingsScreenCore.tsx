@@ -3,7 +3,7 @@ import { DialogLayer } from '../components/ui/DialogLayer';
 import { hydratePlatformPreferences } from '../features/providers/platformPreferenceHydration';
 import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Cloud, LogIn, FileText, CheckCircle2, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronRight, Check, AlertCircle, Sparkles, Download, X, UploadCloud, DownloadCloud, LayoutGrid, Server, MonitorSmartphone, Package, Tv, Clock, Newspaper, Film, Smartphone, FlaskConical, Sun } from 'lucide-react';
+import { Cloud, LogIn, FileText, CheckCircle2, Bell, RefreshCw, Loader2, Terminal, Copy, Trash2, ChevronRight, Check, AlertCircle, Sparkles, Download, X, UploadCloud, DownloadCloud, LayoutGrid, Server, MonitorSmartphone, Package, HardDrive, Tv, Clock, Newspaper, Film, Smartphone, FlaskConical, Sun } from 'lucide-react';
 import { DownloadMark } from '../components/SeenItLogo';
 import { auth, db, googleAuthProvider, requestNotificationPermission, revokeCurrentDeviceNotifications } from '../lib/firebase';
 import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -12,6 +12,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { DEFAULT_NOTIFICATION_PREFS, mergeNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { Capacitor } from '@capacitor/core';
 import { describeIntegration, useIntegrationHealth } from '../features/settings/integrationHealth';
+import { describeDisk, diskTone, useDiskStatus } from '../features/downloads/arrDiskStatus';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { Browser } from '@capacitor/browser';
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, User } from 'firebase/auth';
@@ -612,7 +613,9 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
   };
 
   const isNative = Capacitor.isNativePlatform();
-  const integrationHealth = useIntegrationHealth(useDownloadConfigStore());
+  const downloadConfig = useDownloadConfigStore();
+  const integrationHealth = useIntegrationHealth(downloadConfig);
+  const diskStatus = useDiskStatus(downloadConfig);
   const isAndroid = Capacitor.getPlatform() === 'android';
   const devicePlace = isNative ? 'ce téléphone' : 'ce navigateur';
   const avatarUrl = getProfileAvatarUrl(user);
@@ -1064,6 +1067,8 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
           {/* #403 (retour du 15/11) : les intégrations elles-mêmes, pas le serveur SeenIt. */}
           <SettingsRow icon={Server} label="Plex" sub={plexState.text} tone={plexState.tone} dot={Boolean(plexState.tone)} onClick={() => setPage('plex')} />
           {integrationHealth.map(result => { const state = describeIntegration(result); return <SettingsRow key={result.key} icon={Download} label={result.label} sub={state.text} tone={state.tone} dot />; })}
+          {/* Retour du 15/11 : espace libre des disques de Sonarr/Radarr, relu à chaque ouverture des Réglages. */}
+          {diskStatus?.map(disk => <SettingsRow key={disk.label} icon={HardDrive} label={`Disque ${disk.label}`} sub={describeDisk(disk)} tone={diskTone(disk)} dot />)}
           <SettingsRow icon={MonitorSmartphone} label="Appareils" sub={isNative ? 'Ce téléphone' : 'Ce navigateur'} onClick={() => setPage('devices')} />
         </SettingsGroup>
 

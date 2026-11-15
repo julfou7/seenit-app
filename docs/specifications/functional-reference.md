@@ -995,7 +995,9 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   par un après l'affichage des listes (une recherche peut durer 90 s), chacun relu au plus toutes les 3 h. Depuis
   la v1.4.318, quand rien n'est prouvable (taille minimale à 0, indexers en pause), un recherché dont le disque a
   moins de 10 Go libres affiche « Disque presque plein · 1,2 Go libres » (chiffre lu dans Sonarr/Radarr) ; les
-  alertes d'indexers sont en français avec quoi faire. Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
+  alertes d'indexers sont en français avec quoi faire. L'espace libre des disques de Sonarr/Radarr est relu à
+  chaque ouverture : sous le titre de l'onglet Télécharger quand il passe sous 10 Go (« Disque D: · 1,2 Go libres
+  sur 515,7 Go »), et toujours dans Réglages → Connexions (une ligne par disque, rouge sous 2 Go). Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
   les épisodes demandés depuis SeenIt la rejoignent (sorties à venir puis recherchés) et gardent leur demande (✕ d'une
   ligne = annuler l'attente, « Relancer la recherche » dans ⋯). La section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni

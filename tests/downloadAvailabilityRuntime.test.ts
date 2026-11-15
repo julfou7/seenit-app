@@ -139,6 +139,9 @@ test('retour du 15/11 (v1.4.317) : les alertes d’indexers de Sonarr/Radarr son
   assert.match(indexerHealthMessage('All search-capable indexers are temporarily unavailable due to recent indexer errors'), /^Tous les indexers sont en pause après des erreurs récentes\. Vérifie-les dans Prowlarr/);
   assert.equal(indexerHealthMessage('Indexers unavailable due to failures: C411, YggAPI'), 'Indexers en échec : C411, YggAPI. Vérifie-les dans Prowlarr ou dans Sonarr/Radarr, puis relance la recherche.');
   assert.match(indexerHealthMessage('No indexers available with Automatic Search enabled, Sonarr will not provide any automatic search results'), /^Aucun indexer n’a la recherche activée/);
+  // Sonarr du propriétaire (15/11) : tous les indexers en échec, RSS en pause.
+  assert.match(indexerHealthMessage('All indexers are unavailable due to failures'), /^Tous les indexers sont en échec : Sonarr\/Radarr ne peuvent trouver aucune version\./);
+  assert.match(indexerHealthMessage('All rss-capable indexers are temporarily unavailable due to recent indexer errors'), /^Tous les indexers sont en pause/);
   assert.equal(indexerHealthMessage('Something new'), 'Indexers en défaut : Something new', 'alerte inconnue : citée telle quelle');
 });
 
