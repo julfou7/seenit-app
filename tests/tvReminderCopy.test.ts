@@ -60,7 +60,8 @@ test('SEENIT-NOTIFICATION-005 #778 sépare le type du fait compact sans emoji ni
   assert.equal((copy.body.match(/S02 \| E03/g) || []).length, 1);
 });
 
-test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le prochain épisode à voir et le compteur de l’accueil', () => {
+test('SEENIT-NOTIFICATION-002 et #623 alignent le rappel en retard sur le prochain épisode à voir et son propre compteur de reprise', () => {
+  // #703 : la carte À Regarder n'affiche plus ce compteur ; « + X épisode(s) » est propre à la notification.
   const released = episode(2, 3, 'La finale');
   const nextToWatch = episode(2, 2, 'Demi-finale');
   const show = showFixture({
