@@ -18,23 +18,37 @@ const diskLabel = (path: string) => {
   return drive ? `${drive[1].toUpperCase()}:` : path.replace(/\/+$/, '') || '/';
 };
 
-export interface DiskSource { host: string; service: string; rootFolders: readonly unknown[] }
+export interface DiskSource { host: string; service: string; rootFolders: readonly unknown[]; diskSpace?: readonly unknown[] }
+type RawDisk = { path?: string; freeSpace?: number; totalSpace?: number };
+const sameOrUnder = (path: string, parent: string) => {
+  const norm = (value: string) => value.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+  return norm(path) === norm(parent) || norm(path).startsWith(`${norm(parent)}/`);
+};
 /**
- * Revue Codex #1058 : deux disques ne sont fusionnés que s'ils sont sur la même machine (même hôte) ; deux lecteurs
- * « D: » de machines différentes restent distincts et sont nommés avec leur service (« D: · Radarr »).
+ * Revue Codex #1058 : deux lecteurs « D: » de machines différentes ne sont jamais fusionnés. Retour du 15/11
+ * (v1.4.318, « pas besoin de mettre l'info deux fois ») : Sonarr et Radarr joints par deux adresses différentes
+ * voient le même disque ; la taille totale exacte du lecteur (liste `diskspace`) prouve que c'est le même. Sans
+ * taille totale, seule la même machine (même hôte) permet de fusionner.
  */
 export function mergeDisks(sources: readonly DiskSource[]): DiskStatus[] {
-  const disks = new Map<string, DiskStatus & { service: string }>();
+  const disks = new Map<string, DiskStatus & { service: string; host: string }>();
   for (const source of sources) {
-    for (const root of source.rootFolders as Array<{ path?: string; freeSpace?: number; totalSpace?: number }>) {
+    const volumes = (source.diskSpace || []) as RawDisk[];
+    for (const root of source.rootFolders as RawDisk[]) {
       if (!root?.path || !Number.isFinite(root.freeSpace)) continue;
       const label = diskLabel(String(root.path));
-      const key = `${source.host}\n${label}`;
-      if (!disks.has(key)) disks.set(key, { label, service: source.service, freeSpace: Number(root.freeSpace), ...(Number(root.totalSpace) > 0 ? { totalSpace: Number(root.totalSpace) } : {}) });
+      const volume = volumes.filter(entry => entry?.path && sameOrUnder(String(root.path), String(entry.path))).sort((a, b) => String(b.path).length - String(a.path).length)[0];
+      const totalSpace = Number(root.totalSpace) > 0 ? Number(root.totalSpace) : Number(volume?.totalSpace) > 0 ? Number(volume?.totalSpace) : undefined;
+      // Revue Codex #1059 : une capacité égale ne suffit pas ; il faut aussi le même espace libre (à 64 Mo près,
+      // deux lectures quasi simultanées du même disque), sinon les disques restent distincts.
+      const freeSpace = Number(root.freeSpace);
+      const same = [...disks.entries()].find(([, other]) => other.label === label && (other.host === source.host
+        || (totalSpace !== undefined && other.totalSpace === totalSpace && Math.abs(other.freeSpace - freeSpace) <= 64 * 1024 ** 2)));
+      if (!same) disks.set(`${source.host}\n${label}\n${disks.size}`, { label, host: source.host, service: source.service, freeSpace, ...(totalSpace ? { totalSpace } : {}) });
     }
   }
   const all = [...disks.values()];
-  return all.map(({ service, ...disk }) => all.filter(other => other.label === disk.label).length > 1 ? { ...disk, label: `${disk.label} · ${service}` } : disk)
+  return all.map(({ service, host: _host, ...disk }) => all.filter(other => other.label === disk.label).length > 1 ? { ...disk, label: `${disk.label} · ${service}` } : disk)
     .sort((a, b) => a.freeSpace - b.freeSpace);
 }
 const hostOf = (url: string) => { try { return new URL(url).hostname.toLowerCase(); } catch { return url; } };
@@ -42,8 +56,12 @@ const hostOf = (url: string) => { try { return new URL(url).hostname.toLowerCase
 export async function fetchDiskStatus(config: DiskConfig, read: Read = executeGet): Promise<DiskStatus[]> {
   if (!isDownloadFeatureEnabled(config as Parameters<typeof isDownloadFeatureEnabled>[0])) return [];
   const sources = [['Sonarr', config.sonarrUrl, config.sonarrApiKey], ['Radarr', config.radarrUrl, config.radarrApiKey]].filter(([, url, key]) => url?.trim() && key?.trim()) as Array<[string, string, string]>;
-  const lists = await Promise.all(sources.map(([service, url, key]) => read(`${cleanUrl(url)}/api/v3/rootfolder`, { 'X-Api-Key': key, Accept: 'application/json' })
-    .then(list => ({ host: hostOf(cleanUrl(url)), service, rootFolders: Array.isArray(list) ? list : [] }), () => ({ host: hostOf(cleanUrl(url)), service, rootFolders: [] }))));
+  const list = (value: unknown) => Array.isArray(value) ? value : [];
+  const lists = await Promise.all(sources.map(async ([service, url, key]) => {
+    const headers = { 'X-Api-Key': key, Accept: 'application/json' };
+    const [rootFolders, diskSpace] = await Promise.all([read(`${cleanUrl(url)}/api/v3/rootfolder`, headers).then(list, () => []), read(`${cleanUrl(url)}/api/v3/diskspace`, headers).then(list, () => [])]);
+    return { host: hostOf(cleanUrl(url)), service, rootFolders, diskSpace };
+  }));
   return mergeDisks(lists);
 }
 

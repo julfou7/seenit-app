@@ -196,8 +196,8 @@ export async function executeGet(url: string, headers: Record<string, string> = 
         }
 
         throw new Error(json.message || json.error || `Erreur proxy ${json.status || res.status}`);
-      } catch (proxyErr: any) {
-        throw new Error(proxyErr?.message || 'Impossible de joindre le service');
+      } catch (proxyErr: unknown) {
+        throw new Error((proxyErr instanceof Error && proxyErr.message) || 'Impossible de joindre le service');
       }
     }
   }
@@ -759,7 +759,8 @@ async function executeArrInteractiveWeb(method: 'GET' | 'POST', url: string, hea
     body: JSON.stringify({ targetUrl: url, method, headers, body }), signal: AbortSignal.timeout(ARR_RELEASE_TIMEOUT_MS + 5_000)
   });
   const result = await response.json();
-  if (!response.ok || !result.ok || result.error) throw new Error(result.message || result.error || `Erreur proxy ${response.status}`);
+  // Retour du 15/11 (« Retester les indexers ») : le statut du service (400 = validation) reste lisible.
+  if (!response.ok || !result.ok || result.error) throw new Error(result.message || result.error || `Erreur HTTP ${result.status ?? response.status}`);
   return result.data;
 }
 
@@ -798,7 +799,7 @@ export async function executeArrInteractivePost(url: string, body: unknown, head
       headers: mutationHeaders,
       data: body,
       connectTimeout: 10000,
-      readTimeout: 30000
+      readTimeout: ARR_RELEASE_TIMEOUT_MS
     });
     if (response.status >= 200 && response.status < 300) return response.data || { success: true };
     throw new Error(`Erreur HTTP ${response.status}`);

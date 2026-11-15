@@ -261,6 +261,22 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     await launchArrDownload({ ...launch, config: useDownloadConfigStore.getState(), notify: (action, toastType = 'download') => showToast({ title: launch.title, action, posterPath: item.posterPath }, toastType) });
   };
 
+  // Retour du 15/11 (v1.4.318) : retester les indexers de Sonarr/Radarr depuis la carte, résultat nommé.
+  const [testingIndexers, setTestingIndexers] = useState<'tv' | 'movie' | null>(null);
+  const handleTestIndexers = async (item: LiveDownloadItem) => {
+    if (testingIndexers) return;
+    setTestingIndexers(item.mediaType);
+    try {
+      const { retestIndexers, describeIndexerRetest } = await import('../features/downloads/indexerRetest');
+      const result = describeIndexerRetest(await retestIndexers(useDownloadConfigStore.getState(), item.mediaType));
+      showToast({ title: item.mediaType === 'tv' ? 'Indexers de Sonarr' : 'Indexers de Radarr', action: result.text }, result.ok ? 'success' : 'error');
+    } catch (error: unknown) {
+      showToast({ title: 'Indexers', action: error instanceof Error ? error.message : 'Test impossible.' }, 'error');
+    } finally {
+      setTestingIndexers(null);
+    }
+  };
+
   // Retour terrain du 15/11 (v1.4.316, « je suis bloqué ») : une demande « À régler » se relance ; sa carte en échec
   // est retirée (aucun transfert à supprimer), puis la recherche repart avec la même qualité.
   const handleRetryFailed = async (item: LiveDownloadItem) => {
@@ -451,7 +467,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             className="download-swipe"
             actions={[{ label: isActive ? 'Annuler' : 'Retirer', ariaLabel: `${isActive ? 'Annuler le téléchargement de' : 'Retirer'} ${item.movieTitle || item.seriesTitle || item.title}`, icon: <Trash2 size={18} />, tone: 'rose', onSelect: () => handleRemove(item) }]}
           >
-            <DownloadItemCard item={item} onShowClick={onShowClick} onRemove={() => handleRemove(item)} onRetry={waitingRetryLaunch(item) ? () => void handleRetryFailed(item) : undefined} />
+            <DownloadItemCard item={item} onShowClick={onShowClick} onRemove={() => handleRemove(item)} onRetry={waitingRetryLaunch(item) ? () => void handleRetryFailed(item) : undefined} onTestIndexers={() => void handleTestIndexers(item)} testingIndexers={testingIndexers === item.mediaType} />
           </ActionSwipeCard>
         );
       })}

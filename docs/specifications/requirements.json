@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.318",
+  "applicationVersion": "1.4.319",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -1822,6 +1822,10 @@
         {
           "file": "tests/programmedCalendar.test.ts",
           "contains": "Programmés : jour de diffusion de la chaîne, et disque plein prouvé par les règles de Sonarr/Radarr"
+        },
+        {
+          "file": "tests/indexerRetest.test.ts",
+          "contains": "retester les indexers : test lancé, indexers encore en échec nommés, aucun réglage modifié"
         },
         {
           "file": "tests/episodeProgramming.test.ts",

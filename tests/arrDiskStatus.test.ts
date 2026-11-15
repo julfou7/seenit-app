@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
+import { isAllowedServiceProxyPath } from '../src/features/downloads/downloadBackendSecurity.ts';
 
 // Retour du propriétaire du 15/11 : « peut-on avoir l'espace disque libre en temps réel, à la demande ? »
 const bundle = await build({ entryPoints: ['src/features/downloads/arrDiskStatus.ts'], bundle: true, platform: 'node', format: 'esm', write: false,
@@ -21,7 +22,8 @@ test('espace disque de Sonarr/Radarr : un disque une fois, chiffres réels, lu �
     urls.push(url);
     return url.includes(':8989') ? [{ path: 'D:\\Series', freeSpace: 1.2 * gib, totalSpace: 515.7 * gib }] : [{ path: 'D:\\Films', freeSpace: 1.2 * gib, totalSpace: 515.7 * gib }, { path: '/data/films', freeSpace: 300 * gib }];
   });
-  assert.deepEqual(urls, ['http://nas:8989/api/v3/rootfolder', 'http://nas:7878/api/v3/rootfolder']);
+  assert.deepEqual(urls, ['http://nas:8989/api/v3/rootfolder', 'http://nas:8989/api/v3/diskspace', 'http://nas:7878/api/v3/rootfolder', 'http://nas:7878/api/v3/diskspace']);
+  assert.ok(urls.every(url => isAllowedServiceProxyPath(url, 'GET')), 'lectures acceptées par le proxy PWA');
   assert.deepEqual(disks.map(entry => entry.label), ['D:', '/data/films'], 'même machine, même lecteur : montré une fois, le plus plein d’abord');
   // Revue Codex #1058 : deux machines, chacune avec un lecteur D: — jamais fusionnés.
   const twoHosts = await disk.fetchDiskStatus({ ...config, radarrUrl: 'http://autre:7878' }, async url => url.includes(':8989') ? [{ path: 'D:\\Series', freeSpace: 200 * gib }] : [{ path: 'D:\\Films', freeSpace: 1 * gib }]);
@@ -36,4 +38,26 @@ test('espace disque de Sonarr/Radarr : un disque une fois, chiffres réels, lu �
   const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
   assert.match(screen, /const lowDisks = \(useDiskStatus\(config\) \|\| \[\]\)\.filter\(disk => diskTone\(disk\) !== 'ok'\);/);
   assert.match(screen, /lowDisks\.map\(disk => <p key=\{disk\.label\} className="downloads-disk" data-tone=\{diskTone\(disk\)\}>Disque \{disk\.label\} · \{describeDisk\(disk\)\}<\/p>\)/);
+});
+
+test('retour du 15/11 (v1.4.318) : le même disque vu par Sonarr et Radarr via deux adresses n’apparaît qu’une fois', () => {
+  const gib = 1024 ** 3;
+  const volume = [{ path: 'D:\\', freeSpace: 1.2 * gib, totalSpace: 515.7 * gib }];
+  const merged = disk.mergeDisks([
+    { host: '192.168.1.10', service: 'Sonarr', rootFolders: [{ path: 'D:\\Series', freeSpace: 1.2 * gib }], diskSpace: volume },
+    { host: 'nas.local', service: 'Radarr', rootFolders: [{ path: 'D:\\Films', freeSpace: 1.2 * gib }], diskSpace: volume },
+  ]);
+  assert.deepEqual(merged.map(entry => [entry.label, disk.describeDisk(entry)]), [['D:', '1,2 Go libres sur 515,7 Go']]);
+  // Revue Codex #1059 : même capacité mais espace libre différent (deux machines) : jamais fusionnés.
+  const sameSize = disk.mergeDisks([
+    { host: 'a', service: 'Sonarr', rootFolders: [{ path: 'D:\\Series', freeSpace: 200 * gib }], diskSpace: volume },
+    { host: 'b', service: 'Radarr', rootFolders: [{ path: 'D:\\Films', freeSpace: 1 * gib }], diskSpace: volume },
+  ]);
+  assert.deepEqual(sameSize.map(entry => entry.label), ['D: · Radarr', 'D: · Sonarr']);
+  // Tailles totales différentes : deux disques distincts, nommés avec leur service.
+  const distinct = disk.mergeDisks([
+    { host: 'a', service: 'Sonarr', rootFolders: [{ path: 'D:\\Series', freeSpace: 200 * gib }], diskSpace: [{ path: 'D:\\', totalSpace: 1000 * gib }] },
+    { host: 'b', service: 'Radarr', rootFolders: [{ path: 'D:\\Films', freeSpace: 1 * gib }], diskSpace: volume },
+  ]);
+  assert.deepEqual(distinct.map(entry => entry.label), ['D: · Radarr', 'D: · Sonarr']);
 });

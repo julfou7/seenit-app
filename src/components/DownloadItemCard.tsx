@@ -12,7 +12,7 @@ import { releaseVariantLabel } from '../features/downloads/releaseQuality';
 const AlternativeReleaseModal = lazy(() => import('./AlternativeReleaseModal').then(module => ({ default: module.AlternativeReleaseModal })));
 const DownloadModal = lazy(() => import('./DownloadModal').then(module => ({ default: module.DownloadModal })));
 
-export function DownloadItemCard({ item, onShowClick, onRemove, onRetry }: { item: LiveDownloadItem; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: () => void; onRetry?: () => void }) {
+export function DownloadItemCard({ item, onShowClick, onRemove, onRetry, onTestIndexers, testingIndexers = false }: { item: LiveDownloadItem; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: () => void; onRetry?: () => void; onTestIndexers?: () => void; testingIndexers?: boolean }) {
   const [choosingRelease, setChoosingRelease] = useState(false);
   const [choosingQuality, setChoosingQuality] = useState(false);
   const [details, setDetails] = useState(false);
@@ -66,6 +66,8 @@ export function DownloadItemCard({ item, onShowClick, onRemove, onRetry }: { ite
     </div>}
     {/* Une carte à régler montre ses deux actions sans passer par « … ». */}
     {/* Retour terrain du 15/11 (v1.4.316) : une recherche en échec (timeout…) se relance en un appui. */}
+    {/* Retour du 15/11 (v1.4.318) : indexers en pause ou en échec — les retester depuis SeenIt. */}
+    {toFix && onTestIndexers && /indexer/i.test(`${item.errorMessage || ''} ${item.statusText || ''}`) && <button type="button" className="download-card__retest" disabled={testingIndexers} onClick={onTestIndexers}>{testingIndexers ? 'Test des indexers…' : 'Retester les indexers'}</button>}
     {toFix && onRetry && <button type="button" className="download-card__retry" onClick={onRetry}><RotateCw size={15} aria-hidden="true" />Relancer la recherche</button>}
     {toFix && <div className="download-card__quick">
       {item.tmdbId && <button type="button" onClick={() => setChoosingRelease(true)}>Choisir une version</button>}
