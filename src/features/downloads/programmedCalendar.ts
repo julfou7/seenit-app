@@ -119,6 +119,17 @@ export async function checkWantedReleases(items: ProgrammedItem[], previous: rea
   }));
 }
 
+/**
+ * Lecture des versions proposées pour un recherché (`checkWantedReleases`). Revue Codex #1053 : appelée par la
+ * synchronisation après la consolidation de la liste (titres hors de la première page compris).
+ */
+export const wantedReleaseReader = (config: DownloadConfig, io: CalendarIo = defaultIo) => (item: ProgrammedItem): Promise<unknown> => {
+  const isEpisode = item.kind === 'episode';
+  const url = isEpisode ? config.sonarrUrl : config.radarrUrl;
+  const apiKey = isEpisode ? config.sonarrApiKey : config.radarrApiKey;
+  return url && apiKey ? io.get(`${cleanUrl(url)}/api/v3/release?${isEpisode ? 'episodeId' : 'movieId'}=${item.id}`, headersFor(apiKey)) : Promise.resolve(null);
+};
+
 export const dayTime = (date: string) => {
   const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
   return day ? new Date(Number(day[1]), Number(day[2]) - 1, Number(day[3])).getTime() : Date.parse(date);
@@ -130,7 +141,7 @@ export const dayTime = (date: string) => {
  * sans fichier, dont la série est elle-même surveillée, sont listés. Une source injoignable est rendue
  * dans `failures`, jamais confondue avec « rien de programmé ».
  */
-export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Date.now(), days = 120, io = defaultIo, previous = [] }: { now?: number; days?: number; io?: CalendarIo; previous?: readonly ProgrammedItem[] } = {}): Promise<ProgrammedCalendar> {
+export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Date.now(), days = 120, io = defaultIo }: { now?: number; days?: number; io?: CalendarIo } = {}): Promise<ProgrammedCalendar> {
   const result: ProgrammedCalendar = { items: [], failures: [] };
   if (!isDownloadFeatureEnabled(config)) return result;
   const range = `start=${encodeURIComponent(iso(now))}&end=${encodeURIComponent(iso(now + days * 86_400_000))}&unmonitored=false`;
@@ -183,12 +194,6 @@ export async function fetchProgrammedCalendar(config: DownloadConfig, { now = Da
     }, () => { result.failures.push('Radarr'); }));
   }
   await Promise.all(tasks);
-  await checkWantedReleases(result.items, previous, now, item => {
-    const isEpisode = item.kind === 'episode';
-    const url = isEpisode ? config.sonarrUrl : config.radarrUrl;
-    const apiKey = isEpisode ? config.sonarrApiKey : config.radarrApiKey;
-    return url && apiKey ? io.get(`${cleanUrl(url)}/api/v3/release?${isEpisode ? 'episodeId' : 'movieId'}=${item.id}`, headersFor(apiKey)) : Promise.resolve(null);
-  });
   result.items = sortProgrammedItems(result.items);
   return result;
 }

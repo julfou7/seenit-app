@@ -270,16 +270,21 @@ test('Programmés : disque plein prouvé par les versions réellement proposées
     throw new Error(url);
   };
   const io = { get, put: async () => undefined };
-  const first = await calendar.fetchProgrammedCalendar({ ...config, sonarr4kProfileId: 4, radarr1080pProfileId: 6 }, { now: sunday, io });
+  const cfg = { ...config, sonarr4kProfileId: 4, radarr1080pProfileId: 6 };
+  const api = calendar as unknown as { checkWantedReleases: (items: Item[], previous: Item[], now: number, read: (item: Item) => Promise<unknown>) => Promise<void>; wantedReleaseReader: (config: Record<string, unknown>, io: Record<string, unknown>) => (item: Item) => Promise<unknown> };
+  // Chemin de production (arrSyncStore) : liste lue, puis versions vérifiées sur la liste complète.
+  const sync = async (at: number, previous: Item[]) => { const result = await calendar.fetchProgrammedCalendar(cfg, { now: at, io }); await api.checkWantedReleases(result.items, previous, at, api.wantedReleaseReader(cfg, io)); return result; };
+  const first = await sync(sunday, []);
   const flags = (items: Item[]) => items.map(item => `${item.id}:${(item as { wanted?: boolean }).wanted ? 'recherché' : '-'}:${(item as { diskFull?: boolean }).diskFull ? 'plein' : '-'}`).sort();
   assert.deepEqual(flags(first.items), ['21:recherché:plein', '22:recherché:-', '3:recherché:plein'], 'S02E03 sorti le jour même ; disque prouvé par les versions ; Heartland sans version reste recherché');
   assert.ok(reads.every(url => isAllowedServiceProxyPath(url, 'GET')), 'lecture des versions acceptée par le proxy PWA');
   // Synchronisation suivante, moins de 3 h après : rien n'est relu, le résultat est repris.
   reads.length = 0;
-  const again = await calendar.fetchProgrammedCalendar({ ...config, sonarr4kProfileId: 4, radarr1080pProfileId: 6 }, { now: sunday + 60_000, io, previous: first.items });
+  const again = await sync(sunday + 60_000, first.items);
   assert.deepEqual([reads.length, flags(again.items)], [0, flags(first.items)]);
   // Au-delà, une relecture a lieu (au plus 8 titres par synchronisation).
-  const later = await calendar.fetchProgrammedCalendar({ ...config, sonarr4kProfileId: 4, radarr1080pProfileId: 6 }, { now: sunday + 4 * 3_600_000, io, previous: again.items });
+  const later = await sync(sunday + 4 * 3_600_000, again.items);
+  assert.match(readFileSync('src/store/arrSyncStore.ts', 'utf8'), /const coverage = coverArrLibrary\(programmed, imports\.pending\);[\s\S]*?await checkWantedReleases\(coverage\.programmed\.items, /, 'revue Codex #1053 : après la consolidation de la liste');
   assert.equal(reads.length, 3);
   assert.deepEqual(flags(later.items), flags(first.items));
   const source = readFileSync('src/features/downloads/programmedCalendar.ts', 'utf8');
