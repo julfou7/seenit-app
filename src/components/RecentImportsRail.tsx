@@ -6,6 +6,7 @@ import { auth } from '../lib/firebase';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore } from '../store/arrSyncStore';
 import { recentImportLabel, recentImportServerKey, recentImportsScope, removeRecentImport, visibleRecentImports, type ArrPendingTitle, type RecentImport } from '../features/downloads/recentImports';
+import { importedEpisodesLabel } from '../features/downloads/importedEpisodes';
 import { undecidedReason } from '../features/downloads/arrCoverage';
 import { LoadMore } from './cards/HomeLoadMore';
 import { frenchArrMessage } from '../features/downloads/arrStatusMessages';
@@ -112,6 +113,8 @@ export function RecentImportsRail({ items, failures, onShowClick, variant = 'imp
           action={{ label: 'Retirer', ariaLabel: `Retirer ${item.title} de ${undecided ? 'À décider' : 'Téléchargés'} et de ${item.kind === 'movie' ? 'Radarr' : 'Sonarr'}`, busy: busy === item.key, disabled: busy !== null && busy !== item.key,
             icon: busy === item.key ? <Loader2 size={10} className="animate-spin" aria-hidden="true" /> : <X size={10} aria-hidden="true" />, onSelect: () => void remove(item) }} />
         {undecided && <p className="downloads-undecided__reason">{undecidedReason(item as ArrPendingTitle)}</p>}
+        {/* Retour terrain du 15/11 : les épisodes récupérés d'une série, visibles sans survol. */}
+        {!undecided && importedEpisodesLabel(item) && <p className="downloads-recent__episodes">{importedEpisodesLabel(item)}</p>}
       </li>)}
     </ul>}
     <LoadMore previews={visible.slice(limit, limit + 3).map(item => ({ key: item.key, initial: item.title.charAt(0), imagePath: tmdbPosterPath(item.posterUrl) || null }))}

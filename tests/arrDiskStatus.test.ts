@@ -36,7 +36,7 @@ test('espace disque de Sonarr/Radarr : un disque une fois, chiffres réels, lu �
   assert.deepEqual(await disk.fetchDiskStatus({ ...config, downloadsEnabled: false }, async () => { throw new Error('jamais'); }), []);
   // L'onglet Télécharger montre un disque presque plein sous son titre.
   const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
-  assert.match(screen, /const lowDisks = \(useDiskStatus\(config\) \|\| \[\]\)\.filter\(disk => diskTone\(disk\) !== 'ok'\);/);
+  assert.match(screen, /const disks = useDiskStatus\(config\) \|\| \[\];\n\s+const lowDisks = disks\.filter\(disk => diskTone\(disk\) !== 'ok'\);/);
   assert.match(screen, /lowDisks\.map\(disk => <p key=\{disk\.label\} className="downloads-disk" data-tone=\{diskTone\(disk\)\}>Disque \{disk\.label\} · \{describeDisk\(disk\)\}<\/p>\)/);
 });
 
@@ -60,4 +60,11 @@ test('retour du 15/11 (v1.4.318) : le même disque vu par Sonarr et Radarr via d
     { host: 'b', service: 'Radarr', rootFolders: [{ path: 'D:\\Films', freeSpace: 1 * gib }], diskSpace: volume },
   ]);
   assert.deepEqual(distinct.map(entry => entry.label), ['D: · Radarr', 'D: · Sonarr']);
+  // Revue Codex #1063 : disque de destination d'un import, seulement s'il est certain.
+  assert.deepEqual(merged[0].services, ['Sonarr', 'Radarr']);
+  assert.equal(disk.lowImportDisk(merged, 'tv')?.label, 'D:', 'Sonarr n’a qu’un disque, presque plein');
+  assert.equal(disk.lowImportDisk(distinct, 'movie')?.label, 'D: · Radarr');
+  assert.equal(disk.lowImportDisk(distinct, 'tv'), undefined, 'disque Sonarr avec 200 Go : rien');
+  const twoRoots = disk.mergeDisks([{ host: 'a', service: 'Radarr', rootFolders: [{ path: 'D:\\Films', freeSpace: 1 * gib }, { path: 'E:\\Films', freeSpace: 500 * gib }] }]);
+  assert.equal(disk.lowImportDisk(twoRoots, 'movie'), undefined, 'deux disques possibles : destination incertaine');
 });
