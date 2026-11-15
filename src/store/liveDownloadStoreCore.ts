@@ -694,7 +694,7 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
               serverItem.sizeleft = 0;
             } else if (serverItem.importState === 'pending' && serverItem.progress >= 100 && !serverItem.errorMessage && serverItem.status !== 'error' && serverItem.status !== 'warning') {
               serverItem.status = 'importing';
-              serverItem.statusText = 'Transfert terminé · import à confirmer';
+              serverItem.statusText = 'Téléchargé · import Plex en cours';
             } else {
               markCompletionNotificationEligible(serverItem);
             }
