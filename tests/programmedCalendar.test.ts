@@ -286,3 +286,25 @@ test('Programmés : disque plein prouvé par les versions réellement proposées
   assert.match(source, /export const RELEASE_CHECKS_PER_SYNC = 8;/);
   assert.match(source, /due\.slice\(0, RELEASE_CHECKS_PER_SYNC\)/);
 });
+
+// Revue Codex #1053 : preuve refaite si la qualité change ; une lecture en échec laisse passer les suivants.
+test('Programmés : vérification des versions refaite au changement de qualité, rotation malgré les échecs', async () => {
+  const { checkWantedReleases, RELEASE_CHECKS_PER_SYNC } = calendar as unknown as { checkWantedReleases: (items: Array<Record<string, unknown>>, previous: Array<Record<string, unknown>>, now: number, read: (item: Record<string, unknown>) => Promise<unknown>) => Promise<void>; RELEASE_CHECKS_PER_SYNC: number };
+  const now = 1_000_000_000;
+  const proven = [{ kind: 'movie', id: 1, wanted: true, quality: '4K', profileId: 4, diskFull: true, releaseCheckedAt: now - 60_000, releaseScope: '4|4K', releaseAttemptAt: now - 60_000 }];
+  const changed: Array<Record<string, unknown>> = [{ kind: 'movie', id: 1, wanted: true, quality: '1080p', profileId: 6 }];
+  let reads = 0;
+  await checkWantedReleases(changed, proven, now, async () => { reads++; return []; });
+  assert.deepEqual([reads, changed[0].diskFull], [1, undefined], 'nouvelle qualité : relue, l’ancienne preuve 4K n’est pas reprise');
+  // 12 recherchés, lectures toujours en échec : la synchronisation suivante examine d'autres titres.
+  const make = () => Array.from({ length: 12 }, (_, index) => ({ kind: 'episode', id: index + 1, wanted: true, quality: '4K' }));
+  const first = make();
+  const seen: number[] = [];
+  await checkWantedReleases(first, [], now, async item => { seen.push(Number(item.id)); throw new Error('503'); });
+  const second = make();
+  const next: number[] = [];
+  await checkWantedReleases(second, first, now + 60_000, async item => { next.push(Number(item.id)); throw new Error('503'); });
+  assert.equal(seen.length, RELEASE_CHECKS_PER_SYNC);
+  assert.ok(next.some(id => !seen.includes(id)), 'les titres non encore tentés passent en tête');
+  assert.ok(second.every(item => !(item as { diskFull?: boolean }).diskFull), 'un échec ne prouve jamais le disque plein');
+});

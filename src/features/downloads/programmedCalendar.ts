@@ -22,8 +22,8 @@ export type ProgrammedQuality = string;
  * propriétaire du 09/11, `USR-2026-11-09-009`). `inCinemasPast` : film sorti en salle sans date numérique connue.
  */
 export type ProgrammedItem =
-  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; releaseCheckedAt?: number; addedAt?: number }
-  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; releaseCheckedAt?: number; inCinemasPast?: boolean; addedAt?: number };
+  | { kind: 'episode'; id: number; seriesId: number; tmdbId?: number; tvdbId?: number; seriesTitle: string; season: number; episode: number; title: string; date?: string; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; releaseCheckedAt?: number; releaseAttemptAt?: number; releaseScope?: string; addedAt?: number }
+  | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; releaseCheckedAt?: number; releaseAttemptAt?: number; releaseScope?: string; inCinemasPast?: boolean; addedAt?: number };
 
 /** `movieQuality` : libellé de qualité d'un profil Radarr de ce serveur (revue Codex #933 : films ajoutés hors calendrier). */
 export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[]; movieQuality?: (profileId?: number) => ProgrammedQuality | undefined }
@@ -93,21 +93,28 @@ export const RELEASE_CHECKS_PER_SYNC = 8;
 const qualityPreference = (quality?: string) => /4k|2160/i.test(quality || '') ? '4k' as const : /1080/.test(quality || '') ? '1080p' as const : undefined;
 export async function checkWantedReleases(items: ProgrammedItem[], previous: readonly ProgrammedItem[], now: number, read: (item: ProgrammedItem) => Promise<unknown>): Promise<void> {
   const prior = new Map(previous.map(item => [`${item.kind}:${item.id}`, item]));
+  // Revue Codex #1053 : une preuve ne vaut que pour la qualité et le profil vérifiés ; un changement la refait.
+  const scopeOf = (item: ProgrammedItem) => `${item.profileId || ''}|${item.quality || ''}`;
   const due: ProgrammedItem[] = [];
   for (const item of items) {
     if (!item.wanted) continue;
     const before = prior.get(`${item.kind}:${item.id}`);
-    if (before?.releaseCheckedAt && now - before.releaseCheckedAt < RELEASE_CHECK_TTL_MS) {
+    // Revue Codex #1053 : la tentative (même échouée) est gardée pour faire tourner la file des vérifications.
+    if (before?.releaseAttemptAt) item.releaseAttemptAt = before.releaseAttemptAt;
+    if (before?.releaseCheckedAt && before.releaseScope === scopeOf(item) && now - before.releaseCheckedAt < RELEASE_CHECK_TTL_MS) {
       item.releaseCheckedAt = before.releaseCheckedAt;
+      item.releaseScope = before.releaseScope;
       if (before.diskFull) item.diskFull = true;
     } else if (!item.diskFull) due.push(item);
   }
-  // Les plus anciennement vérifiés d'abord : chaque recherché finit par être relu.
-  due.sort((a, b) => (prior.get(`${a.kind}:${a.id}`)?.releaseCheckedAt || 0) - (prior.get(`${b.kind}:${b.id}`)?.releaseCheckedAt || 0));
+  // Les plus anciennement tentés d'abord : chaque recherché finit par être relu, même si d'autres échouent.
+  due.sort((a, b) => (a.releaseAttemptAt || 0) - (b.releaseAttemptAt || 0));
   await Promise.all(due.slice(0, RELEASE_CHECKS_PER_SYNC).map(async item => {
+    item.releaseAttemptAt = now;
     const releases = await read(item).catch(() => null);
     if (!Array.isArray(releases)) return;
     item.releaseCheckedAt = now;
+    item.releaseScope = scopeOf(item);
     if (diskFullRejection(releases as ArrRelease[], qualityPreference(item.quality))) item.diskFull = true;
   }));
 }
