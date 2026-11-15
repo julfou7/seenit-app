@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCardStaleDetail, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone } from '../src/features/watchlist/seriesCardPresentation.ts';
+import { buildSeriesSeasonProgress, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCardStaleDetail, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone, upToDateCode } from '../src/features/watchlist/seriesCardPresentation.ts';
 import { dominantPosterHue, readPosterHue, rememberPosterHue, POSTER_HUE_CACHE_LIMIT } from '../src/features/watchlist/posterHue.ts';
 import { buildSeasonProgressEvidence, needsSeasonProgressRefresh } from '../src/features/shows/seasonProgressEvidence.ts';
 
@@ -63,13 +63,13 @@ test('SEENIT-UX-014 Harry Potter : un épisode provisoire ne vaut pas une saison
 test('SEENIT-UX-014 conserve les états de saison sans inventer les diffusions', () => {
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Ended' }), 'Série terminée');
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Canceled' }), 'Série annulée');
-  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series' }), 'Prochain épisode bientôt');
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series' }), 'Suite pas encore annoncée', 'retour du 15/11 (Lupin)');
   // Retour terrain 07/11 (MobLand) : date connue → délai relatif, jamais « bientôt ».
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-13' } }, '2026-11-07'), 'Prochain épisode dans 6 jours');
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-08' } }, '2026-11-07'), 'Prochain épisode demain');
   assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-20' } }, '2026-11-07'), 'Prochain épisode dans 13 jours · 20 nov.');
   // Date passée ou absente : pas de délai inventé.
-  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-01' } }, '2026-11-07'), 'Prochain épisode bientôt');
+  assert.equal(seriesCompletionLabel({ tmdbStatus: 'Returning Series', nextEpisodeToAir: { air_date: '2026-11-01' } }, '2026-11-07'), 'Prochain épisode annoncé, date à venir');
   const episode = { season_number: 5, episode_number: 4, episode_count: 8, aired_episodes_in_season: 5 };
   const show = { seenEpisodes: ['5x1', '5x2', '5x3'], seasonsCache: [], nextEpisodeToWatch: episode, nextEpisodeToAir: null, seriesEnded: true, tmdbStatus: 'Ended' };
   const progress = buildSeriesSeasonProgress(show, episode, 'watch', '2026-10-21');
@@ -226,4 +226,12 @@ test('la carte 8f reste partagée par les adapters de production et leurs action
   assert.match(history, /onOpen=\{handleRowClick\}/);
   const expanded = readFileSync(new URL('../src/screens/watchListPresentation.tsx', import.meta.url), 'utf8');
   assert.match(expanded, /<ContinueWatchingCard show=\{show\} layout="list"/);
+});
+
+// Retour terrain du 15/11 (Lupin, saison 3 vue jusqu'au bout) : « S03 · à jour · Prochain épisode bientôt » était faux.
+test('fin de saison : « saison vue » sans épisode annoncé dans la saison, « à jour » si elle continue', () => {
+  const episode = { season_number: 3, episode_number: 7 };
+  assert.equal(upToDateCode({ nextEpisodeToAir: null }, episode), 'S03 · saison vue');
+  assert.equal(upToDateCode({ nextEpisodeToAir: { season_number: 4, episode_number: 1 } }, episode), 'S03 · saison vue', 'saison suivante annoncée');
+  assert.equal(upToDateCode({ nextEpisodeToAir: { season_number: 3, episode_number: 8 } }, episode), 'S03 · à jour', 'saison en cours de diffusion');
 });
