@@ -313,3 +313,15 @@ test('Programmés : vérification des versions refaite au changement de qualité
   assert.ok(next.some(id => !seen.includes(id)), 'les titres non encore tentés passent en tête');
   assert.ok(second.every(item => !(item as { diskFull?: boolean }).diskFull), 'un échec ne prouve jamais le disque plein');
 });
+
+// Revue Codex #1056 : une relecture pendant la vérification garde ses résultats (report sans nouvelle lecture).
+test('Programmés : les résultats de vérification sont reportés sur une copie plus récente', async () => {
+  const api = calendar as unknown as { checkWantedReleases: (items: Array<Record<string, unknown>>, previous: Array<Record<string, unknown>>, now: number, read: () => Promise<unknown>, limit?: number) => Promise<void> };
+  const checked = [{ kind: 'movie', id: 21, wanted: true, quality: '1080p', profileId: 6, diskFull: true, releaseCheckedAt: 1_000, releaseAttemptAt: 1_000, releaseScope: '6|1080p' }];
+  const newer: Array<Record<string, unknown>> = [{ kind: 'movie', id: 21, wanted: true, quality: '1080p', profileId: 6 }, { kind: 'movie', id: 22, wanted: true, quality: '1080p', profileId: 6 }];
+  let reads = 0;
+  await api.checkWantedReleases(newer, checked, 2_000, async () => { reads++; return []; }, 0);
+  assert.deepEqual([reads, newer[0].diskFull, newer[1].diskFull], [0, true, undefined]);
+  const store = readFileSync('src/store/arrSyncStore.ts', 'utf8');
+  assert.match(store, /const merged = latest\.programmed\.items\.map\(item => \(\{ \.\.\.item \}\)\);\n\s+void checkWantedReleases\(merged, items, Date\.now\(\), wantedReleaseReader\(config\), 0\);/);
+});

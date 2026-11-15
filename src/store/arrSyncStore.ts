@@ -133,9 +133,12 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
         void checks.catch(() => undefined).finally(() => {
           releaseChecking = false;
           const latest = get().snapshot;
-          // Seule la copie vérifiée est mise à jour ; une relecture plus récente l'a déjà remplacée sinon.
-          if (arrSyncKey() !== key || latest?.programmed?.items !== items || !latest.programmed) return;
-          const updated = { ...latest, programmed: { ...latest.programmed, items: [...items] } };
+          if (arrSyncKey() !== key || latest?.key !== key || !latest.programmed) return;
+          // Revue Codex #1056 : une relecture arrivée pendant la vérification ne perd pas ses résultats ; ils sont
+          // reportés sur la copie courante, titre par titre, si la qualité et le profil sont les mêmes.
+          const merged = latest.programmed.items.map(item => ({ ...item }));
+          void checkWantedReleases(merged, items, Date.now(), wantedReleaseReader(config), 0);
+          const updated = { ...latest, programmed: { ...latest.programmed, items: merged } };
           set({ snapshot: updated });
           persistArrSnapshot(updated);
         });
