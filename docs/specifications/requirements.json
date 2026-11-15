@@ -3554,6 +3554,19 @@
       ]
     },
     {
+      "id": "SEENIT-QUALITY-014",
+      "title": "Préflight de permission avant toute suppression Cloud Storage",
+      "targets": [
+        "ci"
+      ],
+      "tests": [
+        {
+          "file": "tests/workflowPolicy.test.ts",
+          "contains": "SEENIT-QUALITY-014 #511 toute suppression GCS est précédée du préflight testIamPermissions storage.objects.delete"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-AUTH-001",
       "title": "Connexion Google Android native via Credential Manager sans changer le Firebase UID",
       "targets": [

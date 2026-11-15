@@ -45,7 +45,7 @@ test('SEENIT-DISCOVER-003 E-20 le panneau applique sans scroll ni fermeture impl
 
 test('Les cartes exposent un état de recherche diffuseur sans dupliquer le cache', () => {
   assert.match(providerHookSource, /readWatchProviderCache/);
-  assert.match(providerHookSource, /writeWatchProviderCache/);
+  assert.match(providerHookSource, /recordWatchProviderPayload/, '#641 : la carte enregistre sans rajeunir une copie existante');
   assert.match(providerHookSource, /isProviderLoading/);
   assert.match(providerHookSource, /providerLoading = 'true'/);
   assert.match(providerHookSource, /aria-busy/);
