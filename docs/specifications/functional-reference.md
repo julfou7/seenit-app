@@ -1167,7 +1167,11 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
   sont remplacés par les canaux système « Épisodes et saisons » et « Films » (chaque ligne ouvre son
   canal), l'interrupteur Actualités restant, puis **Autres alertes** sans préférence SeenIt (Rappels,
   Téléchargements et Plex, Mise à jour de SeenIt) : chaque ligne ouvre son canal Android, réglages
-  Android, et « Envoyer une notification test » qui déplie les quatre tests existants ;
+  Android, et « Envoyer une notification test » qui déplie les quatre tests existants. Dans les
+  catégories de notification Android de l'APK (ménage du 15/11), la catégorie de secours de Firebase
+  « Miscellaneous » est supprimée au démarrage ; Firebase la recrée seulement si une notification serveur
+  arrive avant sa catégorie SeenIt. Celle de la bibliothèque de notifications, recréée à chaque démarrage,
+  s'affiche « Autres » au lieu de « Default », avec l'importance choisie par l'utilisateur ;
 - **Connexions → Serveur SeenIt** (#404, « météo » des services) : point vert « Opérationnel » seulement si
   `/api/health` répond `status: ok`, orange si la réponse dépasse 2,5 s, rouge si injoignable ; sondé au
   plus une fois toutes les 5 minutes, sans contacter TMDB/TVDB/OMDb depuis l'appareil ;
