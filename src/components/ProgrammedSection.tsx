@@ -101,7 +101,10 @@ const posterUrl = (path?: string | null) => !path ? null : path.startsWith('http
  * annulation). La liste vient de l'état Sonarr/Radarr synchronisé (SEENIT-DOWNLOAD-016) : la section ne lit
  * rien elle-même, et chaque action resynchronise cet état et la fiche concernée.
  */
-export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], queued = [], onRemoveWatching, onRetryWatching, onRetryWatchingGroup, onForgetWatching }: {refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void; onRetryWatchingGroup?: (items: LiveDownloadItem[]) => void; onForgetWatching?: (item: LiveDownloadItem) => Promise<unknown> }) {
+/** Recherché de Sonarr/Radarr à relancer (retour terrain du 15/11) : identité TMDB, périmètre et qualité affichée. */
+export interface ProgrammedSearchTarget { mediaType: 'tv' | 'movie'; tmdbId: number; tvdbId?: number; title: string; season?: number; episode?: number; quality?: string; posterPath?: string }
+
+export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watchingRequests = [], queued = [], onRemoveWatching, onRetryWatching, onRetryWatchingGroup, onForgetWatching, onSearchProgrammed }: {refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void; onRetryWatchingGroup?: (items: LiveDownloadItem[]) => void; onForgetWatching?: (item: LiveDownloadItem) => Promise<unknown>; onSearchProgrammed?: (target: ProgrammedSearchTarget) => void }) {
   // Les identifiants viennent d'un serveur précis : la copie synchronisée est liée au compte et au serveur.
   const scope = programmedScope(useDownloadConfigStore());
   const snapshot = useArrSnapshot();
@@ -257,6 +260,8 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
             <span className="programmed__row-title" data-untitled={isUntitledEpisode(item) || undefined}>{isUntitledEpisode(item) ? 'Titre à venir' : item.title}</span>
             <span className="programmed__row-date" data-wanted={item.wanted || undefined}>{item.wanted ? `Sorti ${pastDayLabel(item.date)} · ${item.diskFull ? 'disque plein' : item.freeSpace !== undefined ? 'disque presque plein' : 'recherché'}` : programmedDateLabel(item.date)}</span>
           </span>
+          {/* Retour terrain du 15/11 (« relancer le E01 en premier, impossible ») : un épisode recherché se relance. */}
+          {onSearchProgrammed && item.wanted && item.tmdbId && !requestFor.has(item.id) && <button type="button" disabled={busy !== null} onClick={() => onSearchProgrammed({ mediaType: 'tv', tmdbId: item.tmdbId!, tvdbId: item.tvdbId, title: item.seriesTitle, season: item.season, episode: item.episode, quality: item.quality, posterPath: item.posterUrl })} aria-label={`Relancer la recherche de ${first.seriesTitle} ${code(item)}`} className="programmed__cancel programmed__cancel--icon"><RotateCw size={18} aria-hidden="true" /></button>}
           {rowCancel(item, `${first.seriesTitle} ${code(item)}`)}
         </li>)}
       </ul> } });
@@ -264,7 +269,8 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
   for (const movie of movies) {
     cards.push({ key: `m${movie.id}`, addedAt: movie.addedAt, data: { 'data-programmed-movie': movie.id }, name: movie.title, isTv: false, poster: movie.posterUrl, meta: meta('Film', movie.quality), pill: programmedMoviePill(movie),
       open: () => movie.tmdbId && onShowClick?.(movie.tmdbId, 'movie'), canOpen: Boolean(movie.tmdbId && onShowClick),
-      actions: cardMenu(`m${movie.id}`, movie.title, movie.quality, choice => void changeQuality({ kind: 'movie', id: movie.id }, choice, movie.title, { tmdbId: movie.tmdbId, mediaType: 'movie' }, movie.posterUrl), () => void cancel([movie], movie.title)) });
+      actions: cardMenu(`m${movie.id}`, movie.title, movie.quality, choice => void changeQuality({ kind: 'movie', id: movie.id }, choice, movie.title, { tmdbId: movie.tmdbId, mediaType: 'movie' }, movie.posterUrl), () => void cancel([movie], movie.title), undefined,
+        onSearchProgrammed && movie.wanted && movie.tmdbId ? () => { setMenu(null); onSearchProgrammed({ mediaType: 'movie', tmdbId: movie.tmdbId!, title: movie.title, quality: movie.quality, posterPath: movie.posterUrl }); } : undefined) });
   }
   const posterButton = (card: ProgrammedCard, className: string) => <button type="button" className={className} disabled={!card.canOpen} aria-label={`Ouvrir ${card.name}`} onClick={card.open}>{card.poster ? <img src={card.poster} alt="" loading="lazy" decoding="async" /> : card.isTv ? <Tv size={20} /> : <Film size={20} />}</button>;
   const switchLayout = (next: ProgrammedLayout) => { setLayout(next); writeUserScopedJson(auth.currentUser?.uid, LAYOUT_FIELD, next); };
