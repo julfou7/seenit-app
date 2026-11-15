@@ -213,9 +213,11 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const quality = item?.quality || details?.quality || entry.quality;
     const pill = item ? item.kind === 'movie' ? programmedMoviePill(item) : itemPill(item) : isTv ? 'Pas encore de version' : watchedMoviePill(Number(entry.tmdbId) in watchedMovies ? details : undefined);
     const radarrId = item?.kind === 'movie' ? item.id : details?.id;
+    // Revue Codex #1051 : la relance reprend la qualité affichée (synchronisée, éventuellement changée via ⋯).
+    const retryEntry = quality ? { ...entry, quality } : entry;
     cards.push({ key: `w${entry.id}`, addedAt: Number(entry.addedAt) || undefined, data: { 'data-programmed-request': entry.id }, name, isTv, poster: posterUrl(entry.posterPath), meta: meta(requestScope(entry), quality), pill,
       open: () => entry.tmdbId && onShowClick?.(entry.tmdbId, entry.mediaType), canOpen: Boolean(entry.tmdbId && onShowClick),
-      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }, undefined, onRetryWatching && waitingRetryLaunch(entry) ? () => { setMenu(null); onRetryWatching(entry); } : undefined) : null });
+      actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }, undefined, onRetryWatching && waitingRetryLaunch(retryEntry) ? () => { setMenu(null); onRetryWatching(retryEntry); } : undefined) : null });
   }
   for (const group of series.values()) {
     const first = group[0];

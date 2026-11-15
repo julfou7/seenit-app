@@ -21,7 +21,7 @@ test('#664 Relancer la recherche d’une attente : même identité TMDB, même p
   // Câblage réel : menu ⋯ de la carte en attente → lancement de la fiche (qui remplace l'attente du même périmètre).
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
   assert.match(section, /\{onRetry && <button type="button" disabled=\{busy !== null\} onClick=\{onRetry\}><RotateCw size=\{15\} aria-hidden="true" \/>Relancer la recherche<\/button>\}/);
-  assert.match(section, /onRetryWatching && waitingRetryLaunch\(entry\) \? \(\) => \{ setMenu\(null\); onRetryWatching\(entry\); \} : undefined/);
+  assert.match(section, /const retryEntry = quality \? \{ \.\.\.entry, quality \} : entry;[\s\S]*?onRetryWatching && waitingRetryLaunch\(retryEntry\) \? \(\) => \{ setMenu\(null\); onRetryWatching\(retryEntry\); \} : undefined/);
   const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
   assert.match(screen, /const launch = waitingRetryLaunch\(item\);[\s\S]*?await launchArrDownload\(\{ \.\.\.launch, config: useDownloadConfigStore\.getState\(\)/);
   assert.match(screen, /onRetryWatching=\{item => void handleRetryWaiting\(item\)\}/);
