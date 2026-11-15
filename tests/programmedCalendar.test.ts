@@ -10,7 +10,7 @@ const bundle = await build({ entryPoints: ['src/features/downloads/programmedCal
     builder.onResolve({ filter: /\/(?:sonarrRadarr|sonarrRadarrTransport|downloadFeatureVisibility)$/ }, args => ({ path: args.path.split('/').at(-1) || '', namespace: 'ports' }));
     builder.onLoad({ filter: /.*/, namespace: 'ports' }, args => ({ contents: args.path === 'sonarrRadarr'
       ? 'export const cleanUrl=u=>String(u).replace(/\\/+$/,"");export const executeGet=async()=>{throw new Error("réseau réel interdit")};'
-      : args.path === 'sonarrRadarrTransport' ? 'export const executePut=async()=>{throw new Error("réseau réel interdit")};'
+      : args.path === 'sonarrRadarrTransport' ? 'export const executePut=async()=>{throw new Error("réseau réel interdit")};export const executeArrInteractiveGet=executePut;'
       : 'export const isDownloadFeatureEnabled=c=>c.downloadsEnabled===true;' }));
   } }] });
 type Item = { kind: string; id: number; seriesId?: number; date?: string; title?: string };
@@ -284,12 +284,12 @@ test('Programmés : disque plein prouvé par les versions réellement proposées
   assert.deepEqual([reads.length, flags(again.items)], [0, flags(first.items)]);
   // Au-delà, une relecture a lieu (au plus 8 titres par synchronisation).
   const later = await sync(sunday + 4 * 3_600_000, again.items);
-  assert.match(readFileSync('src/store/arrSyncStore.ts', 'utf8'), /const coverage = coverArrLibrary\(programmed, imports\.pending\);[\s\S]*?await checkWantedReleases\(coverage\.programmed\.items, /, 'revue Codex #1053 : après la consolidation de la liste');
+  assert.match(readFileSync('src/store/arrSyncStore.ts', 'utf8'), /const coverage = coverArrLibrary\(programmed, imports\.pending\);[\s\S]*?const checks = items \? checkWantedReleases\(items, previous, Date\.now\(\), wantedReleaseReader\(config\), releaseChecking \? 0 : undefined\) : null;[\s\S]*?set\(\{ snapshot \}\);/, 'revue Codex #1053 : après la consolidation de la liste ; retour du 15/11 : listes affichées sans attendre');
   assert.equal(reads.length, 3);
   assert.deepEqual(flags(later.items), flags(first.items));
   const source = readFileSync('src/features/downloads/programmedCalendar.ts', 'utf8');
-  assert.match(source, /export const RELEASE_CHECKS_PER_SYNC = 8;/);
-  assert.match(source, /due\.slice\(0, RELEASE_CHECKS_PER_SYNC\)/);
+  assert.match(source, /export const RELEASE_CHECKS_PER_SYNC = 4;/);
+  assert.match(source, /for \(const item of due\.slice\(0, limit\)\) \{/, 'retour du 15/11 (« timeout ») : lectures une par une');
 });
 
 // Revue Codex #1053 : preuve refaite si la qualité change ; une lecture en échec laisse passer les suivants.
@@ -312,4 +312,16 @@ test('Programmés : vérification des versions refaite au changement de qualité
   assert.equal(seen.length, RELEASE_CHECKS_PER_SYNC);
   assert.ok(next.some(id => !seen.includes(id)), 'les titres non encore tentés passent en tête');
   assert.ok(second.every(item => !(item as { diskFull?: boolean }).diskFull), 'un échec ne prouve jamais le disque plein');
+});
+
+// Revue Codex #1056 : une relecture pendant la vérification garde ses résultats (report sans nouvelle lecture).
+test('Programmés : les résultats de vérification sont reportés sur une copie plus récente', async () => {
+  const api = calendar as unknown as { checkWantedReleases: (items: Array<Record<string, unknown>>, previous: Array<Record<string, unknown>>, now: number, read: () => Promise<unknown>, limit?: number) => Promise<void> };
+  const checked = [{ kind: 'movie', id: 21, wanted: true, quality: '1080p', profileId: 6, diskFull: true, releaseCheckedAt: 1_000, releaseAttemptAt: 1_000, releaseScope: '6|1080p' }];
+  const newer: Array<Record<string, unknown>> = [{ kind: 'movie', id: 21, wanted: true, quality: '1080p', profileId: 6 }, { kind: 'movie', id: 22, wanted: true, quality: '1080p', profileId: 6 }];
+  let reads = 0;
+  await api.checkWantedReleases(newer, checked, 2_000, async () => { reads++; return []; }, 0);
+  assert.deepEqual([reads, newer[0].diskFull, newer[1].diskFull], [0, true, undefined]);
+  const store = readFileSync('src/store/arrSyncStore.ts', 'utf8');
+  assert.match(store, /const merged = latest\.programmed\.items\.map\(item => \(\{ \.\.\.item \}\)\);\n\s+void checkWantedReleases\(merged, items, Date\.now\(\), wantedReleaseReader\(config\), 0\);/);
 });

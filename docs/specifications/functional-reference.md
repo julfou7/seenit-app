@@ -991,8 +991,8 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   plein · libère de l’espace » (« Sorti … · disque plein » pour un épisode) ; et le jour d'un épisode est celui de
   sa diffusion par la chaîne, comme dans le reste de l'app (plus de « Sortie demain » le jour même). Depuis la
   v1.4.315, la preuve lit aussi les versions réellement proposées (comme au lancement) : une version de la qualité
-  demandée refusée pour le seul espace disque suffit ; au plus 8 titres par synchronisation, chacun relu au plus
-  toutes les 3 h. Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
+  demandée refusée pour le seul espace disque suffit ; depuis la v1.4.316, au plus 4 titres par synchronisation, lus un
+  par un après l'affichage des listes (une recherche peut durer 90 s), chacun relu au plus toutes les 3 h. Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
   les épisodes demandés depuis SeenIt la rejoignent (sorties à venir puis recherchés) et gardent leur demande (✕ d'une
   ligne = annuler l'attente, « Relancer la recherche » dans ⋯). La section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni

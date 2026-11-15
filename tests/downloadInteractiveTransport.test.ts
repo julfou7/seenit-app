@@ -12,9 +12,9 @@ const runtime = await bundleDownloadRuntime(`export { executeArrInteractiveGet, 
   apiAuth: `export const authenticatedFetch=async(path,init)=>{const s=globalThis.__interactiveFixture;s.calls.push({path,init});
     if(s.fails)throw new Error('timeout');return {ok:true,json:async()=>({ok:true,data:[]})};};`
 });
-test('le proxy borne recherche et grab à 30 secondes, sans allonger le polling ordinaire', () => {
-  assert.equal(downloadServiceTimeoutMs('GET', 'https://arr.example/api/v3/release?movieId=3'), 30_000);
-  assert.equal(downloadServiceTimeoutMs('POST', 'https://arr.example/api/v3/release'), 30_000);
+test('le proxy borne recherche et grab à 90 secondes (retour du 15/11 « timeout »), sans allonger le polling ordinaire', () => {
+  assert.equal(downloadServiceTimeoutMs('GET', 'https://arr.example/api/v3/release?movieId=3'), 90_000);
+  assert.equal(downloadServiceTimeoutMs('POST', 'https://arr.example/api/v3/release'), 90_000);
   assert.equal(downloadServiceTimeoutMs('GET', 'https://arr.example/api/v3/queue'), 10_000);
 });
 test('les transports PWA et Android conservent la clé de soumission et ne rejouent pas un POST ambigu', async () => {
