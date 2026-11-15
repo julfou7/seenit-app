@@ -313,6 +313,7 @@ async function createPageTarget(port) {
  */
 const CDP_SEND_TIMEOUT_MS = 60_000;
 const LANE_TASK_TIMEOUT_MS = 240_000;
+let ISOLATED_CLOSE_TIMEOUT_MS = 5_000;
 
 class CdpClient {
   constructor(url) {
@@ -573,7 +574,17 @@ async function runLane(client, tasks, timings, label, taskTimeoutMs = LANE_TASK_
     let isolated;
     let finished = false;
     let closed = false;
-    const closeIsolated = async () => { if (isolated && !closed) { closed = true; await isolated.close(); } };
+    // Fermeture bornée elle aussi : un Chromium muet ne doit jamais bloquer le watchdog (revue #1035).
+    const closeIsolated = async () => {
+      if (!isolated || closed) return;
+      closed = true;
+      let closeTimer;
+      await Promise.race([
+        Promise.resolve(isolated.close()).catch(() => undefined),
+        new Promise(resolve => { closeTimer = setTimeout(resolve, ISOLATED_CLOSE_TIMEOUT_MS); }),
+      ]);
+      clearTimeout(closeTimer);
+    };
     try {
       const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`harnais bloqué depuis ${taskTimeoutMs} ms`)), taskTimeoutMs); });
       // L'ouverture de l'onglet isolé fait partie du travail surveillé : un blocage reste un échec nommé (revue #1035).
@@ -623,7 +634,7 @@ async function launchBrowser() {
       const page = await preparePageClient(target);
       return { client: page, close: async () => {
         page.close();
-        await fetch(`http://127.0.0.1:${port}/json/close/${target.id}`).catch(() => undefined);
+        await fetch(`http://127.0.0.1:${port}/json/close/${target.id}`, { signal: AbortSignal.timeout(ISOLATED_CLOSE_TIMEOUT_MS) }).catch(() => undefined);
       } };
     };
   } catch (error) {
@@ -776,6 +787,7 @@ if (require.main === module) {
 
 module.exports = {
   runLane,
+  setIsolatedCloseTimeoutForTests: ms => { ISOLATED_CLOSE_TIMEOUT_MS = ms; },
   buildLaneGroups,
   resolveLaneCount,
   CdpClient,

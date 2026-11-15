@@ -42,6 +42,12 @@ test('SEENIT-QUALITY-013 #722 un harnais à horloge virtuelle reçoit un onglet 
   await assert.rejects(run(main, [['minuterie', async () => 'jamais', { isolatedClock: true }]], {}, 'c', 10, slowOpen), /minuterie \(c\) : harnais bloqué depuis 10 ms/);
   await new Promise(resolve => setTimeout(resolve, 60));
   assert.deepEqual(late, ['ouvert', 'fermé'], 'onglet ouvert après le délai : refermé');
+  // Revue #1035 : une fermeture d'onglet muette est bornée et ne bloque pas le watchdog.
+  (smoke as unknown as { setIsolatedCloseTimeoutForTests: (ms: number) => void }).setIsolatedCloseTimeoutForTests(20);
+  const hangingClose = async () => ({ client: { id: 'muet' }, close: () => new Promise<void>(() => {}) });
+  const startedAt = Date.now();
+  await assert.rejects(run(main, [['minuterie', () => new Promise(() => {}), { isolatedClock: true }]], {}, 'c', 10, hangingClose), /harnais bloqué depuis 10 ms/);
+  assert.ok(Date.now() - startedAt < 500, 'le watchdog rend la main malgré une fermeture muette');
   const groups = (smoke as unknown as { buildLaneGroups: (config: unknown) => Array<Array<[string, unknown, { isolatedClock?: boolean }?]>> })
     .buildLaneGroups({ pwa: { minTouchTargetCssPx: 44, viewports: [] } }).flat();
   assert.equal(groups.find(([key]) => key === 'watchNext')?.[2]?.isolatedClock, true);
