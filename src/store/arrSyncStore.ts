@@ -128,13 +128,13 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       const reading = Boolean(checks) && !releaseChecking;
       // Retour terrain du 15/11 (v1.4.320) : un import nouveau depuis la copie précédente rafraîchit la présence du
       // titre (fiche, « Ajouter E… »), au lieu de garder un état « à télécharger » en cache.
-      const previousImports = get().snapshot?.key === key ? get().snapshot?.imports?.items : undefined;
+      const previousImports = get().snapshot?.key === key ? get().snapshot?.imports : undefined;
       const snapshot = { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() };
       set({ snapshot });
       persistArrSnapshot(snapshot);
-      for (const target of importsNeedingPresence(previousImports, labelled.imports?.items || [])) {
-        void useMediaPresenceStore.getState().checkPresence({ ...target, forceRefresh: true }).catch(() => undefined);
-      }
+      // Revue Codex #1063 : relectures une par une, jamais en rafale.
+      const refreshes = labelled.imports ? importsNeedingPresence(previousImports, labelled.imports) : [];
+      void refreshes.reduce((chain, target) => chain.then(() => useMediaPresenceStore.getState().checkPresence({ ...target, forceRefresh: true })).catch(() => undefined), Promise.resolve());
       if (checks && reading) {
         releaseChecking = true;
         void checks.catch(() => undefined).finally(() => {
