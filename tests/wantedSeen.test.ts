@@ -32,7 +32,7 @@ test('SEENIT-DOWNLOAD-020 un recherché déjà vu dans SeenIt depuis 24 h quitte
   const upcoming = [episode(9, 2, 9, { wanted: undefined })];
   assert.equal(hideSeenWanted(upcoming as never, [{ ...mobland, seenEpisodes: ['2x9'] }] as never, now).length, 1);
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
-  assert.match(section, /const items = hideSeenWanted\(\(snapshot\?\.programmed\?\.items \|\| \[\]\)\.filter\(item => !hidden\.has\(`\$\{item\.kind\}:\$\{item\.id\}`\)\), shows\);/, 'appliqué à la liste affichée, sans écriture Sonarr/Radarr');
+  assert.match(section, /const items = hideQueuedProgrammed\(hideSeenWanted\(\(snapshot\?\.programmed\?\.items \|\| \[\]\)\.filter\(item => !hidden\.has\(`\$\{item\.kind\}:\$\{item\.id\}`\)\), shows\), queued\);/,'appliqué à la liste affichée, sans écriture Sonarr/Radarr');
   assert.doesNotMatch(readFileSync('src/features/downloads/wantedSeen.ts', 'utf8'), /executePut|executeDelete|unprogram/, 'affichage seul');
 });
 
