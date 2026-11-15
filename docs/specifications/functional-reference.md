@@ -1029,7 +1029,10 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   surveillance ; une recherche interrompue reste en attente de vérification, sans faux zéro résultat.
   Annuler l'attente désactive la surveillance du scope exact et retire l'intention, sans supprimer de
   fichier ni de transfert distant. Une annulation non confirmée conserve la carte. Une arrivée tardive
-  de transfert doit rester non ambiguë ; une file vide ne supprime jamais l'attente.
+  de transfert doit rester non ambiguë ; une file vide ne supprime jamais l'attente. Depuis la v1.4.314
+  (#664), le menu ⋯ d'une attente dans Programmés propose « Relancer la recherche » : même titre TMDB,
+  même périmètre et même qualité qu'au lancement depuis la fiche ; la nouvelle demande remplace l'attente,
+  qui revient avec sa raison exacte si rien n'est trouvé.
 - Une carte terminale ou en attente possédant un TMDB exact propose « Chercher une autre release ». Le dialogue
   consulte les releases du média déjà présent dans Arr, sans ajout ni lancement automatique. Il expose
   audio VFF/VFQ/MULTI, qualité, taille, seeders et refus, avec filtre audio et scope TV exact. L'utilisateur
