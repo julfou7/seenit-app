@@ -29,6 +29,26 @@ const CHANNELS: ReadonlyArray<Channel> = [
 
 let ensurePromise: Promise<void> | null = null;
 
+/** Catégorie de secours créée par Firebase quand une notification arrive avant sa catégorie (« Miscellaneous »). */
+export const FCM_FALLBACK_CHANNEL_ID = 'fcm_fallback_notification_channel';
+/** Catégorie de secours de la bibliothèque de notifications, recréée à chaque démarrage (« Default »). */
+export const PLUGIN_DEFAULT_CHANNEL_ID = 'default';
+export const PLUGIN_DEFAULT_CHANNEL_NAME = 'Autres';
+
+/**
+ * Demande du 15/11 : « Default » et « Miscellaneous » n'ont aucun sens pour l'utilisateur. La catégorie de
+ * secours Firebase est supprimée (Firebase ne la recrée qu'en cas de besoin) ; celle de la bibliothèque, qu'on
+ * ne peut pas supprimer durablement, est renommée « Autres » en gardant l'importance choisie par l'utilisateur.
+ */
+export function planChannelHousekeeping(channels: ReadonlyArray<Channel>): { remove: string[]; rename: Channel[] } {
+  const remove = channels.some(channel => channel.id === FCM_FALLBACK_CHANNEL_ID) ? [FCM_FALLBACK_CHANNEL_ID] : [];
+  const pluginDefault = channels.find(channel => channel.id === PLUGIN_DEFAULT_CHANNEL_ID);
+  const rename = pluginDefault && pluginDefault.name !== PLUGIN_DEFAULT_CHANNEL_NAME
+    ? [{ ...pluginDefault, name: PLUGIN_DEFAULT_CHANNEL_NAME, description: 'Notifications sans catégorie dédiée' }]
+    : [];
+  return { remove, rename };
+}
+
 /**
  * Canaux SeenIt bloqués par l'utilisateur dans Android (importance NONE = 0). Hors Android ou en cas
  * d'échec de lecture : aucun canal considéré bloqué (le comportement historique est conservé).
@@ -60,6 +80,10 @@ export const ensureSeenItNotificationChannels = async (): Promise<void> => {
         await LocalNotifications.createChannel(channel);
       }
     }
+    // Ménage des catégories techniques : jamais bloquant pour la création des catégories SeenIt.
+    const housekeeping = planChannelHousekeeping(existing.channels);
+    for (const id of housekeeping.remove) await LocalNotifications.deleteChannel({ id }).catch(() => undefined);
+    for (const channel of housekeeping.rename) await LocalNotifications.createChannel(channel).catch(() => undefined);
   })().catch(error => {
     ensurePromise = null;
     throw error;
