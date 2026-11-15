@@ -48,7 +48,7 @@ test('SEENIT-DOWNLOAD-015 une demande apparaît tout de suite dans « En attente
   // v1.4.284 : un film couvert garde sa raison exacte (sortie, recherché ou salle) ; un épisode, sa date ou « recherché ».
   assert.match(programmed, /const pill = item \? item\.kind === 'movie' \? programmedMoviePill\(item\) : itemPill\(item\) : isTv \? 'Pas encore de version' : watchedMoviePill\(/);
   assert.match(readFileSync('src/features/downloads/programmedQueue.ts', 'utf8'), /Number\(item\.tmdbId\) === Number\(request\.tmdbId\)/, 'doublon calendrier reconnu par TMDB exact, jamais le titre');
-  assert.match(programmed, /import \{ coveredBy, hideQueuedProgrammed \} from '\.\.\/features\/downloads\/programmedQueue'/);
+  assert.match(programmed, /import \{ coveredBy, hideQueuedProgrammed, orderByRecentlyAdded \} from '\.\.\/features\/downloads\/programmedQueue'/);
   const card = read('src/components/DownloadItemCard.tsx');
   assert.match(card, /waiting \? \(item\.availability\?\.reason === 'no_release' \? 'Pas encore disponible · surveillance non confirmée' : 'Recherche à vérifier'\)/);
   assert.match(card, /\$\{toFix \? ' download-card--attention' : ''\}/);

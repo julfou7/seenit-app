@@ -1146,11 +1146,10 @@ Android autorisées du compte :
 
 Chaque média est évalué indépendamment : un média archivé/abandonné, sans date exploitable ou sans
 prochain épisode est ignoré sans interrompre la programmation des suivants. Aucun rappel n'est programmé
-pour l'élément inéligible. Les tests « Tester » des réglages réutilisent le même pipeline de rendu média
-que les vrais rappels (visuel, libellé avec emoji et action adaptée au type). Ils prennent en priorité le
-prochain événement réel éligible de la bibliothèque ; à défaut, un média actif du bon type sert seulement
-d'exemple de rendu. Ils valident l'autorisation et le rendu, pas l'arrivée future d'une donnée TMDB ou
-d'un webhook réel.
+pour l'élément inéligible. Depuis le 15/11, Réglages → Notifications propose une seule notification de
+test : un rappel « nouvel épisode » construit par le même code que le vrai rappel (texte, affiche et image,
+catégorie, « ✓ Vu » sur l'épisode à reprendre), sur une série de la liste qui a un épisode à voir ou à
+venir. Il valide l'autorisation et le rendu, pas l'arrivée future d'une donnée TMDB ou d'un webhook réel.
 
 ## 12. Réglages et maintenance utilisateur
 
@@ -1173,7 +1172,7 @@ seul en-tête : bouton Retour rond de 44 px et titre. L'accueil tient en cinq li
   dans l'APK Android (#402, simplifié le 15/11), une seule ligne « Catégories de notification » ouvre la
   page Android des catégories SeenIt, où chaque type se coupe ou se règle (épisodes et saisons, films,
   actualités, rappels, téléchargements, mises à jour) : aucun interrupteur SeenIt n'y filtre plus, les
-  actualités comprises. « Envoyer une notification test » déplie les quatre tests existants. Dans les
+  actualités comprises. « Envoyer une notification test » envoie un rappel « nouvel épisode » réel. Dans les
   catégories de notification Android de l'APK (ménage du 15/11), la catégorie de secours de Firebase
   « Miscellaneous » est supprimée au démarrage ; Firebase la recrée seulement si une notification serveur
   arrive avant sa catégorie SeenIt. Celle de la bibliothèque de notifications, recréée à chaque démarrage,

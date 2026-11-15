@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { hideQueuedProgrammed } from '../src/features/downloads/programmedQueue.ts';
+import { hideQueuedProgrammed, orderByRecentlyAdded } from '../src/features/downloads/programmedQueue.ts';
 import type { ProgrammedItem } from '../src/features/downloads/programmedCalendar.ts';
 import type { LiveDownloadItem } from '../src/services/sonarrRadarrLive.ts';
 
@@ -29,4 +29,22 @@ test('l’onglet Télécharger passe la file (en cours et en recherche) à Progr
   assert.match(screen, /<ProgrammedSection [^>]*queued=\{queuedDownloads\}/);
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
   assert.match(section, /hideQueuedProgrammed\(hideSeenWanted\(/);
+});
+
+// Retour terrain du 15/11 : « La Guerre des mondes », ajouté en dernier, apparaissait au milieu de « Programmés ».
+test('Programmés trié par date d’ajout, le plus récent en premier, dates inconnues en fin', () => {
+  const ordered = orderByRecentlyAdded([
+    { key: 'chat', addedAt: Date.parse('2026-11-01') },
+    { key: 'inconnu-1' },
+    { key: 'guerre', addedAt: Date.parse('2026-11-15T09:44:00Z') },
+    { key: 'potter', addedAt: Date.parse('2026-10-20') },
+    { key: 'inconnu-2' },
+  ]);
+  assert.deepEqual(ordered.map(card => card.key), ['guerre', 'chat', 'potter', 'inconnu-1', 'inconnu-2']);
+  const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
+  assert.match(section, /\{orderByRecentlyAdded\(cards\)\.map\(card => compact/);
+  assert.match(section, /addedAt: Number\(entry\.addedAt\) \|\| undefined/, 'demande SeenIt : date de la demande');
+  const calendar = readFileSync('src/features/downloads/programmedCalendar.ts', 'utf8');
+  assert.match(calendar, /\.\.\.addedAt\(entry\.series\?\.added\)/, 'série Sonarr');
+  assert.match(calendar, /\.\.\.addedAt\(movie\.added\)/, 'film Radarr');
 });

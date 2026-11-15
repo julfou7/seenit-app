@@ -28,10 +28,8 @@ import {
   type ReminderToastCandidate,
 } from '../features/notifications/reminderToastSummary';
 import { readBlockedSeenItChannels } from '../features/notifications/notificationChannels';
-import {
-  buildTvEpisodeReminderCopy,
-  buildTvSeasonReminderSummary,
-} from '../features/notifications/tvReminderCopy';
+import { buildTvSeasonReminderSummary } from '../features/notifications/tvReminderCopy';
+import { buildTvReleaseNotification } from '../features/notifications/tvReleaseNotification';
 
 const REMINDER_SCHEDULE_SCHEMA = 'v8';
 const REMINDER_TOAST_RECEIPT_SCHEMA = 'v1';
@@ -306,7 +304,8 @@ export function useRemindersNotifier() {
           msgBody: string,
           detailText?: string,
           addActions: boolean = false,
-          emitInternalToast: boolean = true
+          emitInternalToast: boolean = true,
+          built?: ReturnType<typeof buildTvReleaseNotification>
         ) => {
           const targetStr = toLocalDateKey(targetDate);
           const notificationTag = buildTvTag(tagPrefix, targetStr);
@@ -317,6 +316,13 @@ export function useRemindersNotifier() {
           };
 
           const send = async (scheduleDate?: Date) => {
+            // Nouvel épisode : même construction que la notification de test des Réglages.
+            if (built) {
+              const builtVisual = await resolveNotificationMediaVisual(built.iconUrl, built.imageUrl);
+              if (!active()) return { delivered: false, visualReady: false };
+              const delivered = await sendMediaReminderNotification(built.title, { ...built.options, ...builtVisual, tag: notificationTag, scheduleDate });
+              return { delivered, visualReady: Boolean(builtVisual.icon || builtVisual.image) };
+            }
             const mediaVisual = await resolveNotificationMediaVisual(iconUrl, tvImageUrl);
             if (!active()) return { delivered: false, visualReady: false };
             const delivered = await sendMediaReminderNotification(notificationTitle, {
@@ -377,16 +383,17 @@ export function useRemindersNotifier() {
         }
 
         if (userPrefs.release_today_tv || isSpecificReminder || s.notificationsEnabled === true) {
-          const episodeCopy = buildTvEpisodeReminderCopy(s, upcoming, todayStr, provider?.name);
+          const built = buildTvReleaseNotification({ show: s, released: upcoming, todayStr, provider, isSpecificReminder: Boolean(isSpecificReminder) });
           await scheduleTvAlert(
             airDate9Am,
             'today',
-            title,
-            episodeCopy.summaryText,
-            episodeCopy.body,
-            episodeCopy.detailText,
+            built.title,
+            built.options.summaryText || '',
+            built.options.body || '',
+            built.options.detailText,
             true,
-            false
+            false,
+            built
           );
         }
       }
