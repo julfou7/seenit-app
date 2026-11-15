@@ -29,13 +29,14 @@ export function TrailerModal({ videos, onClose }: TrailerModalProps) {
   const present = () => {
     const element = overlayRef.current;
     if (!element || presentationRef.current) return;
-    if (native) setNativeImmersive(true);
     const session = startTrailerPresentation(trailerPresentationAdapter(element));
     presentationRef.current = session;
-    void session.ready.then(() => {
-      if (!native && document.fullscreenElement !== element && presentationRef.current === session) {
-        presentationRef.current = null;
-      }
+    void session.ready.then(result => {
+      if (presentationRef.current !== session) return;
+      // #672 : le rendu immersif suit l'immersion réellement appliquée par le bridge, jamais la seule plateforme.
+      if (native) setNativeImmersive(result.immersive);
+      const presented = native ? result.immersive : document.fullscreenElement === element;
+      if (!presented) presentationRef.current = null;
     });
   };
 

@@ -8,6 +8,8 @@ type LockableOrientation = ScreenOrientation & { lock?: (orientation: string) =>
 export const isNativeTrailer = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android';
 
 export function trailerPresentationAdapter(element: HTMLElement): TrailerPresentationAdapter {
+  // #672 : sur Android, le plein écran Web est refermé par la WebView Capacitor ; le bridge immerge tout
+  // appareil et n'impose le paysage qu'aux téléphones.
   if (isNativeTrailer()) return nativeQueue;
   const orientation = screen.orientation as LockableOrientation | undefined;
   let ownsFullscreen = false;

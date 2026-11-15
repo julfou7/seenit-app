@@ -598,6 +598,10 @@
         {
           "file": "tests/trailerPresentation.test.ts",
           "contains": "SEENIT-UX-013 restaure la présentation même si le lecteur ferme pendant son ouverture"
+        },
+        {
+          "file": "tests/trailerPlatform.test.ts",
+          "contains": "SEENIT-UX-013 #672 le rendu immersif suit l’immersion réellement appliquée par le bridge, pas la plateforme"
         }
       ]
     },
