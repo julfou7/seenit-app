@@ -3,7 +3,7 @@ import { auth } from '../lib/firebase';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
 import { useDownloadConfigStore } from './downloadConfigStore';
 import { useMediaPresenceStore } from './mediaPresenceStore';
-import { fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
+import { checkWantedReleases, fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, wantedReleaseReader, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
 import { fetchRecentImports, type ArrPendingTitle, type RecentImports } from '../features/downloads/recentImports';
 import { coverArrLibrary } from '../features/downloads/arrCoverage';
 import { localizeArrLists } from '../features/downloads/arrMediaLabels';
@@ -112,6 +112,10 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       // SEENIT-DOWNLOAD-022 : titres, affiches et notes de la fiche TMDB en français, comme le reste de l'app.
       // SEENIT-DOWNLOAD-023 : chaque titre de Sonarr/Radarr à un endroit (Téléchargés, Programmés ou À décider).
       const coverage = coverArrLibrary(programmed, imports.pending);
+      // Retour terrain du 15/11 (v1.4.314) : « Disque plein » prouvé par les versions proposées, sur la liste complète
+      // (revue Codex #1053) ; la dernière copie de cette portée garde les vérifications récentes, non refaites.
+      if (coverage.programmed) await checkWantedReleases(coverage.programmed.items, get().snapshot?.key === key ? get().snapshot?.programmed?.items || [] : [], Date.now(), wantedReleaseReader(config));
+      if (arrSyncKey() !== key || id !== sequence) return;
       const labelled = await localizeArrLists({ programmed: coverage.programmed, imports, undecided: coverage.undecided }, tmdbArrLabelSource);
       if (arrSyncKey() !== key || id !== sequence) return;
       const snapshot = { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() };

@@ -17,6 +17,8 @@ test('la dernière copie Sonarr/Radarr est montrée tout de suite, pour le même
         export const programmedScope=c=>[c.sonarrUrl,c.sonarrApiKey].join('\\n');
         export const fetchProgrammedCalendar=async()=>({items:[{kind:'movie',id:1,tmdbId:7,title:'La Guerre des mondes'}],failures:[]});
         export const fetchWatchedMovie=async()=>null;
+        export const checkWantedReleases=async()=>{};
+        export const wantedReleaseReader=()=>async()=>null;
         export const fetchRecentImports=async()=>({items:[],failures:[],pending:[]});
         export const coverArrLibrary=(programmed)=>({programmed,undecided:[]});
         export const localizeArrLists=async lists=>lists;
