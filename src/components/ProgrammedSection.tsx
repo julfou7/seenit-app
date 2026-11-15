@@ -9,7 +9,7 @@ import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
 import { changeProgrammedQuality, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
 import type { LiveDownloadItem } from '../services/sonarrRadarrLive';
-import { coveredBy, hideQueuedProgrammed } from '../features/downloads/programmedQueue';
+import { coveredBy, hideQueuedProgrammed, orderByRecentlyAdded } from '../features/downloads/programmedQueue';
 
 type EpisodeItem = Extract<ProgrammedItem, { kind: 'episode' }>;
 type MovieItem = Extract<ProgrammedItem, { kind: 'movie' }>;
@@ -66,6 +66,8 @@ export function episodesToggleLabel(open: boolean, count: number, wanted: number
 interface ProgrammedCard {
   key: string; data: Record<string, number | string>; name: string; isTv: boolean; poster?: string | null; meta: string; pill: string;
   open: () => unknown; canOpen: boolean;
+  /** Date d'ajout (demande SeenIt, série Sonarr ou film Radarr) pour l'ordre « ajouté récemment ». */
+  addedAt?: number;
   actions: { open: boolean; button: React.ReactNode; panel: React.ReactNode } | null;
   episodes?: { summary: string; count: number; wanted: number; rows: React.ReactNode };
 }
@@ -205,7 +207,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const quality = item?.quality || details?.quality || entry.quality;
     const pill = item ? item.kind === 'movie' ? programmedMoviePill(item) : itemPill(item) : isTv ? 'Pas encore de version' : watchedMoviePill(Number(entry.tmdbId) in watchedMovies ? details : undefined);
     const radarrId = item?.kind === 'movie' ? item.id : details?.id;
-    cards.push({ key: `w${entry.id}`, data: { 'data-programmed-request': entry.id }, name, isTv, poster: posterUrl(entry.posterPath), meta: meta(requestScope(entry), quality), pill,
+    cards.push({ key: `w${entry.id}`, addedAt: Number(entry.addedAt) || undefined, data: { 'data-programmed-request': entry.id }, name, isTv, poster: posterUrl(entry.posterPath), meta: meta(requestScope(entry), quality), pill,
       open: () => entry.tmdbId && onShowClick?.(entry.tmdbId, entry.mediaType), canOpen: Boolean(entry.tmdbId && onShowClick),
       actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }) : null });
   }
@@ -213,7 +215,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const first = group[0];
     const upcoming = group.filter(item => !item.wanted).map(item => item.date).filter((value): value is string => Boolean(value)).sort()[0];
     const wantedCount = group.filter(item => item.wanted).length;
-    cards.push({ key: `s${first.seriesId}`, data: { 'data-programmed-series': first.seriesId }, name: first.seriesTitle, isTv: true, poster: first.posterUrl,
+    cards.push({ key: `s${first.seriesId}`, addedAt: Math.max(...group.map(item => item.addedAt ?? -Infinity)) > -Infinity ? Math.max(...group.map(item => item.addedAt ?? -Infinity)) : undefined, data: { 'data-programmed-series': first.seriesId }, name: first.seriesTitle, isTv: true, poster: first.posterUrl,
       meta: meta('Série', first.quality, `${group.length} épisode${group.length > 1 ? 's' : ''}`),
       pill: upcoming || wantedCount < group.length ? releasePill(upcoming) : WANTED_PILL,
       open: () => first.tmdbId && onShowClick?.(first.tmdbId, 'tv'), canOpen: Boolean(first.tmdbId && onShowClick),
@@ -230,7 +232,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
       </ul> } });
   }
   for (const movie of movies) {
-    cards.push({ key: `m${movie.id}`, data: { 'data-programmed-movie': movie.id }, name: movie.title, isTv: false, poster: movie.posterUrl, meta: meta('Film', movie.quality), pill: programmedMoviePill(movie),
+    cards.push({ key: `m${movie.id}`, addedAt: movie.addedAt, data: { 'data-programmed-movie': movie.id }, name: movie.title, isTv: false, poster: movie.posterUrl, meta: meta('Film', movie.quality), pill: programmedMoviePill(movie),
       open: () => movie.tmdbId && onShowClick?.(movie.tmdbId, 'movie'), canOpen: Boolean(movie.tmdbId && onShowClick),
       actions: cardMenu(`m${movie.id}`, movie.title, movie.quality, choice => void changeQuality({ kind: 'movie', id: movie.id }, choice, movie.title, { tmdbId: movie.tmdbId, mediaType: 'movie' }, movie.posterUrl), () => void cancel([movie], movie.title)) });
   }
@@ -246,7 +248,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
       </div>
     </div>
     {failures.length > 0 && <p className="download-card__meta" role="status">{failures.join(' et ')} injoignable pour l’instant : la liste peut être incomplète.</p>}
-    {cards.map(card => compact
+    {orderByRecentlyAdded(cards).map(card => compact
       ? <article key={card.key} className="programmed-compact" {...card.data}>
         <div className="programmed-compact__row">
           {posterButton(card, 'programmed-compact__poster')}

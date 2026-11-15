@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { confirmNoArrRelease, executeProvenArrSearch, requireArrReleaseArray, sonarrSeriesSearchQueries } from '../src/features/downloads/downloadNoRelease.ts';
+import { confirmNoArrRelease, diskFullRejection, executeProvenArrSearch, requireArrReleaseArray, sonarrSeriesSearchQueries } from '../src/features/downloads/downloadNoRelease.ts';
 
 const healthy = [{ enableAutomaticSearch: true, enableInteractiveSearch: true }];
 
@@ -66,3 +66,31 @@ test('la série vérifie chaque saison diffusée et manquante, jamais le flux RS
 });
 
 // CI recovery 2026-10-14: no functional change; resynchronize PR checks after GitHub access restoration.
+
+// Retour terrain du 15/11 (« La Guerre des mondes ») : Radarr refusait toutes les versions faute de place,
+// SeenIt affichait « Aucune release compatible trouvée ».
+test('disque plein : une version refusée faute de place devient une panne nommée, jamais « aucune release »', async () => {
+  const reads: string[] = [];
+  const read = async (path: string) => {
+    reads.push(path);
+    if (path.startsWith('release')) return [
+      { approved: false, title: 'War.of.the.Worlds.2025.1080p.WEB-DL', quality: { quality: { name: 'WEBDL-1080p', resolution: 1080 } }, rejections: ['Not enough free space'] },
+      { approved: false, title: 'War.of.the.Worlds.2025.2160p', quality: { quality: { name: 'WEBDL-2160p', resolution: 2160 } }, rejections: ['Not enough free space'] },
+    ];
+    return [];
+  };
+  let launched = 0;
+  const outcome = await executeProvenArrSearch({ queries: ['release?movieId=7'], read, launch: async () => { launched++; }, preference: '1080p' });
+  assert.equal(outcome.success, false);
+  assert.equal(outcome.failureCode, undefined, 'pas une absence de release : une panne');
+  assert.match(outcome.message, /^Disque plein/);
+  assert.equal(launched, 0);
+  assert.ok(!reads.includes('health'), 'conclusion directe, sans diagnostic d’indexers');
+
+  // Refus d'une autre nature (qualité, taille) : la règle « aucune release » reste inchangée.
+  assert.equal(diskFullRejection([{ approved: false, title: 'x.1080p', quality: { quality: { name: 'WEBDL-1080p', resolution: 1080 } }, rejections: ['Size too large'] }], '1080p'), false);
+  // Revue Codex #1043 : refusée aussi pour la langue, la version resterait bloquée une fois le disque libéré.
+  assert.equal(diskFullRejection([{ approved: false, title: 'x.1080p', quality: { quality: { name: 'WEBDL-1080p', resolution: 1080 } }, rejections: ['Not enough free space', 'Language is not wanted'] }], '1080p'), false);
+  // Disque plein seulement sur une autre qualité que celle demandée : pas de conclusion disque.
+  assert.equal(diskFullRejection([{ approved: false, title: 'x.2160p', quality: { quality: { name: 'WEBDL-2160p', resolution: 2160 } }, rejections: ['Not enough free space'] }], '1080p'), false);
+});

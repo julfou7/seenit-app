@@ -68,6 +68,24 @@ export async function confirmNoArrRelease(read: (path: string) => Promise<unknow
   }
 }
 
+const DISK_FULL = /disk is full|not enough free space|no space left|space left on device/i;
+
+/**
+ * Retour terrain du 15/11 (« La Guerre des mondes ») : Radarr trouvait des versions mais les refusait toutes
+ * faute de place sur le disque ; SeenIt concluait « Aucune release compatible trouvée ». Une version de la
+ * qualité demandée refusée seulement pour l'espace disque prouve que le blocage est le disque, pas l'offre.
+ */
+export function diskFullRejection(releases: readonly ArrRelease[], preference?: '1080p' | '4k'): boolean {
+  return releases.some(release => {
+    const reasons = Array.isArray(release.rejections) ? release.rejections.map(String) : [];
+    // Revue Codex #1043 : seul le disque doit bloquer ; un autre refus (langue, profil) resterait bloquant.
+    return release.approved !== true && reasons.length > 0 && reasons.every(reason => DISK_FULL.test(reason))
+      && isCompatibleArrRelease({ ...release, approved: true }, preference);
+  });
+}
+
+export const DISK_FULL_MESSAGE = 'Disque plein : plus assez de place pour ce téléchargement. Libère de l’espace puis relance.';
+
 /** Ne lance jamais une commande concurrente avant la conclusion des recherches observables. */
 export async function executeProvenArrSearch(options: {
   queries: string[];
@@ -80,8 +98,10 @@ export async function executeProvenArrSearch(options: {
   try {
     if (!options.queries.length) return { success: false, message: 'Aucun épisode diffusé à rechercher dans ce scope.' };
     let launched = 0;
+    let diskFull = false;
     for (const query of options.queries) {
       const releases = requireArrReleaseArray(await options.read(query));
+      diskFull ||= diskFullRejection(releases, options.preference);
       const compatible = releases.filter(release => isCompatibleArrRelease(release, options.preference)).sort((a, b) => {
         const weightA = Number(a.releaseWeight ?? Number.MAX_SAFE_INTEGER), weightB = Number(b.releaseWeight ?? Number.MAX_SAFE_INTEGER);
         if (weightA !== weightB) return weightA - weightB;
@@ -96,7 +116,10 @@ export async function executeProvenArrSearch(options: {
         if (!options.allScopes) return { success: true, message: 'Release compatible envoyée au client.' };
       }
     }
-    return launched ? { success: true, message: `${launched} release(s) vérifiée(s) envoyée(s) au client.` } : await confirmNoArrRelease(options.read);
+    if (launched) return { success: true, message: `${launched} release(s) vérifiée(s) envoyée(s) au client.` };
+    // Une panne réelle, jamais « aucune release » : la demande passe dans « À régler » avec sa cause.
+    if (diskFull) return { success: false, message: DISK_FULL_MESSAGE };
+    return await confirmNoArrRelease(options.read);
   } catch (error: unknown) {
     return { success: false, message: `Recherche impossible : ${error instanceof Error ? error.message : 'service indisponible'}` };
   }
