@@ -36,6 +36,12 @@ test('SEENIT-QUALITY-013 #722 un harnais à horloge virtuelle reçoit un onglet 
   assert.deepEqual(opened, ['ouvert isolé-1', 'fermé isolé-1'], 'onglet isolé refermé avant le harnais suivant');
   await assert.rejects(run(main, [['minuterie', async () => { throw new Error('rouge'); }, { isolatedClock: true }]], {}, 'c', 1000, openIsolatedClient), /minuterie \(c\) : rouge/);
   assert.equal(opened.at(-1), opened.at(-2)!.replace('ouvert', 'fermé'), 'refermé même en échec');
+  // Revue #1035 : une ouverture d'onglet bloquée reste dans le délai surveillé ; l'onglet tardif est refermé.
+  const late: string[] = [];
+  const slowOpen = async () => { await new Promise(resolve => setTimeout(resolve, 40)); late.push('ouvert'); return { client: { id: 'tard' }, close: async () => { late.push('fermé'); } }; };
+  await assert.rejects(run(main, [['minuterie', async () => 'jamais', { isolatedClock: true }]], {}, 'c', 10, slowOpen), /minuterie \(c\) : harnais bloqué depuis 10 ms/);
+  await new Promise(resolve => setTimeout(resolve, 60));
+  assert.deepEqual(late, ['ouvert', 'fermé'], 'onglet ouvert après le délai : refermé');
   const groups = (smoke as unknown as { buildLaneGroups: (config: unknown) => Array<Array<[string, unknown, { isolatedClock?: boolean }?]>> })
     .buildLaneGroups({ pwa: { minTouchTargetCssPx: 44, viewports: [] } }).flat();
   assert.equal(groups.find(([key]) => key === 'watchNext')?.[2]?.isolatedClock, true);

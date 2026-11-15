@@ -571,15 +571,28 @@ async function runLane(client, tasks, timings, label, taskTimeoutMs = LANE_TASK_
     const started = Date.now();
     let timer;
     let isolated;
+    let finished = false;
+    let closed = false;
+    const closeIsolated = async () => { if (isolated && !closed) { closed = true; await isolated.close(); } };
     try {
       const deadline = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`harnais bloqué depuis ${taskTimeoutMs} ms`)), taskTimeoutMs); });
-      if (options?.isolatedClock && openIsolatedClient) isolated = await openIsolatedClient();
-      results[key] = await Promise.race([task(isolated ? isolated.client : client), deadline]);
+      // L'ouverture de l'onglet isolé fait partie du travail surveillé : un blocage reste un échec nommé (revue #1035).
+      const work = (async () => {
+        if (options?.isolatedClock && openIsolatedClient) {
+          isolated = await openIsolatedClient();
+          // Onglet obtenu après l'expiration du délai : refermé aussitôt.
+          if (finished) { await closeIsolated(); throw new Error('onglet isolé ouvert après expiration'); }
+        }
+        return task(isolated ? isolated.client : client);
+      })();
+      work.catch(() => undefined);
+      results[key] = await Promise.race([work, deadline]);
     } catch (error) {
       error.message = `${key} (${label}) : ${error.message}`;
       throw error;
     } finally {
-      await isolated?.close();
+      finished = true;
+      await closeIsolated();
       clearTimeout(timer);
       timings[key] = Math.round((Date.now() - started) / 100) / 10;
     }
