@@ -20,7 +20,8 @@ test('#664 Relancer la recherche d’une attente : même identité TMDB, même p
   assert.equal(waitingRetryLaunch(failed)?.qualityPreference, '1080p');
   assert.equal(waitingRetryLaunch({ ...failed, downloadId: 'abc' }), null);
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
-  assert.match(card, /\{onRetry && <button type="button" onClick=\{onRetry\}><RotateCw size=\{15\} aria-hidden="true" \/>Relancer la recherche<\/button>\}/);
+  assert.match(card, /\{toFix && onRetry && <button type="button" className="download-card__retry" onClick=\{onRetry\}><RotateCw size=\{15\} aria-hidden="true" \/>Relancer la recherche<\/button>\}/);
+  assert.equal(waitingRetryLaunch({ ...failed, status: 'warning', progress: 100 }), null, 'import manuel requis : le fichier est arrivé, pas de relance');
   const core = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
   assert.match(core, /onRetry=\{waitingRetryLaunch\(item\) \? \(\) => void handleRetryFailed\(item\) : undefined\}/);
   assert.match(core, /if \(item\.status !== 'waiting' && !\(await removeDownload\(item\)\)\)/, 'la carte en échec est retirée avant la relance');

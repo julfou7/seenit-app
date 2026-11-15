@@ -65,9 +65,9 @@ export function DownloadItemCard({ item, onShowClick, onRemove, onRetry }: { ite
       </div>
     </div>}
     {/* Une carte à régler montre ses deux actions sans passer par « … ». */}
+    {/* Retour terrain du 15/11 (v1.4.316) : une recherche en échec (timeout…) se relance en un appui. */}
+    {toFix && onRetry && <button type="button" className="download-card__retry" onClick={onRetry}><RotateCw size={15} aria-hidden="true" />Relancer la recherche</button>}
     {toFix && <div className="download-card__quick">
-      {/* Retour terrain du 15/11 (v1.4.316) : une recherche en échec (timeout…) se relance en un appui. */}
-      {onRetry && <button type="button" onClick={onRetry}><RotateCw size={15} aria-hidden="true" />Relancer la recherche</button>}
       {item.tmdbId && <button type="button" onClick={() => setChoosingRelease(true)}>Choisir une version</button>}
       <button type="button" onClick={onRemove} aria-label={`Retirer ${cleanTitle}`}>Retirer</button>
     </div>}
