@@ -238,8 +238,6 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
       actions: onRemoveWatching ? cardMenu(`w${entry.id}`, name, quality, !isTv && radarrId ? choice => void changeQuality({ kind: 'movie', id: radarrId }, choice, name, { tmdbId: Number(entry.tmdbId) || undefined, mediaType: 'movie' }, posterUrl(entry.posterPath)) : null, () => { setMenu(null); onRemoveWatching(entry); }, undefined, onRetryWatching && waitingRetryLaunch(retryEntry) ? () => { setMenu(null); onRetryWatching(retryEntry); } : undefined) : null });
   }
   for (const group of series.values()) {
-    // Épisodes dans l'ordre de la série (S02E01–S02E04), quelle que soit leur origine.
-    group.sort((a, b) => a.season - b.season || a.episode - b.episode);
     const first = group[0];
     const upcoming = group.filter(item => !item.wanted).map(item => item.date).filter((value): value is string => Boolean(value)).sort()[0];
     const wantedCount = group.filter(item => item.wanted).length;

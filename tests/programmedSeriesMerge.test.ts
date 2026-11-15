@@ -10,7 +10,6 @@ test('Programmés : une seule carte par série, épisodes demandés depuis SeenI
   // Un épisode couvert par une demande SeenIt rejoint le groupe de sa série au lieu d'avoir sa propre carte.
   assert.match(section, /if \(watched && item\.kind === 'episode'\) \{ requestFor\.set\(item\.id, watched\); merged\.add\(watched\.id\); series\.set\(item\.seriesId, /);
   assert.match(section, /for \(const entry of watching\) \{\n\s+if \(merged\.has\(entry\.id\)\) continue;/);
-  assert.match(section, /group\.sort\(\(a, b\) => a\.season - b\.season \|\| a\.episode - b\.episode\);/, 'épisodes dans l’ordre de la série');
   // La demande reste attachée à sa ligne : annuler l'épisode annule l'attente (avec confirmation).
   assert.match(section, /const request = requestFor\.get\(item\.id\); if \(request && onRemoveWatching\) onRemoveWatching\(request\); else void cancel\(\[item\], label\);/);
   assert.match(section, /if \(request && onForgetWatching && await onForgetWatching\(request\) === false\) kept\+\+;/, 'annuler la série retire aussi les demandes SeenIt');
