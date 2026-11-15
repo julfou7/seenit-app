@@ -197,7 +197,7 @@ test('SEENIT-NOTIFICATION-005 TNR #106 : Settings réutilise le pipeline natif',
   const source = readFileSync('src/screens/SettingsScreenCore.tsx', 'utf8');
 
   // Retour du 15/11 : le test choisit la série puis passe par le code du vrai rappel « nouvel épisode ».
-  assert.match(source, /buildNotificationTestSample\(shows, 'release_today_tv'\)/);
+  assert.match(source, /buildNotificationTestSample\(shows\.filter\(show => show\.mediaType === 'tv' && Boolean\(show\.nextEpisodeToWatch \|\| show\.nextEpisodeToAir\)\), 'release_today_tv'\)/, 'revue Codex #1042 : candidats avec épisode seulement');
   assert.match(source, /buildTvReleaseNotification\(\{/);
   assert.match(source, /resolveNotificationMediaVisual\(built\.iconUrl, built\.imageUrl\)/);
   assert.match(source, /const sent = await sendMediaReminderNotification\(built\.title, \{ \.\.\.built\.options/);

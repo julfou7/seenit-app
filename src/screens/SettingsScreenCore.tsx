@@ -537,7 +537,8 @@ export function SettingsScreen({ onClose }: { onClose?: () => void } = {}) {
   // Retour du 15/11 : une seule notification de test, construite par le code du vrai rappel « nouvel épisode »
   // (même texte, mêmes images, même catégorie, même « ✓ Vu ») sur une série de la liste.
   const triggerTestNotif = async () => {
-    const sample = buildNotificationTestSample(shows, 'release_today_tv');
+    // Revue Codex #1042 : seules les séries qui ont un épisode à voir ou à venir peuvent porter le test.
+    const sample = buildNotificationTestSample(shows.filter(show => show.mediaType === 'tv' && Boolean(show.nextEpisodeToWatch || show.nextEpisodeToAir)), 'release_today_tv');
     if (!sample?.episodeSample) {
       showToast("🧪 Test · Aucune série avec un épisode à voir dans ta liste.", "info");
       return;
