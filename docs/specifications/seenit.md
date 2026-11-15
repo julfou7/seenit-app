@@ -1157,8 +1157,10 @@ pour le cache des sagas et univers.
   *Arr que l'application construit doit figurer dans cette liste, sinon la PWA échoue là où l'APK
   (requête directe) fonctionne : les lectures du calendrier (Programmés), de l'historique depuis une
   date (Téléchargés) et d'une ressource par identifiant numérique (`series`, `episode`, `movie`) en
-  font partie, toujours en GET seul. Les tests passent les URL réellement émises par ces modules
-  au prédicat du proxy.
+  font partie, toujours en GET seul. Depuis le retour terrain du 15/11, les lectures des règles
+  d'espace disque (`qualitydefinition`, `config/mediamanagement`, avec `rootfolder` et
+  `qualityprofile`) en font aussi partie, en GET seul, pour prouver qu'un recherché est bloqué par
+  un disque plein. Les tests passent les URL réellement émises par ces modules au prédicat du proxy.
 - Le SID qBittorrent est indexé par UID, URL et utilisateur, puis invalidé uniquement sur une
   erreur d'authentification reconnue.
 

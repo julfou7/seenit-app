@@ -986,7 +986,10 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   sont en français. Programmer un épisode précis ne programme plus le reste de sa saison (`SEENIT-DOWNLOAD-017`).
   Depuis la v1.4.284 (`SEENIT-DOWNLOAD-020`) : les **recherchés** y figurent aussi — surveillés, déjà sortis,
   sans fichier (« Sorti sam. 31 oct. · recherché », « Recherché · pas encore de version »), après les sorties à
-  venir ; et la section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
+  venir. Depuis la v1.4.314, un recherché que Sonarr/Radarr refuseront faute de place, prouvé par leurs propres
+  règles (espace libre du dossier, plus petite version admise par le profil, marge minimale), affiche « Disque
+  plein · libère de l’espace » (« Sorti … · disque plein » pour un épisode) ; et le jour d'un épisode est celui de
+  sa diffusion par la chaîne, comme dans le reste de l'app (plus de « Sortie demain » le jour même). La section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni
   « Radarr » : « Film · 4K », « Série · 4K · 3 épisodes ». Depuis la v1.4.285, en détaillé, les épisodes d'une
   série se replient (« Voir les 9 épisodes · 8 recherchés » / « Masquer les 9 épisodes ») et sont repliés par
