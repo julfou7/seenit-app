@@ -108,6 +108,13 @@ export function seriesEpisodeCode(episode: SeriesCardEpisode): string {
   return `S${String(episode.season_number).padStart(2, '0')} | E${String(episode.episode_number).padStart(2, '0')}`;
 }
 
+/** « S03 · à jour » quand la saison continue ; « S03 · saison vue » quand rien n'y est annoncé (retour du 15/11). */
+export function upToDateCode(show: Pick<Show, 'nextEpisodeToAir'>, episode: SeriesCardEpisode): string {
+  const season = `S${String(episode.season_number).padStart(2, '0')}`;
+  const continues = show.nextEpisodeToAir?.season_number === episode.season_number;
+  return `${season} · ${continues ? 'à jour' : 'saison vue'}`;
+}
+
 export function seriesCompletionLabel(show: Pick<Show, 'seriesEnded' | 'tmdbStatus' | 'nextEpisodeToAir'>, today?: string): string {
   if (show.tmdbStatus === 'Canceled') return 'Série annulée';
   if (show.seriesEnded || show.tmdbStatus === 'Ended') return 'Série terminée';
@@ -117,7 +124,9 @@ export function seriesCompletionLabel(show: Pick<Show, 'seriesEnded' | 'tmdbStat
     const label = upcomingEpisodeLabel(airDate, today);
     return `Prochain épisode ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
   }
-  return 'Prochain épisode bientôt';
+  // Retour terrain du 15/11 (Lupin, saison 3 vue) : « Prochain épisode bientôt » promettait une suite
+  // qu'aucune donnée n'annonce. Sans épisode annoncé, on le dit ; annoncé sans date à venir, on le dit aussi.
+  return show.nextEpisodeToAir ? 'Prochain épisode annoncé, date à venir' : 'Suite pas encore annoncée';
 }
 
 export function buildSeriesSeasonProgress(

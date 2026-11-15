@@ -5,7 +5,7 @@ import type { Show } from '../../types';
 import { SeenItCheckButton } from '../SeenItCheckButton';
 import { CANAL_ORIGINAL_BROADCASTER_NAME } from '../../utils/providerLogos';
 import { DialogLayer } from '../ui/DialogLayer';
-import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone, type SeriesCardEpisode, type SeriesSeasonProgress, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
+import { buildSeriesSeasonProgress, imageUrl, seriesCardPosterCandidates, seriesCardPosterCrossOrigin, seriesCompletionLabel, seriesEpisodeCode, upcomingCardTone, upToDateCode, type SeriesCardEpisode, type SeriesSeasonProgress, type SeasonSegmentState } from '../../features/watchlist/seriesCardPresentation';
 import { dominantPosterHue, POSTER_HUE_FALLBACK, readPosterHue, rememberPosterHue } from '../../features/watchlist/posterHue';
 import './seriesEpisodeCard.css';
 import { SeenItWatchedStamp } from './SeenItWatchedStamp';
@@ -96,7 +96,8 @@ export function SeriesEpisodeCard({ show, today: day, episode, context, detail, 
     ? buildSeriesSeasonProgress(show, episode, context.kind, today)
     : { label: 'À actualiser', description: 'Épisode de reprise à confirmer', continuous: false, segments: [], totalUnknown: true, unknownTail: false, knownEpisodes: 0, availableUnseen: 0 });
   const reversibleComplete = context.kind === 'watch' && context.upToDate && Boolean(context.onMarkUnseen);
-  const code = presentation?.code ?? (reversibleComplete && episode ? `S${String(episode.season_number).padStart(2, '0')} · à jour` : episode ? seriesEpisodeCode(episode) : 'Épisode à confirmer');
+  // Retour terrain du 15/11 : « à jour » seulement si la saison continue (épisode annoncé dans la même saison).
+  const code = presentation?.code ?? (reversibleComplete && episode ? upToDateCode(show, episode) : episode ? seriesEpisodeCode(episode) : 'Épisode à confirmer');
   const requestedDetail = detail?.trim() && !REMAINING_DETAIL.test(detail) ? detail.trim() : undefined;
   const visibleDetail = requestedDetail || progress.detail;
   const detailIsBadge = visibleDetail ? BADGE_DETAIL.test(visibleDetail) : false;

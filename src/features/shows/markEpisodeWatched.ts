@@ -3,12 +3,37 @@ import { useShowsStore } from '../../store/showsStore';
 import { tmdb } from './tmdb';
 import { useToastStore } from '../../store/toastStore';
 import { useLogStore } from '../../store/logStore';
-import { scrollAllCarouselsToStart } from '../../lib/utils';
+import { getTodayStr, scrollAllCarouselsToStart } from '../../lib/utils';
+import { detectCompletionCelebration, useCelebrationStore } from './completionCelebration';
 import { type Show } from '../../types';
 import { db, auth } from '../../lib/firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
+/**
+ * Retour terrain du 15/11 (dernier épisode de Lupin coché en quatre fois) : les lectures TMDB précèdent
+ * l'enregistrement ; sans retour visuel, chaque tap relançait un marquage en parallèle. Un même épisode n'est
+ * marqué qu'une fois à la fois ; la carte garde son animation « Vu » pendant le marquage (revue Codex #1044 :
+ * une mise à jour anticipée sans épisode suivant retirait le bouton).
+ */
+const marksInFlight = new Set<string>();
+
 export async function markEpisodeWatched(
+  showOrId: Show | string | number,
+  season: number,
+  episode: number,
+  updateShowFn?: (id: string, updates: Partial<Show>) => Promise<void>
+) {
+  const key = `${typeof showOrId === 'object' && showOrId !== null ? showOrId.id : showOrId}:${season}x${episode}`;
+  if (marksInFlight.has(key)) return false;
+  marksInFlight.add(key);
+  try {
+    return await markEpisodeWatchedOnce(showOrId, season, episode, updateShowFn);
+  } finally {
+    marksInFlight.delete(key);
+  }
+}
+
+async function markEpisodeWatchedOnce(
   showOrId: Show | string | number,
   season: number,
   episode: number,
@@ -50,6 +75,7 @@ export async function markEpisodeWatched(
   const newSeenArray = Array.from(newSeenSet);
 
   let fetchedEpTitle: string | null = null;
+  let seasonEpisodes: Array<{ episode_number: number; air_date?: string | null }> | null = null;
   let fetchedRuntime: number | null = null;
   let optimisticNextEp: Show['nextEpisodeToWatch'] = null;
   const totalEps = targetShow.totalAiredEpisodes || targetShow.totalEpisodes || 0;
@@ -58,6 +84,7 @@ export async function markEpisodeWatched(
     try {
       const seasonRes = await tmdb.getSeasonDetails(targetShow.tmdbId, sNum);
       if (seasonRes.ok && seasonRes.value?.episodes) {
+        seasonEpisodes = seasonRes.value.episodes;
         const curEp = seasonRes.value.episodes.find((x: { episode_number: number; name?: string; runtime?: number }) => x.episode_number === eNum);
         if (curEp && curEp.name) fetchedEpTitle = curEp.name;
         if (typeof curEp?.runtime === 'number' && curEp.runtime > 0) fetchedRuntime = curEp.runtime;
@@ -85,7 +112,7 @@ export async function markEpisodeWatched(
           } else {
             const nextSeasonRes = await tmdb.getSeasonDetails(targetShow.tmdbId, sNum + 1);
             if (nextSeasonRes.ok && nextSeasonRes.value?.episodes) {
-              const nextSeasonUnseen = nextSeasonRes.value.episodes.find((x: any) => !newSeenSet.has(`${sNum + 1}x${x.episode_number}`));
+              const nextSeasonUnseen = nextSeasonRes.value.episodes.find((x: { episode_number: number }) => !newSeenSet.has(`${sNum + 1}x${x.episode_number}`));
               if (nextSeasonUnseen) {
                 const evidence = targetShow.seasonProgress?.[String(sNum + 1)];
                 optimisticNextEp = {
@@ -97,7 +124,7 @@ export async function markEpisodeWatched(
                   still_path: nextSeasonUnseen.still_path || null,
                   episode_count: evidence?.episode_count || null,
                   known_episodes_in_season: Math.max(evidence?.known_episodes_in_season || 0, ...nextSeasonRes.value.episodes.map((ep: { episode_number: number }) => ep.episode_number)),
-                  aired_episodes_in_season: nextSeasonRes.value.episodes?.filter((ep: any) => ep.air_date && ep.air_date <= new Date().toISOString().slice(0, 10)).length || 1,
+                  aired_episodes_in_season: nextSeasonRes.value.episodes?.filter((ep: { air_date?: string | null }) => ep.air_date && ep.air_date <= new Date().toISOString().slice(0, 10)).length || 1,
                   is_final_season: targetShow.nextEpisodeToWatch?.is_final_season,
                   series_ended: targetShow.nextEpisodeToWatch?.series_ended || targetShow.seriesEnded
                 };
@@ -204,6 +231,12 @@ export async function markEpisodeWatched(
   }
 
   if (auth.currentUser?.uid !== initiatingUid) return false;
+  // Retour terrain du 15/11 : la fin de saison cochée depuis l'accueil n'était pas célébrée (#436).
+  useCelebrationStore.getState().celebrate(detectCompletionCelebration({
+    season: sNum, wasSeen: prevSeenEpisodes.includes(epKey), previousSeen: prevSeenEpisodes, nextSeen: newSeenSet,
+    seasonEpisodes, today: getTodayStr(), nextEpisodeToWatch: optimisticNextEp,
+    seriesEnded: Boolean(targetShow.seriesEnded || targetShow.tmdbStatus === 'Ended' || targetShow.tmdbStatus === 'Canceled'),
+  }), targetShow.title);
   scrollAllCarouselsToStart();
 
   useToastStore.getState().showToast(
