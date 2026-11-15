@@ -16,7 +16,8 @@ test('#664 Relancer la recherche d’une attente : même identité TMDB, même p
   assert.equal(waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'Film', movieTitle: 'Film', tmdbId: 7 }), null, 'qualité inconnue : jamais devinée');
   // Retour terrain du 15/11 (v1.4.316, « je suis bloqué ») : une demande « À régler » sans transfert se relance ;
   // un vrai transfert en échec non (« Choisir une version »).
-  const failed = { ...base, status: 'error', mediaType: 'movie' as const, title: 'La Guerre des mondes', movieTitle: 'La Guerre des mondes', tmdbId: 755898, errorMessage: 'Recherche impossible : timeout', releaseTitle: 'La Guerre des mondes • 1080p' };
+  const failed = { ...base, status: 'error', mediaType: 'movie' as const, title: 'La Guerre des mondes', movieTitle: 'La Guerre des mondes', tmdbId: 755898, errorMessage: 'Recherche impossible : timeout', releaseTitle: 'La Guerre des mondes • 1080p', importState: 'pending' as const };
+  // Revue Codex #1057 : importState: 'pending' vient du lancement lui-même, pas d'un transfert.
   assert.equal(waitingRetryLaunch(failed)?.qualityPreference, '1080p');
   assert.equal(waitingRetryLaunch({ ...failed, downloadId: 'abc' }), null);
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');

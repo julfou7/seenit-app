@@ -13,7 +13,9 @@ export function waitingRetryLaunch(item: LiveDownloadItem): Omit<ArrDownloadLaun
   // Retour terrain du 15/11 (v1.4.316, « je suis bloqué, rien pour relancer ») : une demande « À régler » sans
   // transfert (recherche impossible, timeout…) se relance aussi ; un vrai transfert en échec passe par « Choisir
   // une version ».
-  const transferStarted = Boolean(item.downloadId || item.transferPath) || Number(item.progress) > 0 || item.importState === 'pending';
+  // Revue Codex #1057 : `importState: 'pending'` est posé dès la demande (`beginDownloadRequest`) ; seul un
+  // identifiant, un chemin ou une progression prouvent un transfert.
+  const transferStarted = Boolean(item.downloadId || item.transferPath) || Number(item.progress) > 0;
   const failedRequest = downloadGroup(item) === 'attention' && !transferStarted;
   if ((item.status !== 'waiting' && !failedRequest) || !(Number(item.tmdbId) > 0)) return null;
   // Revue Codex #1051 : une attente créée depuis la fiche garde sa qualité dans `releaseTitle` (« … • 4K ») ;
