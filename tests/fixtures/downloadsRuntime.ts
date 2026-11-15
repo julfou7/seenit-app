@@ -113,4 +113,6 @@ export const executeGet = async (url: string) => {
   if (/\/api\/v3\/(?:episode|movie)\/\d+$/.test(url)) return { id: Number(url.split('/').pop()), monitored: true };
   return [];
 };
+// Recherche de versions (disque plein, retour du 15/11) : même faux serveur que les lectures ordinaires.
+export const executeArrInteractiveGet = (url: string) => executeGet(url);
 export const executePut = async (url: string, body: { monitored?: boolean; qualityProfileId?: number }) => { if (body.monitored === false) telemetry.unmonitored.push(url); if (body.qualityProfileId) telemetry.qualities.push(`${url}:${body.qualityProfileId}`); return body; };
