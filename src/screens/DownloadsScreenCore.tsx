@@ -259,6 +259,14 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     await launchArrDownload({ ...launch, config: useDownloadConfigStore.getState(), notify: (action, toastType = 'download') => showToast({ title: launch.title, action, posterPath: item.posterPath }, toastType) });
   };
 
+  // Retour terrain du 15/11 (v1.4.316, « je suis bloqué ») : une demande « À régler » se relance ; sa carte en échec
+  // est retirée (aucun transfert à supprimer), puis la recherche repart avec la même qualité.
+  const handleRetryFailed = async (item: LiveDownloadItem) => {
+    if (!waitingRetryLaunch(item)) return;
+    if (item.status !== 'waiting' && !(await removeDownload(item))) { showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: 'Relance impossible : réessaie dans un instant.', posterPath: item.posterPath }, 'error'); return; }
+    await handleRetryWaiting(item);
+  };
+
   // Revue Codex #1054 : les épisodes en attente d'une même série sont relancés en lot par saison (même mécanisme que
   // la fiche) : un pack de saison sert à tous et aucun épisode déjà couvert n'est relancé.
   const handleRetryWaitingGroup = async (items: LiveDownloadItem[]) => {
@@ -441,7 +449,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             className="download-swipe"
             actions={[{ label: isActive ? 'Annuler' : 'Retirer', ariaLabel: `${isActive ? 'Annuler le téléchargement de' : 'Retirer'} ${item.movieTitle || item.seriesTitle || item.title}`, icon: <Trash2 size={18} />, tone: 'rose', onSelect: () => handleRemove(item) }]}
           >
-            <DownloadItemCard item={item} onShowClick={onShowClick} onRemove={() => handleRemove(item)} />
+            <DownloadItemCard item={item} onShowClick={onShowClick} onRemove={() => handleRemove(item)} onRetry={waitingRetryLaunch(item) ? () => void handleRetryFailed(item) : undefined} />
           </ActionSwipeCard>
         );
       })}

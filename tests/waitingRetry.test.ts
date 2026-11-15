@@ -14,6 +14,16 @@ test('#664 Relancer la recherche d’une attente : même identité TMDB, même p
   // Revue Codex #1051 : attente créée depuis la fiche, qualité gardée seulement dans le titre de release.
   assert.equal(waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'Film', movieTitle: 'Film', tmdbId: 7, releaseTitle: 'Film • 4K' })?.qualityPreference, '4k');
   assert.equal(waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'Film', movieTitle: 'Film', tmdbId: 7 }), null, 'qualité inconnue : jamais devinée');
+  // Retour terrain du 15/11 (v1.4.316, « je suis bloqué ») : une demande « À régler » sans transfert se relance ;
+  // un vrai transfert en échec non (« Choisir une version »).
+  const failed = { ...base, status: 'error', mediaType: 'movie' as const, title: 'La Guerre des mondes', movieTitle: 'La Guerre des mondes', tmdbId: 755898, errorMessage: 'Recherche impossible : timeout', releaseTitle: 'La Guerre des mondes • 1080p' };
+  assert.equal(waitingRetryLaunch(failed)?.qualityPreference, '1080p');
+  assert.equal(waitingRetryLaunch({ ...failed, downloadId: 'abc' }), null);
+  const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
+  assert.match(card, /\{onRetry && <button type="button" onClick=\{onRetry\}><RotateCw size=\{15\} aria-hidden="true" \/>Relancer la recherche<\/button>\}/);
+  const core = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
+  assert.match(core, /onRetry=\{waitingRetryLaunch\(item\) \? \(\) => void handleRetryFailed\(item\) : undefined\}/);
+  assert.match(core, /if \(item\.status !== 'waiting' && !\(await removeDownload\(item\)\)\)/, 'la carte en échec est retirée avant la relance');
   // Sans identité TMDB ou hors attente : rien n'est relancé, jamais de recherche par titre.
   assert.equal(waitingRetryLaunch({ ...base, status: 'waiting', mediaType: 'movie', title: 'Sans identité', quality: '4K' }), null);
   assert.equal(waitingRetryLaunch({ ...base, status: 'downloading', mediaType: 'movie', title: 'En cours', tmdbId: 1, quality: '4K' }), null);

@@ -1037,7 +1037,9 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   de transfert doit rester non ambiguë ; une file vide ne supprime jamais l'attente. Depuis la v1.4.314
   (#664), le menu ⋯ d'une attente dans Programmés propose « Relancer la recherche » : même titre TMDB,
   même périmètre et même qualité qu'au lancement depuis la fiche ; la nouvelle demande remplace l'attente,
-  qui revient avec sa raison exacte si rien n'est trouvé.
+  qui revient avec sa raison exacte si rien n'est trouvé. Depuis la v1.4.317, une carte « À régler » sans
+  transfert (recherche impossible, timeout…) propose aussi « Relancer la recherche » : la carte en échec est
+  retirée, puis la recherche repart avec la même qualité.
 - Une carte terminale ou en attente possédant un TMDB exact propose « Chercher une autre release ». Le dialogue
   consulte les releases du média déjà présent dans Arr, sans ajout ni lancement automatique. Il expose
   audio VFF/VFQ/MULTI, qualité, taille, seeders et refus, avec filtre audio et scope TV exact. L'utilisateur

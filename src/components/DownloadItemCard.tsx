@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useRef, useState } from 'react';
-import { Film, Search, Trash2, Tv, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Film, Search, Trash2, Tv, ChevronDown, CheckCircle2, RotateCw } from 'lucide-react';
 import { useShowsStore } from '../store/showsStore';
 import { formatBytes, formatCleanMediaInfo, type LiveDownloadItem } from '../services/sonarrRadarr';
 import { findMatchingShowForDownload } from '../features/downloads/downloadIdentity';
@@ -12,7 +12,7 @@ import { releaseVariantLabel } from '../features/downloads/releaseQuality';
 const AlternativeReleaseModal = lazy(() => import('./AlternativeReleaseModal').then(module => ({ default: module.AlternativeReleaseModal })));
 const DownloadModal = lazy(() => import('./DownloadModal').then(module => ({ default: module.DownloadModal })));
 
-export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDownloadItem; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: () => void }) {
+export function DownloadItemCard({ item, onShowClick, onRemove, onRetry }: { item: LiveDownloadItem; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: () => void; onRetry?: () => void }) {
   const [choosingRelease, setChoosingRelease] = useState(false);
   const [choosingQuality, setChoosingQuality] = useState(false);
   const [details, setDetails] = useState(false);
@@ -66,6 +66,8 @@ export function DownloadItemCard({ item, onShowClick, onRemove }: { item: LiveDo
     </div>}
     {/* Une carte à régler montre ses deux actions sans passer par « … ». */}
     {toFix && <div className="download-card__quick">
+      {/* Retour terrain du 15/11 (v1.4.316) : une recherche en échec (timeout…) se relance en un appui. */}
+      {onRetry && <button type="button" onClick={onRetry}><RotateCw size={15} aria-hidden="true" />Relancer la recherche</button>}
       {item.tmdbId && <button type="button" onClick={() => setChoosingRelease(true)}>Choisir une version</button>}
       <button type="button" onClick={onRemove} aria-label={`Retirer ${cleanTitle}`}>Retirer</button>
     </div>}
