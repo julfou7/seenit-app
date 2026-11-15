@@ -47,7 +47,8 @@ test('SEENIT-NOTIFICATION-006 #909 la nouvelle version sonne et vibre : canal d�
 
 test('SEENIT-NOTIFICATION-005 transporte le type via subText et garde summaryText au détail BigPicture', () => {
   assert.match(reminder, /subText: options\.summaryText/);
-  assert.match(reminder, /summaryText: attachments && detailText \? detailText : undefined/);
+  // Retour terrain du 15/11 : sans détail, le corps reste le texte développé du BigPicture.
+  assert.match(reminder, /summaryText: attachments \? \(detailText \|\| options\.body \|\| undefined\) : undefined/);
   assert.match(reminder, /channelId: resolveChannelId\(options\)/);
   assert.match(reminder, /smallIcon: 'ic_stat_seenit'/);
   assert.match(reminder, /'✓ Vu'/);

@@ -19,6 +19,7 @@ import { useShowsStore } from '../store/showsStore';
 import { performPlexSync } from '../features/plex/syncPlex';
 import { getPlexLastSyncTimestamp, getStoredPlexToken } from '../features/plex/plexStorage';
 import { PLEX_AUTO_SYNC_INTERVAL_MS, PLEX_AUTO_SYNC_RETRY_MS } from '../features/plex/plexAutoSync';
+import { buildNewsNotificationVisual } from '../features/notifications/newsNotificationVisual';
 
 /** `complete: false` : au moins une série n'a pas pu être lue (fournisseur indisponible, quota) ; le passage sera retenté. */
 export async function performDetailsSync(forceAll = false): Promise<{ success: boolean; syncedCount: number; complete?: boolean; error?: string }> {
@@ -261,7 +262,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
             series_ended: isEnded
           };
         } else {
-          const futureEpisodes: any[] = [];
+          const futureEpisodes: Array<Record<string, unknown> & { season_number: number; episode_number: number; air_date: string }> = [];
           for (const s of seasonsCache) {
             for (const ep of s.episodes || []) {
               if (ep.air_date && ep.air_date >= todayStr) {
@@ -398,6 +399,9 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         const hasSeriesEndedChanged = showToSync.seriesEnded !== isEnded;
         const hasTmdbStatusChanged = showToSync.tmdbStatus !== (details.status || null);
 
+        // Retour terrain du 15/11 (#443) : l'actualité développée montre l'image paysage de la série, l'affiche
+        // reste la vignette ; sans image paysage connue, l'affiche entière reste le repli.
+        const newsVisual = buildNewsNotificationVisual(showToSync.posterPath, showToSync.backdropPath || details.backdrop_path);
         const allowNews = mergeNotificationPreferences(readUserScopedJson(userUid, 'notifications', null)).news
           && !showToSync.isArchived && showToSync.status !== 'dropped' && showToSync.notificationsEnabled !== false;
         // Notification pour les saisons renouvelées
@@ -405,7 +409,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
            sendNativeNotification(showToSync.title, {
              body: `Bonne nouvelle ! La série a été renouvelée pour une suite.`,
              tag: `notif_${showId}_news`,
-             icon: showToSync.posterPath ? (showToSync.posterPath.startsWith('http') ? showToSync.posterPath : `https://image.tmdb.org/t/p/w342${showToSync.posterPath}`) : undefined,
+             ...newsVisual,
              showId,
              tmdbId: tmdbIdNum,
              mediaType: 'tv'
@@ -415,7 +419,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
            sendNativeNotification(showToSync.title, {
              body: `La saison ${nextEpisodeToAir.season_number} a été annoncée et est prévue pour le ${new Date(nextEpisodeToAir.air_date).toLocaleDateString('fr-FR')} !`,
              tag: `notif_${showId}_news`,
-             icon: showToSync.posterPath ? (showToSync.posterPath.startsWith('http') ? showToSync.posterPath : `https://image.tmdb.org/t/p/w342${showToSync.posterPath}`) : undefined,
+             ...newsVisual,
              showId,
              tmdbId: tmdbIdNum,
              mediaType: 'tv'
