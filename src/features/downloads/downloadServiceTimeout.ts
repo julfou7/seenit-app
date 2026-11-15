@@ -5,6 +5,6 @@
  */
 export const ARR_RELEASE_TIMEOUT_MS = 90_000;
 export function downloadServiceTimeoutMs(method: string, targetUrl: string): number {
-  return (method === 'GET' || method === 'POST') && /\/api\/v3\/release$/.test(new URL(targetUrl).pathname)
+  return (method === 'GET' || method === 'POST') && /\/api\/v3\/(?:release|indexer\/testall)$/.test(new URL(targetUrl).pathname)
     ? ARR_RELEASE_TIMEOUT_MS : 10_000;
 }

@@ -8,7 +8,7 @@ import { isAllowedServiceProxyPath } from '../src/features/downloads/downloadBac
 const bundle = await build({ entryPoints: ['src/features/downloads/indexerRetest.ts'], bundle: true, platform: 'node', format: 'esm', write: false,
   plugins: [{ name: 'ports', setup(builder) {
     builder.onResolve({ filter: /\/(?:sonarrRadarr|sonarrRadarrTransport)$/ }, args => ({ path: args.path, namespace: 'ports' }));
-    builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const cleanUrl=u=>String(u).replace(/\\/+$/,"");const no=async()=>{throw new Error("réseau réel interdit")};export const executeGet=no;export const executePost=no;' }));
+    builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const cleanUrl=u=>String(u).replace(/\\/+$/,"");const no=async()=>{throw new Error("réseau réel interdit")};export const executeGet=no;export const executeArrInteractivePost=no;' }));
   } }] });
 const retest = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`) as typeof import('../src/features/downloads/indexerRetest.ts');
 const now = Date.parse('2026-11-15T19:00:00Z');
@@ -27,6 +27,8 @@ test('retester les indexers : test lancé, indexers encore en échec nommés, au
   const fixed = await retest.retestIndexers(config, 'movie', io([]), now);
   assert.deepEqual(retest.describeIndexerRetest(fixed), { text: 'Indexers réactivés : relance la recherche.', ok: true });
   assert.ok(!isAllowedServiceProxyPath('http://nas:8989/api/v3/indexer/1', 'PUT'), 'aucun réglage d’indexer modifiable');
+  // Revue Codex #1059 : un test refusé (proxy, droits, délai) n'est jamais présenté comme une réactivation.
+  await assert.rejects(retest.retestIndexers(config, 'tv', { ...io([]), post: async () => { throw new Error('Erreur HTTP 403'); } }, now), /Le test des indexers n’a pas pu être lancé \(Erreur HTTP 403\)/);
   // Bouton visible seulement sur une carte « À régler » qui parle d'indexers.
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
   assert.match(card, /toFix && onTestIndexers && \/indexer\/i\.test\(/);

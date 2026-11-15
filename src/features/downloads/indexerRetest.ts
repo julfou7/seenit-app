@@ -1,5 +1,5 @@
 import { cleanUrl, executeGet } from '../../services/sonarrRadarr';
-import { executePost } from '../../services/sonarrRadarrTransport';
+import { executeArrInteractivePost } from '../../services/sonarrRadarrTransport';
 
 /**
  * Retour du propriétaire du 15/11 (v1.4.318, « pour les erreurs d'indexers, impossible de fix depuis SeenIt ? ») :
@@ -10,7 +10,8 @@ import { executePost } from '../../services/sonarrRadarrTransport';
 export interface IndexerRetestResult { service: 'Sonarr' | 'Radarr'; total: number; failing: string[] }
 type RetestConfig = { sonarrUrl?: string; sonarrApiKey?: string; radarrUrl?: string; radarrApiKey?: string };
 export interface RetestIo { get: (url: string, headers: Record<string, string>) => Promise<unknown>; post: (url: string, body: unknown, headers: Record<string, string>) => Promise<unknown> }
-const defaultIo: RetestIo = { get: executeGet, post: executePost };
+// Tester tous les indexers peut être long : même transport que la recherche des versions (jusqu'à 90 s).
+const defaultIo: RetestIo = { get: executeGet, post: executeArrInteractivePost };
 
 export async function retestIndexers(config: RetestConfig, mediaType: 'tv' | 'movie', io: RetestIo = defaultIo, now = Date.now()): Promise<IndexerRetestResult> {
   const service = mediaType === 'tv' ? 'Sonarr' : 'Radarr';
@@ -19,8 +20,14 @@ export async function retestIndexers(config: RetestConfig, mediaType: 'tv' | 'mo
   if (!url?.trim() || !apiKey?.trim()) throw new Error(`${service} n’est pas configuré.`);
   const base = cleanUrl(url);
   const headers = { 'X-Api-Key': apiKey, Accept: 'application/json' };
-  // Un test en échec répond une erreur : seul l'état relu ensuite fait foi.
-  await io.post(`${base}/api/v3/indexer/testall`, {}, headers).catch(() => undefined);
+  // Revue Codex #1059 : un test terminé avec des indexers invalides répond 400 (résultat de validation) ; tout autre
+  // refus (proxy, délai, droits) veut dire que le test n'a pas eu lieu — jamais présenté comme une réactivation.
+  try {
+    await io.post(`${base}/api/v3/indexer/testall`, {}, headers);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '';
+    if (!/\b400\b/.test(message)) throw new Error(`Le test des indexers n’a pas pu être lancé${message ? ` (${message})` : ''}. Réessaie dans un instant ou vérifie ${service}.`);
+  }
   const [indexers, statuses] = await Promise.all([io.get(`${base}/api/v3/indexer`, headers), io.get(`${base}/api/v3/indexerstatus`, headers)]);
   if (!Array.isArray(indexers) || !Array.isArray(statuses)) throw new Error(`${service} n’a pas rendu l’état de ses indexers.`);
   const names = new Map((indexers as Array<{ id?: number; name?: string }>).map(indexer => [Number(indexer.id), String(indexer.name || `Indexer ${indexer.id}`)]));

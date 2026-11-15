@@ -31,7 +31,7 @@ const sameOrUnder = (path: string, parent: string) => {
  * taille totale, seule la même machine (même hôte) permet de fusionner.
  */
 export function mergeDisks(sources: readonly DiskSource[]): DiskStatus[] {
-  const disks = new Map<string, DiskStatus & { service: string }>();
+  const disks = new Map<string, DiskStatus & { service: string; host: string }>();
   for (const source of sources) {
     const volumes = (source.diskSpace || []) as RawDisk[];
     for (const root of source.rootFolders as RawDisk[]) {
@@ -39,12 +39,16 @@ export function mergeDisks(sources: readonly DiskSource[]): DiskStatus[] {
       const label = diskLabel(String(root.path));
       const volume = volumes.filter(entry => entry?.path && sameOrUnder(String(root.path), String(entry.path))).sort((a, b) => String(b.path).length - String(a.path).length)[0];
       const totalSpace = Number(root.totalSpace) > 0 ? Number(root.totalSpace) : Number(volume?.totalSpace) > 0 ? Number(volume?.totalSpace) : undefined;
-      const key = totalSpace ? `${label}\n${totalSpace}` : `${source.host}\n${label}`;
-      if (!disks.has(key)) disks.set(key, { label, service: source.service, freeSpace: Number(root.freeSpace), ...(totalSpace ? { totalSpace } : {}) });
+      // Revue Codex #1059 : une capacité égale ne suffit pas ; il faut aussi le même espace libre (à 64 Mo près,
+      // deux lectures quasi simultanées du même disque), sinon les disques restent distincts.
+      const freeSpace = Number(root.freeSpace);
+      const same = [...disks.entries()].find(([, other]) => other.label === label && (other.host === source.host
+        || (totalSpace !== undefined && other.totalSpace === totalSpace && Math.abs(other.freeSpace - freeSpace) <= 64 * 1024 ** 2)));
+      if (!same) disks.set(`${source.host}\n${label}\n${disks.size}`, { label, host: source.host, service: source.service, freeSpace, ...(totalSpace ? { totalSpace } : {}) });
     }
   }
   const all = [...disks.values()];
-  return all.map(({ service, ...disk }) => all.filter(other => other.label === disk.label).length > 1 ? { ...disk, label: `${disk.label} · ${service}` } : disk)
+  return all.map(({ service, host: _host, ...disk }) => all.filter(other => other.label === disk.label).length > 1 ? { ...disk, label: `${disk.label} · ${service}` } : disk)
     .sort((a, b) => a.freeSpace - b.freeSpace);
 }
 const hostOf = (url: string) => { try { return new URL(url).hostname.toLowerCase(); } catch { return url; } };

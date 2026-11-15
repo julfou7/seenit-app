@@ -48,6 +48,12 @@ test('retour du 15/11 (v1.4.318) : le même disque vu par Sonarr et Radarr via d
     { host: 'nas.local', service: 'Radarr', rootFolders: [{ path: 'D:\\Films', freeSpace: 1.2 * gib }], diskSpace: volume },
   ]);
   assert.deepEqual(merged.map(entry => [entry.label, disk.describeDisk(entry)]), [['D:', '1,2 Go libres sur 515,7 Go']]);
+  // Revue Codex #1059 : même capacité mais espace libre différent (deux machines) : jamais fusionnés.
+  const sameSize = disk.mergeDisks([
+    { host: 'a', service: 'Sonarr', rootFolders: [{ path: 'D:\\Series', freeSpace: 200 * gib }], diskSpace: volume },
+    { host: 'b', service: 'Radarr', rootFolders: [{ path: 'D:\\Films', freeSpace: 1 * gib }], diskSpace: volume },
+  ]);
+  assert.deepEqual(sameSize.map(entry => entry.label), ['D: · Radarr', 'D: · Sonarr']);
   // Tailles totales différentes : deux disques distincts, nommés avec leur service.
   const distinct = disk.mergeDisks([
     { host: 'a', service: 'Sonarr', rootFolders: [{ path: 'D:\\Series', freeSpace: 200 * gib }], diskSpace: [{ path: 'D:\\', totalSpace: 1000 * gib }] },
