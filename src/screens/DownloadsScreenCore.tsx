@@ -12,6 +12,7 @@ import { ReleaseVersionCard, VersionFilterChips } from '../components/ReleaseVer
 import './downloads.css';
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShowsStore } from '../store/showsStore';
+import { tmdb } from '../features/shows/tmdb';
 // Retour terrain du 16/11 (Programmés, « je ne peux pas cliquer là ») : la fiche d'un épisode programmé, chargée à la demande.
 const EpisodeDetailModal = lazy(() => import('./EpisodeDetailModal').then(module => ({ default: module.EpisodeDetailModal })));
 import {
@@ -596,7 +597,9 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />
             {openEpisode && <Suspense fallback={null}>
               <EpisodeDetailModal show={episodeShow} season={openEpisode.season} tmdbShowId={openEpisode.tmdbId} tmdbShowTitle={episodeShow?.title}
-                episode={{ season_number: openEpisode.season, episode_number: openEpisode.episode, name: `Épisode ${openEpisode.episode}` }} isHydrating
+                // Revue Codex #1086 : pas d'`isHydrating` figé (squelette permanent) ; la fiche lit elle-même l'épisode sur TMDB,
+                // en partant du cache quand il existe.
+                episode={tmdb.peekEpisodeDetails(openEpisode.tmdbId, openEpisode.season, openEpisode.episode) || { season_number: openEpisode.season, episode_number: openEpisode.episode, name: `Épisode ${openEpisode.episode}` }}
                 onShowClick={(tmdbId, mediaType) => { setOpenEpisode(null); onShowClick?.(tmdbId, mediaType); }} onClose={() => setOpenEpisode(null)} />
             </Suspense>}
             {listedCompleted.length > 0 && renderSection('Terminés', listedCompleted, 'completed')}
