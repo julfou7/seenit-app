@@ -13,6 +13,7 @@ import './downloads.css';
 import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useShowsStore } from '../store/showsStore';
 import { tmdb } from '../features/shows/tmdb';
+import type { EpisodeDetailData } from './episodeDetailTypes';
 // Retour terrain du 16/11 (Programmés, « je ne peux pas cliquer là ») : la fiche d'un épisode programmé, chargée à la demande.
 const EpisodeDetailModal = lazy(() => import('./EpisodeDetailModal').then(module => ({ default: module.EpisodeDetailModal })));
 import {
@@ -81,8 +82,12 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const showToast = useToastStore(state => state.showToast);
   // Épisode programmé ouvert : la fiche lit elle-même l'épisode sur TMDB ; la série de la bibliothèque, si elle y est,
   // donne le statut vu et les rappels.
-  const [openEpisode, setOpenEpisode] = useState<{ tmdbId: number; season: number; episode: number } | null>(null);
-  const episodeShow = useShowsStore(state => openEpisode ? state.shows.find(show => Number(show.tmdbId) === openEpisode.tmdbId) : undefined);
+  // Revue Codex #1086 : l'épisode transmis est figé à l'ouverture (la relecture des téléchargements ne ramène jamais la fiche
+  // à l'épisode de départ) et seule une série de la bibliothèque est retenue (jamais un film de même numéro TMDB).
+  const [openEpisode, setOpenEpisode] = useState<{ tmdbId: number; season: number; episode: EpisodeDetailData } | null>(null);
+  const episodeShow = useShowsStore(state => openEpisode ? state.shows.find(show => show.mediaType === 'tv' && Number(show.tmdbId) === openEpisode.tmdbId) : undefined);
+  const openProgrammedEpisode = (tmdbId: number, season: number, episode: number) => setOpenEpisode({ tmdbId, season,
+    episode: tmdb.peekEpisodeDetails(tmdbId, season, episode) || { season_number: season, episode_number: episode, name: `Épisode ${episode}` } });
   const screenRootRef = useRef<HTMLDivElement>(null);
   const searchRequestRef = useRef(0);
   const sendInFlightRef = useRef(false);
@@ -591,15 +596,14 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
             {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
-            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} onEpisodeClick={(tmdbId, season, episode) => setOpenEpisode({ tmdbId, season, episode })} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} onRetryWatching={item => void handleRetryWaiting(item)} onRetryWatchingGroup={items => void handleRetryWaitingGroup(items)} onForgetWatching={removeDownload} onSearchProgrammed={target => void handleSearchProgrammed(target)} />}
+            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} onEpisodeClick={openProgrammedEpisode} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} onRetryWatching={item => void handleRetryWaiting(item)} onRetryWatchingGroup={items => void handleRetryWaitingGroup(items)} onForgetWatching={removeDownload} onSearchProgrammed={target => void handleSearchProgrammed(target)} />}
             <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
             {/* SEENIT-DOWNLOAD-023 : ni téléchargés ni programmés — aucun titre de Sonarr/Radarr invisible. */}
             <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />
             {openEpisode && <Suspense fallback={null}>
               <EpisodeDetailModal show={episodeShow} season={openEpisode.season} tmdbShowId={openEpisode.tmdbId} tmdbShowTitle={episodeShow?.title}
-                // Revue Codex #1086 : pas d'`isHydrating` figé (squelette permanent) ; la fiche lit elle-même l'épisode sur TMDB,
-                // en partant du cache quand il existe.
-                episode={tmdb.peekEpisodeDetails(openEpisode.tmdbId, openEpisode.season, openEpisode.episode) || { season_number: openEpisode.season, episode_number: openEpisode.episode, name: `Épisode ${openEpisode.episode}` }}
+                // Revue Codex #1086 : pas d'`isHydrating` figé (squelette permanent) ; la fiche se complète elle-même.
+                episode={openEpisode.episode}
                 onShowClick={(tmdbId, mediaType) => { setOpenEpisode(null); onShowClick?.(tmdbId, mediaType); }} onClose={() => setOpenEpisode(null)} />
             </Suspense>}
             {listedCompleted.length > 0 && renderSection('Terminés', listedCompleted, 'completed')}

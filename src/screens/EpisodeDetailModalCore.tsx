@@ -61,10 +61,10 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const { showToast } = useToastStore();
 
   // Find live show from Zustand store so updates are instantly reactive
+  // Revue Codex #1086 : un épisode appartient à une série ; un film de même numéro TMDB n'est jamais retenu.
   const liveShow = shows.find(s =>
     (show?.id && s.id === show.id) ||
-    (show?.tmdbId && s.tmdbId === show.tmdbId) ||
-    (tmdbShowId && s.tmdbId === tmdbShowId)
+    (s.mediaType !== 'movie' && ((show?.tmdbId && s.tmdbId === show.tmdbId) || (tmdbShowId && s.tmdbId === tmdbShowId)))
   );
   const activeShow = liveShow || show;
 
