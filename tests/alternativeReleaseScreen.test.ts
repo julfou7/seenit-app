@@ -44,7 +44,8 @@ test('remplacer une version : accessible pendant le transfert, annulation vérif
   assert.match(screen, /kept \? 'error' : 'success'/, 'jamais « remplacée » si l’ancien continue');
   assert.match(screen, /removeDownload\(download\)\)\)\s*kept\+\+;[\s\S]*?if \(!kept\) \{\s+const requestId = beginDownloadRequest\(/, 'le remplaçant est suivi après l’annulation, jamais greffé sur l’ancienne carte');
   assert.match(screen, /candidate\.episodes === 'season'\s*\|\| \(download\.episodeNumber != null && Array\.isArray\(candidate\.episodes\) && candidate\.episodes\.includes\(Number\(download\.episodeNumber\)\)\)/, 'un épisode seul n’annule jamais le pack');
-  assert.match(screen, /hasActiveDownloadInScope\(\[download\], session\.scope\) && covers\(download\)/);
+  assert.match(screen, /&& covers\(download\) && !\(candidate\.infoHash && samePhysicalDownload\(download, \{ downloadId: candidate\.infoHash \}\)\)\);/, 'la version choisie n’est jamais annulée');
+  assert.match(screen, /if \(replaced\.some\(download => !\/\^\(sonarr\|radarr\|qbit\)_\/\.test\(download\.id\)\)\) \{[\s\S]*?return;/, 'demande pas encore chez le client : pas de remplacement');
   const service = readFileSync('src/services/arrManualReleases.ts', 'utf8');
   assert.match(service, /episodes: release\.fullSeason === true \? 'season' as const/);
   const store = readFileSync('src/store/liveDownloadStoreCore.ts', 'utf8');

@@ -82,7 +82,15 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     // jamais le pack de saison ni les autres épisodes en cours ; une couverture inconnue n'annule rien.
     const covers = (download: LiveDownloadItem) => item.mediaType === 'movie' || candidate.episodes === 'season'
       || (download.episodeNumber != null && Array.isArray(candidate.episodes) && candidate.episodes.includes(Number(download.episodeNumber)));
-    const replaced = useLiveDownloadStore.getState().downloads.filter(download => hasActiveDownloadInScope([download], session.scope) && covers(download));
+    // Revue Codex #1070 : la version choisie, si elle est déjà en cours, n'est jamais annulée.
+    const replaced = useLiveDownloadStore.getState().downloads.filter(download => hasActiveDownloadInScope([download], session.scope)
+      && covers(download) && !(candidate.infoHash && samePhysicalDownload(download, { downloadId: candidate.infoHash })));
+    // Revue Codex #1070 : une demande pas encore confiée au client ne peut pas être annulée à distance de façon prouvée.
+    // (même règle que `deleteLiveDownloadItem` : seuls les transferts Sonarr, Radarr ou qBittorrent s'annulent à distance).
+    if (replaced.some(download => !/^(sonarr|radarr|qbit)_/.test(download.id))) {
+      setError('La demande en cours n’est pas encore chez le client : attends qu’elle apparaisse dans « En cours » pour la remplacer.');
+      return;
+    }
     try { assertManualReleaseSearchCurrent(session); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Relance la recherche.'); return; }
     inFlight.current = true; setSending(true); setSubmitted(true); setError('');
