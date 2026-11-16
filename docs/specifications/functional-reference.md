@@ -535,7 +535,8 @@ jamais de feuille du bas) ;
 hors du mode téléchargement (#879), aucune ligne ni saison ne porte de bouton de téléchargement. Depuis la v1.4.282,
 le mode téléchargement est bleu (bouton, panneau, épisodes cochés, choix de qualité ; `SEENIT-DOWNLOAD-019`) ;
 l'or reste au Vu et à la cloche. Le badge du jour de sortie dit « Aujourd’hui » (plus « Ce soir » : l'heure n'est
-pas connue). Une série
+pas connue). Depuis la v1.4.323, « Plus que N » (2 ou 3) ne s'affiche que si ce sont les derniers épisodes de la
+saison, tous sortis ; sinon la carte dit « N dispo » (Dexter S02 : 3 sortis sur 10 → « 3 dispo »). Une série
 n'a qu'un bouton ⬇ dans sa carte de progression : il ouvre le mode (épisodes cochés, prochain coché d'office
 et amené à l'écran, bandeau de saison dont chaque segment se touche, barre compacte ✕ · 1080p · 4K sur une
 ligne à la place de la navigation ; depuis la v1.4.283, son texte se lit en entier — « 2 maintenant · 1 à la
