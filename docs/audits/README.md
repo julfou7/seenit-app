@@ -3,6 +3,7 @@
 Notifications import #801 : [affiche, cache privé et contrôle natif du 6 novembre](./notification-import-poster-2026-11-06.md), baseline f9db3015.
 
 Téléchargements : [refonte prototype et matrice du backlog du 5 novembre](./downloads-2026-11-05.md), #861.
+Téléchargements : [audit des améliorations, risques et manques du 16 novembre](./downloads-2026-11-16.md), #1076 à #1079.
 
 Terrain230 : [Non vu historique et recherche au clavier](./terrain230-non-vu-clavier-2026-10-27.md),
 baseline701054d, #729/#774 ; mutation sans fournisseur, scénario tactile et clavier Explorer.
