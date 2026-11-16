@@ -24,6 +24,8 @@ export interface ManualReleaseCandidate {
   /** Refusée seulement parce qu'un téléchargement du même titre est en cours : la choisir le remplace (retour du 16/11). */
   replacesQueue?: boolean;
   infoHash?: string;
+  /** Série : ce que la release couvre (pack de saison ou épisodes), pour ne remplacer que les transferts couverts. */
+  episodes?: 'season' | number[];
 }
 export interface ManualReleaseSearch {
   scope: ManualReleaseScope;
@@ -139,6 +141,8 @@ export async function searchManualArrReleases(scope: ManualReleaseScope, config:
       seeders: Math.max(0, Number(release.seeders) || 0), indexer: String(release.indexer || ''),
       rejections: exactContext ? rejections : ['Identité du résultat incompatible.'], selectable,
       ...(exactContext && queueOnly ? { replacesQueue: true } : {}),
+      ...(!isMovie ? { episodes: release.fullSeason === true ? 'season' as const
+        : Array.isArray(release.mappedEpisodeNumbers) ? release.mappedEpisodeNumbers.map(Number).filter(Number.isFinite) : [] } : {}),
       infoHash: isStrongTorrentHash(release.infoHash) ? normalizeDownloadClientId(release.infoHash) || undefined : undefined }];
   }).sort((a, b) => Number(b.audio.vff) - Number(a.audio.vff) || b.seeders - a.seeders);
   const targetId = context.movieId || context.seriesId;

@@ -78,7 +78,11 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
 
   const submit = async (candidate: AlternativeRelease['candidate']) => {
     if (!session || !candidate.selectable || candidate.current || inFlight.current || submitted) return;
-    const replaced = useLiveDownloadStore.getState().downloads.filter(download => hasActiveDownloadInScope([download], session.scope));
+    // Revue Codex #1070 : seuls les transferts que la version choisie couvre sont remplacés — un épisode seul n'annule
+    // jamais le pack de saison ni les autres épisodes en cours ; une couverture inconnue n'annule rien.
+    const covers = (download: LiveDownloadItem) => item.mediaType === 'movie' || candidate.episodes === 'season'
+      || (download.episodeNumber != null && Array.isArray(candidate.episodes) && candidate.episodes.includes(Number(download.episodeNumber)));
+    const replaced = useLiveDownloadStore.getState().downloads.filter(download => hasActiveDownloadInScope([download], session.scope) && covers(download));
     try { assertManualReleaseSearchCurrent(session); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Relance la recherche.'); return; }
     inFlight.current = true; setSending(true); setSubmitted(true); setError('');
