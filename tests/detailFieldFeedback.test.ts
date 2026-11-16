@@ -67,7 +67,7 @@ async function loadLaunch(outcome: () => Promise<Record<string, unknown>>) {
       builder.onResolve({ filter: /\/(?:shows\/tmdb|services\/sonarrRadarr|downloadLifecycle|qualityProfileSelection|episodeSeasonPackFallback|lib\/firebase)$/ }, args => ({ path: args.path, namespace: 'ports' }));
       builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: `const s=globalThis.${key};export const tmdb={};export const fetchQualityProfiles=async()=>[];export const resolveEffectiveQualityProfileId=()=>1;
         export const searchAndDownloadInRadarr=()=>s.outcome();export const searchAndDownloadInSonarr=()=>s.outcome();export const downloadEpisodeWithSeasonPackFallback=()=>s.outcome();
-        export const beginDownloadRequest=()=>'request';export const acceptDownloadRequest=()=>{};export const updateDownloadRequest=()=>{};export const failDownloadRequest=(...args)=>{s.failed.push(args)};export const auth={currentUser:{uid:'owner'}};` }));
+        export const beginDownloadRequest=()=>'request';export const acceptDownloadRequest=()=>{};export const updateDownloadRequest=()=>{};export const failDownloadRequest=(...args)=>{s.failed.push(args)};export const dismissDownloadRequest=()=>{};export const isAlreadyAvailableMessage=m=>/est déjà disponible/i.test(m||'');export const auth={currentUser:{uid:'owner'}};` }));
     } }] });
   const module = await import(`data:text/javascript;base64,${Buffer.from(launchBundle.outputFiles[0].text).toString('base64')}`) as { launchArrDownload: (input: Record<string, unknown>) => Promise<unknown> };
   return { launch: module.launchArrDownload, state: (globalThis as Record<string, unknown>)[key] as { failed: unknown[][] } };
