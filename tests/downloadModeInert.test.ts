@@ -19,5 +19,8 @@ test('mode téléchargement : un épisode qui ne se coche pas est visiblement in
 
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.match(view, /const nothingToPick = !pickedList\.length && modeStates\.length > 0 && !selectableEpisodes\.length;/);
-  assert.match(view, /nothingToPick \? 'Tout est déjà téléchargé ou programmé\.'/, 'la barre ne dit plus « Coche un épisode »');
+  assert.match(view, /'Tout est déjà téléchargé ou programmé\.'/, 'la barre ne dit plus « Coche un épisode »');
+  // Revue Codex #1075 : épisodes encore en cours — jamais « à jour ».
+  assert.match(view, /const activeLeft = modeStates\.filter\(entry => entry\.state === 'active'\)\.length;/);
+  assert.match(view, /nothingToPick \? \(activeLeft \? `Saison \$\{modeSeason\} en cours` : `Saison \$\{modeSeason\} à jour`\)/);
 });
