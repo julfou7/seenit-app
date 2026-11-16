@@ -71,7 +71,8 @@ async function testDownloadsHarness(client, root) {
     await check(client, 'document.querySelector(\'[data-download-id="1"] .download-card__actions\') && !document.body.innerText.includes("Blade Runner.1080p")', 'actions utiles sans nom de fichier même dépliées');
     await evaluate(client, 'document.querySelector(\'[data-download-id="1"] .download-card__more\').click(); document.querySelector(\'[data-download-id="2"] .download-card__more\').click()');
     await check(client, 'document.querySelector(\'[data-download-id="2"] .download-card__actions button\')', 'actions actives dépliées');
-    await evaluate(client, 'document.querySelector(\'[data-download-id="2"] .download-card__actions button\').click()');
+    // Revue Codex #1070 : « Autre version » précède désormais « Annuler le téléchargement » sur une carte active.
+    await evaluate(client, 'document.querySelector(\'[data-download-id="2"] .download-card__cancel\').click()');
     await check(client, 'document.querySelector("[role=alertdialog]") && document.activeElement.textContent.includes("Garder")', 'confirmation centrée avec focus sûr');
     await check(client, '(()=>{const r=document.querySelector("[role=alertdialog] > div").getBoundingClientRect();return r.top>=16&&r.bottom<=innerHeight-16})()', 'confirmation visible au-dessus du système');
     await evaluate(client, '[...document.querySelectorAll("button")].find(el=>el.textContent.trim()==="Garder").click()');
