@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { DialogLayer } from './ui/DialogLayer';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
@@ -10,7 +10,7 @@ import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGu
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { beginDownloadRequest, acceptDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { describeReleases, matchesVersionFilter, type ReleaseLike, type VersionFilter } from '../features/downloads/releaseVersions';
-import { ReleaseVersionCard, VersionFilterChips } from './ReleaseVersionCard';
+import { ReleaseVersionCard, VersionFilterChips, VersionPageHeader } from './ReleaseVersionCard';
 import { autoProfileSwitchFor, commonRejections, frenchRejections } from '../features/downloads/releaseRejections';
 import { formatBytes } from '../services/sonarrRadarr';
 import { downloadGroup } from '../features/downloads/downloadGroups';
@@ -221,15 +221,9 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   const currentBadges = releaseBadges(item.releaseTitle || '').slice(0, 5);
   return <DialogLayer onDismiss={onClose} canDismiss={!sending} label="Autre version" role="dialog" data-alternative-release
     className="fixed inset-0 z-[180] max-w-md mx-auto bg-[#0B0B0D] text-white flex flex-col">
-    <header className="shrink-0 flex items-center gap-1 px-2 pt-[calc(var(--seenit-safe-area-top,env(safe-area-inset-top,0px))+6px)] pb-2">
-      <button type="button" onClick={onClose} disabled={sending} aria-label="Retour" className="w-11 h-11 grid place-items-center rounded-full text-zinc-100 active:bg-white/10"><ChevronLeft size={26} /></button>
-      <div className="min-w-0 leading-tight">
-        <h2 className="text-[19px] font-extrabold">Autre version</h2>
-        <p className="truncate text-[13px] text-zinc-400"><span className="seenit-media-title font-bold">{title}</span> · {scopeLabel}</p>
-      </div>
-    </header>
+    <VersionPageHeader label="Autre version" title={title} scope={scopeLabel} onBack={onClose} disabled={sending} />
 
-    <div className="shrink-0 px-4 pb-3 flex flex-col gap-2">
+    <div className="shrink-0 px-4 pb-2.5 flex flex-col gap-2">
       {/* Demande sur toute une série : la saison à comparer reste au choix. */}
       {item.mediaType === 'tv' && item.seasonNumber == null && <label className="flex items-center gap-2 text-[14px] font-bold text-zinc-300">Saison
         <input aria-label="Saison à rechercher" type="number" min={0} max={999} value={season} disabled={busy}
@@ -261,7 +255,7 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
         const switchTo = autoSwitch(candidate);
         const switchLabel = switchTo === '4k' ? '4K' : '1080p';
         return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} current={candidate.current} onToggle={() => setOpen(isOpen ? null : release.id)}
-          details={[candidate.indexer, `${candidate.seeders} source${candidate.seeders > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}>
+          details={candidate.indexer}>
           {own.length > 0 && <p data-rejection className="text-[13px] text-amber-300">{own.join(' · ')}</p>}
           {switchTo && !candidate.current && <p data-auto-switch className="text-[13px] text-zinc-300">Le titre passera en {switchLabel} pour l’accepter.</p>}
           <button type="button" disabled={(!candidate.selectable && !switchTo) || candidate.current || busy || submitted} onClick={() => void submit(candidate)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40">

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronLeft, Loader2, Search } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { DialogLayer } from '../../components/ui/DialogLayer';
 import { type C411Torrent, searchC411Torrents } from '../../services/c411';
 import { useDownloadConfigStore } from '../../store/downloadConfigStore';
@@ -7,7 +7,7 @@ import { useToastStore } from '../../store/toastStore';
 import { isDownloadFeatureEnabled } from '../../features/downloads/downloadFeatureVisibility';
 import { sendReleaseToClient } from '../../features/downloads/releaseSend';
 import { describeReleases, matchesVersionFilter, releaseAgeLabel, type VersionFilter } from '../../features/downloads/releaseVersions';
-import { ReleaseVersionCard, VersionFilterChips } from '../../components/ReleaseVersionCard';
+import { ReleaseVersionCard, VersionFilterChips, VersionPageHeader } from '../../components/ReleaseVersionCard';
 
 export interface PreciseVersionTarget {
   title: string;
@@ -88,15 +88,9 @@ export default function PreciseVersionPage({ target, onClose }: { target: Precis
 
   return <DialogLayer onDismiss={onClose} label="Version précise" role="dialog" data-precise-version
     className="fixed inset-0 z-[180] max-w-md mx-auto bg-[#0B0B0D] text-white flex flex-col">
-    <header className="shrink-0 flex items-center gap-1 px-2 pt-[calc(var(--seenit-safe-area-top,env(safe-area-inset-top,0px))+6px)] pb-2">
-      <button type="button" onClick={onClose} aria-label="Retour" className="w-11 h-11 grid place-items-center rounded-full text-zinc-100 active:bg-white/10"><ChevronLeft size={26} /></button>
-      <div className="min-w-0 leading-tight">
-        <h2 className="text-[19px] font-extrabold">Version précise</h2>
-        <p className="truncate text-[13px] text-zinc-400"><span className="seenit-media-title font-bold">{title}</span> · {scopeLabel}</p>
-      </div>
-    </header>
+    <VersionPageHeader label="Version précise" title={title} scope={scopeLabel} onBack={onClose} />
 
-    <div className="shrink-0 px-4 pb-3"><VersionFilterChips value={filter} onChange={label => { setFilter(label); setOpen(null); }} /></div>
+    <div className="shrink-0 px-4 pb-2.5"><VersionFilterChips value={filter} onChange={label => { setFilter(label); setOpen(null); }} /></div>
 
     <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] flex flex-col gap-2.5">
       {state === 'loading' && <p role="status" className="flex items-center gap-2 py-6 text-[14px] text-zinc-400"><Loader2 size={18} className="animate-spin" />Recherche des versions…</p>}
@@ -106,7 +100,7 @@ export default function PreciseVersionPage({ target, onClose }: { target: Precis
         const { release } = entry;
         const isOpen = open === release.id;
         return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} onToggle={() => setOpen(isOpen ? null : release.id)}
-          details={['C411', `${release.seeders} source${release.seeders > 1 ? 's' : ''}`, releaseAgeLabel(entry.ageDays)].filter(Boolean).join(' · ')}>
+          details={['C411', releaseAgeLabel(entry.ageDays)].filter(Boolean).join(' · ')}>
           <button type="button" disabled={sending !== null} onClick={() => void send(release)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-60">
             {sending === release.id && <Loader2 size={18} className="animate-spin" />}Télécharger cette version
           </button>
