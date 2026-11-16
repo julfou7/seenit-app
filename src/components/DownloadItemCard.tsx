@@ -78,7 +78,8 @@ export function DownloadItemCard({ item, onShowClick, onRemove, onRetry, onTestI
     {details && <div className="download-card__actions">
       {audio && <p className="download-card__fact"><span>Langues</span><strong>{audio}</strong></p>}
       {received && group === 'active' && <p className="download-card__fact"><span>Reçu</span><strong>{received}</strong></p>}
-      {item.tmdbId && (terminal || item.status === 'stalled') && <button type="button" onClick={() => setChoosingRelease(true)}><Search size={15} />Autre version</button>}
+      {/* Retour terrain du 16/11 — revue Codex #1070 : aussi pendant un téléchargement actif (le choix le remplace). */}
+      {item.tmdbId && (terminal || group === 'active') && <button type="button" onClick={() => setChoosingRelease(true)}><Search size={15} />Autre version</button>}
       {item.tmdbId && toFix && <button type="button" onClick={() => setChoosingQuality(true)}>Changer la qualité</button>}
       {!toFix && <button type="button" className="download-card__cancel" onClick={onRemove} aria-label={`${terminal ? 'Retirer' : 'Annuler le téléchargement de'} ${cleanTitle}`}><Trash2 size={16} aria-hidden="true" />{terminal ? 'Retirer' : 'Annuler le téléchargement'}</button>}
     </div>}

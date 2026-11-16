@@ -93,8 +93,12 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
         inFlight.current = false; if (mounted.current) setSending(false);
         return;
       }
-      for (const download of replaced) await useLiveDownloadStore.getState().removeDownload(download);
-      showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: 'Version remplacée : l’ancien téléchargement est annulé.', posterPath: item.posterPath }, 'success');
+      // Revue Codex #1070 : chaque annulation est vérifiée ; un ancien transfert resté actif est signalé, jamais caché.
+      let kept = 0;
+      for (const download of replaced) if (!(await useLiveDownloadStore.getState().removeDownload(download))) kept++;
+      showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: kept
+        ? 'Nouvelle version envoyée, mais l’ancien téléchargement n’a pas pu être annulé : annule-le dans « En cours ».'
+        : 'Version remplacée : l’ancien téléchargement est annulé.', posterPath: item.posterPath }, kept ? 'error' : 'success');
       void useLiveDownloadStore.getState().fetchDownloads();
       inFlight.current = false;
       if (mounted.current) { setSending(false); onClose(); }

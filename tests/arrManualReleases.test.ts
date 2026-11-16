@@ -97,6 +97,6 @@ test('refus « déjà en file » : version choisissable qui remplace, les autres
   assert.deepEqual([light?.selectable, light?.replacesQueue], [true, true]);
   assert.deepEqual([profile?.selectable, profile?.replacesQueue], [false, undefined], 'hors profil : toujours bloquant');
   const modal = readFileSync('src/components/AlternativeReleaseModal.tsx', 'utf8');
-  assert.match(modal, /if \(replaced\.length\) \{\n\s+try \{\n\s+await grabManualArrRelease\(session, candidate\.key, crypto\.randomUUID\(\)\);[\s\S]*?Le téléchargement en cours continue\.[\s\S]*?for \(const download of replaced\) await useLiveDownloadStore\.getState\(\)\.removeDownload\(download\);/, 'envoi d’abord, annulation de l’ancien ensuite');
+  assert.match(modal, /if \(replaced\.length\) \{\n\s+try \{\n\s+await grabManualArrRelease\(session, candidate\.key, crypto\.randomUUID\(\)\);[\s\S]*?Le téléchargement en cours continue\.[\s\S]*?for \(const download of replaced\) if \(!\(await useLiveDownloadStore\.getState\(\)\.removeDownload\(download\)\)\) kept\+\+;/, 'envoi d’abord, annulation de l’ancien ensuite');
   assert.match(modal, /if \(loading \|\| !session \|\| openedFor\.current === session\) return;/, 'carte dépliée jamais refermée par le rafraîchissement');
 });

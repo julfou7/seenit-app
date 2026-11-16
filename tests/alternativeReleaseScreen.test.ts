@@ -35,6 +35,15 @@ test('« Autre version » : mêmes pastilles et cartes que « Version précise �
   assert.match(service, /target: \{ kind: context\.movieId \? 'movie' as const : 'series' as const, id: targetId \}/);
 });
 
+// Retour terrain du 16/11 (« le DL a déjà commencé, je veux une version plus légère ») — revue Codex #1070.
+test('remplacer une version : accessible pendant le transfert, annulation vérifiée', () => {
+  const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
+  assert.match(card, /item\.tmdbId && \(terminal \|\| group === 'active'\) && <button type="button" onClick=\{\(\) => setChoosingRelease\(true\)\}>/);
+  const screen = readFileSync('src/components/AlternativeReleaseModal.tsx', 'utf8');
+  assert.match(screen, /if \(!\(await useLiveDownloadStore\.getState\(\)\.removeDownload\(download\)\)\) kept\+\+;/);
+  assert.match(screen, /kept \? 'error' : 'success'/, 'jamais « remplacée » si l’ancien continue');
+});
+
 // Retour terrain du 16/11 (v1.4.325, « Autre version » : une fine barre vide par version) : dans la liste en colonne
 // qui défile, une carte de version ne rétrécit jamais — corrige aussi « Version précise » (carte partagée).
 test('carte de version jamais écrasée dans une longue liste', () => {
