@@ -64,7 +64,8 @@ export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggl
           : <>
             <span className="text-[13px] text-zinc-400">{formatReleaseSize(release.size)}{seeders > 0 && <> · <span data-seeders className="font-bold text-zinc-200">{seeders.toLocaleString('fr-FR')} source{seeders > 1 ? 's' : ''}</span></>}</span>
             {badges.length > 0 && <span data-release-badges className="mt-0.5 flex flex-wrap gap-1">
-              {badges.slice(0, 6).map(badge => <span key={badge} className="h-6 px-1.5 rounded-md bg-[#26262B] text-[11.5px] font-extrabold leading-6 text-zinc-200">{badge}</span>)}
+              {/* Revue Codex #1074 : 6 badges repliée, tous une fois dépliée. */}
+              {(open ? badges : badges.slice(0, 6)).map(badge => <span key={badge} className="h-6 px-1.5 rounded-md bg-[#26262B] text-[11.5px] font-extrabold leading-6 text-zinc-200">{badge}</span>)}
             </span>}
           </>}
       </span>

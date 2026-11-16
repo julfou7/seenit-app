@@ -93,7 +93,7 @@ test('carte de version jamais écrasée dans une longue liste', () => {
   const card = readFileSync('src/components/ReleaseVersionCard.tsx', 'utf8');
   // Retour terrain du 16/11 (« vire Rapide et Moyen ; trop simple, il faut plus d'éléments pour choisir »).
   assert.doesNotMatch(card, /speedLabel|SPEED_COLOR/, 'plus de Rapide / Moyen');
-  assert.match(card, /\{badges\.length > 0 && <span data-release-badges[\s\S]*?badges\.slice\(0, 6\)/, 'type de release visible carte repliée');
+  assert.match(card, /\{badges\.length > 0 && <span data-release-badges[\s\S]*?\(open \? badges : badges\.slice\(0, 6\)\)/, 'type de release visible repliée, complet dépliée');
   assert.match(card, /source\{seeders > 1 \? 's' : ''\}/, 'nombre de sources visible');
   assert.match(card, /data-version-header className="shrink-0 flex items-center gap-1 px-2 pt-\[var\(--seenit-safe-area-top,env\(safe-area-inset-top,0px\)\)\] pb-1"/, 'aucune marge ajoutée à la zone sûre');
   assert.match(card, /<article data-version-card=\{release\.id\} className=\{cn\('shrink-0 rounded-\[18px\] bg-\[#161619\] overflow-hidden'/);
