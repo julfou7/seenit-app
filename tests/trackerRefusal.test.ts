@@ -11,7 +11,8 @@ test('refus du tracker lu dans qBittorrent et expliqué en français', () => {
   assert.equal(trackerRefusal([dht, { url: 'https://tracker.example/announce', status: 4, msg: 'Your ratio is too low to download' }]), 'Bloqué par le tracker : ratio insuffisant.');
   assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 4, msg: 'Téléchargement bloqué : crédit insuffisant' }]), 'Bloqué par le tracker : ratio insuffisant.');
   assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 4, msg: 'Unregistered torrent' }]), 'Bloqué par le tracker : ce torrent n’y existe plus.');
-  assert.match(trackerRefusal([{ url: 'https://t.example/a', status: 4, msg: 'Compte suspendu : téléchargement interdit' }]) || '', /^Bloqué par le tracker : « Compte suspendu : téléchargement interdit »\.$/);
+  assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 4, msg: 'Your account is banned' }]), 'Bloqué par le tracker : compte suspendu.', 'revue Codex #1072 : traduit');
+  assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 4, msg: 'Download not allowed for this torrent' }]), 'Bloqué par le tracker : téléchargement refusé.', 'jamais le texte brut anglais');
   assert.equal(trackerRefusal([{ url: 'udp://public.example:1337', status: 4, msg: 'Connection timed out' }]), null, 'revue Codex #1072 : une panne n’est pas un refus');
   assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 2, msg: 'Bienvenue !' }]), null, 'message anodin d’un tracker qui fonctionne : rien');
   assert.equal(trackerRefusal([{ url: '** [PeX] **', status: 4, msg: 'ratio' }]), null, 'DHT/PeX/LSD ignorés');

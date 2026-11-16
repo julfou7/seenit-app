@@ -20,7 +20,9 @@ export function trackerRefusal(trackers: unknown): string | null {
     if (!REFUSAL.test(message)) continue;
     if (/ratio|credit|crédit/i.test(message)) return 'Bloqué par le tracker : ratio insuffisant.';
     if (/unregistered|not registered|not found|introuvable/i.test(message)) return 'Bloqué par le tracker : ce torrent n’y existe plus.';
-    return `Bloqué par le tracker : « ${message.slice(0, 160)} ».`;
+    // Revue Codex #1072 : jamais le message brut (souvent anglais) du tracker — une phrase française reconnue ou générique.
+    if (/banned|bann|suspen/i.test(message)) return 'Bloqué par le tracker : compte suspendu.';
+    return 'Bloqué par le tracker : téléchargement refusé.';
   }
   return null;
 }
@@ -29,5 +31,6 @@ export function trackerRefusal(trackers: unknown): string | null {
 export function trackerRefusalHint(message: string): string {
   if (/ratio insuffisant/.test(message)) return 'Ton ratio sur ce tracker est trop bas : le téléchargement reprendra quand tu auras assez partagé ou acheté du crédit de téléchargement. Tu peux aussi choisir une version d’un autre tracker.';
   if (/n’y existe plus/.test(message)) return 'Le tracker a retiré ce torrent : choisis une autre version.';
+  if (/compte suspendu/.test(message)) return 'Ton compte sur ce tracker est suspendu : vérifie-le sur le site du tracker ou choisis une version d’un autre tracker.';
   return 'Le tracker refuse ce téléchargement : vérifie ton compte sur le tracker ou choisis une autre version.';
 }
