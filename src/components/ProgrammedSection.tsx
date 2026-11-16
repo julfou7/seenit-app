@@ -106,7 +106,7 @@ export interface ProgrammedSearchTarget { mediaType: 'tv' | 'movie'; tmdbId: num
 
 export function ProgrammedSection({ refreshKey = 0, onShowClick, onEpisodeClick, watching: watchingRequests = [], queued = [], onRemoveWatching, onRetryWatching, onRetryWatchingGroup, onForgetWatching, onSearchProgrammed }: {refreshKey?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void;
   /** Retour terrain du 16/11 (« je ne peux pas cliquer là ») : toucher un épisode programmé ouvre sa fiche. */
-  onEpisodeClick?: (tmdbId: number, season: number, episode: number) => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void; onRetryWatchingGroup?: (items: LiveDownloadItem[]) => void; onForgetWatching?: (item: LiveDownloadItem) => Promise<unknown>; onSearchProgrammed?: (target: ProgrammedSearchTarget) => void }) {
+  onEpisodeClick?: (tmdbId: number, season: number, episode: number, seriesTitle: string, posterUrl?: string) => void; watching?: readonly LiveDownloadItem[]; queued?: readonly LiveDownloadItem[]; onRemoveWatching?: (item: LiveDownloadItem) => void; onRetryWatching?: (item: LiveDownloadItem) => void; onRetryWatchingGroup?: (items: LiveDownloadItem[]) => void; onForgetWatching?: (item: LiveDownloadItem) => Promise<unknown>; onSearchProgrammed?: (target: ProgrammedSearchTarget) => void }) {
   // Les identifiants viennent d'un serveur précis : la copie synchronisée est liée au compte et au serveur.
   const scope = programmedScope(useDownloadConfigStore());
   const snapshot = useArrSnapshot();
@@ -258,7 +258,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, onEpisodeClick,
       actions: cardMenu(`s${first.seriesId}`, first.seriesTitle, first.quality, choice => void changeQuality({ kind: 'series', id: first.seriesId }, choice, first.seriesTitle, { tmdbId: first.tmdbId, mediaType: 'tv' }, first.posterUrl), () => { setMenu(null); if (group.some(item => requestFor.has(item.id))) setConfirming({ group, title: first.seriesTitle }); else void cancelEpisodes(group, first.seriesTitle); }, group.length > 1 ? `Ne plus programmer ces ${group.length} épisodes` : 'Annuler la programmation', onRetryWatchingGroup && requests.length ? () => { setMenu(null); onRetryWatchingGroup(requests); } : undefined),
       episodes: { summary: group.length === 1 ? code(first) : `${code(first)}–${code(group[group.length - 1])}`, count: group.length, wanted: wantedCount, rows: <ul className="download-season__rows">
         {group.map(item => <li key={item.id} className="download-season__row" data-programmed-episode={item.id}>
-          <button type="button" className="programmed__row-open" disabled={!item.tmdbId || !onEpisodeClick} onClick={() => item.tmdbId && onEpisodeClick?.(item.tmdbId, item.season, item.episode)}
+          <button type="button" className="programmed__row-open" disabled={!item.tmdbId || !onEpisodeClick} onClick={() => item.tmdbId && onEpisodeClick?.(item.tmdbId, item.season, item.episode, item.seriesTitle, item.posterUrl)}
             aria-label={`Ouvrir ${first.seriesTitle} ${code(item)}`}>
             <span className="download-season__code">{code(item)}</span>
             <span className="programmed__row-text">

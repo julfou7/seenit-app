@@ -62,6 +62,9 @@ interface Props {
 
 type ViewMode = 'downloads' | 'search';
 
+/** Chemin TMDB d'une affiche (« /abc.jpg ») tiré de son adresse ; autre source : rien (jamais une adresse externe stockée). */
+const tmdbPosterPath = (url?: string) => /^https:\/\/image\.tmdb\.org\/t\/p\/[^/]+(\/[^/?#]+)$/.exec(url || '')?.[1];
+
 /** Séries dont les attentes sont en cours de relance (revue Codex #1054 : jamais deux lots concurrents). */
 const retryingSeries = new Set<string>();
 /** Recherchés de Programmés en cours de relance, par périmètre (revue Codex #1061). */
@@ -84,10 +87,34 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   // donne le statut vu et les rappels.
   // Revue Codex #1086 : l'épisode transmis est figé à l'ouverture (la relecture des téléchargements ne ramène jamais la fiche
   // à l'épisode de départ) et seule une série de la bibliothèque est retenue (jamais un film de même numéro TMDB).
-  const [openEpisode, setOpenEpisode] = useState<{ tmdbId: number; season: number; episode: EpisodeDetailData } | null>(null);
+  // Revue Codex #1086 : titre et affiche TMDB de la série programmée sont transmis (une série hors bibliothèque marquée
+  // vue depuis la fiche est créée avec son vrai titre, jamais « Série »).
+  const [openEpisode, setOpenEpisode] = useState<{ tmdbId: number; season: number; episode: EpisodeDetailData; title: string; posterPath?: string } | null>(null);
   const episodeShow = useShowsStore(state => openEpisode ? state.shows.find(show => show.mediaType === 'tv' && Number(show.tmdbId) === openEpisode.tmdbId) : undefined);
-  const openProgrammedEpisode = (tmdbId: number, season: number, episode: number) => setOpenEpisode({ tmdbId, season,
-    episode: tmdb.peekEpisodeDetails(tmdbId, season, episode) || { season_number: season, episode_number: episode, name: `Épisode ${episode}` } });
+  const pendingEpisodeParent = useRef<{ id: number; mediaType?: 'tv' | 'movie' } | null>(null);
+  const openProgrammedEpisode = (tmdbId: number, season: number, episode: number, title: string, posterUrl?: string) => {
+    setOpenEpisode({ tmdbId, season, title, posterPath: tmdbPosterPath(posterUrl),
+      episode: tmdb.peekEpisodeDetails(tmdbId, season, episode) || { season_number: season, episode_number: episode, name: `Épisode ${episode}` } });
+    // Revue Codex #1086 : comme depuis À voir, la fiche a son entrée d'historique : Retour la ferme et revient à Programmés.
+    const state = window.history.state || {};
+    if (!state.isEpisodeDetailModal) window.history.pushState({ ...state, isModal: true, isEpisodeDetailModal: true }, '');
+  };
+  const closeProgrammedEpisode = (parent?: { id: number; mediaType?: 'tv' | 'movie' }) => {
+    if (window.history.state?.isEpisodeDetailModal) { pendingEpisodeParent.current = parent || null; window.history.back(); return; }
+    setOpenEpisode(null);
+    if (parent) onShowClick?.(parent.id, parent.mediaType);
+  };
+  useEffect(() => {
+    const onPop = (event: PopStateEvent) => {
+      if (event.state?.isEpisodeDetailModal) return;
+      setOpenEpisode(null);
+      const parent = pendingEpisodeParent.current;
+      pendingEpisodeParent.current = null;
+      if (parent) onShowClick?.(parent.id, parent.mediaType);
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, [onShowClick]);
   const screenRootRef = useRef<HTMLDivElement>(null);
   const searchRequestRef = useRef(0);
   const sendInFlightRef = useRef(false);
@@ -601,10 +628,10 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {/* SEENIT-DOWNLOAD-023 : ni téléchargés ni programmés — aucun titre de Sonarr/Radarr invisible. */}
             <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />
             {openEpisode && <Suspense fallback={null}>
-              <EpisodeDetailModal show={episodeShow} season={openEpisode.season} tmdbShowId={openEpisode.tmdbId} tmdbShowTitle={episodeShow?.title}
+              <EpisodeDetailModal show={episodeShow} season={openEpisode.season} tmdbShowId={openEpisode.tmdbId} tmdbShowTitle={episodeShow?.title || openEpisode.title} tmdbShowPosterPath={openEpisode.posterPath}
                 // Revue Codex #1086 : pas d'`isHydrating` figé (squelette permanent) ; la fiche se complète elle-même.
                 episode={openEpisode.episode}
-                onShowClick={(tmdbId, mediaType) => { setOpenEpisode(null); onShowClick?.(tmdbId, mediaType); }} onClose={() => setOpenEpisode(null)} />
+                onShowClick={(tmdbId, mediaType) => closeProgrammedEpisode({ id: tmdbId, mediaType })} onClose={() => closeProgrammedEpisode()} />
             </Suspense>}
             {listedCompleted.length > 0 && renderSection('Terminés', listedCompleted, 'completed')}
             {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'cancelled')}
