@@ -36,7 +36,7 @@ export interface SeriesSeasonProgress {
   knownEpisodes: number;
   availableUnseen: number;
   /** Épisodes de la saison pas encore vus, sortis ou non (retour du 16/11 : « Plus que N » = fin de saison). */
-  remainingInSeason: number;
+  remainingInSeason?: number;
   detail?: string;
 }
 

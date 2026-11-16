@@ -31,7 +31,8 @@ export function seriesBadge(show: Show, episode: SeriesCardEpisode | null, progr
   // Retour terrain du 16/11 (Dexter S02, 3 sortis sur 10) : « Plus que N » veut dire N épisodes avant la fin de la
   // saison — seulement quand tous les restants sont sortis ; sinon le nombre disponible (« 3 dispo »).
   if (age >= 0 && !progress.totalUnknown && [2, 3].includes(progress.availableUnseen)) {
-    return progress.availableUnseen >= progress.remainingInSeason
+    // Fin de saison non prouvée (restants inconnus) : jamais « Plus que ».
+    return progress.remainingInSeason !== undefined && progress.availableUnseen >= progress.remainingInSeason
       ? { label: `Plus que ${progress.availableUnseen}`, tone: 'remaining' }
       : { label: `${progress.availableUnseen} dispo`, tone: 'new' };
   }
