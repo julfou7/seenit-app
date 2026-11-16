@@ -25,6 +25,18 @@ test('refus de Sonarr/Radarr traduits, raison commune dite une fois', () => {
   assert.equal(autoProfileSwitchFor([cutoff]), null);
 });
 
+// Retour terrain du 16/11 sur la v1.4.329 (« un peu de place perdue en haut, recherche étrangement longue +5 s »).
+test('« Autre version » : haut compact, réouverture sans nouvelle interrogation des indexers', () => {
+  const screen = readFileSync('src/components/AlternativeReleaseModal.tsx', 'utf8');
+  assert.doesNotMatch(screen, /bg-amber-500\/10[^"]*"[^>]*>Un téléchargement est en cours/, 'plus de second bandeau');
+  assert.match(screen, /<section data-current-version[\s\S]*?data-active-request[\s\S]*?<\/section>/, 'règle de remplacement dans l’encadré de la version actuelle');
+  assert.match(screen, /const RECENT_SEARCH_MS = 2 \* 60_000;/);
+  assert.match(screen, /const key = JSON\.stringify\(\[config\.scopeUid, config\.radarrUrl, config\.radarrApiKey, config\.sonarrUrl, config\.sonarrApiKey, scope\]\);/, 'revue Codex #1073 : mémoire propre au serveur Arr');
+  assert.match(screen, /if \(!forced && recent && Date\.now\(\) - recent\.at < RECENT_SEARCH_MS\) \{\s*try \{ assertManualReleaseSearchCurrent\(recent\.session\);/, 'résultat récent et encore valide réutilisé');
+  assert.match(screen, /const forced = lastRefresh\.current !== refresh;/, '« Relancer la recherche » interroge toujours');
+  assert.equal((screen.match(/recentSearches\.clear\(\);/g) || []).length, 2, 'envoi ou bascule de qualité : mémoire vidée');
+});
+
 // Retour terrain du 16/11 (« le fichier actuel n'est pas assez mis en valeur »).
 test('« Autre version » : la version actuelle est résumée en tête et marquée dans la liste', () => {
   const screen = readFileSync('src/components/AlternativeReleaseModal.tsx', 'utf8');
