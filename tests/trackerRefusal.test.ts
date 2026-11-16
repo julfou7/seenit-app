@@ -36,6 +36,6 @@ test('le suivi qBittorrent relit les trackers d’un torrent à l’arrêt, au p
   assert.match(live, /if \(cached\?\.note && now - cached\.at <= TRACKER_NOTE_MAX_AGE_MS\) notes\.set\(hashOf\(key\), cached\.note\);/, 'notes valides rendues pour tous, jamais une note périmée');
   assert.match(live, /`\$\{buildQbitSessionScopeKey\(auth\.currentUser\?\.uid, cleanUrl\(config\.qbittorrentUrl \|\| ''\), config\.qbittorrentUsername\)\}\|\$\{String\(torrent\.hash\)\}`/, 'revue Codex #1072 : note propre à la connexion qBittorrent');
   assert.match(live, /qbitGet\(config, `\/api\/v2\/torrents\/trackers\?hash=\$\{encodeURIComponent\(hashOf\(key\)\)\}`\)/);
-  assert.match(live, /const trackerNote = !isQbitError && !isDone \? refusals\.get\(String\(t\.hash\)\) : undefined;/);
+  assert.match(live, /const trackerNote = !isQbitError && !isDone \? refusals\.get\(String\(t\.hash\)\) \?\?/);
   assert.match(live, /existing\.errorMessage = trackerNote;/);
 });
