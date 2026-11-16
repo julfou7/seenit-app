@@ -8,7 +8,7 @@ import { truncateDownloadProgressPercent } from '../features/downloads/downloadP
 import { downloadGroup, downloadProblem } from '../features/downloads/downloadGroups';
 import { availabilityHint } from '../features/downloads/downloadAvailability';
 import { getReleaseAudio } from '../features/downloads/releaseAudio';
-import { releaseVariantLabel } from '../features/downloads/releaseQuality';
+import { shownVariantLabel } from '../features/downloads/releaseQuality';
 const AlternativeReleaseModal = lazy(() => import('./AlternativeReleaseModal').then(module => ({ default: module.AlternativeReleaseModal })));
 const DownloadModal = lazy(() => import('./DownloadModal').then(module => ({ default: module.DownloadModal })));
 
@@ -32,7 +32,7 @@ export function DownloadItemCard({ item, onShowClick, onRemove, onRetry, onTestI
   const id = item.tmdbId || library?.tmdbId;
   const audio = getReleaseAudio(item.releaseTitle).label;
   // #293 : la variante choisie (HD Light ou Standard) reste visible dans la file, d'après la release envoyée.
-  const variant = releaseVariantLabel(item.releaseTitle);
+  const variant = shownVariantLabel(item.releaseTitle);
   const scope = isTv ? subTitle : ['Film', item.quality, variant].filter(Boolean).join(' · ');
   // Carte « En cours » v2 (design validé le 09/11) : langues et reçu passent dans le détail déplié.
   const meta = [isTv ? item.quality : '', isTv ? variant : '', item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');

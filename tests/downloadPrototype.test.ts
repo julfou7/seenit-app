@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { downloadGroup, downloadProblem } from '../src/features/downloads/downloadGroups.ts';
 import { episodeDownloadPresentation } from '../src/features/downloads/episodeDownloadPresentation.ts';
-import { matchesLightFilter, releaseVariantLabel } from '../src/features/downloads/releaseQuality.ts';
+import { matchesLightFilter, releaseVariantLabel, shownVariantLabel } from '../src/features/downloads/releaseQuality.ts';
 import { readFileSync } from 'node:fs';
 import { fetchC411Torrents } from '../src/features/downloads/c411Backend.ts';
 import type { LiveDownloadItem } from '../src/services/sonarrRadarrLive.ts';
@@ -75,9 +75,12 @@ test('SEENIT-DOWNLOAD-013 #293 la variante HD Light ou Standard reste visible da
   assert.equal(releaseVariantLabel('Twilight'), null, 'titre sans marque technique');
   assert.equal(releaseVariantLabel('Show.S01E02.1080p.WEB.H264-GRP'), 'Standard');
   const season = readFileSync('src/components/SeasonDownloadCard.tsx', 'utf8');
-  assert.match(season, /\[rowState\(item, kind, importDiskNote\), releaseVariantLabel\(item\.releaseTitle\)\]/, 'épisodes regroupés : variante par ligne');
+  // Retour terrain du 16/11 : « Standard » n'est plus affiché, seule « HD Light » l'est.
+  assert.equal(shownVariantLabel('Film.2024.MULTi.1080p.BluRay.x264'), null);
+  assert.equal(shownVariantLabel('Film.2024.MULTi.1080p.HDLight.x264'), 'HD Light');
+  assert.match(season, /\[rowState\(item, kind, importDiskNote\), shownVariantLabel\(item\.releaseTitle\)\]/, 'épisodes regroupés : variante par ligne');
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
-  assert.match(card, /const variant = releaseVariantLabel\(item\.releaseTitle\);/);
+  assert.match(card, /const variant = shownVariantLabel\(item\.releaseTitle\);/);
   assert.match(card, /\['Film', item\.quality, variant\]/);
   const filter = readFileSync('src/components/ReleaseLightFilter.tsx', 'utf8');
   for (const label of ['Toutes les versions', 'HD Light · fichier plus léger', 'Standard · meilleure qualité']) assert.ok(filter.includes(label), label);

@@ -546,6 +546,8 @@ Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sa
 épisode à venir déjà surveillé affiche « Programmé » (pastille hors mode). Depuis la v1.4.332, en mode, un épisode
 qui ne se coche pas (déjà téléchargé, programmé, vu) a sa ligne effacée et une étiquette passive (« ✓ Téléchargé »,
 « Programmé ») au lieu d'un rond qui ressemblait à un bouton ; une saison sans rien à cocher affiche « Saison N à jour ».
+Depuis la v1.4.335, toucher un tel épisode ouvre sa fiche, comme hors mode. Les cartes de téléchargement n'affichent
+plus « Standard » : seule la variante « HD Light » est mentionnée.
 Avec un seul épisode sorti
 coché, « Version précise › » ouvre une page pleine hauteur : versions C411 filtrables (Toutes, 1080p, 4K, Français, VO),
 la conseillée en tête et dépliée (type de release en badges, sources, date, « Nom du fichier » masqué par défaut,
