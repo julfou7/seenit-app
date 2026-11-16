@@ -497,10 +497,11 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           isRestored: false
             });
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : '';
           recordSourceResult('sonarr', config.sonarrUrl, false);
-          sourceHealth.sonarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Sonarr indisponible' };
-          if (!e?.message?.includes('PWA Web')) {
+          sourceHealth.sonarr = { configured: true, ok: false, checkedAt: Date.now(), error: message || 'Sonarr indisponible' };
+          if (!message.includes('PWA Web')) {
             console.warn('[LiveQueue] Erreur Sonarr queue:', e);
           }
         }
