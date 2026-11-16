@@ -1,28 +1,41 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Loader2, Search, X } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import { DialogLayer } from './ui/DialogLayer';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
-import { formatBytes, type LiveDownloadItem } from '../services/sonarrRadarr';
-import { assertManualReleaseSearchCurrent, grabManualArrRelease, searchManualArrReleases, type ManualReleaseSearch } from '../services/arrManualReleases';
+import { type LiveDownloadItem } from '../services/sonarrRadarr';
+import { assertManualReleaseSearchCurrent, grabManualArrRelease, searchManualArrReleases, type ManualReleaseCandidate, type ManualReleaseSearch } from '../services/arrManualReleases';
 import { samePhysicalDownload } from '../features/downloads/downloadIdentity';
 import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGuard';
 import { useLiveDownloadStore } from '../store/liveDownloadStore';
-import { matchesLightFilter, type LightFilter } from '../features/downloads/releaseQuality';
-import { ReleaseLightFilter } from './ReleaseLightFilter';
 import { beginDownloadRequest, acceptDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
+import { describeReleases, matchesVersionFilter, type ReleaseLike, type VersionFilter } from '../features/downloads/releaseVersions';
+import { ReleaseVersionCard, VersionFilterChips } from './ReleaseVersionCard';
+import { commonRejections, frenchRejections, profileSwitchFor } from '../features/downloads/releaseRejections';
+import { changeProgrammedQuality } from '../features/downloads/programmedCalendar';
 
+type AlternativeRelease = ReleaseLike & { candidate: ManualReleaseCandidate & { current: boolean }; reasons: string[] };
+
+const code = (season: number, episode?: number) => `S${String(season).padStart(2, '0')}${episode != null ? `E${String(episode).padStart(2, '0')}` : ''}`;
+
+/**
+ * « Chercher une autre release » (À régler, Autre version). Retour terrain du 16/11 (« cet écran est un peu pourri ;
+ * l'interface pourrait être la même que la recherche manuelle et une modif dans l'une s'appliquer à l'autre ») :
+ * pleine page, mêmes pastilles de filtre et mêmes cartes que « Version précise » (`ReleaseVersionCard`,
+ * `VersionFilterChips`) ; les versions viennent toujours de Sonarr/Radarr (recherche interactive), avec leurs
+ * raisons de refus traduites, une raison commune dite une seule fois, et « Passer en 4K / 1080p » quand le profil
+ * refuse la qualité.
+ */
 export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadItem; onClose: () => void }) {
   const config = useDownloadConfigStore();
   const showToast = useToastStore(state => state.showToast);
   const [season, setSeason] = useState(item.seasonNumber ?? 1);
-  const [audioFilter, setAudioFilter] = useState<'all' | 'vff' | 'vfq'>('all');
-  const [lightFilter, setLightFilter] = useState<LightFilter>('all');
-  const [qualityFilter, setQualityFilter] = useState('all');
+  const [filter, setFilter] = useState<VersionFilter>('Toutes');
+  const [open, setOpen] = useState<number | null>(null);
   const [session, setSession] = useState<ManualReleaseSearch | null>(null);
-  const [selectedKey, setSelectedKey] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [switching, setSwitching] = useState(false);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -34,7 +47,7 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     let current = true;
-    setLoading(true); setError(''); setSession(null); setSelectedKey(''); setSubmitted(false);
+    setLoading(true); setError(''); setSession(null); setOpen(null); setSubmitted(false);
     void searchManualArrReleases({ mediaType: item.mediaType, tmdbId: Number(item.tmdbId),
       seasonNumber: item.mediaType === 'tv' ? season : undefined, episodeNumber: item.episodeNumber }, config)
       .then(result => { if (current) setSession(result); })
@@ -43,85 +56,109 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     return () => { current = false; };
   }, [item.mediaType, item.tmdbId, item.episodeNumber, season, refresh, config.radarrUrl,
     config.radarrApiKey, config.sonarrUrl, config.sonarrApiKey, config.scopeUid]);
-  const candidates = (session?.candidates || []).filter(candidate => audioFilter === 'all' || candidate.audio[audioFilter])
-    .filter(candidate => matchesLightFilter(`${candidate.title} ${candidate.quality}`, lightFilter))
-    .filter(candidate => qualityFilter === 'all' || (qualityFilter === '4k' ? /2160|4k|uhd/i.test(`${candidate.title} ${candidate.quality}`) : /1080/i.test(`${candidate.title} ${candidate.quality}`) && !/2160|4k|uhd/i.test(`${candidate.title} ${candidate.quality}`)))
-    .map(candidate => ({ ...candidate, current: samePhysicalDownload(item, { downloadId: candidate.infoHash }) }));
-  const selected = candidates.find(candidate => candidate.key === selectedKey);
-  const submit = async () => {
-    if (!session || !selected?.selectable || selected.current || inFlight.current || submitted) return;
+
+  const preferred = /4k|2160/i.test(item.quality || '') ? '4k' : '1080p';
+  const releases = useMemo<AlternativeRelease[]>(() => (session?.candidates || []).map((candidate, index) => ({
+    id: index + 1, name: candidate.title, size: candidate.size, seeders: candidate.seeders, quality: candidate.quality,
+    candidate: { ...candidate, current: samePhysicalDownload(item, { downloadId: candidate.infoHash }) },
+    reasons: candidate.selectable ? [] : frenchRejections(candidate.rejections),
+  })), [session, item]);
+  const shared = useMemo(() => commonRejections(releases.map(release => release.reasons)), [releases]);
+  const versions = useMemo(() => describeReleases(releases, preferred), [releases, preferred]);
+  const visible = versions.filter(entry => matchesVersionFilter(entry, filter));
+  useEffect(() => { if (!loading) setOpen(versions.find(entry => entry.release.candidate.selectable)?.release.id ?? null); }, [loading, versions]);
+
+  const submit = async (candidate: AlternativeRelease['candidate']) => {
+    if (!session || !candidate.selectable || candidate.current || inFlight.current || submitted) return;
     if (hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, session.scope)) {
-      setError('Une demande est déjà en cours pour ce média. Attendez sa fin ou annulez-la avant de choisir une autre release.');
+      setError('Une demande est déjà en cours pour ce titre. Attends sa fin ou annule-la avant de choisir une autre version.');
       return;
     }
     try { assertManualReleaseSearchCurrent(session); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Rouvrez la recherche.'); return; }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Relance la recherche.'); return; }
     inFlight.current = true; setSending(true); setSubmitted(true); setError('');
     const requestId = beginDownloadRequest({ title: item.movieTitle || item.seriesTitle || item.title,
       mediaType: item.mediaType, tmdbId: item.tmdbId, posterPath: item.posterPath, backdropPath: item.backdropPath,
       seasonNumber: session.scope.seasonNumber, episodeNumber: session.scope.episodeNumber,
-      downloadClient: item.mediaType === 'movie' ? 'Radarr' : 'Sonarr', releaseTitle: selected.title });
-    updateDownloadRequest(requestId, { quality: selected.quality, downloadId: selected.infoHash });
+      downloadClient: item.mediaType === 'movie' ? 'Radarr' : 'Sonarr', releaseTitle: candidate.title });
+    updateDownloadRequest(requestId, { quality: candidate.quality, downloadId: candidate.infoHash });
     try {
-      await grabManualArrRelease(session, selected.key, requestId);
-      acceptDownloadRequest(requestId, 'Release choisie envoyée au client', 'queued');
-      showToast('Release choisie envoyée au client', 'success');
+      await grabManualArrRelease(session, candidate.key, requestId);
+      acceptDownloadRequest(requestId, 'Version choisie envoyée au client', 'queued');
+      showToast('Version choisie envoyée au client', 'success');
       if (mounted.current) onClose();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Résultat du lancement inconnu.';
       failDownloadRequest(requestId, message);
-      if (mounted.current) setError(`${message} Vérifiez le client avant de refaire une recherche : l’envoi a pu aboutir.`);
+      if (mounted.current) setError(`${message} Vérifie le client avant de relancer : l’envoi a pu aboutir.`);
     } finally {
       inFlight.current = false;
       if (mounted.current) setSending(false);
     }
   };
-  return (
-    <DialogLayer label="Chercher une autre release" onDismiss={onClose} canDismiss={!sending}
-      className="fixed inset-0 flex items-end justify-center bg-black/80 p-3 pb-[max(12px,env(safe-area-inset-bottom))] pt-[max(12px,env(safe-area-inset-top))] sm:items-center"
-      onClick={event => { event.stopPropagation(); if (event.target === event.currentTarget && !sending) onClose(); }}>
-      <div className="flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#121216] text-white">
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4">
-          <div className="min-w-0"><h2 className="text-lg font-bold">Chercher une autre release</h2>
-            <p className="mt-1 text-sm text-[#E5A93D]">{item.movieTitle || item.seriesTitle || item.title}</p>
-            {item.mediaType === 'tv' && <p className="mt-1 text-xs text-zinc-300">Saison {season}{item.episodeNumber != null ? ` · Épisode ${item.episodeNumber}` : ''}</p>}
-            <p className="mt-1 text-xs text-zinc-400">Comparer les versions, puis choisir celle à télécharger.</p></div>
-          <button type="button" aria-label="Fermer" disabled={sending} onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5"><X size={20} /></button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-b border-white/10 p-3">
-          <select aria-label="Filtrer la qualité" value={qualityFilter} disabled={sending} onChange={event => { setQualityFilter(event.target.value); setSelectedKey(''); }} className="h-11 rounded-lg bg-zinc-800 px-3 text-sm"><option value="all">Toutes les qualités</option><option value="1080p">1080p</option><option value="4k">4K</option></select>
-          <ReleaseLightFilter value={lightFilter} disabled={sending} onChange={value => { setLightFilter(value); setSelectedKey(''); }} />
-          {item.mediaType === 'tv' && item.seasonNumber == null && <label className="flex items-center gap-2 text-sm">Saison
-            <input aria-label="Saison à rechercher" type="number" min={0} max={999} value={season} disabled={sending}
-              onChange={event => setSeason(Math.max(0, Number(event.target.value)))} className="h-11 w-16 rounded-lg bg-zinc-800 px-2" /></label>}
-          <select aria-label="Filtrer les versions audio" value={audioFilter} disabled={sending}
-            onChange={event => { setAudioFilter(event.target.value as typeof audioFilter); setSelectedKey(''); }}
-            className="h-11 rounded-lg bg-zinc-800 px-3 text-sm"><option value="all">Toutes les versions</option><option value="vff">VFF</option><option value="vfq">VFQ</option></select>
-          <button type="button" disabled={loading || sending} onClick={() => setRefresh(value => value + 1)}
-            className="flex min-h-11 items-center gap-2 rounded-lg bg-white/5 px-3 text-sm"><Search size={16} />Rechercher</button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3" aria-busy={loading}>
-          {error && <p role="alert" className="mb-3 rounded-xl bg-red-500/10 p-3 text-sm text-red-300">{error}</p>}
-          {loading ? <p role="status" className="flex items-center gap-2 p-4 text-sm text-zinc-300"><Loader2 size={18} className="animate-spin" />Recherche des releases…</p>
-            : !error && candidates.length === 0 ? <p className="p-4 text-sm text-zinc-400">Aucune release pour ce filtre. Essayez toutes les versions ou relancez la recherche.</p>
-              : candidates.map(candidate => <label key={candidate.key} className={`mb-2 block rounded-xl border p-3 ${selectedKey === candidate.key ? 'border-[#E5A93D] bg-[#E5A93D]/10' : 'border-white/10 bg-white/[0.03]'}`}>
-                <div className="flex items-start gap-3"><input type="radio" name="alternative-release" aria-label={candidate.title}
-                  checked={selectedKey === candidate.key} disabled={!candidate.selectable || candidate.current || sending || submitted} onChange={() => setSelectedKey(candidate.key)} className="mt-1 h-5 w-5 shrink-0 accent-[#E5A93D]" />
-                  <div className="min-w-0 flex-1"><p className="break-words text-sm font-semibold">{candidate.title}</p>
-                    <p className="mt-2 text-xs font-bold text-cyan-300">{candidate.audio.label || 'Audio non précisé'} · {candidate.quality || 'Qualité non précisée'}</p>
-                    <p className="mt-1 text-xs text-zinc-400">{formatBytes(candidate.size)} · {candidate.seeders} seeders{candidate.indexer ? ` · ${candidate.indexer}` : ''}</p>
-                    {candidate.current && <p className="mt-2 text-xs text-zinc-300">Version actuelle</p>}
-                    {!candidate.selectable && <p className="mt-2 text-xs text-amber-300">{candidate.rejections.join(' · ') || 'Refusée par le client'}</p>}
-                  </div></div></label>)}
-        </div>
-        <div className="border-t border-white/10 p-3">
-          {activeInScope && !sending && <p className="mb-2 text-xs text-amber-300">Une demande est déjà en cours. Attendez sa fin ou annulez-la avant un autre envoi.</p>}
-          {selected && <p className="mb-2 break-words text-xs text-zinc-400">Choix : {selected.title}</p>}
-          <button type="button" disabled={!selected?.selectable || selected.current || activeInScope || loading || sending || submitted} onClick={() => void submit()}
-            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#E5A93D] px-3 text-sm font-bold text-black disabled:opacity-40">
-            {sending && <Loader2 size={16} className="animate-spin" />}{sending ? 'Envoi…' : 'Télécharger cette release'}</button>
-        </div>
+
+  // Retour du 16/11 : changer la qualité depuis cet écran — le profil 4K ou 1080p de SeenIt est appliqué au film ou à
+  // la série (comme « Changer la qualité » de Programmés), puis la recherche est relancée.
+  const switchQuality = async (preference: '4k' | '1080p') => {
+    if (!session?.target || switching) return;
+    setSwitching(true); setError('');
+    try {
+      await changeProgrammedQuality(useDownloadConfigStore.getState(), session.target, preference);
+      showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: `Qualité : ${preference === '4k' ? '4K' : '1080p'}`, posterPath: item.posterPath }, 'success');
+      if (mounted.current) setRefresh(value => value + 1);
+    } catch (cause) {
+      if (mounted.current) setError(cause instanceof Error ? cause.message : 'Qualité inchangée.');
+    } finally {
+      if (mounted.current) setSwitching(false);
+    }
+  };
+
+  const title = item.movieTitle || item.seriesTitle || item.title;
+  const scopeLabel = item.mediaType === 'tv' ? code(season, item.episodeNumber ?? undefined) : 'Film';
+  const busy = sending || switching;
+  return <DialogLayer onDismiss={onClose} canDismiss={!sending} label="Autre version" role="dialog" data-alternative-release
+    className="fixed inset-0 z-[180] max-w-md mx-auto bg-[#0B0B0D] text-white flex flex-col">
+    <header className="shrink-0 flex items-center gap-1 px-2 pt-[calc(var(--seenit-safe-area-top,env(safe-area-inset-top,0px))+6px)] pb-2">
+      <button type="button" onClick={onClose} disabled={sending} aria-label="Retour" className="w-11 h-11 grid place-items-center rounded-full text-zinc-100 active:bg-white/10"><ChevronLeft size={26} /></button>
+      <div className="min-w-0 leading-tight">
+        <h2 className="text-[19px] font-extrabold">Autre version</h2>
+        <p className="truncate text-[13px] text-zinc-400"><span className="seenit-media-title font-bold">{title}</span> · {scopeLabel}</p>
       </div>
-    </DialogLayer>
-  );
+    </header>
+
+    <div className="shrink-0 px-4 pb-3 flex flex-col gap-2">
+      {/* Demande sur toute une série : la saison à comparer reste au choix. */}
+      {item.mediaType === 'tv' && item.seasonNumber == null && <label className="flex items-center gap-2 text-[14px] font-bold text-zinc-300">Saison
+        <input aria-label="Saison à rechercher" type="number" min={0} max={999} value={season} disabled={busy}
+          onChange={event => setSeason(Math.max(0, Number(event.target.value)))} className="h-11 w-20 rounded-full bg-[#1F1F23] px-4 text-white" /></label>}
+      <VersionFilterChips value={filter} onChange={label => { setFilter(label); setOpen(null); }} />
+    </div>
+
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] flex flex-col gap-2.5" aria-busy={loading}>
+      {error && <p role="alert" className="rounded-2xl bg-rose-500/10 px-4 py-3 text-[14px] text-rose-200">{error}</p>}
+      {activeInScope && !sending && <p data-active-request className="rounded-2xl bg-amber-500/10 px-4 py-3 text-[13.5px] text-amber-200">Une demande est déjà en cours pour ce titre : attends sa fin ou annule-la avant de choisir une autre version.</p>}
+      {!loading && shared.length > 0 && <p data-shared-rejections className="rounded-2xl bg-white/[0.04] px-4 py-3 text-[13.5px] text-zinc-300">Refusées par {item.mediaType === 'movie' ? 'Radarr' : 'Sonarr'} : {shared.join(' · ')}</p>}
+      {loading && <p role="status" className="flex items-center gap-2 py-6 text-[14px] text-zinc-400"><Loader2 size={18} className="animate-spin" />Recherche des versions…</p>}
+      {!loading && !error && !visible.length && <p className="py-6 text-[14px] text-zinc-400">{versions.length ? 'Aucune version pour ce filtre.' : 'Aucune version trouvée.'}</p>}
+      {!loading && visible.map(entry => {
+        const { release } = entry;
+        const { candidate } = release;
+        const isOpen = open === release.id;
+        const own = release.reasons.filter(reason => !shared.includes(reason));
+        const switchTo = session?.target && !candidate.selectable ? profileSwitchFor(candidate.rejections) : null;
+        return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} onToggle={() => setOpen(isOpen ? null : release.id)}
+          details={[candidate.indexer, `${candidate.seeders} source${candidate.seeders > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}>
+          {candidate.current && <p className="text-[13px] text-zinc-300">Version actuelle</p>}
+          {own.length > 0 && <p data-rejection className="text-[13px] text-amber-300">{own.join(' · ')}</p>}
+          {switchTo && <button type="button" disabled={busy} onClick={() => void switchQuality(switchTo)} className="mt-1 h-12 rounded-[14px] bg-[#26262B] text-[15px] font-extrabold text-zinc-100 flex items-center justify-center gap-2 disabled:opacity-60">
+            {switching && <Loader2 size={18} className="animate-spin" />}Passer en {switchTo === '4k' ? '4K' : '1080p'}
+          </button>}
+          <button type="button" disabled={!candidate.selectable || candidate.current || activeInScope || busy || submitted} onClick={() => void submit(candidate)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40">
+            {sending && <Loader2 size={18} className="animate-spin" />}{sending ? 'Envoi…' : 'Télécharger cette version'}
+          </button>
+        </ReleaseVersionCard>;
+      })}
+      {!loading && <button type="button" disabled={busy} onClick={() => setRefresh(value => value + 1)} className="mt-1 h-12 rounded-[14px] text-[14.5px] font-bold text-zinc-300 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)] active:bg-white/5">Relancer la recherche</button>}
+    </div>
+  </DialogLayer>;
 }
