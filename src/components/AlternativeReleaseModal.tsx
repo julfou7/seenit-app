@@ -93,6 +93,13 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
         inFlight.current = false; if (mounted.current) setSending(false);
         return;
       }
+      // Revue Codex #1070 : le remplaçant est suivi comme tout envoi (visible aussitôt dans « En cours »).
+      const requestId = beginDownloadRequest({ title: item.movieTitle || item.seriesTitle || item.title,
+        mediaType: item.mediaType, tmdbId: item.tmdbId, posterPath: item.posterPath, backdropPath: item.backdropPath,
+        seasonNumber: session.scope.seasonNumber, episodeNumber: session.scope.episodeNumber,
+        downloadClient: item.mediaType === 'movie' ? 'Radarr' : 'Sonarr', releaseTitle: candidate.title });
+      updateDownloadRequest(requestId, { quality: candidate.quality, downloadId: candidate.infoHash });
+      acceptDownloadRequest(requestId, 'Version choisie envoyée au client', 'queued');
       // Revue Codex #1070 : chaque annulation est vérifiée ; un ancien transfert resté actif est signalé, jamais caché.
       let kept = 0;
       for (const download of replaced) if (!(await useLiveDownloadStore.getState().removeDownload(download))) kept++;

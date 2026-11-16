@@ -42,6 +42,9 @@ test('remplacer une version : accessible pendant le transfert, annulation vérif
   const screen = readFileSync('src/components/AlternativeReleaseModal.tsx', 'utf8');
   assert.match(screen, /if \(!\(await useLiveDownloadStore\.getState\(\)\.removeDownload\(download\)\)\) kept\+\+;/);
   assert.match(screen, /kept \? 'error' : 'success'/, 'jamais « remplacée » si l’ancien continue');
+  assert.match(screen, /suivi comme tout envoi[\s\S]*?beginDownloadRequest\([\s\S]*?acceptDownloadRequest\(requestId/, 'le remplaçant est suivi');
+  const store = readFileSync('src/store/liveDownloadStoreCore.ts', 'utf8');
+  assert.match(store, /if \(cancelledHash && remoteHash && cancelledHash !== remoteHash\) return false;/, 'l’annulation de l’ancien ne masque pas un autre infohash');
 });
 
 // Retour terrain du 16/11 (v1.4.325, « Autre version » : une fine barre vide par version) : dans la liste en colonne
