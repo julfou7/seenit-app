@@ -9,7 +9,8 @@ export interface QbitTrackerEntry { url?: unknown; status?: unknown; msg?: unkno
 // tracker, même au statut « ne fonctionne pas », ne prouve pas que le téléchargement est interdit.
 // Revue Codex #1072 : « ratio » et « credit » sont des mots entiers (« Operation timed out » n'est pas un refus).
 const RATIO = /\bratio\b|\bcredits?\b|\bcrédits?\b/i;
-const REFUSAL = /\bratio\b|\bcredits?\b|\bcrédits?\b|not allowed|non autoris|interdit|bloqu|blocked|banned|unregistered|not registered|torrent not found|introuvable/i;
+// Revue Codex #1072 : suspensions et bannissements passent aussi le filtre (« Your account has been suspended »).
+const REFUSAL = /\bratio\b|\bcredits?\b|\bcrédits?\b|bann|suspen|not allowed|non autoris|interdit|bloqu|blocked|banned|unregistered|not registered|torrent not found|introuvable/i;
 
 export function trackerRefusal(trackers: unknown): string | null {
   if (!Array.isArray(trackers)) return null;

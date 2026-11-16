@@ -359,6 +359,7 @@ async function fetchQbitTorrentQueue(config: SonarrRadarrConfig): Promise<unknow
 // des trackers d'un torrent à l'arrêt est relu au plus une fois par minute et par torrent (5 torrents par relecture).
 const trackerNotes = new Map<string, { at: number; note: string | null }>();
 const TRACKER_NOTE_TTL_MS = 60_000;
+const TRACKER_NOTE_MAX_AGE_MS = 3 * TRACKER_NOTE_TTL_MS;
 const STOPPED_STATES = new Set(['stalledDL', 'metaDL', 'downloading', 'forcedDL', 'queuedDL']);
 
 async function fetchTrackerRefusals(config: SonarrRadarrConfig, torrents: unknown[]): Promise<Map<string, string>> {
@@ -378,7 +379,11 @@ async function fetchTrackerRefusals(config: SonarrRadarrConfig, torrents: unknow
     const note = trackerRefusal(await qbitGet(config, `/api/v2/torrents/trackers?hash=${encodeURIComponent(hashOf(key))}`));
     trackerNotes.set(key, { at: now, note });
   }));
-  for (const key of stopped) { const note = trackerNotes.get(key)?.note; if (note) notes.set(hashOf(key), note); }
+  // Revue Codex #1072 : une note que les relectures n'ont pas pu confirmer depuis 3 minutes n'est plus rendue.
+  for (const key of stopped) {
+    const cached = trackerNotes.get(key);
+    if (cached?.note && now - cached.at <= TRACKER_NOTE_MAX_AGE_MS) notes.set(hashOf(key), cached.note);
+  }
   return notes;
 }
 

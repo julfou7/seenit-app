@@ -15,6 +15,8 @@ test('refus du tracker lu dans qBittorrent et expliqué en français', () => {
   assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 4, msg: 'Download not allowed for this torrent' }]), 'Bloqué par le tracker : téléchargement refusé.', 'jamais le texte brut anglais');
   assert.equal(trackerRefusal([{ url: 'udp://public.example:1337', status: 4, msg: 'Connection timed out' }]), null, 'revue Codex #1072 : une panne n’est pas un refus');
   assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 2, msg: 'Bienvenue !' }]), null, 'message anodin d’un tracker qui fonctionne : rien');
+  for (const msg of ['Your account has been suspended', 'Votre compte est banni'])
+    assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 4, msg }]), 'Bloqué par le tracker : compte suspendu.', `revue Codex #1072 : « ${msg} »`);
   for (const msg of ['Operation timed out', 'Operation canceled', 'Connection refused', 'Configuration error'])
     assert.equal(trackerRefusal([{ url: 'udp://public.example:1337', status: 4, msg }]), null, `revue Codex #1072 : « ${msg} » n’est pas un refus`);
   assert.equal(trackerRefusal([{ url: '** [PeX] **', status: 4, msg: 'ratio' }]), null, 'DHT/PeX/LSD ignorés');
@@ -31,7 +33,7 @@ test('le suivi qBittorrent relit les trackers d’un torrent à l’arrêt, au p
   const live = readFileSync('src/services/sonarrRadarrLive.ts', 'utf8');
   assert.match(live, /const TRACKER_NOTE_TTL_MS = 60_000;/);
   assert.match(live, /\.sort\(\(a, b\) => \(trackerNotes\.get\(a\)\?\.at \?\? 0\) - \(trackerNotes\.get\(b\)\?\.at \?\? 0\)\)\.slice\(0, 5\)/, 'revue Codex #1072 : rotation, jamais toujours les 5 mêmes');
-  assert.match(live, /for \(const key of stopped\) \{ const note = trackerNotes\.get\(key\)\?\.note;/, 'notes valides rendues pour tous');
+  assert.match(live, /if \(cached\?\.note && now - cached\.at <= TRACKER_NOTE_MAX_AGE_MS\) notes\.set\(hashOf\(key\), cached\.note\);/, 'notes valides rendues pour tous, jamais une note périmée');
   assert.match(live, /`\$\{buildQbitSessionScopeKey\(auth\.currentUser\?\.uid, cleanUrl\(config\.qbittorrentUrl \|\| ''\), config\.qbittorrentUsername\)\}\|\$\{String\(torrent\.hash\)\}`/, 'revue Codex #1072 : note propre à la connexion qBittorrent');
   assert.match(live, /qbitGet\(config, `\/api\/v2\/torrents\/trackers\?hash=\$\{encodeURIComponent\(hashOf\(key\)\)\}`\)/);
   assert.match(live, /const trackerNote = !isQbitError && !isDone \? refusals\.get\(String\(t\.hash\)\) : undefined;/);
