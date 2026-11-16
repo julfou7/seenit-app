@@ -79,6 +79,12 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   const searchRequestRef = useRef(0);
   const sendInFlightRef = useRef(false);
 
+  // Retour terrain du 16/11 : onglet ouvert, un nouveau transfert apparaît en quelques secondes (pas 30 s).
+  useEffect(() => {
+    useLiveDownloadStore.getState().setDownloadsScreenOpen(true);
+    return () => useLiveDownloadStore.getState().setDownloadsScreenOpen(false);
+  }, []);
+
   const [viewMode, setViewMode] = useState<ViewMode>('downloads');
   const [programmedRefresh, setProgrammedRefresh] = useState(0);
   useTabShortcut(navigationShortcut, () => {

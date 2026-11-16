@@ -1010,7 +1010,11 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   Depuis la v1.4.322 : un import bloqué faute de place (transfert terminé) propose « Relancer l'import » — Sonarr/Radarr
   réimportent ce téléchargement exact, après vérification qu'il y a désormais assez de place (sinon « Il manque encore
   … ») ; une relance qui trouve le fichier déjà là se ferme (« Déjà disponible : rien n'a été lancé »), sans carte « À
-  régler » ; la carte de saison d'« En cours » apparaît dès un seul épisode. Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
+  régler » ; la carte de saison d'« En cours » apparaît dès un seul épisode. Depuis la v1.4.324 : onglet Télécharger
+  ouvert, un nouveau transfert apparaît en quelques secondes (relecture toutes les 3 s sans transfert actif, chaque
+  seconde sinon ; 30 s ailleurs dans l'app) ; « Annuler la programmation » d'un film sans fichier le supprime de
+  Radarr (« Retiré de Radarr. », aucun fichier effacé) — un film avec fichier et un épisode perdent seulement leur
+  surveillance. Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
   les épisodes demandés depuis SeenIt la rejoignent (sorties à venir puis recherchés) et gardent leur demande (✕ d'une
   ligne = annuler l'attente, « Relancer la recherche » dans ⋯). La section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni

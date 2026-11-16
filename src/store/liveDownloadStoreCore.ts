@@ -56,6 +56,8 @@ interface LiveDownloadState {
   fetchDownloads: () => Promise<void>;
   startPolling: (intervalMs?: number) => void;
   stopPolling: () => void;
+  /** Onglet Télécharger ouvert : un nouveau transfert apparaît en quelques secondes (retour du 16/11). */
+  setDownloadsScreenOpen: (open: boolean) => void;
   addOptimisticDownload: (item: Partial<LiveDownloadItem> & { title: string; mediaType: 'tv' | 'movie' }) => string;
   updateDownloadRequest: (id: string, patch: Partial<LiveDownloadItem>) => void;
   removeDownload: (item: LiveDownloadItem) => Promise<boolean>;
@@ -68,6 +70,15 @@ interface LiveDownloadState {
 
 let pollingTimer: ReturnType<typeof setTimeout> | null = null;
 let pollingIntervalMs = 1000;
+/**
+ * Retour terrain du 16/11 (« La Guerre des mondes » vu à 0 % puis à 31 %) : sans transfert actif, la relecture n'avait lieu
+ * que toutes les 30 s ; un téléchargement lancé dans qBittorrent apparaissait déjà avancé. Onglet Télécharger ouvert :
+ * relecture toutes les DOWNLOADS_SCREEN_IDLE_MS, puis chaque seconde dès qu'un transfert est actif.
+ */
+export const DOWNLOADS_SCREEN_IDLE_MS = 3_000;
+let downloadsScreenOpen = false;
+let pollGeneration = 0;
+let restartPollingLoop: (() => void) | null = null;
 let activeFetchPromise: Promise<void> | null = null;
 let downloadScopeEpoch = 0;
 let activeDownloadStorageUid: string | null = null;
@@ -1137,8 +1148,10 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
         clearPollingTimer();
         set({ isPolling: true });
 
-        const scheduleNext = () => {
-          if (!get().isPolling) return;
+        // Une seule boucle vivante : une relance (ouverture de l'onglet) passe à la génération suivante et la boucle
+        // précédente s'arrête d'elle-même, même si une lecture était en vol.
+        const scheduleNext = (generation: number) => {
+          if (!get().isPolling || generation !== pollGeneration) return;
           const downloads = get().downloads || [];
           const hasActive = downloads.some(item =>
             item.status !== 'completed'
@@ -1153,15 +1166,29 @@ export const useLiveDownloadStore = create<LiveDownloadState>()(
             ? 15_000
             : hasActive
               ? pollingIntervalMs
-              : 30_000;
+              : downloadsScreenOpen ? DOWNLOADS_SCREEN_IDLE_MS : 30_000;
 
           pollingTimer = setTimeout(async () => {
             await get().fetchDownloads();
-            scheduleNext();
+            scheduleNext(generation);
           }, delay);
         };
 
-        void get().fetchDownloads().finally(scheduleNext);
+        restartPollingLoop = () => {
+          clearPollingTimer();
+          const generation = ++pollGeneration;
+          void get().fetchDownloads().finally(() => scheduleNext(generation));
+        };
+        restartPollingLoop();
+      },
+
+      setDownloadsScreenOpen: open => {
+        const opened = open && !downloadsScreenOpen;
+        downloadsScreenOpen = open;
+        // À l'ouverture : relecture immédiate et nouveau rythme, dans la même boucle (jamais une seconde).
+        if (!opened) return;
+        if (get().isPolling && restartPollingLoop) restartPollingLoop();
+        else get().startPolling(1000);
       },
 
       stopPolling: () => {

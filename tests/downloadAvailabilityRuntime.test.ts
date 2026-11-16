@@ -52,7 +52,7 @@ async function fixture(storage = new Map<string, string>()) {
     };
     export const executePost=async url=>{s.posts.push(url);throw Error('POST inattendu');};
     export const executeArrInteractiveGet=executeGet;export const executeArrInteractivePost=executePost;
-    export const executeDelete=async()=>{throw Error('DELETE inattendu')};
+    export const executeDelete=async url=>{const path=url.split('/api/v3/')[1];if(!path.startsWith('movie/')||!path.endsWith('?deleteFiles=false'))throw Error('DELETE inattendu '+path);(s.deletes||(s.deletes=[])).push(path);s.movies=s.movies.filter(m=>'movie/'+m.id+'?deleteFiles=false'!==path);};
     export const loginQBittorrent=async()=>({success:true});export const resolveQualityProfileId=()=>1;
     export const isLocalNetworkUrl=()=>true;`;
   const runtime = await bundleDownloadRuntime(`
@@ -278,7 +278,9 @@ test('annuler l’attente arrête la surveillance exacte sans supprimer un fichi
   releaseQueue?.();
   await inFlightPoll;
   state.queueGate = null;
-  assert.equal(state.movies[0].monitored, false);
+  // Retour du 16/11 — revue Codex #1067 : film sans fichier retiré de Radarr (aucun fichier effacé).
+  assert.equal(state.movies.length, 0);
+  assert.deepEqual((state as { deletes?: string[] }).deletes?.map(path => path.endsWith('?deleteFiles=false')), [true]);
   assert.equal(runtime.store.getState().downloads.length, 0);
   assert.equal(state.queueDeletes.length, 0);
   await runtime.store.getState().fetchDownloads();
@@ -302,4 +304,18 @@ test('un choix manuel remplace l’attente par une seule nouvelle intention', as
   assert.equal(runtime.store.getState().downloads.length, 1);
   assert.equal(runtime.store.getState().downloads[0].status, 'submitting');
   assert.notEqual(runtime.store.getState().downloads[0].requestId, id);
+});
+
+// Retour terrain du 16/11 (« La Guerre des mondes » resté dans Radarr en non surveillé) — revue Codex #1067 : annuler
+// l'attente d'un film sans fichier le retire de Radarr, sans effacer de fichier ; un film avec fichier reste.
+test('annuler l’attente d’un film sans fichier le retire de Radarr, jamais un film avec fichier', async () => {
+  for (const hasFile of [false, true]) {
+    const { runtime, state } = await fixture();
+    state.movies[0].hasFile = hasFile;
+    await runtime.cancelArrAvailabilityWatch(watch);
+    const deletes = (state as { deletes?: string[] }).deletes || [];
+    assert.equal(deletes.length, hasFile ? 0 : 1);
+    assert.ok(deletes.every(path => /^movie\/\d+\?deleteFiles=false$/.test(path)), 'jamais de fichier effacé');
+    assert.equal(state.movies.length, hasFile ? 1 : 0, hasFile ? 'film avec fichier gardé' : 'film sans fichier retiré');
+  }
 });

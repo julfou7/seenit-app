@@ -2,7 +2,7 @@ import { auth } from '../lib/firebase';
 import { tmdb } from '../features/shows/tmdb';
 import { resolveCanonicalSeriesBridge } from '../features/downloads/sonarrCanonicalIdentity';
 import type { DownloadAvailability } from '../features/downloads/downloadAvailability';
-import { cleanUrl, executeGet, executePut } from './sonarrRadarrTransport';
+import { cleanUrl, executeDelete, executeGet, executePut } from './sonarrRadarrTransport';
 
 interface WatchScope {
   ownerUid: string | undefined;
@@ -103,4 +103,13 @@ export async function enableArrAvailabilityWatch(scope: WatchScope): Promise<Dow
 
 export async function cancelArrAvailabilityWatch(scope: WatchScope): Promise<void> {
   await updateWatch(scope, false);
+  // Retour terrain du 16/11 (« La Guerre des mondes » resté dans Radarr en non surveillé) — revue Codex #1067 : une
+  // attente de film annulée dont le film n'a aucun fichier le retire de Radarr (aucun fichier effacé).
+  if (scope.service !== 'radarr') return;
+  const base = cleanUrl(scope.url);
+  const headers = { 'X-Api-Key': scope.apiKey, 'Content-Type': 'application/json' };
+  const movies = records(await executeGet(`${base}/api/v3/movie`, headers)).filter(item => Number(item.tmdbId) === Number(scope.tmdbId));
+  if (movies.length !== 1 || !positiveId(movies[0].id) || movies[0].hasFile !== false) return;
+  if (auth.currentUser?.uid !== scope.ownerUid) throw new Error('Le compte a changé.');
+  await executeDelete(`${base}/api/v3/movie/${movies[0].id}?deleteFiles=false`, headers);
 }

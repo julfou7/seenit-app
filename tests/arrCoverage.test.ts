@@ -9,7 +9,7 @@ const bundle = await build({ entryPoints: ['src/features/downloads/arrCoverage.t
     builder.onResolve({ filter: /\/(?:sonarrRadarr|sonarrRadarrTransport|downloadFeatureVisibility)$/ }, args => ({ path: args.path.split('/').at(-1) || '', namespace: 'ports' }));
     builder.onLoad({ filter: /.*/, namespace: 'ports' }, args => ({ contents: args.path === 'sonarrRadarr'
       ? 'export const cleanUrl=u=>String(u);export const executeGet=async()=>{throw new Error("réseau réel interdit")};export const executeDelete=executeGet;'
-      : args.path === 'sonarrRadarrTransport' ? 'export const executePut=async()=>{throw new Error("réseau réel interdit")};export const executeArrInteractiveGet=executePut;'
+      : args.path === 'sonarrRadarrTransport' ? 'export const executePut=async()=>{throw new Error("réseau réel interdit")};export const executeArrInteractiveGet=executePut;export const executeDelete=executePut;'
       : 'export const isDownloadFeatureEnabled=()=>true;' }));
   } }] });
 type Pending = { kind: 'series' | 'movie'; key: string; arrId: number; tmdbId?: number; title: string; date: number; monitored: boolean; episodes?: []; release?: Record<string, unknown>; profileId?: number };
