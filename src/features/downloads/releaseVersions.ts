@@ -64,7 +64,7 @@ export const hasFrenchAudio = (language: ReleaseLanguage) => language === 'Fran�
  * ont une piste française, dans la qualité préférée et hors Light ; à défaut, la mieux partagée.
  * Les autres suivent par nombre de sources décroissant. Aucune version n'est masquée ici.
  */
-export function describeReleases<T extends ReleaseLike>(releases: readonly T[], preferred: '1080p' | '4k' = '1080p', now = Date.now()): DescribedRelease<T>[] {
+export function describeReleases<T extends ReleaseLike>(releases: readonly T[], preferred: '1080p' | '4k' = '1080p', now = Date.now(), fits?: (release: T) => boolean): DescribedRelease<T>[] {
   const described = releases.map(release => {
     const created = release.createdAt ? Date.parse(release.createdAt) : NaN;
     return {
@@ -78,7 +78,10 @@ export function describeReleases<T extends ReleaseLike>(releases: readonly T[], 
     };
   }).sort((a, b) => (Number(b.release.seeders) || 0) - (Number(a.release.seeders) || 0));
   const target = preferred === '4k' ? '4K' : '1080p';
-  const best = described.find(entry => entry.quality === target && hasFrenchAudio(entry.language) && !entry.light) ?? described[0];
+  const ideal = (entry: typeof described[number]) => entry.quality === target && hasFrenchAudio(entry.language) && !entry.light;
+  // #1076 : la conseillée tient sur le disque de destination quand une telle version existe.
+  const fitting = fits ? described.filter(entry => fits(entry.release)) : described;
+  const best = fitting.find(ideal) ?? fitting[0] ?? described.find(ideal) ?? described[0];
   if (best) best.recommended = true;
   return best ? [best, ...described.filter(entry => entry !== best)] : described;
 }

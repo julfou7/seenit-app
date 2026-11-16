@@ -20,6 +20,7 @@ import { releaseVariantLabel } from '../features/downloads/releaseQuality';
 import { releaseBadges } from '../features/downloads/releaseBadges';
 import { changeProgrammedQuality } from '../features/downloads/programmedCalendar';
 import { notifyArrWrite } from '../store/arrSyncStore';
+import { destinationDisk, spaceShortfall, useDiskStatus } from '../features/downloads/arrDiskStatus';
 
 type AlternativeRelease = ReleaseLike & { candidate: ManualReleaseCandidate & { current: boolean }; reasons: string[] };
 
@@ -87,7 +88,9 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     reasons: candidate.selectable || (session?.target && autoProfileSwitchFor(candidate.rejections)) ? [] : frenchRejections(candidate.rejections),
   })), [session, item]);
   const shared = useMemo(() => commonRejections(releases.map(release => release.reasons)), [releases]);
-  const versions = useMemo(() => describeReleases(releases, preferred), [releases, preferred]);
+  // #1076 : espace libre du disque où Sonarr/Radarr importera ; la conseillée tient dessus si possible.
+  const disk = destinationDisk(useDiskStatus(config) || [], item.mediaType);
+  const versions = useMemo(() => describeReleases(releases, preferred, undefined, release => !spaceShortfall(disk, release.size)), [releases, preferred, disk]);
   // La version actuelle, si la recherche la retrouve, passe en tête de liste.
   const visible = versions.filter(entry => matchesVersionFilter(entry, filter))
     .sort((a, b) => Number(b.release.candidate.current) - Number(a.release.candidate.current));
@@ -254,12 +257,13 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
         const own = release.reasons.filter(reason => !shared.includes(reason));
         const switchTo = autoSwitch(candidate);
         const switchLabel = switchTo === '4k' ? '4K' : '1080p';
-        return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} current={candidate.current} onToggle={() => setOpen(isOpen ? null : release.id)}
+        const tooBig = candidate.current ? undefined : spaceShortfall(disk, release.size);
+        return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} current={candidate.current} spaceWarning={tooBig} onToggle={() => setOpen(isOpen ? null : release.id)}
           details={candidate.indexer}>
           {own.length > 0 && <p data-rejection className="text-[13px] text-amber-300">{own.join(' · ')}</p>}
           {switchTo && !candidate.current && <p data-auto-switch className="text-[13px] text-zinc-300">Le titre passera en {switchLabel} pour l’accepter.</p>}
           <button type="button" disabled={(!candidate.selectable && !switchTo) || candidate.current || busy || submitted} onClick={() => void submit(candidate)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40">
-            {sending && <Loader2 size={18} className="animate-spin" />}{candidate.current ? 'Version actuelle' : sending ? 'Envoi…' : activeInScope ? 'Remplacer par cette version' : 'Télécharger cette version'}
+            {sending && <Loader2 size={18} className="animate-spin" />}{candidate.current ? 'Version actuelle' : sending ? 'Envoi…' : activeInScope ? (tooBig ? 'Remplacer quand même' : 'Remplacer par cette version') : tooBig ? 'Télécharger quand même' : 'Télécharger cette version'}
           </button>
         </ReleaseVersionCard>;
       })}

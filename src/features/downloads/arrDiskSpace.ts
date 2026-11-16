@@ -60,6 +60,28 @@ export function lowFreeSpace(roots: DiskRules['roots'], path?: string): number |
 /** « 1,2 Go » */
 export const formatFreeSpace = (bytes: number) => `${(Math.max(0, bytes) / 1024 ** 3).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Go`;
 
+type DestinationDisk = { label: string; freeSpace: number; services?: string[] };
+
+/** Disque où Sonarr (série) ou Radarr (film) importe, seulement s'il est certain : le service n'en utilise qu'un. */
+export function destinationDisk<T extends DestinationDisk>(disks: readonly T[], mediaType: 'tv' | 'movie'): T | undefined {
+  const service = mediaType === 'tv' ? 'Sonarr' : 'Radarr';
+  const used = disks.filter(disk => disk.services?.includes(service));
+  return used.length === 1 ? used[0] : undefined;
+}
+
+/** Marge laissée libre à l'import (réglage par défaut de Sonarr/Radarr : 100 Mo). */
+export const IMPORT_MARGIN_BYTES = 100 * 1024 ** 2;
+
+/**
+ * #1076 (audit du 16/11, Dexter S02E02 bloqué à l'import faute de place) : une version plus grosse que l'espace
+ * libre du disque de destination est signalée avant l'envoi. Taille ou disque inconnus : rien n'est affirmé.
+ */
+export function spaceShortfall(disk: DestinationDisk | undefined, sizeBytes: number): string | undefined {
+  const size = Number(sizeBytes);
+  if (!disk || !(size > 0) || size + IMPORT_MARGIN_BYTES <= disk.freeSpace) return undefined;
+  return `Pas assez de place : ${formatFreeSpace(size)} pour ${formatFreeSpace(disk.freeSpace)} libres sur ${disk.label}`;
+}
+
 /** Vrai seulement si chaque version acceptable serait refusée faute de place. */
 export function proveDiskFull(rules: DiskRules | null, target: { path?: string; runtime?: number; profileId?: number; special?: boolean }): boolean {
   // Revue Codex #1049 : Sonarr n'applique pas de taille minimale aux spéciaux (saison 0) ; rien n'y est prouvable.
