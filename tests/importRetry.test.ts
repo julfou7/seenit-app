@@ -28,7 +28,8 @@ test('relancer l’import d’un téléchargement terminé bloqué faute de plac
   await retry.retryImport({ sonarrUrl: 'http://nas:8989/', sonarrApiKey: 's' }, blocked, async (url, body) => { posts.push([url, body]); return {}; });
   assert.deepEqual(posts, [['http://nas:8989/api/v3/command', { name: 'DownloadedEpisodesScan', path: blocked.transferPath, downloadClientId: blocked.downloadId.toUpperCase(), importMode: 'Auto' }]]);
   assert.ok(isAllowedServiceProxyPath(posts[0][0], 'POST'));
-  // Place insuffisante : il manque la taille du fichier plus 100 Mo de marge.
+  // Place insuffisante : seul l'impossible est bloqué (revue Codex #1064 : la marge configurée reste à Sonarr).
+  assert.equal(retry.missingSpace(blocked, 1.5 * gib + 50 * 1024 ** 2), 0, 'taille + 50 Mo : relance envoyée');
   assert.equal(retry.missingSpace(blocked, 0.9 * gib) > 0, true);
   assert.equal(retry.missingSpace(blocked, 3 * gib), 0);
   assert.match(retry.missingSpaceMessage(0.7 * gib), /^Il manque encore 0,7 Go sur le disque/);

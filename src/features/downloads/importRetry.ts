@@ -28,8 +28,9 @@ const arrDownloadId = (id: string) => /^[0-9a-f]{40}$/i.test(id) ? id.toUpperCas
 /** Espace manquant avant de relancer (octets), si le disque de destination est connu. */
 export function missingSpace(item: LiveDownloadItem, freeSpace?: number): number {
   if (freeSpace === undefined || !(Number(item.size) > 0)) return 0;
-  // Marge de 100 Mo, comme le minimum par défaut de Sonarr/Radarr à l'import.
-  return Math.max(0, Number(item.size) + 100 * 1024 ** 2 - freeSpace);
+  // Revue Codex #1064 : seul l'impossible est bloqué (moins de place que le fichier) ; la marge configurée dans
+  // Sonarr/Radarr (éventuellement abaissée ou ignorée) reste leur décision.
+  return Math.max(0, Number(item.size) - freeSpace);
 }
 
 export const missingSpaceMessage = (missing: number) => `Il manque encore ${formatFreeSpace(missing)} sur le disque : libère de la place puis relance l’import.`;
