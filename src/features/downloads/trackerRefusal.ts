@@ -30,6 +30,37 @@ export function trackerRefusal(trackers: unknown): string | null {
   return null;
 }
 
+export type TrackerNoteCache = Map<string, { at: number; note: string | null }>;
+export const TRACKER_NOTE_TTL_MS = 60_000;
+export const TRACKER_NOTE_MAX_AGE_MS = 3 * TRACKER_NOTE_TTL_MS;
+export const TRACKER_READS_PER_PASS = 5;
+const STOPPED_STATES = new Set(['stalledDL', 'metaDL', 'downloading', 'forcedDL', 'queuedDL']);
+
+/**
+ * Notes de refus des torrents à l'arrêt, par hash (#1078 : extrait du suivi qBittorrent pour être testé en exécution).
+ * Règles de la revue Codex #1072 :
+ * - une note appartient à une connexion (`scope` : UID, URL, utilisateur), jamais réutilisée pour une autre ;
+ * - une note de moins d'une minute est rendue sans relecture ; au plus 5 relectures par passage, les plus anciennes
+ *   (jamais lues d'abord) : au-delà de 5 torrents, chacun finit par être relu ;
+ * - une note que les relectures n'ont pas pu confirmer depuis 3 minutes n'est plus rendue.
+ */
+export async function collectTrackerRefusals(cache: TrackerNoteCache, torrents: readonly unknown[], scope: string,
+  readTrackers: (hash: string) => Promise<unknown>, now = Date.now()): Promise<Map<string, string>> {
+  const stopped = torrents.map(torrent => torrent as { hash?: string; state?: string; dlspeed?: number; progress?: number })
+    .filter(torrent => torrent.hash && STOPPED_STATES.has(String(torrent.state)) && !(Number(torrent.dlspeed) > 0) && Number(torrent.progress || 0) < 0.995)
+    .map(torrent => ({ hash: String(torrent.hash), key: `${scope}|${String(torrent.hash)}` }));
+  const stale = stopped.filter(({ key }) => { const cached = cache.get(key); return !cached || now - cached.at > TRACKER_NOTE_TTL_MS; })
+    // Un torrent jamais lu passe toujours avant un torrent déjà lu, quelle que soit la date de lecture (#1078).
+    .sort((a, b) => (cache.get(a.key)?.at ?? -Infinity) - (cache.get(b.key)?.at ?? -Infinity)).slice(0, TRACKER_READS_PER_PASS);
+  await Promise.allSettled(stale.map(async ({ hash, key }) => { cache.set(key, { at: now, note: trackerRefusal(await readTrackers(hash)) }); }));
+  const notes = new Map<string, string>();
+  for (const { hash, key } of stopped) {
+    const cached = cache.get(key);
+    if (cached?.note && now - cached.at <= TRACKER_NOTE_MAX_AGE_MS) notes.set(hash, cached.note);
+  }
+  return notes;
+}
+
 /** Explication et action proposées sur la carte « À régler ». */
 export function trackerRefusalHint(message: string): string {
   if (/ratio insuffisant/.test(message)) return 'Ton ratio sur ce tracker est trop bas : le téléchargement reprendra quand tu auras assez partagé ou acheté du crédit de téléchargement. Tu peux aussi choisir une version d’un autre tracker.';

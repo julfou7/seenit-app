@@ -21,6 +21,7 @@ import { releaseBadges } from '../features/downloads/releaseBadges';
 import { changeProgrammedQuality } from '../features/downloads/programmedCalendar';
 import { notifyArrWrite } from '../store/arrSyncStore';
 import { destinationDisk, spaceShortfall, useDiskStatus } from '../features/downloads/arrDiskStatus';
+import { planReplacement } from '../features/downloads/releaseReplacement';
 
 type AlternativeRelease = ReleaseLike & { candidate: ManualReleaseCandidate & { current: boolean }; reasons: string[] };
 
@@ -144,19 +145,11 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     // Un envoi change l'état du titre : le résultat mémorisé n'est plus à jour.
     recentSearches.clear();
     const withNote = (text: string) => note ? `${note} · ${text}` : text;
-    // Revue Codex #1070 : seuls les transferts que la version choisie couvre sont remplacés — un épisode seul n'annule
-    // jamais le pack de saison ni les autres épisodes en cours ; une couverture inconnue n'annule rien.
-    const covers = (download: LiveDownloadItem) => item.mediaType === 'movie' || candidate.episodes === 'season'
-      || (download.episodeNumber != null && Array.isArray(candidate.episodes) && candidate.episodes.includes(Number(download.episodeNumber)));
-    // Revue Codex #1070 : la version choisie, si elle est déjà en cours, n'est jamais annulée.
-    const replaced = useLiveDownloadStore.getState().downloads.filter(download => hasActiveDownloadInScope([download], session.scope)
-      && covers(download) && !(candidate.infoHash && samePhysicalDownload(download, { downloadId: candidate.infoHash })));
-    // Revue Codex #1070 : une demande pas encore confiée au client ne peut pas être annulée à distance de façon prouvée.
-    // (même règle que `deleteLiveDownloadItem` : seuls les transferts Sonarr, Radarr ou qBittorrent s'annulent à distance).
-    if (replaced.some(download => !/^(sonarr|radarr|qbit)_/.test(download.id))) {
-      setError('La demande en cours n’est pas encore chez le client : attends qu’elle apparaisse dans « En cours » pour la remplacer.');
-      return;
-    }
+    // Transferts remplacés : couverture d'épisodes, version déjà en cours épargnée, demande pas encore chez le client
+    // refusée (revue Codex #1070) — logique testée en exécution dans `releaseReplacement.ts` (#1078).
+    const plan = planReplacement(useLiveDownloadStore.getState().downloads, { ...session.scope, mediaType: item.mediaType }, candidate);
+    if (plan.kind === 'blocked') { setError(plan.reason); return; }
+    const replaced = plan.kind === 'replace' ? plan.replaced : [];
     try { assertManualReleaseSearchCurrent(session); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Relance la recherche.'); return; }
     inFlight.current = true; setSending(true); setSubmitted(true); setError('');

@@ -10,7 +10,7 @@ import { auth } from '../lib/firebase';
 import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope';
 import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
 import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
-import { trackerRefusal } from '../features/downloads/trackerRefusal';
+import { collectTrackerRefusals, type TrackerNoteCache } from '../features/downloads/trackerRefusal';
 import { noSourceMessage, noSourceSeconds } from '../features/downloads/noSourceStall';
 import { isSafeMagnetLink } from '../features/downloads/magnetLink';
 import {
@@ -358,34 +358,13 @@ async function fetchQbitTorrentQueue(config: SonarrRadarrConfig): Promise<unknow
 
 // Retour terrain du 16/11 (« bloqué faute de ratio, SeenIt montre un téléchargement à 0 % sans explication ») : le message
 // des trackers d'un torrent à l'arrêt est relu au plus une fois par minute et par torrent (5 torrents par relecture).
-const trackerNotes = new Map<string, { at: number; note: string | null }>();
-const TRACKER_NOTE_TTL_MS = 60_000;
-const TRACKER_NOTE_MAX_AGE_MS = 3 * TRACKER_NOTE_TTL_MS;
-const STOPPED_STATES = new Set(['stalledDL', 'metaDL', 'downloading', 'forcedDL', 'queuedDL']);
+// La mémoire et ses règles (revue Codex #1072) sont dans `trackerRefusal.ts`, testées en exécution (#1078).
+const trackerNotes: TrackerNoteCache = new Map();
 
-async function fetchTrackerRefusals(config: SonarrRadarrConfig, torrents: unknown[]): Promise<Map<string, string>> {
-  const notes = new Map<string, string>();
-  const now = Date.now();
-  const stopped = torrents.map(torrent => torrent as { hash?: string; state?: string; dlspeed?: number; progress?: number })
-    .filter(torrent => torrent.hash && STOPPED_STATES.has(String(torrent.state)) && !(Number(torrent.dlspeed) > 0) && Number(torrent.progress || 0) < 0.995)
-    // Revue Codex #1072 : une note appartient à une connexion (UID, URL, utilisateur) — jamais réutilisée pour un autre
-    // serveur ou compte qBittorrent qui aurait le même torrent.
-    .map(torrent => `${buildQbitSessionScopeKey(auth.currentUser?.uid, cleanUrl(config.qbittorrentUrl || ''), config.qbittorrentUsername)}|${String(torrent.hash)}`);
-  // Revue Codex #1072 : les notes encore valides sont rendues pour tous ; seules les plus anciennes (jamais lues
-  // d'abord) sont relues, 5 par passage — les torrents suivants finissent toujours par être interrogés.
-  const stale = stopped.filter(hash => { const cached = trackerNotes.get(hash); return !cached || now - cached.at > TRACKER_NOTE_TTL_MS; })
-    .sort((a, b) => (trackerNotes.get(a)?.at ?? 0) - (trackerNotes.get(b)?.at ?? 0)).slice(0, 5);
-  const hashOf = (key: string) => key.slice(key.lastIndexOf('|') + 1);
-  await Promise.allSettled(stale.map(async key => {
-    const note = trackerRefusal(await qbitGet(config, `/api/v2/torrents/trackers?hash=${encodeURIComponent(hashOf(key))}`));
-    trackerNotes.set(key, { at: now, note });
-  }));
-  // Revue Codex #1072 : une note que les relectures n'ont pas pu confirmer depuis 3 minutes n'est plus rendue.
-  for (const key of stopped) {
-    const cached = trackerNotes.get(key);
-    if (cached?.note && now - cached.at <= TRACKER_NOTE_MAX_AGE_MS) notes.set(hashOf(key), cached.note);
-  }
-  return notes;
+function fetchTrackerRefusals(config: SonarrRadarrConfig, torrents: unknown[]): Promise<Map<string, string>> {
+  const scope = buildQbitSessionScopeKey(auth.currentUser?.uid, cleanUrl(config.qbittorrentUrl || ''), config.qbittorrentUsername);
+  return collectTrackerRefusals(trackerNotes, torrents, scope,
+    hash => qbitGet(config, `/api/v2/torrents/trackers?hash=${encodeURIComponent(hash)}`));
 }
 
 async function qbitGet(config: SonarrRadarrConfig, path: string): Promise<unknown> {
@@ -576,10 +555,11 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           isRestored: false
             });
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : '';
           recordSourceResult('radarr', config.radarrUrl, false);
-          sourceHealth.radarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Radarr indisponible' };
-          if (!e?.message?.includes('PWA Web')) {
+          sourceHealth.radarr = { configured: true, ok: false, checkedAt: Date.now(), error: message || 'Radarr indisponible' };
+          if (!message.includes('PWA Web')) {
             console.warn('[LiveQueue] Erreur Radarr queue:', e);
           }
         }
