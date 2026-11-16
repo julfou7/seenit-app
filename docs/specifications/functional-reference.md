@@ -1067,7 +1067,9 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   audio VFF/VFQ/MULTI, qualité, taille, seeders et refus, avec filtre audio et scope TV exact. Depuis la v1.4.325
   (« Autre version ») : pleine page, mêmes pastilles (Toutes, 1080p, 4K, Français, VO) et mêmes cartes que « Version
   précise » ; refus de Sonarr/Radarr traduits, une raison commune à toutes les versions dite une fois en tête ;
-  « Passer en 4K / 1080p » quand le profil refuse la qualité (profil appliqué au film ou à la série, recherche relancée). L'utilisateur
+  « Passer en 4K / 1080p » quand le profil refuse la qualité (profil appliqué au film ou à la série, recherche relancée).
+  Depuis la v1.4.327, pendant un téléchargement du même titre, « Remplacer par cette version » envoie la version
+  choisie puis annule l'ancien transfert ; une carte dépliée le reste malgré le rafraîchissement. L'utilisateur
   confirme le seul candidat sélectionné ; fermer ou revenir annule la consultation. Un échec d'envoi
   n'entraîne jamais le lancement d'une autre release. Les cartes du suivi conservent ces badges audio ;
   MULTI/FRENCH seul reste une variante inconnue.

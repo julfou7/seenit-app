@@ -21,6 +21,8 @@ export interface ManualReleaseCandidate {
   indexer: string;
   rejections: string[];
   selectable: boolean;
+  /** Refusée seulement parce qu'un téléchargement du même titre est en cours : la choisir le remplace (retour du 16/11). */
+  replacesQueue?: boolean;
   infoHash?: string;
 }
 export interface ManualReleaseSearch {
@@ -39,6 +41,7 @@ interface Grant {
   submission?: Promise<void>;
 }
 const grants = new WeakMap<ManualReleaseSearch, Grant>();
+const QUEUE_REJECTION = /release in queue|already in (?:the )?queue|in queue already meets cutoff/i;
 function record(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
     ? value as Record<string, unknown> : {};
@@ -122,8 +125,12 @@ export async function searchManualArrReleases(scope: ManualReleaseScope, config:
       && (scope.episodeNumber == null || (!release.fullSeason && (!Array.isArray(release.mappedEpisodeNumbers)
         || release.mappedEpisodeNumbers.length === 0
         || (release.mappedEpisodeNumbers.length === 1 && Number(release.mappedEpisodeNumbers[0]) === scope.episodeNumber))));
+    // Retour terrain du 16/11 (« fichier beaucoup trop gros, je veux une version plus légère alors que le DL a
+    // commencé ») : un refus dû uniquement au téléchargement déjà en file n'empêche pas de choisir — le choix remplace.
+    const queueOnly = rejections.length > 0 && rejections.every(reason => QUEUE_REJECTION.test(reason) || /existing file/i.test(reason))
+      && rejections.some(reason => QUEUE_REJECTION.test(reason));
     const selectable = exactContext && (release.approved === true
-      || (rejections.length > 0 && rejections.every(reason => /existing file/i.test(reason))));
+      || (rejections.length > 0 && rejections.every(reason => /existing file/i.test(reason))) || queueOnly);
     payloads.set(key, { guid, indexerId, ...context });
     if (selectable) selectableKeys.add(key);
     const quality = record(record(release.quality).quality);
@@ -131,6 +138,7 @@ export async function searchManualArrReleases(scope: ManualReleaseScope, config:
       quality: normalizeQualityLabel(title, quality.name), size: Math.max(0, Number(release.size) || 0),
       seeders: Math.max(0, Number(release.seeders) || 0), indexer: String(release.indexer || ''),
       rejections: exactContext ? rejections : ['Identité du résultat incompatible.'], selectable,
+      ...(exactContext && queueOnly ? { replacesQueue: true } : {}),
       infoHash: isStrongTorrentHash(release.infoHash) ? normalizeDownloadClientId(release.infoHash) || undefined : undefined }];
   }).sort((a, b) => Number(b.audio.vff) - Number(a.audio.vff) || b.seeders - a.seeders);
   const targetId = context.movieId || context.seriesId;

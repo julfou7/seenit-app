@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { bundleDownloadRuntime } from './helpers/downloadRuntime.ts';
 
@@ -80,4 +81,22 @@ test('Sonarr conserve le scope épisode spécial exact et refuse une série enti
   await runtime.grabManualArrRelease(session, session.candidates[0].key, 'tv-request');
   assert.deepEqual(f.posts[0], { guid: 'vff', indexerId: 2, seriesId: 4, episodeId: 5 });
   await assert.rejects(runtime.searchManualArrReleases({ mediaType: 'tv', tmdbId: 11 }, config), /saison/);
+});
+
+// Retour terrain du 16/11 (« fichier beaucoup trop gros, je veux une version plus légère alors que le DL a commencé ») :
+// un refus dû uniquement au téléchargement en file laisse la version choisissable — le choix remplace.
+test('refus « déjà en file » : version choisissable qui remplace, les autres refus restent bloquants', async () => {
+  const f = fixture();
+  f.releases.push(
+    { guid: 'light', indexerId: 2, title: 'Exact.MULTI.1080p.Light', approved: false, rejections: ['Quality for release in queue already meets cutoff: WEBRip-1080p v1'], size: 2000, seeders: 50 },
+    { guid: 'profile', indexerId: 2, title: 'Exact.MULTI.2160p', approved: false, rejections: ['WEBDL-2160p is not wanted in profile', 'Quality for release in queue already meets cutoff: WEBRip-1080p v1'], size: 9000, seeders: 50 },
+  );
+  const session = await runtime.searchManualArrReleases(scope, config);
+  const light = session.candidates.find(c => c.title === 'Exact.MULTI.1080p.Light');
+  const profile = session.candidates.find(c => c.title === 'Exact.MULTI.2160p');
+  assert.deepEqual([light?.selectable, light?.replacesQueue], [true, true]);
+  assert.deepEqual([profile?.selectable, profile?.replacesQueue], [false, undefined], 'hors profil : toujours bloquant');
+  const modal = readFileSync('src/components/AlternativeReleaseModal.tsx', 'utf8');
+  assert.match(modal, /if \(replaced\.length\) \{\n\s+try \{\n\s+await grabManualArrRelease\(session, candidate\.key, crypto\.randomUUID\(\)\);[\s\S]*?Le téléchargement en cours continue\.[\s\S]*?for \(const download of replaced\) await useLiveDownloadStore\.getState\(\)\.removeDownload\(download\);/, 'envoi d’abord, annulation de l’ancien ensuite');
+  assert.match(modal, /if \(loading \|\| !session \|\| openedFor\.current === session\) return;/, 'carte dépliée jamais refermée par le rafraîchissement');
 });
