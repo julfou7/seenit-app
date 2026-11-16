@@ -26,7 +26,7 @@ test('un élément déjà en file n’est pas répété dans Programmés, par p�
 test('l’onglet Télécharger passe la file (en cours et en recherche) à Programmés', () => {
   const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
   assert.match(screen, /const queuedDownloads = useMemo\(\(\) => \[\.\.\.activeDownloads, \.\.\.waitingDownloads\]/);
-  assert.match(screen, /<ProgrammedSection [^>]*queued=\{queuedDownloads\}/);
+  assert.match(screen, /<ProgrammedSection [^\n]*?queued=\{queuedDownloads\}/);
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
   assert.match(section, /hideQueuedProgrammed\(hideSeenWanted\(/);
 });
