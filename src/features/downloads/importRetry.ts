@@ -14,7 +14,10 @@ import { formatFreeSpace } from './arrDiskSpace.ts';
 const DISK_FULL = /disque plein|espace de stockage insuffisant|not enough free space|disk is full|no space left/i;
 
 export function canRetryImport(item: LiveDownloadItem): boolean {
-  const done = Number(item.progress) >= 100 || (Number(item.size) > 0 && Number(item.sizeleft) === 0);
+  // Revue Codex #1064 : le pourcentage est arrondi (99,6 % → 100) ; un reste d'octets prime, le pourcentage ne sert
+  // que si la taille est inconnue.
+  const left = Number(item.sizeleft);
+  const done = Number(item.size) > 0 && Number.isFinite(left) ? left <= 0 : Number(item.progress) >= 100;
   return downloadGroup(item) === 'attention' && done && Boolean(item.downloadId && item.transferPath)
     && DISK_FULL.test(`${item.errorMessage || ''} ${item.statusText || ''}`);
 }

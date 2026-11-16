@@ -21,6 +21,7 @@ const blocked = { id: 'q1', mediaType: 'tv' as const, title: 'Dexter : Résurrec
 test('relancer l’import d’un téléchargement terminé bloqué faute de place, jamais une recherche', async () => {
   assert.equal(retry.canRetryImport(blocked), true);
   assert.equal(retry.canRetryImport({ ...blocked, progress: 40, sizeleft: 100 }), false, 'transfert pas fini');
+  assert.equal(retry.canRetryImport({ ...blocked, progress: 100, sizeleft: 40 * 1024 ** 2 }), false, 'revue Codex #1064 : 100 % arrondi mais 40 Mo restants');
   assert.equal(retry.canRetryImport({ ...blocked, errorMessage: 'Recherche impossible : timeout' }), false, 'autre échec');
   assert.equal(retry.canRetryImport({ ...blocked, transferPath: undefined }), false, 'dossier inconnu');
   const posts: Array<[string, unknown]> = [];
