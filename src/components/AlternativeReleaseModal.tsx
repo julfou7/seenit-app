@@ -23,6 +23,10 @@ import { notifyArrWrite } from '../store/arrSyncStore';
 
 type AlternativeRelease = ReleaseLike & { candidate: ManualReleaseCandidate & { current: boolean }; reasons: string[] };
 
+/** Dernières recherches par titre (2 minutes) : rouvrir « Autre version » n'interroge pas de nouveau tous les indexers. */
+const recentSearches = new Map<string, { at: number; session: ManualReleaseSearch }>();
+const RECENT_SEARCH_MS = 2 * 60_000;
+
 const code = (season: number, episode?: number) => `S${String(season).padStart(2, '0')}${episode != null ? `E${String(episode).padStart(2, '0')}` : ''}`;
 
 /**
@@ -51,12 +55,23 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   const mounted = useRef(true);
   const inFlight = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const lastRefresh = useRef(refresh);
   useEffect(() => {
     let current = true;
-    setLoading(true); setError(''); setSession(null); setOpen(null); setSubmitted(false);
-    void searchManualArrReleases({ mediaType: item.mediaType, tmdbId: Number(item.tmdbId),
-      seasonNumber: item.mediaType === 'tv' ? season : undefined, episodeNumber: item.episodeNumber }, config)
-      .then(result => { if (current) setSession(result); })
+    const scope = { mediaType: item.mediaType, tmdbId: Number(item.tmdbId),
+      seasonNumber: item.mediaType === 'tv' ? season : undefined, episodeNumber: item.episodeNumber };
+    const key = JSON.stringify([config.scopeUid, scope]);
+    // « Relancer la recherche » force toujours une nouvelle interrogation ; sinon un résultat de moins de 2 minutes sert.
+    const forced = lastRefresh.current !== refresh; lastRefresh.current = refresh;
+    const recent = recentSearches.get(key);
+    setError(''); setOpen(null); setSubmitted(false);
+    if (!forced && recent && Date.now() - recent.at < RECENT_SEARCH_MS) {
+      try { assertManualReleaseSearchCurrent(recent.session); setSession(recent.session); setLoading(false); return; }
+      catch { recentSearches.delete(key); }
+    }
+    setLoading(true); setSession(null);
+    void searchManualArrReleases(scope, config)
+      .then(result => { recentSearches.set(key, { at: Date.now(), session: result }); if (current) setSession(result); })
       .catch(cause => { if (current) setError(cause instanceof Error ? cause.message : 'Recherche impossible.'); })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
@@ -96,6 +111,7 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     if (!picked.selectable && !switchTo) return;
     if (!switchTo || !session.target) return send(session, picked);
     inFlight.current = true; setSending(true); setError('');
+    recentSearches.clear();
     let fresh: ManualReleaseSearch;
     try {
       await changeProgrammedQuality(useDownloadConfigStore.getState(), session.target, switchTo);
@@ -121,6 +137,8 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
 
   const send = async (session: ManualReleaseSearch, candidate: AlternativeRelease['candidate'], note = '') => {
     if (!candidate.selectable || candidate.current || inFlight.current) return;
+    // Un envoi change l'état du titre : le résultat mémorisé n'est plus à jour.
+    recentSearches.clear();
     const withNote = (text: string) => note ? `${note} · ${text}` : text;
     // Revue Codex #1070 : seuls les transferts que la version choisie couvre sont remplacés — un épisode seul n'annule
     // jamais le pack de saison ni les autres épisodes en cours ; une couverture inconnue n'annule rien.
@@ -219,17 +237,20 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     </div>
 
     <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] flex flex-col gap-2.5" aria-busy={loading}>
-      {(item.releaseTitle || item.quality) && <section data-current-version aria-label="Version actuelle" className="shrink-0 rounded-[18px] bg-[#10221A] px-4 py-3 shadow-[inset_0_0_0_1.5px_rgba(134,239,172,0.5)]">
-        <p className="text-[12px] font-extrabold uppercase tracking-wide text-[#86EFAC]">{currentGroup === 'active' ? `En cours de téléchargement · ${currentProgress} %` : currentGroup === 'completed' ? 'Version téléchargée' : 'Version actuelle'}</p>
-        {currentFacts && <p className="mt-1 text-[16px] font-extrabold text-white">{currentFacts}</p>}
-        {currentBadges.length > 0 && <ul aria-label="Type de release" className="mt-2 flex flex-wrap gap-1.5">
-          {currentBadges.map(badge => <li key={badge} className="h-7 px-2.5 rounded-lg bg-white/10 text-[12.5px] font-extrabold text-zinc-100 grid place-items-center">{badge}</li>)}
+      {/* Retour terrain du 16/11 (« un peu de place perdue en haut ») : un seul encadré compact — la version actuelle et,
+          pendant un téléchargement, la règle de remplacement en une ligne (plus de second bandeau). */}
+      {(item.releaseTitle || item.quality || activeInScope) && <section data-current-version aria-label="Version actuelle" className="shrink-0 rounded-[16px] bg-[#10221A] px-3.5 py-2.5 shadow-[inset_0_0_0_1.5px_rgba(134,239,172,0.5)]">
+        <p className="text-[12px] font-extrabold uppercase tracking-wide text-[#86EFAC]">{currentGroup === 'active' ? `En cours · ${currentProgress} %` : currentGroup === 'completed' ? 'Version téléchargée' : 'Version actuelle'}{currentFacts && <span className="normal-case tracking-normal text-white"> · {currentFacts}</span>}</p>
+        {currentBadges.length > 0 && <ul aria-label="Type de release" className="mt-1.5 flex flex-wrap gap-1.5">
+          {currentBadges.map(badge => <li key={badge} className="h-6 px-2 rounded-md bg-white/10 text-[12px] font-extrabold text-zinc-100 grid place-items-center">{badge}</li>)}
         </ul>}
+        {activeInScope && !sending && <p data-active-request className="mt-1 text-[12.5px] text-zinc-300">Choisir une autre version la remplace : l’ancienne est annulée.</p>}
       </section>}
       {error && <p role="alert" className="rounded-2xl bg-rose-500/10 px-4 py-3 text-[14px] text-rose-200">{error}</p>}
-      {activeInScope && !sending && <p data-active-request className="rounded-2xl bg-amber-500/10 px-4 py-3 text-[13.5px] text-amber-200">Un téléchargement est en cours pour ce titre : choisir une autre version le remplacera (l’ancien sera annulé).</p>}
       {!loading && shared.length > 0 && <p data-shared-rejections className="rounded-2xl bg-white/[0.04] px-4 py-3 text-[13.5px] text-zinc-300">Refusées par {item.mediaType === 'movie' ? 'Radarr' : 'Sonarr'} : {shared.join(' · ')}</p>}
-      {loading && <p role="status" className="flex items-center gap-2 py-6 text-[14px] text-zinc-400"><Loader2 size={18} className="animate-spin" />Recherche des versions…</p>}
+      {/* Retour terrain du 16/11 (« recherche étrangement longue, +5 s ») : Radarr/Sonarr interrogent chaque indexer en direct ;
+          l'attente est dite, et une réouverture dans les 2 minutes réutilise le dernier résultat. */}
+      {loading && <p role="status" className="flex items-center gap-2 py-6 text-[14px] text-zinc-400"><Loader2 size={18} className="animate-spin" />{item.mediaType === 'movie' ? 'Radarr' : 'Sonarr'} interroge chaque indexer…</p>}
       {!loading && !error && !visible.length && <p className="py-6 text-[14px] text-zinc-400">{versions.length ? 'Aucune version pour ce filtre.' : 'Aucune version trouvée.'}</p>}
       {!loading && visible.map(entry => {
         const { release } = entry;
