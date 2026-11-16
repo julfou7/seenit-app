@@ -28,8 +28,9 @@ test('le suivi qBittorrent relit les trackers d’un torrent à l’arrêt, au p
   const live = readFileSync('src/services/sonarrRadarrLive.ts', 'utf8');
   assert.match(live, /const TRACKER_NOTE_TTL_MS = 60_000;/);
   assert.match(live, /\.sort\(\(a, b\) => \(trackerNotes\.get\(a\)\?\.at \?\? 0\) - \(trackerNotes\.get\(b\)\?\.at \?\? 0\)\)\.slice\(0, 5\)/, 'revue Codex #1072 : rotation, jamais toujours les 5 mêmes');
-  assert.match(live, /for \(const hash of stopped\) \{ const note = trackerNotes\.get\(hash\)\?\.note;/, 'notes valides rendues pour tous');
-  assert.match(live, /qbitGet\(config, `\/api\/v2\/torrents\/trackers\?hash=\$\{encodeURIComponent\(hash\)\}`\)/);
+  assert.match(live, /for \(const key of stopped\) \{ const note = trackerNotes\.get\(key\)\?\.note;/, 'notes valides rendues pour tous');
+  assert.match(live, /`\$\{buildQbitSessionScopeKey\(auth\.currentUser\?\.uid, cleanUrl\(config\.qbittorrentUrl \|\| ''\), config\.qbittorrentUsername\)\}\|\$\{String\(torrent\.hash\)\}`/, 'revue Codex #1072 : note propre à la connexion qBittorrent');
+  assert.match(live, /qbitGet\(config, `\/api\/v2\/torrents\/trackers\?hash=\$\{encodeURIComponent\(hashOf\(key\)\)\}`\)/);
   assert.match(live, /const trackerNote = !isQbitError && !isDone \? refusals\.get\(String\(t\.hash\)\) : undefined;/);
   assert.match(live, /existing\.errorMessage = trackerNote;/);
 });
