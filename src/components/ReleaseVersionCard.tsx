@@ -32,8 +32,10 @@ export function VersionFilterChips({ value, onChange }: { value: VersionFilter; 
 
 // La langue est déjà dans la ligne repliée (« Multi », « Français », « VO sous-titrée ») : ces badges la
 // répéteraient. VFF et VFQ restent, ils précisent la version française.
-// #661 (16/11) : VFF/VFQ sont désormais dans la ligne de langue (« Multi VFF ») : plus de badge en double.
-const LANGUAGE_REPEATS = new Set(['MULTI', 'VF', 'VOSTFR', 'VFF', 'VFQ']);
+// #661 (16/11) : VFF/VFQ passent dans la ligne de langue (« Multi VFF ») ; ils ne sont retirés des badges que
+// lorsque cette ligne les affiche réellement (revue Codex #1080 : « MULTI.VFQ.VOSTFR » reste « VO sous-titrée »).
+const LANGUAGE_REPEATS = new Set(['MULTI', 'VF', 'VOSTFR']);
+const VARIANT_BADGES = new Set(['VFF', 'VFQ']);
 
 /**
  * Carte d'une version (maquette DlVersion), partagée par « Version précise » et la recherche avancée :
@@ -43,16 +45,16 @@ const LANGUAGE_REPEATS = new Set(['MULTI', 'VF', 'VOSTFR', 'VFF', 'VFQ']);
  * de la release (pour reconnaître le bon torrent) et ↑ seeders en vert, ↓ leechers en rouge au lieu de
  * la vitesse.
  */
-export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggle, details, technical = false, current = false, children }: { entry: DescribedRelease<T>; open: boolean; onToggle: () => void; details: string; technical?: boolean; current?: boolean; children: React.ReactNode }) {
+export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggle, details, technical = false, current = false, spaceWarning, children }: { entry: DescribedRelease<T>; open: boolean; onToggle: () => void; details: string; technical?: boolean; current?: boolean; /** #1076 : version plus grosse que l'espace libre du disque de destination. */ spaceWarning?: string; children: React.ReactNode }) {
   const { release } = entry;
   const [showName, setShowName] = useState(false);
   // « Light » et la langue sont déjà dans la ligne repliée : pas de badge en double.
-  const badges = releaseBadges(release.name).filter(badge => !LANGUAGE_REPEATS.has(badge));
+  // #661 : une version avec piste française dit toujours laquelle (VFF par défaut, VFQ quand le nom le marque).
+  const variant = hasFrenchAudio(entry.language) ? frenchVariant(release.name) ?? 'VFF' : null;
+  const badges = releaseBadges(release.name).filter(badge => !LANGUAGE_REPEATS.has(badge) && !(variant && VARIANT_BADGES.has(badge)));
   const seeders = Number(release.seeders) || 0;
   const leechers = Number(release.leechers) || 0;
   const readable = releaseReadableTitle(release.name);
-  // #661 : une version avec piste française dit toujours laquelle (VFF par défaut, VFQ quand le nom le marque).
-  const variant = hasFrenchAudio(entry.language) ? frenchVariant(release.name) ?? 'VFF' : null;
   const readableTitle = [readable.title, readable.episode, readable.year].filter(Boolean).join(' · ');
   // Retour terrain du 16/11 (« Autre version » : une fine barre par version) : dans une liste en colonne qui défile,
   // la carte ne rétrécit jamais (`shrink-0`), sinon `overflow-hidden` l'écrase dès qu'il y a beaucoup de versions.
@@ -69,6 +71,7 @@ export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggl
           // taille et nombre de sources, puis le type de release (source, codec, HDR, son, plateforme) dès la carte repliée.
           : <>
             <span className="text-[13px] text-zinc-400">{formatReleaseSize(release.size)}{seeders > 0 && <> · <span data-seeders className="font-bold text-zinc-200">{seeders.toLocaleString('fr-FR')} source{seeders > 1 ? 's' : ''}</span></>}</span>
+            {spaceWarning && <span data-space-warning className="text-[12.5px] font-bold text-rose-300">{spaceWarning}</span>}
             {badges.length > 0 && <span data-release-badges className="mt-0.5 flex flex-wrap gap-1">
               {/* Revue Codex #1074 : 6 badges repliée, tous une fois dépliée. */}
               {(open ? badges : badges.slice(0, 6)).map(badge => <span key={badge} className="h-6 px-1.5 rounded-md bg-[#26262B] text-[11.5px] font-extrabold leading-6 text-zinc-200">{badge}</span>)}
