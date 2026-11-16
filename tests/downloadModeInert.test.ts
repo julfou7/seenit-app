@@ -15,7 +15,9 @@ test('mode téléchargement : un épisode qui ne se coche pas est visiblement in
 
   const rows = readFileSync('src/screens/mediaDetail/seriesSections.tsx', 'utf8');
   assert.match(rows, /const inert = inMode && isEpisodeInertInMode\(modeState\);/);
-  assert.match(rows, /inert \? 'opacity-50 cursor-default' : 'cursor-pointer'/, 'ligne effacée');
+  assert.match(rows, /cursor-pointer', inert && 'opacity-50'/, 'ligne effacée, toujours touchable');
+  // Retour terrain du 16/11 : « je veux pouvoir cliquer sur un épisode » — un épisode non cochable ouvre sa fiche.
+  assert.match(rows, /const activate = \(\) => \{ if \(inMode && selectable\) downloadMode!\.onToggle\(episode\.episode_number\); else onOpenEpisode\(episode\); \};/);
 
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.match(view, /const nothingToPick = !pickedList\.length && modeStates\.length > 0 && !selectableEpisodes\.length;/);

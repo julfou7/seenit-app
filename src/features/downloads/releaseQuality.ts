@@ -19,3 +19,6 @@ export function releaseVariantLabel(releaseTitle: string | null | undefined): 'H
   if (!title || title.includes('•') || !RELEASE_NAME_TOKEN.test(title)) return null;
   return matchesLightFilter(title, 'light') ? 'HD Light' : 'Standard';
 }
+
+/** Retour terrain du 16/11 (« supprimer Standard qui fait 2 lignes de plus pour rien ») : seule « HD Light » est affichée. */
+export const shownVariantLabel = (releaseTitle: string | null | undefined) => releaseVariantLabel(releaseTitle) === 'HD Light' ? 'HD Light' : null;

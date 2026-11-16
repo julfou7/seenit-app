@@ -37,7 +37,8 @@ test('SEENIT-DOWNLOAD-014 #879 hors mode la fiche reste propre ; en mode le cont
   assert.match(rows, /\{aired && inMode && <EpisodeModeControl /);
   assert.match(rows, /\{aired && !inMode && <SeenItCheckButton /);
   assert.match(rows, /\{downloadMode && !inMode && <EpisodePassiveChip /, 'pastille passive seulement hors mode');
-  assert.match(rows, /const activate = \(\) => \{ if \(!inMode\) onOpenEpisode\(episode\); else if \(selectable\) downloadMode!\.onToggle\(episode\.episode_number\); \}/);
+  // Retour terrain du 16/11 : en mode, un épisode non cochable ouvre sa fiche au lieu de ne rien faire.
+  assert.match(rows, /const activate = \(\) => \{ if \(inMode && selectable\) downloadMode!\.onToggle\(episode\.episode_number\); else onOpenEpisode\(episode\); \}/);
   // Un seul point d'entrée visible : le bouton ⬇ de la carte de progression, sous le gate personnel.
   assert.match(view, /\{canUseDownloadMode && show && <DownloadModeToggle active=\{downloadMode\} badge=\{activeDownloads\} onToggle=\{toggleDownloadMode\} \/>\}/);
   assert.match(view, /if \(canUseDownloadMode\) \{ enterDownloadMode\(\); return; \}/, 'le menu ⋮ ouvre le mode pour une série');

@@ -16,7 +16,7 @@ import { formatBytes } from '../services/sonarrRadarr';
 import { downloadGroup } from '../features/downloads/downloadGroups';
 import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
 import { getReleaseAudio } from '../features/downloads/releaseAudio';
-import { releaseVariantLabel } from '../features/downloads/releaseQuality';
+import { shownVariantLabel } from '../features/downloads/releaseQuality';
 import { releaseBadges } from '../features/downloads/releaseBadges';
 import { changeProgrammedQuality } from '../features/downloads/programmedCalendar';
 import { notifyArrWrite } from '../store/arrSyncStore';
@@ -212,7 +212,7 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   // est résumée en tête, avant toute autre, et sa carte dans la liste porte « Actuelle ».
   const currentGroup = downloadGroup(item);
   const currentProgress = truncateDownloadProgressPercent(Math.min(100, Math.max(0, Number(item.progress) || 0)));
-  const currentFacts = [item.quality, getReleaseAudio(item.releaseTitle).label, releaseVariantLabel(item.releaseTitle),
+  const currentFacts = [item.quality, getReleaseAudio(item.releaseTitle).label, shownVariantLabel(item.releaseTitle),
     item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
   const currentBadges = releaseBadges(item.releaseTitle || '').slice(0, 5);
   return <DialogLayer onDismiss={onClose} canDismiss={!sending} label="Autre version" role="dialog" data-alternative-release
