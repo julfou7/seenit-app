@@ -16,7 +16,9 @@ test('SEENIT-UX-014 B07 ruban unique utile, priorité et aucune disponibilité',
  assert.equal(seriesBadge({...show,seenEpisodes:['1x1']},episode,progress,false,'2026-10-24',now),null);
  assert.equal(seriesBadge(show,{...episode,episode_number:6},progress,false,'2026-10-24',now)?.tone,'today');
  assert.equal(seriesBadge(show,{...episode,episode_number:6,air_date:'2026-10-20'},progress,false,'2026-10-24',now)?.tone,'season');
- assert.equal(seriesBadge(show,{...episode,air_date:'2026-10-20'},{...progress,availableUnseen:3},false,'2026-10-24',now)?.label,'Plus que 3');
+ assert.equal(seriesBadge(show,{...episode,air_date:'2026-10-20'},{...progress,availableUnseen:3,remainingInSeason:3},false,'2026-10-24',now)?.label,'Plus que 3');
+  // Retour terrain du 16/11 (Dexter S02, 3 sortis sur 10) : « Plus que » seulement en fin de saison, sinon « 3 dispo ».
+  assert.equal(seriesBadge(show,{...episode,air_date:'2026-10-20'},{...progress,availableUnseen:3,remainingInSeason:10},false,'2026-10-24',now)?.label,'3 dispo');
  assert.equal(seriesBadge({...show,seriesEnded:true},{...episode,episode_number:6,air_date:'2026-10-20',last_season_number:3},progress,false,'2026-10-24',now)?.tone,'season','la fin de S1 ne devient pas un final de série à trois saisons');
  assert.equal(seriesBadge(show,episode,progress,true,'2026-10-24',now)?.tone,'never','la section ancienne ne met jamais une sortie en avant');
 });
