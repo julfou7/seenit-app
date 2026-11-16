@@ -14,6 +14,7 @@ test('SEENIT-DOWNLOAD-011 dit toujours VFF ou VFQ selon la convention des releas
   assert.equal(getReleaseAudio('Movie.2026.FRENCH.1080p').label, 'VFF');
   assert.equal(getReleaseAudio('Movie.2026.MULTI.QC.1080p').label, 'MULTI VFQ');
   assert.equal(getReleaseAudio('Movie.2026.MULTI.VF2.1080p').label, 'MULTI VFF + VFQ');
+  assert.equal(getReleaseAudio('Movie.2026.MULTI.TRUEFRENCH.VFQ.1080p').label, 'MULTI VFF + VFQ', 'revue Codex #1080');
   assert.equal(getReleaseAudio('Movie.2026.VOSTFR.1080p').label, undefined, 'sous-titres seuls : aucune piste française');
   assert.equal(getReleaseAudio('Movie.2026.1080p.WEB').label, undefined);
   assert.equal(getReleaseAudio('Movie.FRENCH').vff, false);

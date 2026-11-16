@@ -17,7 +17,9 @@ const FRENCH = ['MULTI', 'FRENCH', 'TRUEFRENCH', 'VF', 'VFF', 'VFQ', 'VFI', 'VF2
  */
 export function frenchVariant(releaseTitle?: string): FrenchVariant | null {
   const tokens = new Set((releaseTitle || '').toUpperCase().split(/[^A-Z0-9]+/));
-  const both = tokens.has('VF2') || (tokens.has('VFF') && tokens.has('VFQ'));
+  // Revue Codex #1080 : TRUEFRENCH est la VFF (« MULTI.TRUEFRENCH.VFQ » porte les deux doublages).
+  const vff = tokens.has('VFF') || tokens.has('TRUEFRENCH');
+  const both = tokens.has('VF2') || (vff && tokens.has('VFQ'));
   if (both) return 'VFF + VFQ';
   if (tokens.has('VFQ') || tokens.has('QC') || tokens.has('QUEBEC')) return 'VFQ';
   return FRENCH.some(token => tokens.has(token)) ? 'VFF' : null;
