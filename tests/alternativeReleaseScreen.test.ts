@@ -30,6 +30,7 @@ test('« Autre version » : mêmes pastilles et cartes que « Version précise �
   assert.match(screen, /data-shared-rejections/, 'raison commune en tête');
   assert.match(screen, /const own = release\.reasons\.filter\(reason => !shared\.includes\(reason\)\);/, 'jamais répétée sur chaque carte');
   assert.match(screen, /await changeProgrammedQuality\(useDownloadConfigStore\.getState\(\), session\.target, preference\);[\s\S]*?setRefresh\(value => value \+ 1\)/, 'Passer en 4K : profil appliqué, recherche relancée');
+  assert.match(screen, /notifyArrWrite\(\{ tmdbId: item\.tmdbId, tvdbId: item\.tvdbId, mediaType: item\.mediaType \}\);/, 'revue Codex #1068 : Programmés relit la qualité');
   const service = readFileSync('src/services/arrManualReleases.ts', 'utf8');
   assert.match(service, /target: \{ kind: context\.movieId \? 'movie' as const : 'series' as const, id: targetId \}/);
 });

@@ -13,6 +13,7 @@ import { describeReleases, matchesVersionFilter, type ReleaseLike, type VersionF
 import { ReleaseVersionCard, VersionFilterChips } from './ReleaseVersionCard';
 import { commonRejections, frenchRejections, profileSwitchFor } from '../features/downloads/releaseRejections';
 import { changeProgrammedQuality } from '../features/downloads/programmedCalendar';
+import { notifyArrWrite } from '../store/arrSyncStore';
 
 type AlternativeRelease = ReleaseLike & { candidate: ManualReleaseCandidate & { current: boolean }; reasons: string[] };
 
@@ -104,6 +105,8 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     setSwitching(true); setError('');
     try {
       await changeProgrammedQuality(useDownloadConfigStore.getState(), session.target, preference);
+      // Revue Codex #1068 : Programmés et la présence de la fiche relisent la nouvelle qualité (comme le menu ⋯).
+      notifyArrWrite({ tmdbId: item.tmdbId, tvdbId: item.tvdbId, mediaType: item.mediaType });
       showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: `Qualité : ${preference === '4k' ? '4K' : '1080p'}`, posterPath: item.posterPath }, 'success');
       if (mounted.current) setRefresh(value => value + 1);
     } catch (cause) {
