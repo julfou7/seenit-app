@@ -14,6 +14,7 @@ test('Programmés : toucher un épisode ouvre sa fiche, même pour une série ho
   // Revue Codex #1086 : entrée d'historique à l'ouverture, Retour ferme la fiche ; titre et affiche TMDB de la série.
   assert.match(screen, /if \(!state\.isEpisodeDetailModal\) window\.history\.pushState\(\{ \.\.\.state, isModal: true, isEpisodeDetailModal: true \}, ''\);/);
   assert.match(screen, /if \(event\.state\?\.isEpisodeDetailModal\) return;\s*setOpenEpisode\(null\);/);
+  assert.match(screen, /const onCloseModals = \(\) => \{ pendingEpisodeParent\.current = null; setOpenEpisode\(null\); \};[\s\S]*?addEventListener\('app-close-modals', onCloseModals\)/, 'changement d’onglet : fiche fermée');
   assert.match(screen, /tmdbShowTitle=\{episodeShow\?\.title \|\| openEpisode\.title\} tmdbShowPosterPath=\{openEpisode\.posterPath\}/);
   assert.match(readFileSync('src/screens/EpisodeDetailModalCore.tsx', 'utf8'), /posterPath: activeShow\?\.posterPath \|\| tmdbShowPosterPath \|\| null,/);
   assert.match(screen, /episode=\{openEpisode\.episode\}/);

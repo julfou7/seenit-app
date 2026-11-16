@@ -112,8 +112,11 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
       pendingEpisodeParent.current = null;
       if (parent) onShowClick?.(parent.id, parent.mediaType);
     };
+    // Revue Codex #1086 : un changement d'onglet (`app-close-modals`) ferme aussi la fiche, comme dans À voir.
+    const onCloseModals = () => { pendingEpisodeParent.current = null; setOpenEpisode(null); };
     window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    window.addEventListener('app-close-modals', onCloseModals);
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('app-close-modals', onCloseModals); };
   }, [onShowClick]);
   const screenRootRef = useRef<HTMLDivElement>(null);
   const searchRequestRef = useRef(0);
