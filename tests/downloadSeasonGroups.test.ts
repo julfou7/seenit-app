@@ -34,7 +34,7 @@ test('SEENIT-DOWNLOAD-013 #879 la carte de saison annule épisode par épisode, 
   assert.match(screen, /\(groupSeasons \? groupSeasonDownloads\(items\) : items\.map\(item => \(\{ kind: 'single' as const, item \}\)\)\)\.map\(entry => \{/);
   assert.match(screen, /renderSection\('En cours', activeDownloads, undefined, true\)/);
   assert.equal((screen.match(/renderSection\('[^']+', \w+(?:, '\w+')?\)/g) || []).length, 4, 'les quatre autres sections restent en cartes complètes');
-  assert.match(screen, /<SeasonDownloadCard key=\{entry\.key\} seasonNumber=\{entry\.seasonNumber\} items=\{entry\.items\} onShowClick=\{onShowClick\} onRemove=\{handleRemove\} \/>/, 'même confirmation que les cartes');
+  assert.match(screen, /<SeasonDownloadCard key=\{entry\.key\} seasonNumber=\{entry\.seasonNumber\} items=\{entry\.items\} onShowClick=\{onShowClick\} onRemove=\{handleRemove\} importDiskNote=\{importDiskNote\('tv'\)\} \/>/, 'même confirmation que les cartes');
   assert.doesNotMatch(card, /SwipeableCard|onSwipe/, 'aucun geste qui annulerait toute la saison');
   assert.match(card, /aria-label=\{kind === 'done' \|\| kind === 'attention' \? `Retirer \$\{code\} de la liste` : `Annuler le téléchargement de \$\{code\}`\}/);
 });

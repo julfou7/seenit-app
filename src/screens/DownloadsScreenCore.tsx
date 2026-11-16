@@ -44,6 +44,7 @@ import { sortDownloadsByAddedAt } from '../features/downloads/downloadPresentati
 import { waitingRetryLaunch } from '../features/downloads/waitingRetry';
 import { describeDisk, diskTone, fetchDiskStatus, lowImportDisk, useDiskStatus } from '../features/downloads/arrDiskStatus';
 import { canRetryImport, missingSpace, missingSpaceMessage, retryImport } from '../features/downloads/importRetry';
+import { arrSyncKey } from '../store/arrSyncStore';
 import { formatFreeSpace } from '../features/downloads/arrDiskSpace';
 import { hasActiveDownloadInScope } from '../features/downloads/downloadSearchGuard';
 import { getStableDownloadRenderKey } from '../features/downloads/downloadPosterStability';
@@ -300,11 +301,15 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
     setRetryingImport(item.id);
     const title = item.seriesTitle || item.movieTitle || item.title;
     try {
-      const fresh = await fetchDiskStatus(useDownloadConfigStore.getState());
+      // Revue Codex #1064 : compte et serveur figés au départ ; s'ils changent pendant la vérification, rien n'est envoyé.
+      const scope = arrSyncKey();
+      const scopedConfig = useDownloadConfigStore.getState();
+      const fresh = await fetchDiskStatus(scopedConfig);
       const services = fresh.filter(disk => disk.services?.includes(item.mediaType === 'tv' ? 'Sonarr' : 'Radarr'));
       const missing = services.length === 1 ? missingSpace(item, services[0].freeSpace) : 0;
       if (missing > 0) { showToast({ title, action: missingSpaceMessage(missing), posterPath: item.posterPath }, 'error'); return; }
-      await retryImport(useDownloadConfigStore.getState(), item);
+      if (arrSyncKey() !== scope) { showToast({ title, action: 'La configuration a changé : import non relancé.', posterPath: item.posterPath }, 'info'); return; }
+      await retryImport(scopedConfig, item);
       showToast({ title, action: `Import relancé dans ${item.mediaType === 'tv' ? 'Sonarr' : 'Radarr'}.`, posterPath: item.posterPath }, 'success');
       void useLiveDownloadStore.getState().fetchDownloads();
     } catch (error: unknown) {
@@ -509,7 +514,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
       </div>
       {(groupSeasons ? groupSeasonDownloads(items) : items.map(item => ({ kind: 'single' as const, item }))).map(entry => {
         // #879 — plusieurs épisodes d'une même saison : une seule carte, ✕ par épisode (pas de balayage global).
-        if (entry.kind === 'season') return <SeasonDownloadCard key={entry.key} seasonNumber={entry.seasonNumber} items={entry.items} onShowClick={onShowClick} onRemove={handleRemove} />;
+        if (entry.kind === 'season') return <SeasonDownloadCard key={entry.key} seasonNumber={entry.seasonNumber} items={entry.items} onShowClick={onShowClick} onRemove={handleRemove} importDiskNote={importDiskNote('tv')} />;
         const { item } = entry;
         const isActive = downloadGroup(item) === 'active' || downloadGroup(item) === 'waiting';
 

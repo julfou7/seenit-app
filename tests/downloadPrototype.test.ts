@@ -75,7 +75,7 @@ test('SEENIT-DOWNLOAD-013 #293 la variante HD Light ou Standard reste visible da
   assert.equal(releaseVariantLabel('Twilight'), null, 'titre sans marque technique');
   assert.equal(releaseVariantLabel('Show.S01E02.1080p.WEB.H264-GRP'), 'Standard');
   const season = readFileSync('src/components/SeasonDownloadCard.tsx', 'utf8');
-  assert.match(season, /\[rowState\(item, kind\), releaseVariantLabel\(item\.releaseTitle\)\]/, 'épisodes regroupés : variante par ligne');
+  assert.match(season, /\[rowState\(item, kind, importDiskNote\), releaseVariantLabel\(item\.releaseTitle\)\]/, 'épisodes regroupés : variante par ligne');
   const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
   assert.match(card, /const variant = releaseVariantLabel\(item\.releaseTitle\);/);
   assert.match(card, /\['Film', item\.quality, variant\]/);

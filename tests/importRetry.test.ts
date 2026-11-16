@@ -36,6 +36,13 @@ test('relancer l’import d’un téléchargement terminé bloqué faute de plac
   const screen = readFileSync('src/screens/DownloadsScreenCore.tsx', 'utf8');
   assert.match(screen, /onRetryImport=\{canRetryImport\(item\) \? \(\) => void handleRetryImport\(item\) : undefined\}/);
   assert.match(screen, /if \(missing > 0\) \{ showToast\(\{ title, action: missingSpaceMessage\(missing\)/);
+  // Revue Codex #1064 : portée figée au départ, rien n'est envoyé si elle a changé.
+  assert.match(screen, /const scope = arrSyncKey\(\);\n\s+const scopedConfig = useDownloadConfigStore\.getState\(\);[\s\S]*?if \(arrSyncKey\(\) !== scope\) \{[\s\S]*?return; \}\n\s+await retryImport\(scopedConfig, item\);/);
+  // Revue Codex #1064 : dans la carte de saison, un import en attente le dit (et cite le disque).
+  const season = readFileSync('src/components/SeasonDownloadCard.tsx', 'utf8');
+  assert.match(season, /if \(importPending\(item\)\) return 'active';/);
+  assert.match(season, /if \(kind === 'active' && importPending\(item\)\) return importDiskNote \? `Téléchargé · import en attente : \$\{importDiskNote\}` : 'Téléchargé · import Plex en cours';/);
+  assert.match(screen, /importDiskNote=\{importDiskNote\('tv'\)\} \/>/);
 });
 
 // Retour terrain du 16/11 (S02E01 sur Plex) : « déjà disponible » n'est ni un échec à relancer ni une carte « À régler ».
