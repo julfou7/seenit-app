@@ -288,7 +288,9 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const episodeCode = (season: number, episode: number) => `S${String(season).padStart(2, '0')}E${String(episode).padStart(2, '0')}`;
   const pickedList = [...picked.values()].sort((a, b) => a.season - b.season || a.episode - b.episode);
   const pickedSeasons = new Set(pickedList.map(entry => entry.season)).size;
-  const pickedTitle = !pickedList.length ? 'Coche des épisodes' : pickedList.length === 1
+  // Retour terrain du 16/11 : une saison où rien ne se coche (tout est déjà là ou programmé) le dit au lieu d'inviter à cocher.
+  const nothingToPick = !pickedList.length && modeStates.length > 0 && !selectableEpisodes.length;
+  const pickedTitle = nothingToPick ? `Saison ${modeSeason} à jour` : !pickedList.length ? 'Coche des épisodes' : pickedList.length === 1
     ? `${episodeCode(pickedList[0].season, pickedList[0].episode)} · ${(seasonsCache[pickedList[0].season]?.episodes as Array<{ episode_number: number; name?: string }> | undefined)?.find(entry => entry.episode_number === pickedList[0].episode)?.name || `Épisode ${pickedList[0].episode}`}`
     : `${pickedList.length} épisodes${pickedSeasons > 1 ? ` · ${pickedSeasons} saisons` : ''}`;
   const pickedNow = pickedList.filter(entry => !entry.future);
@@ -296,7 +298,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const bySeason = (entries: PickedEpisode[]) => entries.reduce((groups, entry) => groups.set(entry.season, [...(groups.get(entry.season) || []), entry.episode]), new Map<number, number[]>());
   // Retour terrain du 09/11 : « 6 maintenant · en quelle … » était coupé. Texte court et lisible en entier
   // (« 2 maintenant · 1 à la sortie ») : les boutons 1080p et 4K posent déjà la question de la qualité.
-  const pickedDetail = !pickedList.length ? 'Coche un épisode.'
+  const pickedDetail = nothingToPick ? 'Tout est déjà téléchargé ou programmé.' : !pickedList.length ? 'Coche un épisode.'
     : [pickedNow.length ? `${pickedNow.length} maintenant` : '', pickedFuture.length ? `${pickedFuture.length} à la sortie` : ''].filter(Boolean).join(' · ');
   /** Lance les épisodes cochés avec les mêmes gardes que la popup : rien n'est remplacé ni relancé en double. */
   const launchPickedEpisodes = async (quality: DownloadQualityChoice) => {

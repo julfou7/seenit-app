@@ -543,7 +543,10 @@ ligne à la place de la navigation ; depuis la v1.4.283, son texte se lit en ent
 sortie », un titre long passe à la ligne, jamais de points de suspension). La sélection est gardée quand on change de saison (« 5 épisodes · 2 saisons ») et
 les saisons partent dans l'ordre. En mode, un épisode à venir se coche en bleu pour être **programmé** :
 Sonarr le surveille et le télécharge à sa sortie dans la qualité choisie, sans recherche immédiate ; un
-épisode à venir déjà surveillé affiche « Programmé » (horloge bleue, pastille hors mode). Avec un seul épisode sorti
+épisode à venir déjà surveillé affiche « Programmé » (pastille hors mode). Depuis la v1.4.332, en mode, un épisode
+qui ne se coche pas (déjà téléchargé, programmé, vu) a sa ligne effacée et une étiquette passive (« ✓ Téléchargé »,
+« Programmé ») au lieu d'un rond qui ressemblait à un bouton ; une saison sans rien à cocher affiche « Saison N à jour ».
+Avec un seul épisode sorti
 coché, « Version précise › » ouvre une page pleine hauteur : versions C411 filtrables (Toutes, 1080p, 4K, Français, VO),
 la conseillée en tête et dépliée (type de release en badges, sources, date, « Nom du fichier » masqué par défaut,
 **Télécharger cette version**), et « Chercher sous un
