@@ -5,9 +5,9 @@
  */
 export interface QbitTrackerEntry { url?: unknown; status?: unknown; msg?: unknown }
 
-/** Statut qBittorrent d'un tracker : 2 = fonctionne, 4 = ne fonctionne pas. */
-const NOT_WORKING = 4;
-const REFUSAL = /ratio|credit|crédit|not allowed|non autoris|interdit|bloqu|blocked|banned|unregistered|not registered|not found|introuvable|limit/i;
+// Revue Codex #1072 : seul un message qui prouve un refus compte — une panne de connexion (« Connection timed out ») d'un
+// tracker, même au statut « ne fonctionne pas », ne prouve pas que le téléchargement est interdit.
+const REFUSAL = /ratio|credit|crédit|not allowed|non autoris|interdit|bloqu|blocked|banned|unregistered|not registered|torrent not found|introuvable/i;
 
 export function trackerRefusal(trackers: unknown): string | null {
   if (!Array.isArray(trackers)) return null;
@@ -17,7 +17,7 @@ export function trackerRefusal(trackers: unknown): string | null {
     if (!url || url.startsWith('**')) continue;
     const message = String(entry?.msg ?? '').trim();
     if (!message) continue;
-    if (Number(entry?.status) !== NOT_WORKING && !REFUSAL.test(message)) continue;
+    if (!REFUSAL.test(message)) continue;
     if (/ratio|credit|crédit/i.test(message)) return 'Bloqué par le tracker : ratio insuffisant.';
     if (/unregistered|not registered|not found|introuvable/i.test(message)) return 'Bloqué par le tracker : ce torrent n’y existe plus.';
     return `Bloqué par le tracker : « ${message.slice(0, 160)} ».`;

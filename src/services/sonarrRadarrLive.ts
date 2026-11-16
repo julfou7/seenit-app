@@ -366,16 +366,16 @@ async function fetchTrackerRefusals(config: SonarrRadarrConfig, torrents: unknow
   const now = Date.now();
   const stopped = torrents.map(torrent => torrent as { hash?: string; state?: string; dlspeed?: number; progress?: number })
     .filter(torrent => torrent.hash && STOPPED_STATES.has(String(torrent.state)) && !(Number(torrent.dlspeed) > 0) && Number(torrent.progress || 0) < 0.995)
-    .slice(0, 5);
-  await Promise.allSettled(stopped.map(async torrent => {
-    const hash = String(torrent.hash);
-    let cached = trackerNotes.get(hash);
-    if (!cached || now - cached.at > TRACKER_NOTE_TTL_MS) {
-      cached = { at: now, note: trackerRefusal(await qbitGet(config, `/api/v2/torrents/trackers?hash=${encodeURIComponent(hash)}`)) };
-      trackerNotes.set(hash, cached);
-    }
-    if (cached.note) notes.set(hash, cached.note);
+    .map(torrent => String(torrent.hash));
+  // Revue Codex #1072 : les notes encore valides sont rendues pour tous ; seules les plus anciennes (jamais lues
+  // d'abord) sont relues, 5 par passage — les torrents suivants finissent toujours par être interrogés.
+  const stale = stopped.filter(hash => { const cached = trackerNotes.get(hash); return !cached || now - cached.at > TRACKER_NOTE_TTL_MS; })
+    .sort((a, b) => (trackerNotes.get(a)?.at ?? 0) - (trackerNotes.get(b)?.at ?? 0)).slice(0, 5);
+  await Promise.allSettled(stale.map(async hash => {
+    const note = trackerRefusal(await qbitGet(config, `/api/v2/torrents/trackers?hash=${encodeURIComponent(hash)}`));
+    trackerNotes.set(hash, { at: now, note });
   }));
+  for (const hash of stopped) { const note = trackerNotes.get(hash)?.note; if (note) notes.set(hash, note); }
   return notes;
 }
 
