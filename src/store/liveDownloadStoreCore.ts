@@ -390,6 +390,11 @@ function sameDownloadIdentity(a: LiveDownloadItem, b: LiveDownloadItem): boolean
 function sameCancellationIdentity(cancelled: LiveDownloadItem, remote: LiveDownloadItem, now = Date.now()): boolean {
   if (sameDownloadIdentity(cancelled, remote)) return true;
   if (cancelled.mediaType !== remote.mediaType) return false;
+  // Revue Codex #1070 (remplacer par une version plus légère) : deux transferts physiques distincts (infohash différents)
+  // ne sont jamais confondus — l'annulation de l'ancien ne masque pas son remplaçant de même résolution.
+  const cancelledHash = normalizeDownloadClientId(cancelled.downloadId);
+  const remoteHash = normalizeDownloadClientId(remote.downloadId);
+  if (cancelledHash && remoteHash && cancelledHash !== remoteHash) return false;
 
   const sameCanonical = Boolean(
     cancelled.tmdbId && remote.tmdbId && Number(cancelled.tmdbId) === Number(remote.tmdbId)

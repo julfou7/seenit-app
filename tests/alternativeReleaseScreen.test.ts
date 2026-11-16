@@ -35,6 +35,23 @@ test('« Autre version » : mêmes pastilles et cartes que « Version précise �
   assert.match(service, /target: \{ kind: context\.movieId \? 'movie' as const : 'series' as const, id: targetId \}/);
 });
 
+// Retour terrain du 16/11 (« le DL a déjà commencé, je veux une version plus légère ») — revue Codex #1070.
+test('remplacer une version : accessible pendant le transfert, annulation vérifiée', () => {
+  const card = readFileSync('src/components/DownloadItemCard.tsx', 'utf8');
+  assert.match(card, /item\.tmdbId && \(terminal \|\| group === 'active'\) && <button type="button" onClick=\{\(\) => setChoosingRelease\(true\)\}>/);
+  const screen = readFileSync('src/components/AlternativeReleaseModal.tsx', 'utf8');
+  assert.match(screen, /if \(!\(await useLiveDownloadStore\.getState\(\)\.removeDownload\(download\)\)\) kept\+\+;/);
+  assert.match(screen, /kept \? 'error' : 'success'/, 'jamais « remplacée » si l’ancien continue');
+  assert.match(screen, /removeDownload\(download\)\)\)\s*kept\+\+;[\s\S]*?if \(!kept\) \{\s+const requestId = beginDownloadRequest\(/, 'le remplaçant est suivi après l’annulation, jamais greffé sur l’ancienne carte');
+  assert.match(screen, /candidate\.episodes === 'season'\s*\|\| \(download\.episodeNumber != null && Array\.isArray\(candidate\.episodes\) && candidate\.episodes\.includes\(Number\(download\.episodeNumber\)\)\)/, 'un épisode seul n’annule jamais le pack');
+  assert.match(screen, /&& covers\(download\) && !\(candidate\.infoHash && samePhysicalDownload\(download, \{ downloadId: candidate\.infoHash \}\)\)\);/, 'la version choisie n’est jamais annulée');
+  assert.match(screen, /if \(replaced\.some\(download => !\/\^\(sonarr\|radarr\|qbit\)_\/\.test\(download\.id\)\)\) \{[\s\S]*?return;/, 'demande pas encore chez le client : pas de remplacement');
+  const service = readFileSync('src/services/arrManualReleases.ts', 'utf8');
+  assert.match(service, /episodes: release\.fullSeason === true \? 'season' as const/);
+  const store = readFileSync('src/store/liveDownloadStoreCore.ts', 'utf8');
+  assert.match(store, /if \(cancelledHash && remoteHash && cancelledHash !== remoteHash\) return false;/, 'l’annulation de l’ancien ne masque pas un autre infohash');
+});
+
 // Retour terrain du 16/11 (v1.4.325, « Autre version » : une fine barre vide par version) : dans la liste en colonne
 // qui défile, une carte de version ne rétrécit jamais — corrige aussi « Version précise » (carte partagée).
 test('carte de version jamais écrasée dans une longue liste', () => {

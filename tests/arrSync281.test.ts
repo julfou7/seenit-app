@@ -48,7 +48,8 @@ test('SEENIT-DOWNLOAD-013 messages du client en français, transfert sans source
   assert.match(live, /errorMessage = frenchArrMessages\(statusMsgs\);/);
   const card = read('src/components/DownloadItemCard.tsx');
   assert.match(card, /item\.status === 'stalled' \? 'En attente de sources'/);
-  assert.match(card, /\(terminal \|\| item\.status === 'stalled'\) && <button type="button" onClick=\{\(\) => setChoosingRelease\(true\)\}>/, 'une autre version reste possible depuis ⋯');
+  // Revue Codex #1070 : « bloqué » est un transfert actif, couvert par `group === 'active'`.
+  assert.match(card, /\(terminal \|\| group === 'active'\) && <button type="button" onClick=\{\(\) => setChoosingRelease\(true\)\}>/, 'une autre version reste possible depuis ⋯');
   assert.match(read('src/features/downloads/downloadGroups.ts'), /hint: frenchArrMessage\(message\) \|\|/);
 });
 

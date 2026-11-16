@@ -67,17 +67,65 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   const shared = useMemo(() => commonRejections(releases.map(release => release.reasons)), [releases]);
   const versions = useMemo(() => describeReleases(releases, preferred), [releases, preferred]);
   const visible = versions.filter(entry => matchesVersionFilter(entry, filter));
-  useEffect(() => { if (!loading) setOpen(versions.find(entry => entry.release.candidate.selectable)?.release.id ?? null); }, [loading, versions]);
+  // Retour terrain du 16/11 (« quand je déplie, ça se replie 1 s après ») : la carte suivie se rafraîchit chaque seconde
+  // pendant un téléchargement ; la conseillée n'est ouverte d'office qu'une fois par recherche, jamais à chaque rafraîchissement.
+  const openedFor = useRef<ManualReleaseSearch | null>(null);
+  useEffect(() => {
+    if (loading || !session || openedFor.current === session) return;
+    openedFor.current = session;
+    setOpen(versions.find(entry => entry.release.candidate.selectable)?.release.id ?? null);
+  }, [loading, session, versions]);
 
   const submit = async (candidate: AlternativeRelease['candidate']) => {
     if (!session || !candidate.selectable || candidate.current || inFlight.current || submitted) return;
-    if (hasActiveDownloadInScope(useLiveDownloadStore.getState().downloads, session.scope)) {
-      setError('Une demande est déjà en cours pour ce titre. Attends sa fin ou annule-la avant de choisir une autre version.');
+    // Revue Codex #1070 : seuls les transferts que la version choisie couvre sont remplacés — un épisode seul n'annule
+    // jamais le pack de saison ni les autres épisodes en cours ; une couverture inconnue n'annule rien.
+    const covers = (download: LiveDownloadItem) => item.mediaType === 'movie' || candidate.episodes === 'season'
+      || (download.episodeNumber != null && Array.isArray(candidate.episodes) && candidate.episodes.includes(Number(download.episodeNumber)));
+    // Revue Codex #1070 : la version choisie, si elle est déjà en cours, n'est jamais annulée.
+    const replaced = useLiveDownloadStore.getState().downloads.filter(download => hasActiveDownloadInScope([download], session.scope)
+      && covers(download) && !(candidate.infoHash && samePhysicalDownload(download, { downloadId: candidate.infoHash })));
+    // Revue Codex #1070 : une demande pas encore confiée au client ne peut pas être annulée à distance de façon prouvée.
+    // (même règle que `deleteLiveDownloadItem` : seuls les transferts Sonarr, Radarr ou qBittorrent s'annulent à distance).
+    if (replaced.some(download => !/^(sonarr|radarr|qbit)_/.test(download.id))) {
+      setError('La demande en cours n’est pas encore chez le client : attends qu’elle apparaisse dans « En cours » pour la remplacer.');
       return;
     }
     try { assertManualReleaseSearchCurrent(session); }
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Relance la recherche.'); return; }
     inFlight.current = true; setSending(true); setSubmitted(true); setError('');
+    // Retour terrain du 16/11 (« fichier beaucoup trop gros, je veux une version plus légère alors que le DL a commencé ») :
+    // un téléchargement en cours est remplacé — la nouvelle version est envoyée d'abord, l'ancien transfert n'est
+    // annulé qu'ensuite (un envoi en échec laisse l'ancien continuer).
+    if (replaced.length) {
+      try {
+        await grabManualArrRelease(session, candidate.key, crypto.randomUUID());
+      } catch (cause) {
+        if (mounted.current) setError(`${cause instanceof Error ? cause.message : 'Envoi impossible.'} Le téléchargement en cours continue.`);
+        inFlight.current = false; if (mounted.current) setSending(false);
+        return;
+      }
+      // Revue Codex #1070 : chaque annulation est vérifiée ; un ancien transfert resté actif est signalé, jamais caché.
+      let kept = 0;
+      for (const download of replaced) if (!(await useLiveDownloadStore.getState().removeDownload(download))) kept++;
+      // Revue Codex #1070 : le remplaçant est suivi comme tout envoi, mais seulement une fois l'ancien annulé — sinon la
+      // demande rejoindrait l'ancienne carte (même titre) et lui prêterait le nouvel infohash.
+      if (!kept) {
+        const requestId = beginDownloadRequest({ title: item.movieTitle || item.seriesTitle || item.title,
+          mediaType: item.mediaType, tmdbId: item.tmdbId, posterPath: item.posterPath, backdropPath: item.backdropPath,
+          seasonNumber: session.scope.seasonNumber, episodeNumber: session.scope.episodeNumber,
+          downloadClient: item.mediaType === 'movie' ? 'Radarr' : 'Sonarr', releaseTitle: candidate.title });
+        updateDownloadRequest(requestId, { quality: candidate.quality, downloadId: candidate.infoHash });
+        acceptDownloadRequest(requestId, 'Version choisie envoyée au client', 'queued');
+      }
+      showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: kept
+        ? 'Nouvelle version envoyée, mais l’ancien téléchargement n’a pas pu être annulé : annule-le dans « En cours ».'
+        : 'Version remplacée : l’ancien téléchargement est annulé.', posterPath: item.posterPath }, kept ? 'error' : 'success');
+      void useLiveDownloadStore.getState().fetchDownloads();
+      inFlight.current = false;
+      if (mounted.current) { setSending(false); onClose(); }
+      return;
+    }
     const requestId = beginDownloadRequest({ title: item.movieTitle || item.seriesTitle || item.title,
       mediaType: item.mediaType, tmdbId: item.tmdbId, posterPath: item.posterPath, backdropPath: item.backdropPath,
       seasonNumber: session.scope.seasonNumber, episodeNumber: session.scope.episodeNumber,
@@ -139,7 +187,7 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
 
     <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] flex flex-col gap-2.5" aria-busy={loading}>
       {error && <p role="alert" className="rounded-2xl bg-rose-500/10 px-4 py-3 text-[14px] text-rose-200">{error}</p>}
-      {activeInScope && !sending && <p data-active-request className="rounded-2xl bg-amber-500/10 px-4 py-3 text-[13.5px] text-amber-200">Une demande est déjà en cours pour ce titre : attends sa fin ou annule-la avant de choisir une autre version.</p>}
+      {activeInScope && !sending && <p data-active-request className="rounded-2xl bg-amber-500/10 px-4 py-3 text-[13.5px] text-amber-200">Un téléchargement est en cours pour ce titre : choisir une autre version le remplacera (l’ancien sera annulé).</p>}
       {!loading && shared.length > 0 && <p data-shared-rejections className="rounded-2xl bg-white/[0.04] px-4 py-3 text-[13.5px] text-zinc-300">Refusées par {item.mediaType === 'movie' ? 'Radarr' : 'Sonarr'} : {shared.join(' · ')}</p>}
       {loading && <p role="status" className="flex items-center gap-2 py-6 text-[14px] text-zinc-400"><Loader2 size={18} className="animate-spin" />Recherche des versions…</p>}
       {!loading && !error && !visible.length && <p className="py-6 text-[14px] text-zinc-400">{versions.length ? 'Aucune version pour ce filtre.' : 'Aucune version trouvée.'}</p>}
@@ -156,8 +204,8 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
           {switchTo && <button type="button" disabled={busy} onClick={() => void switchQuality(switchTo)} className="mt-1 h-12 rounded-[14px] bg-[#26262B] text-[15px] font-extrabold text-zinc-100 flex items-center justify-center gap-2 disabled:opacity-60">
             {switching && <Loader2 size={18} className="animate-spin" />}Passer en {switchTo === '4k' ? '4K' : '1080p'}
           </button>}
-          <button type="button" disabled={!candidate.selectable || candidate.current || activeInScope || busy || submitted} onClick={() => void submit(candidate)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40">
-            {sending && <Loader2 size={18} className="animate-spin" />}{sending ? 'Envoi…' : 'Télécharger cette version'}
+          <button type="button" disabled={!candidate.selectable || candidate.current || busy || submitted} onClick={() => void submit(candidate)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40">
+            {sending && <Loader2 size={18} className="animate-spin" />}{sending ? 'Envoi…' : activeInScope ? 'Remplacer par cette version' : 'Télécharger cette version'}
           </button>
         </ReleaseVersionCard>;
       })}
