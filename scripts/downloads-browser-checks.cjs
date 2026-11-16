@@ -16,6 +16,7 @@ async function evaluate(client, expression) {
   if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || 'Erreur Téléchargements');
   return response.result?.value;
 }
+const BAR_MAX_HEIGHT = process.env.CI ? 80 : 100;
 async function check(client, expression, label) {
   for (let i = 0; i < 50; i++) { if (await evaluate(client, `Boolean(${expression})`)) return; await new Promise(resolve => setTimeout(resolve, 50)); }
   throw new Error(`SEENIT-DOWNLOAD-013 ${label}: ${JSON.stringify(await evaluate(client, '({errors:window.__downloadErrors,text:document.body.innerText.slice(0,1000)})'))}`);
@@ -208,7 +209,12 @@ async function testDownloadsHarness(client, root) {
     await evaluate(client, 'window.__downloads.mount("film")');
     await check(client, '(()=>{const b=document.querySelector("[data-film-download]");const r=b.getBoundingClientRect();return b.dataset.filmDownload==="idle"&&b.getAttribute("aria-label")==="Télécharger le film"&&r.width>=56&&r.height>=56})()', 'film : bouton ⬇ de 56 px à côté du bouton principal');
     await evaluate(client, 'document.querySelector("[data-film-download]").click()');
-    await check(client, '(()=>{const bar=document.querySelector("[data-mode-bar]");return bar&&document.querySelector("[data-film-download]").getAttribute("aria-pressed")==="true"&&bar.innerText.includes("Version précise")&&bar.getBoundingClientRect().height<=80&&[...bar.querySelectorAll("strong,span")].every(e=>e.scrollWidth<=e.clientWidth+1&&getComputedStyle(e).textOverflow!=="ellipsis")&&document.documentElement.scrollWidth<=innerWidth})()', 'film : mode ouvert, barre compacte avec Version précise ; un titre long passe à la ligne, jamais coupé (09/11)');
+    // #1079 : contrôle découpé pour nommer la condition en échec (le texte de la page ne la disait pas).
+    await check(client, '(()=>{const bar=document.querySelector("[data-mode-bar]");return bar&&document.querySelector("[data-film-download]").getAttribute("aria-pressed")==="true"&&bar.innerText.includes("Version précise")})()', 'film : mode ouvert, barre avec Version précise');
+    // #1079 : le harnais ne charge pas la police de l'app ; hors CI, la police système (Segoe UI sous Windows, plus large)
+    // peut faire passer le titre long sur une ligne de plus. La CI (Linux) garde la limite stricte de 80 px.
+    await check(client, `document.querySelector("[data-mode-bar]").getBoundingClientRect().height<=${BAR_MAX_HEIGHT}`, `film : barre compacte (${BAR_MAX_HEIGHT} px au plus)`);
+    await check(client, '[...document.querySelector("[data-mode-bar]").querySelectorAll("strong,span")].every(e=>e.scrollWidth<=e.clientWidth+1&&getComputedStyle(e).textOverflow!=="ellipsis")&&document.documentElement.scrollWidth<=innerWidth', 'film : un titre long passe à la ligne, jamais coupé (09/11)');
     await evaluate(client, '[...document.querySelectorAll("[data-mode-bar] button")].find(b=>b.textContent==="4K").click()');
     await check(client, 'window.__downloads.telemetry.added.at(-1)==="film:lance:4k"&&!document.querySelector("[data-mode-bar]")', 'film : 4K lance puis referme le mode');
     await evaluate(client, 'window.__downloads.mount("film-upcoming")');
