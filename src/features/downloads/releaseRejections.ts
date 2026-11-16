@@ -37,6 +37,16 @@ export function commonRejections(lists: ReadonlyArray<readonly string[]>): strin
   return refused[0].filter(reason => refused.every(list => list.includes(reason)));
 }
 
+/**
+ * Retour terrain du 16/11 (« Passer en 4K ok, mais que ce soit transparent : le clic dessus ne m'apporte rien ») :
+ * une version refusée seulement pour sa qualité (et, au plus, pour la file en cours que le choix remplace) se
+ * télécharge directement — le profil du titre bascule d'abord. Tout autre refus reste bloquant.
+ */
+export function autoProfileSwitchFor(reasons: readonly string[]): '4k' | '1080p' | null {
+  const target = profileSwitchFor(reasons);
+  return target && reasons.every(reason => /is not wanted in profile|release in queue|already in (?:the )?queue|existing file/i.test(reason)) ? target : null;
+}
+
 /** Qualité refusée par le profil (« WEBDL-2160p is not wanted in profile ») : proposer de passer le titre en 4K ou 1080p. */
 export function profileSwitchFor(reasons: readonly string[]): '4k' | '1080p' | null {
   const blocked = reasons.find(reason => /is not wanted in profile/i.test(reason));

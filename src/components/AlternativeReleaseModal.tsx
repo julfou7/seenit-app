@@ -11,7 +11,13 @@ import { useLiveDownloadStore } from '../store/liveDownloadStore';
 import { beginDownloadRequest, acceptDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { describeReleases, matchesVersionFilter, type ReleaseLike, type VersionFilter } from '../features/downloads/releaseVersions';
 import { ReleaseVersionCard, VersionFilterChips } from './ReleaseVersionCard';
-import { commonRejections, frenchRejections, profileSwitchFor } from '../features/downloads/releaseRejections';
+import { autoProfileSwitchFor, commonRejections, frenchRejections } from '../features/downloads/releaseRejections';
+import { formatBytes } from '../services/sonarrRadarr';
+import { downloadGroup } from '../features/downloads/downloadGroups';
+import { truncateDownloadProgressPercent } from '../features/downloads/downloadPresentation';
+import { getReleaseAudio } from '../features/downloads/releaseAudio';
+import { releaseVariantLabel } from '../features/downloads/releaseQuality';
+import { releaseBadges } from '../features/downloads/releaseBadges';
 import { changeProgrammedQuality } from '../features/downloads/programmedCalendar';
 import { notifyArrWrite } from '../store/arrSyncStore';
 
@@ -36,7 +42,6 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   const [session, setSession] = useState<ManualReleaseSearch | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
-  const [switching, setSwitching] = useState(false);
   const [error, setError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -62,11 +67,14 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
   const releases = useMemo<AlternativeRelease[]>(() => (session?.candidates || []).map((candidate, index) => ({
     id: index + 1, name: candidate.title, size: candidate.size, seeders: candidate.seeders, quality: candidate.quality,
     candidate: { ...candidate, current: samePhysicalDownload(item, { downloadId: candidate.infoHash }) },
-    reasons: candidate.selectable ? [] : frenchRejections(candidate.rejections),
+    // Un refus de qualité seul est levé par l'appui lui-même : ni bandeau ni avertissement pour lui.
+    reasons: candidate.selectable || (session?.target && autoProfileSwitchFor(candidate.rejections)) ? [] : frenchRejections(candidate.rejections),
   })), [session, item]);
   const shared = useMemo(() => commonRejections(releases.map(release => release.reasons)), [releases]);
   const versions = useMemo(() => describeReleases(releases, preferred), [releases, preferred]);
-  const visible = versions.filter(entry => matchesVersionFilter(entry, filter));
+  // La version actuelle, si la recherche la retrouve, passe en tête de liste.
+  const visible = versions.filter(entry => matchesVersionFilter(entry, filter))
+    .sort((a, b) => Number(b.release.candidate.current) - Number(a.release.candidate.current));
   // Retour terrain du 16/11 (« quand je déplie, ça se replie 1 s après ») : la carte suivie se rafraîchit chaque seconde
   // pendant un téléchargement ; la conseillée n'est ouverte d'office qu'une fois par recherche, jamais à chaque rafraîchissement.
   const openedFor = useRef<ManualReleaseSearch | null>(null);
@@ -76,8 +84,44 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     setOpen(versions.find(entry => entry.release.candidate.selectable)?.release.id ?? null);
   }, [loading, session, versions]);
 
-  const submit = async (candidate: AlternativeRelease['candidate']) => {
-    if (!session || !candidate.selectable || candidate.current || inFlight.current || submitted) return;
+  const autoSwitch = (candidate: ManualReleaseCandidate) => session?.target && !candidate.selectable ? autoProfileSwitchFor(candidate.rejections) : null;
+  const arrName = item.mediaType === 'movie' ? 'Radarr' : 'Sonarr';
+
+  // Retour terrain du 16/11 (« Passer en 4K ok, mais que ce soit transparent ; le clic m'oblige à revenir sur la page ») :
+  // choisir une version refusée seulement pour sa qualité bascule d'abord le profil du titre, relit la même version
+  // auprès de Sonarr/Radarr, puis l'envoie — un seul appui, sans quitter ni recharger l'écran.
+  const submit = async (picked: AlternativeRelease['candidate']) => {
+    if (!session || picked.current || inFlight.current || submitted) return;
+    const switchTo = autoSwitch(picked);
+    if (!picked.selectable && !switchTo) return;
+    if (!switchTo || !session.target) return send(session, picked);
+    inFlight.current = true; setSending(true); setError('');
+    let fresh: ManualReleaseSearch;
+    try {
+      await changeProgrammedQuality(useDownloadConfigStore.getState(), session.target, switchTo);
+      // Revue Codex #1068 : Programmés et la présence de la fiche relisent la nouvelle qualité.
+      notifyArrWrite({ tmdbId: item.tmdbId, tvdbId: item.tvdbId, mediaType: item.mediaType });
+      fresh = await searchManualArrReleases(session.scope, useDownloadConfigStore.getState());
+    } catch (cause) {
+      if (mounted.current) setError(cause instanceof Error ? cause.message : 'Qualité inchangée.');
+      inFlight.current = false; if (mounted.current) setSending(false);
+      return;
+    }
+    inFlight.current = false;
+    if (!mounted.current) return;
+    setSending(false);
+    const again = fresh.candidates.find(candidate => candidate.key === picked.key);
+    if (!again?.selectable) {
+      openedFor.current = fresh; setSession(fresh);
+      setError(`Qualité passée en ${switchTo === '4k' ? '4K' : '1080p'}, mais ${arrName} refuse encore cette version${again ? ` : ${frenchRejections(again.rejections).join(' · ')}` : ' : elle n’apparaît plus dans la recherche'}.`);
+      return;
+    }
+    return send(fresh, { ...again, current: picked.current }, `Qualité passée en ${switchTo === '4k' ? '4K' : '1080p'}`);
+  };
+
+  const send = async (session: ManualReleaseSearch, candidate: AlternativeRelease['candidate'], note = '') => {
+    if (!candidate.selectable || candidate.current || inFlight.current) return;
+    const withNote = (text: string) => note ? `${note} · ${text}` : text;
     // Revue Codex #1070 : seuls les transferts que la version choisie couvre sont remplacés — un épisode seul n'annule
     // jamais le pack de saison ni les autres épisodes en cours ; une couverture inconnue n'annule rien.
     const covers = (download: LiveDownloadItem) => item.mediaType === 'movie' || candidate.episodes === 'season'
@@ -118,9 +162,9 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
         updateDownloadRequest(requestId, { quality: candidate.quality, downloadId: candidate.infoHash });
         acceptDownloadRequest(requestId, 'Version choisie envoyée au client', 'queued');
       }
-      showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: kept
+      showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: withNote(kept
         ? 'Nouvelle version envoyée, mais l’ancien téléchargement n’a pas pu être annulé : annule-le dans « En cours ».'
-        : 'Version remplacée : l’ancien téléchargement est annulé.', posterPath: item.posterPath }, kept ? 'error' : 'success');
+        : 'Version remplacée : l’ancien téléchargement est annulé.'), posterPath: item.posterPath }, kept ? 'error' : 'success');
       void useLiveDownloadStore.getState().fetchDownloads();
       inFlight.current = false;
       if (mounted.current) { setSending(false); onClose(); }
@@ -134,7 +178,7 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     try {
       await grabManualArrRelease(session, candidate.key, requestId);
       acceptDownloadRequest(requestId, 'Version choisie envoyée au client', 'queued');
-      showToast('Version choisie envoyée au client', 'success');
+      showToast(withNote('Version choisie envoyée au client'), 'success');
       if (mounted.current) onClose();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Résultat du lancement inconnu.';
@@ -146,27 +190,16 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     }
   };
 
-  // Retour du 16/11 : changer la qualité depuis cet écran — le profil 4K ou 1080p de SeenIt est appliqué au film ou à
-  // la série (comme « Changer la qualité » de Programmés), puis la recherche est relancée.
-  const switchQuality = async (preference: '4k' | '1080p') => {
-    if (!session?.target || switching) return;
-    setSwitching(true); setError('');
-    try {
-      await changeProgrammedQuality(useDownloadConfigStore.getState(), session.target, preference);
-      // Revue Codex #1068 : Programmés et la présence de la fiche relisent la nouvelle qualité (comme le menu ⋯).
-      notifyArrWrite({ tmdbId: item.tmdbId, tvdbId: item.tvdbId, mediaType: item.mediaType });
-      showToast({ title: item.movieTitle || item.seriesTitle || item.title, action: `Qualité : ${preference === '4k' ? '4K' : '1080p'}`, posterPath: item.posterPath }, 'success');
-      if (mounted.current) setRefresh(value => value + 1);
-    } catch (cause) {
-      if (mounted.current) setError(cause instanceof Error ? cause.message : 'Qualité inchangée.');
-    } finally {
-      if (mounted.current) setSwitching(false);
-    }
-  };
-
   const title = item.movieTitle || item.seriesTitle || item.title;
   const scopeLabel = item.mediaType === 'tv' ? code(season, item.episodeNumber ?? undefined) : 'Film';
-  const busy = sending || switching;
+  const busy = sending;
+  // Retour terrain du 16/11 (« le fichier actuel n'est pas assez mis en valeur ») : la version en cours ou téléchargée
+  // est résumée en tête, avant toute autre, et sa carte dans la liste porte « Actuelle ».
+  const currentGroup = downloadGroup(item);
+  const currentProgress = truncateDownloadProgressPercent(Math.min(100, Math.max(0, Number(item.progress) || 0)));
+  const currentFacts = [item.quality, getReleaseAudio(item.releaseTitle).label, releaseVariantLabel(item.releaseTitle),
+    item.size > 0 ? formatBytes(item.size) : ''].filter(Boolean).join(' · ');
+  const currentBadges = releaseBadges(item.releaseTitle || '').slice(0, 5);
   return <DialogLayer onDismiss={onClose} canDismiss={!sending} label="Autre version" role="dialog" data-alternative-release
     className="fixed inset-0 z-[180] max-w-md mx-auto bg-[#0B0B0D] text-white flex flex-col">
     <header className="shrink-0 flex items-center gap-1 px-2 pt-[calc(var(--seenit-safe-area-top,env(safe-area-inset-top,0px))+6px)] pb-2">
@@ -186,6 +219,13 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     </div>
 
     <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-[calc(24px+env(safe-area-inset-bottom,0px))] flex flex-col gap-2.5" aria-busy={loading}>
+      {(item.releaseTitle || item.quality) && <section data-current-version aria-label="Version actuelle" className="shrink-0 rounded-[18px] bg-[#10221A] px-4 py-3 shadow-[inset_0_0_0_1.5px_rgba(134,239,172,0.5)]">
+        <p className="text-[12px] font-extrabold uppercase tracking-wide text-[#86EFAC]">{currentGroup === 'active' ? `En cours de téléchargement · ${currentProgress} %` : currentGroup === 'completed' ? 'Version téléchargée' : 'Version actuelle'}</p>
+        {currentFacts && <p className="mt-1 text-[16px] font-extrabold text-white">{currentFacts}</p>}
+        {currentBadges.length > 0 && <ul aria-label="Type de release" className="mt-2 flex flex-wrap gap-1.5">
+          {currentBadges.map(badge => <li key={badge} className="h-7 px-2.5 rounded-lg bg-white/10 text-[12.5px] font-extrabold text-zinc-100 grid place-items-center">{badge}</li>)}
+        </ul>}
+      </section>}
       {error && <p role="alert" className="rounded-2xl bg-rose-500/10 px-4 py-3 text-[14px] text-rose-200">{error}</p>}
       {activeInScope && !sending && <p data-active-request className="rounded-2xl bg-amber-500/10 px-4 py-3 text-[13.5px] text-amber-200">Un téléchargement est en cours pour ce titre : choisir une autre version le remplacera (l’ancien sera annulé).</p>}
       {!loading && shared.length > 0 && <p data-shared-rejections className="rounded-2xl bg-white/[0.04] px-4 py-3 text-[13.5px] text-zinc-300">Refusées par {item.mediaType === 'movie' ? 'Radarr' : 'Sonarr'} : {shared.join(' · ')}</p>}
@@ -196,16 +236,14 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
         const { candidate } = release;
         const isOpen = open === release.id;
         const own = release.reasons.filter(reason => !shared.includes(reason));
-        const switchTo = session?.target && !candidate.selectable ? profileSwitchFor(candidate.rejections) : null;
-        return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} onToggle={() => setOpen(isOpen ? null : release.id)}
+        const switchTo = autoSwitch(candidate);
+        const switchLabel = switchTo === '4k' ? '4K' : '1080p';
+        return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} current={candidate.current} onToggle={() => setOpen(isOpen ? null : release.id)}
           details={[candidate.indexer, `${candidate.seeders} source${candidate.seeders > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}>
-          {candidate.current && <p className="text-[13px] text-zinc-300">Version actuelle</p>}
           {own.length > 0 && <p data-rejection className="text-[13px] text-amber-300">{own.join(' · ')}</p>}
-          {switchTo && <button type="button" disabled={busy} onClick={() => void switchQuality(switchTo)} className="mt-1 h-12 rounded-[14px] bg-[#26262B] text-[15px] font-extrabold text-zinc-100 flex items-center justify-center gap-2 disabled:opacity-60">
-            {switching && <Loader2 size={18} className="animate-spin" />}Passer en {switchTo === '4k' ? '4K' : '1080p'}
-          </button>}
-          <button type="button" disabled={!candidate.selectable || candidate.current || busy || submitted} onClick={() => void submit(candidate)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40">
-            {sending && <Loader2 size={18} className="animate-spin" />}{sending ? 'Envoi…' : activeInScope ? 'Remplacer par cette version' : 'Télécharger cette version'}
+          {switchTo && !candidate.current && <p data-auto-switch className="text-[13px] text-zinc-300">Le titre passera en {switchLabel} pour l’accepter.</p>}
+          <button type="button" disabled={(!candidate.selectable && !switchTo) || candidate.current || busy || submitted} onClick={() => void submit(candidate)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-40">
+            {sending && <Loader2 size={18} className="animate-spin" />}{candidate.current ? 'Version actuelle' : sending ? 'Envoi…' : activeInScope ? 'Remplacer par cette version' : 'Télécharger cette version'}
           </button>
         </ReleaseVersionCard>;
       })}
