@@ -10,7 +10,12 @@ import { downloadGroup, isPreTransferRequest, isWatchedWaitingRequest } from '..
 import { describeReleases, matchesVersionFilter, releaseAgeLabel, type VersionFilter } from '../features/downloads/releaseVersions';
 import { ReleaseVersionCard, VersionFilterChips } from '../components/ReleaseVersionCard';
 import './downloads.css';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useShowsStore } from '../store/showsStore';
+import { tmdb } from '../features/shows/tmdb';
+import type { EpisodeDetailData } from './episodeDetailTypes';
+// Retour terrain du 16/11 (Programmés, « je ne peux pas cliquer là ») : la fiche d'un épisode programmé, chargée à la demande.
+const EpisodeDetailModal = lazy(() => import('./EpisodeDetailModal').then(module => ({ default: module.EpisodeDetailModal })));
 import {
   AlertCircle,
   ArrowLeft,
@@ -57,6 +62,9 @@ interface Props {
 
 type ViewMode = 'downloads' | 'search';
 
+/** Chemin TMDB d'une affiche (« /abc.jpg ») tiré de son adresse ; autre source : rien (jamais une adresse externe stockée). */
+const tmdbPosterPath = (url?: string) => /^https:\/\/image\.tmdb\.org\/t\/p\/[^/]+(\/[^/?#]+)$/.exec(url || '')?.[1];
+
 /** Séries dont les attentes sont en cours de relance (revue Codex #1054 : jamais deux lots concurrents). */
 const retryingSeries = new Set<string>();
 /** Recherchés de Programmés en cours de relance, par périmètre (revue Codex #1061). */
@@ -75,6 +83,41 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
   // réel — revue Codex #1063 : seulement le disque certain de sa destination (Sonarr ou Radarr), sinon rien.
   const importDiskNote = (mediaType: 'tv' | 'movie') => { const disk = lowImportDisk(disks, mediaType); return disk ? `disque ${disk.label} presque plein (${formatFreeSpace(disk.freeSpace)} libres)` : undefined; };
   const showToast = useToastStore(state => state.showToast);
+  // Épisode programmé ouvert : la fiche lit elle-même l'épisode sur TMDB ; la série de la bibliothèque, si elle y est,
+  // donne le statut vu et les rappels.
+  // Revue Codex #1086 : l'épisode transmis est figé à l'ouverture (la relecture des téléchargements ne ramène jamais la fiche
+  // à l'épisode de départ) et seule une série de la bibliothèque est retenue (jamais un film de même numéro TMDB).
+  // Revue Codex #1086 : titre et affiche TMDB de la série programmée sont transmis (une série hors bibliothèque marquée
+  // vue depuis la fiche est créée avec son vrai titre, jamais « Série »).
+  const [openEpisode, setOpenEpisode] = useState<{ tmdbId: number; season: number; episode: EpisodeDetailData; title: string; posterPath?: string } | null>(null);
+  const episodeShow = useShowsStore(state => openEpisode ? state.shows.find(show => show.mediaType === 'tv' && Number(show.tmdbId) === openEpisode.tmdbId) : undefined);
+  const pendingEpisodeParent = useRef<{ id: number; mediaType?: 'tv' | 'movie' } | null>(null);
+  const openProgrammedEpisode = (tmdbId: number, season: number, episode: number, title: string, posterUrl?: string) => {
+    setOpenEpisode({ tmdbId, season, title, posterPath: tmdbPosterPath(posterUrl),
+      episode: tmdb.peekEpisodeDetails(tmdbId, season, episode) || { season_number: season, episode_number: episode, name: `Épisode ${episode}` } });
+    // Revue Codex #1086 : comme depuis À voir, la fiche a son entrée d'historique : Retour la ferme et revient à Programmés.
+    const state = window.history.state || {};
+    if (!state.isEpisodeDetailModal) window.history.pushState({ ...state, isModal: true, isEpisodeDetailModal: true }, '');
+  };
+  const closeProgrammedEpisode = (parent?: { id: number; mediaType?: 'tv' | 'movie' }) => {
+    if (window.history.state?.isEpisodeDetailModal) { pendingEpisodeParent.current = parent || null; window.history.back(); return; }
+    setOpenEpisode(null);
+    if (parent) onShowClick?.(parent.id, parent.mediaType);
+  };
+  useEffect(() => {
+    const onPop = (event: PopStateEvent) => {
+      if (event.state?.isEpisodeDetailModal) return;
+      setOpenEpisode(null);
+      const parent = pendingEpisodeParent.current;
+      pendingEpisodeParent.current = null;
+      if (parent) onShowClick?.(parent.id, parent.mediaType);
+    };
+    // Revue Codex #1086 : un changement d'onglet (`app-close-modals`) ferme aussi la fiche, comme dans À voir.
+    const onCloseModals = () => { pendingEpisodeParent.current = null; setOpenEpisode(null); };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('app-close-modals', onCloseModals);
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('app-close-modals', onCloseModals); };
+  }, [onShowClick]);
   const screenRootRef = useRef<HTMLDivElement>(null);
   const searchRequestRef = useRef(0);
   const sendInFlightRef = useRef(false);
@@ -583,10 +626,16 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {activeDownloads.length > 0 && renderSection('En cours', activeDownloads, undefined, true)}
             {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
-            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} onRetryWatching={item => void handleRetryWaiting(item)} onRetryWatchingGroup={items => void handleRetryWaitingGroup(items)} onForgetWatching={removeDownload} onSearchProgrammed={target => void handleSearchProgrammed(target)} />}
+            {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} onEpisodeClick={openProgrammedEpisode} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} onRetryWatching={item => void handleRetryWaiting(item)} onRetryWatchingGroup={items => void handleRetryWaitingGroup(items)} onForgetWatching={removeDownload} onSearchProgrammed={target => void handleSearchProgrammed(target)} />}
             <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
             {/* SEENIT-DOWNLOAD-023 : ni téléchargés ni programmés — aucun titre de Sonarr/Radarr invisible. */}
             <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />
+            {openEpisode && <Suspense fallback={null}>
+              <EpisodeDetailModal show={episodeShow} season={openEpisode.season} tmdbShowId={openEpisode.tmdbId} tmdbShowTitle={episodeShow?.title || openEpisode.title} tmdbShowPosterPath={openEpisode.posterPath}
+                // Revue Codex #1086 : pas d'`isHydrating` figé (squelette permanent) ; la fiche se complète elle-même.
+                episode={openEpisode.episode}
+                onShowClick={(tmdbId, mediaType) => closeProgrammedEpisode({ id: tmdbId, mediaType })} onClose={() => closeProgrammedEpisode()} />
+            </Suspense>}
             {listedCompleted.length > 0 && renderSection('Terminés', listedCompleted, 'completed')}
             {cancelledDownloads.length > 0 && renderSection('Annulés', cancelledDownloads, 'cancelled')}
 

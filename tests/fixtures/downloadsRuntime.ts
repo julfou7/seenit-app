@@ -1,6 +1,12 @@
+import React from 'react';
 import { create } from 'zustand';
 import type { LiveDownloadItem } from '../../src/services/sonarrRadarrLive';
 
+// Retour terrain du 16/11 : fiche d'épisode ouverte depuis Programmés (remplace la vraie fiche, trop lourde pour le harnais).
+export function EpisodeDetailModal({ tmdbShowId, season, episode, onClose }: { tmdbShowId?: number; season: number; episode: { episode_number: number }; onClose: () => void }) {
+  return React.createElement('div', { role: 'dialog', 'data-episode-detail-stub': `${tmdbShowId}:${season}:${episode.episode_number}` },
+    React.createElement('button', { type: 'button', onClick: onClose }, 'Fermer'));
+}
 export const telemetry = { removed: [] as string[], opened: [] as string[], requested: [] as number[], searched: 0, mutations: [] as Array<{ quality: string }>, c411Results: false, queries: [] as string[], qualities: [] as string[], presence: [] as string[], pushed: [] as string[], programmed: false, unmonitored: [] as string[], added: [] as string[], arrDeleted: [] as string[] };
 // #879 — versions de la page « Version précise » (C411 simulé) : la conseillée n'est pas la première reçue.
 const day = 86_400_000;

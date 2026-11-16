@@ -38,13 +38,15 @@ interface EpisodeDetailModalProps {
   episode: EpisodeDetailData;
   isHydrating?: boolean;
   tmdbShowTitle?: string;
+  /** Revue Codex #1086 : affiche TMDB (« /abc.jpg ») d'une série hors bibliothèque, reprise si l'épisode est marqué vu. */
+  tmdbShowPosterPath?: string;
   tmdbShowId?: number;
   onShowClick?: (tmdbId: number, mediaType?: 'tv' | 'movie') => void;
   onClose: () => void;
   onLoadSeason?: (seasonNum: number) => Promise<EpisodeDetailData[] | { episodes?: EpisodeDetailData[] } | null | undefined>;
 }
 
-export function EpisodeDetailModal({ show, season: initialSeason, episode: initialEpisode, isHydrating = false, tmdbShowTitle, tmdbShowId, onShowClick, onClose, onLoadSeason }: EpisodeDetailModalProps) {
+export function EpisodeDetailModal({ show, season: initialSeason, episode: initialEpisode, isHydrating = false, tmdbShowTitle, tmdbShowPosterPath, tmdbShowId, onShowClick, onClose, onLoadSeason }: EpisodeDetailModalProps) {
   const dialogRootRef = useRef<HTMLDivElement>(null);
   const [currentSeason, setCurrentSeason] = useState(initialSeason);
   const [currentEpisode, setCurrentEpisode] = useState(initialEpisode);
@@ -61,10 +63,10 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const { showToast } = useToastStore();
 
   // Find live show from Zustand store so updates are instantly reactive
+  // Revue Codex #1086 : un épisode appartient à une série ; un film de même numéro TMDB n'est jamais retenu.
   const liveShow = shows.find(s =>
     (show?.id && s.id === show.id) ||
-    (show?.tmdbId && s.tmdbId === show.tmdbId) ||
-    (tmdbShowId && s.tmdbId === tmdbShowId)
+    (s.mediaType !== 'movie' && ((show?.tmdbId && s.tmdbId === show.tmdbId) || (tmdbShowId && s.tmdbId === tmdbShowId)))
   );
   const activeShow = liveShow || show;
 
@@ -606,7 +608,7 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
         status: 'watching' as const,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        posterPath: activeShow?.posterPath || null,
+        posterPath: activeShow?.posterPath || tmdbShowPosterPath || null,
         backdropPath: activeShow?.backdropPath || null,
         seenEpisodes: [],
         episodeRecords: {},

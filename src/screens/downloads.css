@@ -60,6 +60,9 @@
 .programmed__cancel { flex:none; min-height:44px; min-width:44px; margin-right:-6px; padding:0 8px; border-radius:12px; color:#a1a1aa; font-size:13px; font-weight:700; }
 .programmed__cancel--icon { display:grid; place-items:center; padding:0; margin-right:0; }
 .programmed__row-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; padding:4px 0; }
+/* Retour terrain du 16/11 : l'épisode programmé se touche pour ouvrir sa fiche (code + titre + date, 44 px au moins). */
+.programmed__row-open { flex:1; min-width:0; min-height:44px; display:flex; align-items:center; gap:10px; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; border-radius:10px; }
+.programmed__row-open:active:not(:disabled) { background:#ffffff0a; }
 .programmed__row-title { font-size:14px; font-weight:700; line-height:1.3; overflow-wrap:anywhere; }
 .programmed__row-date { font-size:12px; font-weight:800; color:#7dd3fc; }
 /* Menu ⋯ d'une carte programmée : qualité 1080p/4K et annulation. */
