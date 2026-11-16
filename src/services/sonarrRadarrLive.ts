@@ -10,6 +10,7 @@ import { auth } from '../lib/firebase';
 import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope';
 import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
 import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
+import { trackerRefusal } from '../features/downloads/trackerRefusal';
 import { isSafeMagnetLink } from '../features/downloads/magnetLink';
 import {
   type SonarrRadarrConfig,
@@ -350,9 +351,37 @@ async function fetchAllArrQueuePages(
   return allRecords;
 }
 
-async function fetchQbitTorrentQueue(config: SonarrRadarrConfig): Promise<any> {
+async function fetchQbitTorrentQueue(config: SonarrRadarrConfig): Promise<unknown> {
+  return qbitGet(config, '/api/v2/torrents/info?filter=all&sort=added_on&reverse=true');
+}
+
+// Retour terrain du 16/11 (« bloqué faute de ratio, SeenIt montre un téléchargement à 0 % sans explication ») : le message
+// des trackers d'un torrent à l'arrêt est relu au plus une fois par minute et par torrent (5 torrents par relecture).
+const trackerNotes = new Map<string, { at: number; note: string | null }>();
+const TRACKER_NOTE_TTL_MS = 60_000;
+const STOPPED_STATES = new Set(['stalledDL', 'metaDL', 'downloading', 'forcedDL', 'queuedDL']);
+
+async function fetchTrackerRefusals(config: SonarrRadarrConfig, torrents: unknown[]): Promise<Map<string, string>> {
+  const notes = new Map<string, string>();
+  const now = Date.now();
+  const stopped = torrents.map(torrent => torrent as { hash?: string; state?: string; dlspeed?: number; progress?: number })
+    .filter(torrent => torrent.hash && STOPPED_STATES.has(String(torrent.state)) && !(Number(torrent.dlspeed) > 0) && Number(torrent.progress || 0) < 0.995)
+    .slice(0, 5);
+  await Promise.allSettled(stopped.map(async torrent => {
+    const hash = String(torrent.hash);
+    let cached = trackerNotes.get(hash);
+    if (!cached || now - cached.at > TRACKER_NOTE_TTL_MS) {
+      cached = { at: now, note: trackerRefusal(await qbitGet(config, `/api/v2/torrents/trackers?hash=${encodeURIComponent(hash)}`)) };
+      trackerNotes.set(hash, cached);
+    }
+    if (cached.note) notes.set(hash, cached.note);
+  }));
+  return notes;
+}
+
+async function qbitGet(config: SonarrRadarrConfig, path: string): Promise<unknown> {
   const qbitBase = cleanUrl(config.qbittorrentUrl || '');
-  const fetchInfo = async (forceRelogin = false): Promise<any> => {
+  const fetchInfo = async (forceRelogin = false): Promise<unknown> => {
     if (forceRelogin) invalidateQbitCache(qbitBase, config.qbittorrentUsername, false);
     let cookieHeader = '';
     if (config.qbittorrentUsername || config.qbittorrentPassword) {
@@ -362,12 +391,12 @@ async function fetchQbitTorrentQueue(config: SonarrRadarrConfig): Promise<any> {
     }
     const headers: Record<string, string> = { Accept: 'application/json', Referer: qbitBase, Origin: qbitBase };
     if (cookieHeader) headers.Cookie = cookieHeader;
-    return executeGet(`${qbitBase}/api/v2/torrents/info?filter=all&sort=added_on&reverse=true`, headers);
+    return executeGet(`${qbitBase}${path}`, headers);
   };
 
   try {
     return await fetchInfo(false);
-  } catch (firstError: any) {
+  } catch (firstError: unknown) {
     if (!isQbitAuthError(firstError) || !(config.qbittorrentUsername || config.qbittorrentPassword)) throw firstError;
     return fetchInfo(true);
   }
@@ -580,6 +609,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
       recordSourceResult('qbittorrent', config.qbittorrentUrl, true);
       sourceHealth.qbittorrent = { configured: true, ok: true, checkedAt: Date.now() };
       if (Array.isArray(res)) {
+        const refusals = await fetchTrackerRefusals(config, res).catch(() => new Map<string, string>());
         for (const t of res) {
           const isDone = Boolean(
             (typeof t.progress === 'number' && t.progress >= 0.995) ||
@@ -602,13 +632,14 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           ].filter(Boolean) as string[]));
 
           const isQbitError = t.state === 'error' || t.state === 'missingFiles';
-          const qbitErrorMsg = isQbitError ? 'Erreur de téléchargement (espace disque insuffisant ou fichier manquant)' : undefined;
+          const trackerNote = !isQbitError && !isDone ? refusals.get(String(t.hash)) : undefined;
+          const qbitErrorMsg = isQbitError ? 'Erreur de téléchargement (espace disque insuffisant ou fichier manquant)' : trackerNote;
           const qbitStatus = isQbitError
             ? 'error'
-            : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'stalled' : (t.state === 'pausedDL' ? 'paused' : 'downloading')));
+            : trackerNote ? 'warning' : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'stalled' : (t.state === 'pausedDL' ? 'paused' : 'downloading')));
           const qbitStatusText = isQbitError
             ? 'Erreur'
-            : (isDone
+            : trackerNote ? 'Bloqué par le tracker' : (isDone
                 ? 'Téléchargement terminé 🍿'
                 : (t.state === 'stalledDL'
                     ? 'En attente de sources'
@@ -706,7 +737,7 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
             } else {
               existing.status = qbitStatus;
               existing.statusText = qbitStatusText;
-              existing.errorMessage = undefined;
+              existing.errorMessage = trackerNote;
             }
           } else {
             // Pour qBittorrent direct sans correspondance Radarr/Sonarr, n'ajouter les complétés que si non terminés ou récents

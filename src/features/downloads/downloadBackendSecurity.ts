@@ -57,7 +57,7 @@ export function isAllowedServiceProxyPath(rawUrl: string, method: string): boole
     { method: 'POST', path: /^\/api\/v3\/(?:series|movie|command|release(?:\/push)?|notification|indexer\/testall)$/ },
     { method: 'PUT', path: /^\/api\/v3\/(?:series|movie)(?:\/\d+)?$|^\/api\/v3\/(?:episode|notification)\/\d+$/ },
     { method: 'DELETE', path: /^\/api\/v3\/queue\/\d+$/ },
-    { method: 'GET', path: /^\/api\/v2\/(?:app\/version|torrents\/(?:info|files))$/ },
+    { method: 'GET', path: /^\/api\/v2\/(?:app\/version|torrents\/(?:info|files|trackers))$/ },
     { method: 'POST', path: /^\/api\/v2\/(?:auth\/login|torrents\/(?:add|delete|filePrio|pause|resume|stop|start))$/ }
   ];
   return allowed.some(rule => rule.method === method && rule.path.test(pathname));
