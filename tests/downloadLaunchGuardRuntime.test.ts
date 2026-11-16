@@ -12,6 +12,7 @@ const runtime = await bundleDownloadRuntime(`export { searchAndDownloadInRadarr,
   sonarrRadarrTransport: `export const cleanUrl=url=>url;
     export const executeGet=url=>globalThis.__arrLaunchFixture.get(url);
     export const executeArrInteractiveGet=executeGet;
+export const executeDelete=async url=>{throw new Error('DELETE inattendu '+url)};
     export const executePost=(url,body)=>globalThis.__arrLaunchFixture.post(url,body);
     export const executeArrInteractivePost=executePost;export const executePut=async()=>({});
     export const loginQBittorrent=async()=>({success:true});export const resolveQualityProfileId=()=>1;`
