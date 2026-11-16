@@ -11,6 +11,7 @@ import { buildQbitSessionScopeKey } from '../features/downloads/qbitSessionScope
 import { nextDownloadSourceBackoffMs, shouldFetchNextArrQueuePage } from '../features/downloads/downloadPollingPolicy';
 import { executeDownloadMutationOnce } from '../features/downloads/downloadMutationPolicy';
 import { trackerRefusal } from '../features/downloads/trackerRefusal';
+import { noSourceMessage, noSourceSeconds } from '../features/downloads/noSourceStall';
 import { isSafeMagnetLink } from '../features/downloads/magnetLink';
 import {
   type SonarrRadarrConfig,
@@ -496,10 +497,11 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           isRestored: false
             });
           }
-        } catch (e: any) {
+        } catch (e: unknown) {
+          const message = e instanceof Error ? e.message : '';
           recordSourceResult('sonarr', config.sonarrUrl, false);
-          sourceHealth.sonarr = { configured: true, ok: false, checkedAt: Date.now(), error: e?.message || 'Sonarr indisponible' };
-          if (!e?.message?.includes('PWA Web')) {
+          sourceHealth.sonarr = { configured: true, ok: false, checkedAt: Date.now(), error: message || 'Sonarr indisponible' };
+          if (!message.includes('PWA Web')) {
             console.warn('[LiveQueue] Erreur Sonarr queue:', e);
           }
         }
@@ -640,14 +642,16 @@ export async function fetchLiveDownloadsQueue(config: SonarrRadarrConfig): Promi
           ].filter(Boolean) as string[]));
 
           const isQbitError = t.state === 'error' || t.state === 'missingFiles';
-          const trackerNote = !isQbitError && !isDone ? refusals.get(String(t.hash)) : undefined;
+          // #1077 : sans refus du tracker, un transfert sans aucune source depuis 30 min est aussi à régler.
+          const stalledFor = !isQbitError && !isDone ? noSourceSeconds(t) : null;
+          const trackerNote = !isQbitError && !isDone ? refusals.get(String(t.hash)) ?? (stalledFor !== null ? noSourceMessage(stalledFor) : undefined) : undefined;
           const qbitErrorMsg = isQbitError ? 'Erreur de téléchargement (espace disque insuffisant ou fichier manquant)' : trackerNote;
           const qbitStatus = isQbitError
             ? 'error'
             : trackerNote ? 'warning' : (isDone ? 'completed' : (t.state === 'stalledDL' ? 'stalled' : (t.state === 'pausedDL' ? 'paused' : 'downloading')));
           const qbitStatusText = isQbitError
             ? 'Erreur'
-            : trackerNote ? 'Bloqué par le tracker' : (isDone
+            : trackerNote ? (stalledFor !== null && !refusals.has(String(t.hash)) ? 'Aucune source' : 'Bloqué par le tracker') : (isDone
                 ? 'Téléchargement terminé 🍿'
                 : (t.state === 'stalledDL'
                     ? 'En attente de sources'

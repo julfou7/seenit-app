@@ -992,7 +992,9 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   plus de saut à l'ouverture, et une annulation rend l'épisode aussitôt programmable dans sa fiche. Un
   transfert sans source connectée reste dans « En cours » (« En attente de sources ») ; les messages du client
   sont en français. Depuis la v1.4.329, un transfert à l'arrêt que le tracker refuse (ratio insuffisant, torrent
-  retiré…) passe dans « À régler » avec la raison lue dans qBittorrent et la marche à suivre. Programmer un épisode précis ne programme plus le reste de sa saison (`SEENIT-DOWNLOAD-017`).
+  retiré…) passe dans « À régler » avec la raison lue dans qBittorrent et la marche à suivre. Depuis la v1.4.334
+  (#1077), un transfert sans aucune source (ni connectée, ni connue de l'essaim) depuis 30 minutes y passe aussi
+  (« Aucune source depuis 2 h ») avec « Choisir une version » ; une source qui revient le remet « En cours ». Programmer un épisode précis ne programme plus le reste de sa saison (`SEENIT-DOWNLOAD-017`).
   Depuis la v1.4.284 (`SEENIT-DOWNLOAD-020`) : les **recherchés** y figurent aussi — surveillés, déjà sortis,
   sans fichier (« Sorti sam. 31 oct. · recherché », « Recherché · pas encore de version »), après les sorties à
   venir. Depuis la v1.4.314, un recherché que Sonarr/Radarr refuseront faute de place, prouvé par leurs propres

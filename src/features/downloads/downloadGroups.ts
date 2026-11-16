@@ -2,6 +2,7 @@ import type { LiveDownloadItem } from '../../services/sonarrRadarrLive';
 import { hasExplicitDownloadError, isDownloadCompleted } from './downloadStatePolicy.ts';
 import { frenchArrMessage } from './arrStatusMessages.ts';
 import { trackerRefusalHint } from './trackerRefusal.ts';
+import { NO_SOURCE_HINT } from './noSourceStall.ts';
 
 export type DownloadGroup = 'attention' | 'active' | 'waiting' | 'completed' | 'cancelled';
 /** Une carte unique ; une panne ou un import en attente ne disparaît jamais derrière 100 %. */
@@ -33,6 +34,8 @@ export function isWatchedWaitingRequest(item: Pick<LiveDownloadItem, 'status' | 
 export function downloadProblem(message: string): { title: string; hint: string } {
   // Retour terrain du 16/11 : refus du tracker (ratio insuffisant…) lu dans qBittorrent.
   if (/^Bloqué par le tracker/.test(message)) return { title: message.replace(/\.$/, ''), hint: trackerRefusalHint(message) };
+  // #1077 : transfert sans aucune source depuis longtemps.
+  if (/^Aucune source depuis/.test(message)) return { title: message, hint: NO_SOURCE_HINT };
   if (/manual import|import manuel/i.test(message)) return { title: 'Import manuel requis', hint: 'Le fichier est arrivé, mais le client n’a pas confirmé son import. Choisis une autre version ou vérifie l’import dans le client.' };
   if (/not an upgrade|pas une amélioration/i.test(message)) return { title: 'Une version équivalente existe déjà', hint: 'Choisis une autre qualité pour chercher une amélioration. Aucun remplacement n’a été confirmé.' };
   // Jamais d'anglais dans la carte (retour terrain du 08/11) : le message du client est traduit.
