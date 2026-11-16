@@ -1032,7 +1032,8 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni
   « Radarr » : « Film · 4K », « Série · 4K · 3 épisodes ». Depuis la v1.4.285, en détaillé, les épisodes d'une
   série se replient (« Voir les 9 épisodes · 8 recherchés » / « Masquer les 9 épisodes ») et sont repliés par
-  défaut au-delà de 3. Depuis la v1.4.287, un recherché déjà vu dans SeenIt depuis plus de 24 h n'y figure plus, et
+  défaut au-delà de 3 ; depuis la v1.4.336, toucher un épisode ouvre sa fiche (même hors bibliothèque, lue sur
+  TMDB). Depuis la v1.4.287, un recherché déjà vu dans SeenIt depuis plus de 24 h n'y figure plus, et
   les toasts de Programmés et de Téléchargés gardent l'affiche et ouvrent la fiche au toucher. La synchronisation ne recopie pas toute la
   bibliothèque Sonarr/Radarr : un titre déjà sur le disque se voit sur sa fiche (présence), pas dans cet onglet.
   Depuis la v1.4.288 (`SEENIT-DOWNLOAD-022`), titres, affiches et titres d'épisodes viennent de la fiche TMDB en
