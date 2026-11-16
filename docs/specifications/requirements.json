@@ -3926,7 +3926,7 @@
         },
         {
           "file": "tests/releaseAudio.test.ts",
-          "contains": "SEENIT-DOWNLOAD-011 distingue MULTI VFF et MULTI VFQ sans inventer une variante"
+          "contains": "SEENIT-DOWNLOAD-011 dit toujours VFF ou VFQ selon la convention des releases françaises"
         }
       ]
     },

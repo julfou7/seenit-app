@@ -1274,14 +1274,16 @@ pour le cache des sagas et univers.
   déplacement du fichier, poll ou réouverture de l'application.
 - La progression distante garde ses décimales ; l'interface affiche un entier tronqué. La phase
   de recherche n'invente ni pourcentage ni message technique du client.
-- **SEENIT-DOWNLOAD-011** — Les cartes et les résultats de recherche qualifient l'audio depuis des
-  marqueurs explicites de la release : VFF, VFQ et MULTI. MULTI/FRENCH seul ne prouve aucune variante
-  française. Ces marqueurs ne servent jamais à identifier le média. « Chercher une autre release »,
-  disponible sur une carte terminale identifiée par TMDB, ouvre une recherche interactive du film,
+- **SEENIT-DOWNLOAD-011** — Les cartes et les résultats de recherche qualifient l'audio depuis le nom de la
+  release. Décision du propriétaire du 16/11/2026 (#661, « pour les films Multi ou VF, afficher toujours VFF ou VFQ ») :
+  une version avec piste française dit toujours sa variante, selon la convention des releases françaises — VFQ
+  quand le nom porte VFQ, QC ou QUEBEC ; VFF + VFQ pour VF2 ou les deux marques ; VFF sinon (MULTI, FRENCH, VF,
+  VFI, TRUEFRENCH). Une VOSTFR seule n'a pas de variante. Ces marqueurs ne servent jamais à identifier le média.
+  « Chercher une autre release », disponible sur une carte identifiée par TMDB, ouvre une recherche interactive du film,
   de la saison ou de l'épisode exact dans son client Arr existant. La consultation ne crée pas de média,
-  ne change pas de profil et ne lance aucun transfert ; depuis le retour terrain du 16/11, seul un appui explicite
-  sur « Passer en 4K / 1080p », proposé quand le profil refuse la qualité d'une version, applique le profil
-  SeenIt correspondant au film ou à la série puis relance la consultation. Une version refusée uniquement parce qu'un
+  ne change pas de profil et ne lance aucun transfert ; depuis la v1.4.328, choisir une version refusée seulement pour
+  sa qualité applique d'abord le profil SeenIt 4K ou 1080p au film ou à la série, relit la même version puis l'envoie
+  (un seul appui). Une version refusée uniquement parce qu'un
   téléchargement du même titre est déjà en file reste choisissable : « Remplacer par cette version » l'envoie d'abord,
   puis annule l'ancien transfert (un envoi en échec laisse l'ancien continuer). L'écran partage les pastilles de filtre et
   les cartes de « Version précise » ; les refus du client sont traduits, une raison commune dite une fois. La liste indique audio, qualité, taille, seeders

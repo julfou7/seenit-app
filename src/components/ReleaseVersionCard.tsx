@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft } from 'lucide-react';
-import { formatReleaseSize, VERSION_FILTERS, type DescribedRelease, type ReleaseLike, type VersionFilter } from '../features/downloads/releaseVersions';
+import { formatReleaseSize, hasFrenchAudio, VERSION_FILTERS, type DescribedRelease, type ReleaseLike, type VersionFilter } from '../features/downloads/releaseVersions';
+import { frenchVariant } from '../features/downloads/releaseAudio';
 import { releaseBadges, releaseReadableTitle } from '../features/downloads/releaseBadges';
 import { cn } from '../lib/utils';
 
@@ -31,7 +32,8 @@ export function VersionFilterChips({ value, onChange }: { value: VersionFilter; 
 
 // La langue est déjà dans la ligne repliée (« Multi », « Français », « VO sous-titrée ») : ces badges la
 // répéteraient. VFF et VFQ restent, ils précisent la version française.
-const LANGUAGE_REPEATS = new Set(['MULTI', 'VF', 'VOSTFR']);
+// #661 (16/11) : VFF/VFQ sont désormais dans la ligne de langue (« Multi VFF ») : plus de badge en double.
+const LANGUAGE_REPEATS = new Set(['MULTI', 'VF', 'VOSTFR', 'VFF', 'VFQ']);
 
 /**
  * Carte d'une version (maquette DlVersion), partagée par « Version précise » et la recherche avancée :
@@ -49,6 +51,8 @@ export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggl
   const seeders = Number(release.seeders) || 0;
   const leechers = Number(release.leechers) || 0;
   const readable = releaseReadableTitle(release.name);
+  // #661 : une version avec piste française dit toujours laquelle (VFF par défaut, VFQ quand le nom le marque).
+  const variant = hasFrenchAudio(entry.language) ? frenchVariant(release.name) ?? 'VFF' : null;
   const readableTitle = [readable.title, readable.episode, readable.year].filter(Boolean).join(' · ');
   // Retour terrain du 16/11 (« Autre version » : une fine barre par version) : dans une liste en colonne qui défile,
   // la carte ne rétrécit jamais (`shrink-0`), sinon `overflow-hidden` l'écrase dès qu'il y a beaucoup de versions.
@@ -58,7 +62,7 @@ export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggl
       <span className={cn('w-16 h-11 shrink-0 rounded-xl grid place-items-center text-[14.5px] font-extrabold', entry.quality === '4K' ? 'bg-zinc-100 text-black' : 'bg-[#2A2A2F] text-zinc-100')}>{entry.quality}</span>
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
         {technical && <span data-release-title className="text-[14px] font-bold leading-snug text-zinc-100 line-clamp-2 break-words">{readableTitle}</span>}
-        <span className="flex items-center gap-2 min-w-0"><strong className="truncate text-[15px] font-extrabold">{entry.language}{entry.light ? ' · Light' : ''}</strong>{current && <span className="shrink-0 rounded-md bg-[#86EFAC] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Actuelle</span>}{entry.recommended && !current && <span className="shrink-0 rounded-md bg-[#E5A93D] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Conseillée</span>}</span>
+        <span className="flex items-center gap-2 min-w-0"><strong className="truncate text-[15px] font-extrabold">{entry.language === 'Français' && variant ? variant : entry.language}{entry.language === 'Multi' && variant ? ` ${variant}` : ''}{entry.light ? ' · Light' : ''}</strong>{current && <span className="shrink-0 rounded-md bg-[#86EFAC] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Actuelle</span>}{entry.recommended && !current && <span className="shrink-0 rounded-md bg-[#E5A93D] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Conseillée</span>}</span>
         {technical
           ? <span className="text-[13px] text-zinc-400">{formatReleaseSize(release.size)} · <span data-seeders className="font-bold text-[#86EFAC]"><span aria-hidden="true">↑ </span>{seeders.toLocaleString('fr-FR')}<span className="sr-only"> seeders</span></span> · <span data-leechers className="font-bold text-[#FB7185]"><span aria-hidden="true">↓ </span>{leechers.toLocaleString('fr-FR')}<span className="sr-only"> leechers</span></span></span>
           // Retour terrain du 16/11 (« vire Rapide et Moyen ; c'est trop simple, il faut plus d'éléments pour choisir ») :

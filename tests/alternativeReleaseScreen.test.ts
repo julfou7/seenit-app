@@ -93,6 +93,9 @@ test('carte de version jamais écrasée dans une longue liste', () => {
   const card = readFileSync('src/components/ReleaseVersionCard.tsx', 'utf8');
   // Retour terrain du 16/11 (« vire Rapide et Moyen ; trop simple, il faut plus d'éléments pour choisir »).
   assert.doesNotMatch(card, /speedLabel|SPEED_COLOR/, 'plus de Rapide / Moyen');
+  // #661 (16/11) : « Multi VFF » / « VFQ » dans la ligne de langue, jamais en badge doublon.
+  assert.match(card, /const variant = hasFrenchAudio\(entry\.language\) \? frenchVariant\(release\.name\) \?\? 'VFF' : null;/);
+  assert.match(card, /const LANGUAGE_REPEATS = new Set\(\['MULTI', 'VF', 'VOSTFR', 'VFF', 'VFQ'\]\);/);
   assert.match(card, /\{badges\.length > 0 && <span data-release-badges[\s\S]*?\(open \? badges : badges\.slice\(0, 6\)\)/, 'type de release visible repliée, complet dépliée');
   assert.match(card, /source\{seeders > 1 \? 's' : ''\}/, 'nombre de sources visible');
   // Retour du 16/11 sur la v1.4.330 : la page (`seenit-dialog-layer`) réserve déjà la barre d'état — jamais deux fois.

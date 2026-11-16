@@ -1081,7 +1081,8 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   la même version est relue puis envoyée), sans bouton « Passer en 4K » séparé ni retour sur la page. L'utilisateur
   confirme le seul candidat sélectionné ; fermer ou revenir annule la consultation. Un échec d'envoi
   n'entraîne jamais le lancement d'une autre release. Les cartes du suivi conservent ces badges audio ;
-  MULTI/FRENCH seul reste une variante inconnue.
+  depuis la v1.4.333 (#661), une version avec piste française dit toujours VFF ou VFQ (« Multi VFF ») : VFQ quand
+  le nom porte VFQ, QC ou QUEBEC, VFF + VFQ pour VF2, VFF sinon.
   Une version actuelle reconnue par hash reste non sélectionnable ; une demande active du même scope
   bloque un nouvel envoi. C411 depuis une fiche Film ajoute si nécessaire le film exact sans recherche
   automatique concurrente, vérifie le parseur Radarr et n'envoie que la release choisie.
