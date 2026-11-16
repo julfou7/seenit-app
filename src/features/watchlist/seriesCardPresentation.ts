@@ -35,6 +35,8 @@ export interface SeriesSeasonProgress {
   unknownTail: boolean;
   knownEpisodes: number;
   availableUnseen: number;
+  /** Épisodes de la saison pas encore vus, sortis ou non (retour du 16/11 : « Plus que N » = fin de saison). */
+  remainingInSeason?: number;
   detail?: string;
 }
 
@@ -249,6 +251,7 @@ export function buildSeriesSeasonProgress(
     unknownTail,
     knownEpisodes: renderTotal,
     availableUnseen,
+    remainingInSeason: Math.max(0, renderTotal - watched),
     detail,
   };
 }

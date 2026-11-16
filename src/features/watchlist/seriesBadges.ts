@@ -28,6 +28,13 @@ export function seriesBadge(show: Show, episode: SeriesCardEpisode | null, progr
   const lastSeason = Math.max(episode.last_season_number || 0, ...Object.values(show.seasonProgress || {}).map(season => season.last_season_number || season.season_number), ...(show.seasonsCache || []).map((season: { season_number: number }) => season.season_number));
   const seriesFinale = (show.seriesEnded || show.tmdbStatus === 'Ended') && lastSeason === episode.season_number;
   if (finale) return { label: seriesFinale ? 'Final' : 'Fin saison', tone: seriesFinale ? 'final' : 'season' };
-  if (age >= 0 && !progress.totalUnknown && [2, 3].includes(progress.availableUnseen)) return { label: `Plus que ${progress.availableUnseen}`, tone: 'remaining' };
+  // Retour terrain du 16/11 (Dexter S02, 3 sortis sur 10) : « Plus que N » veut dire N épisodes avant la fin de la
+  // saison — seulement quand tous les restants sont sortis ; sinon le nombre disponible (« 3 dispo »).
+  if (age >= 0 && !progress.totalUnknown && [2, 3].includes(progress.availableUnseen)) {
+    // Fin de saison non prouvée (restants inconnus) : jamais « Plus que ».
+    return progress.remainingInSeason !== undefined && progress.availableUnseen >= progress.remainingInSeason
+      ? { label: `Plus que ${progress.availableUnseen}`, tone: 'remaining' }
+      : { label: `${progress.availableUnseen} dispo`, tone: 'new' };
+  }
   return age >= 2 && age <= 5 ? { label: 'Nouveau', tone: 'new' } : null;
 }
