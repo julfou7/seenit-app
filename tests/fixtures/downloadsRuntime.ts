@@ -31,6 +31,8 @@ export const AlternativeReleaseModal = () => null;
 export const beginDownloadRequest = (request: { quality: string }) => { telemetry.mutations.push(request); return 'fixture-request'; };
 export const acceptDownloadRequest = () => {};
 export const failDownloadRequest = () => {};
+export const dismissDownloadRequest = () => {};
+export const isAlreadyAvailableMessage = (message?: string) => /est déjà disponible/i.test(message || '');
 export const updateDownloadRequest = () => {};
 export const useMediaPresence = () => ({ loading: false, episodesHasFile: {}, seasonsHasFile: {}, radarrHasFile: false, plexInfo: null });
 // v1.4.281 : une annulation dans « Programmés » relit la présence de la fiche (épisode à nouveau sélectionnable).
