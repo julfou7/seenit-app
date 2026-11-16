@@ -120,15 +120,23 @@ export function EpisodeModeControl({ episode, state, picked, progress, onToggle 
       <svg viewBox="0 0 100 100" width="34" height="34" aria-hidden="true"><circle cx="50" cy="50" r="38" fill="none" stroke="#3f3f46" strokeWidth="9" /><circle cx="50" cy="50" r="38" fill="none" stroke="#F4F4F5" strokeWidth="9" strokeLinecap="round" strokeDasharray={`${(2 * Math.PI * 38 * pct / 100).toFixed(1)} 239`} transform="rotate(-90 50 50)" /><text x="50" y="59" textAnchor="middle" fontSize="27" fontWeight="800" fill="#F4F4F5">{pct}</text></svg>
     </span>;
   }
-  if (state === 'present') return <span role="img" aria-label={`Épisode ${episode} téléchargé`} className="w-11 h-11 shrink-0 grid place-items-center"><svg viewBox="0 0 100 100" width="34" height="34" aria-hidden="true"><circle cx="50" cy="50" r="42" fill="#F4F4F5" /><path d="M50 27v30M37 45l13 13 13-13M34 70h32" fill="none" stroke="#0B0B0D" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round" /></svg></span>;
+  // Retour terrain du 16/11 (« rien n'est téléchargeable ici mais visuellement ce n'est pas clair, ça donne envie de
+  // cliquer ») : un épisode déjà là n'a plus de rond blanc à flèche (lu comme un bouton) mais une étiquette passive.
+  if (state === 'present') return <PassiveModeLabel label={`Épisode ${episode} déjà téléchargé`}>✓ Téléchargé</PassiveModeLabel>;
   return <span aria-hidden="true" className="w-11 h-11 shrink-0" />;
 }
 
+/** État non cochable en mode : texte discret, sans cercle ni contour, jamais confondu avec un bouton. */
+function PassiveModeLabel({ label, tone = 'zinc', children }: { label: string; tone?: 'zinc' | 'sky'; children: React.ReactNode }) {
+  return <span role="img" aria-label={label} data-mode-passive className={cn('shrink-0 min-h-11 px-1 flex items-center text-[12px] font-bold whitespace-nowrap', tone === 'sky' ? 'text-sky-300/70' : 'text-zinc-500')}>{children}</span>;
+}
+
+/** Un épisode qui ne se coche pas en mode (déjà là, programmé, vu, en cours) : la ligne s'efface pour ne pas inviter au toucher. */
+export const isEpisodeInertInMode = (state: EpisodeModeState) => !isEpisodePickable(state) && state !== 'active';
+
 /** #879 — Contrôle d'un épisode à venir en mode : case bleue « Programmer », ou état programmé. */
 export function EpisodeProgramControl({ episode, state, picked, onToggle }: { episode: number; state: EpisodeModeState; picked: boolean; onToggle: () => void }) {
-  if (state === 'programmed') return <span role="img" aria-label={`Épisode ${episode} programmé dans Sonarr`} className="w-11 h-11 shrink-0 grid place-items-center">
-    <svg viewBox="0 0 100 100" width="34" height="34" aria-hidden="true"><circle cx="50" cy="50" r="40" fill="none" stroke={SKY} strokeWidth="8" /><path d="M50 30v22l14 9" fill="none" stroke={SKY} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" /></svg>
-  </span>;
+  if (state === 'programmed') return <PassiveModeLabel tone="sky" label={`Épisode ${episode} déjà programmé dans Sonarr`}>Programmé</PassiveModeLabel>;
   if (!isEpisodeProgrammable(state)) return null;
   return <button type="button" role="checkbox" aria-checked={picked} aria-label={`Programmer l’épisode ${episode}`} onClick={event => { event.stopPropagation(); onToggle(); }} className="w-11 h-11 shrink-0 grid place-items-center">
     <svg viewBox="0 0 100 100" width="34" height="34" aria-hidden="true">

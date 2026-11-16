@@ -7,10 +7,12 @@ import { cn } from '../lib/utils';
 
 /**
  * En-tête commun de « Version précise » et « Autre version ». Retour terrain du 16/11 (« place perdue en haut, ça me
- * gêne sur les deux ») : collé à la barre d'état (aucune marge ajoutée à la zone sûre), titre et média sur 2 lignes serrées.
+ * gêne sur les deux ») : collé à la barre d'état, titre et média sur 2 lignes serrées. Cause racine (retour du 16/11 sur
+ * la v1.4.330, « l'espace vide n'est pas supprimé ») : la page (`seenit-dialog-layer`) réserve déjà la barre d'état en
+ * haut ; l'en-tête l'ajoutait une seconde fois. Il n'ajoute donc plus aucune marge haute.
  */
 export function VersionPageHeader({ label, title, scope, onBack, disabled = false }: { label: string; title: string; scope: string; onBack: () => void; disabled?: boolean }) {
-  return <header data-version-header className="shrink-0 flex items-center gap-1 px-2 pt-[var(--seenit-safe-area-top,env(safe-area-inset-top,0px))] pb-1">
+  return <header data-version-header className="shrink-0 flex items-center gap-1 px-2 pt-0 pb-1">
     <button type="button" onClick={onBack} disabled={disabled} aria-label="Retour" className="w-11 h-11 shrink-0 grid place-items-center rounded-full text-zinc-100 active:bg-white/10"><ChevronLeft size={24} /></button>
     <div className="min-w-0 leading-[1.15]">
       <h2 className="text-[17px] font-extrabold">{label}</h2>

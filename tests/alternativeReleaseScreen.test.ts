@@ -95,6 +95,10 @@ test('carte de version jamais écrasée dans une longue liste', () => {
   assert.doesNotMatch(card, /speedLabel|SPEED_COLOR/, 'plus de Rapide / Moyen');
   assert.match(card, /\{badges\.length > 0 && <span data-release-badges[\s\S]*?\(open \? badges : badges\.slice\(0, 6\)\)/, 'type de release visible repliée, complet dépliée');
   assert.match(card, /source\{seeders > 1 \? 's' : ''\}/, 'nombre de sources visible');
-  assert.match(card, /data-version-header className="shrink-0 flex items-center gap-1 px-2 pt-\[var\(--seenit-safe-area-top,env\(safe-area-inset-top,0px\)\)\] pb-1"/, 'aucune marge ajoutée à la zone sûre');
+  // Retour du 16/11 sur la v1.4.330 : la page (`seenit-dialog-layer`) réserve déjà la barre d'état — jamais deux fois.
+  assert.match(card, /data-version-header className="shrink-0 flex items-center gap-1 px-2 pt-0 pb-1"/, 'aucune seconde marge de barre d’état');
+  const css = readFileSync('src/index.css', 'utf8');
+  assert.match(css, /\.seenit-dialog-layer \{[\s\S]*?padding-top: max\(0\.75rem, var\(--seenit-safe-area-top/, 'la page réserve déjà la barre d’état');
+  assert.match(readFileSync('src/components/ui/DialogLayer.tsx', 'utf8'), /className=\{`seenit-dialog-layer \$\{props\.className \|\| ''\}`\}/);
   assert.match(card, /<article data-version-card=\{release\.id\} className=\{cn\('shrink-0 rounded-\[18px\] bg-\[#161619\] overflow-hidden'/);
 });
