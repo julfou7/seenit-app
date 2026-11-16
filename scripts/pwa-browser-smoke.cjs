@@ -245,18 +245,8 @@ async function testComponentActionHarness(client, viewport, minTouchTargetCssPx)
 }
 
 
-function findChrome() {
-  const candidates = [
-    process.env.CHROME_BIN,
-    '/usr/bin/google-chrome',
-    '/usr/bin/google-chrome-stable',
-    '/usr/bin/chromium',
-    '/usr/bin/chromium-browser',
-  ].filter(Boolean);
-  const found = candidates.find(candidate => fs.existsSync(candidate));
-  if (!found) throw new Error(`Chrome/Chromium introuvable (${candidates.join(', ')}).`);
-  return found;
-}
+// #1079 : recherche de Chrome (Linux, Windows, macOS, puis Edge) dans `find-chrome.cjs`.
+const { chromeCandidates, findChrome } = require('./find-chrome.cjs');
 
 async function waitForHttp(url, timeoutMs = 10_000) {
   const deadline = Date.now() + timeoutMs;
@@ -793,5 +783,6 @@ module.exports = {
   CdpClient,
   findNamedButton,
   findChrome,
+  chromeCandidates,
   waitForHttp,
 };

@@ -141,6 +141,12 @@ de chaque harnais (`timings`). Une condition attendue n'échoue qu'à l'expirati
 l'attente, une exception (élément pas encore rendu) vaut « pas encore ». Sans cette règle, deux courses
 latentes (terrain221, recherche) se révélaient dès que le rythme changeait.
 
+En local (#1079), `validate:change` construit déjà les harnais (#1065). Avant de pousser un changement d'écran, un
+couloir se rejoue en quelques secondes sous Windows, macOS ou Linux (Chrome, sinon Edge ; `CHROME_BIN` prioritaire),
+après `npm run build` : `SEENIT_PWA_ONLY=downloads node scripts/pwa-browser-smoke.cjs` (plusieurs clés séparées par
+des virgules). Le harnais ne charge pas la police de l'app : hors CI, une hauteur dépendant de la police système est
+tolérée d'une ligne ; la CI garde la limite stricte.
+
 ### Politique et syntaxe des workflows
 
 `npm run validate:workflows` est inclus dans le préflight. Il impose une allowlist exacte des workflows
