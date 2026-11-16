@@ -31,11 +31,11 @@ test('refus du tracker lu dans qBittorrent et expliqué en français', () => {
 
 test('le suivi qBittorrent relit les trackers d’un torrent à l’arrêt, au plus une fois par minute', () => {
   const live = readFileSync('src/services/sonarrRadarrLive.ts', 'utf8');
-  assert.match(live, /const TRACKER_NOTE_TTL_MS = 60_000;/);
-  assert.match(live, /\.sort\(\(a, b\) => \(trackerNotes\.get\(a\)\?\.at \?\? 0\) - \(trackerNotes\.get\(b\)\?\.at \?\? 0\)\)\.slice\(0, 5\)/, 'revue Codex #1072 : rotation, jamais toujours les 5 mêmes');
-  assert.match(live, /if \(cached\?\.note && now - cached\.at <= TRACKER_NOTE_MAX_AGE_MS\) notes\.set\(hashOf\(key\), cached\.note\);/, 'notes valides rendues pour tous, jamais une note périmée');
-  assert.match(live, /`\$\{buildQbitSessionScopeKey\(auth\.currentUser\?\.uid, cleanUrl\(config\.qbittorrentUrl \|\| ''\), config\.qbittorrentUsername\)\}\|\$\{String\(torrent\.hash\)\}`/, 'revue Codex #1072 : note propre à la connexion qBittorrent');
-  assert.match(live, /qbitGet\(config, `\/api\/v2\/torrents\/trackers\?hash=\$\{encodeURIComponent\(hashOf\(key\)\)\}`\)/);
+  // #1078 : la mémoire (TTL, rotation, âge maximal, connexion) est testée en exécution dans
+  // downloadReplacementBehavior.test.ts ; ici seul le câblage du suivi qBittorrent est vérifié.
+  const scopeKey = /const scope = buildQbitSessionScopeKey\(auth\.currentUser\?\.uid, cleanUrl\(config\.qbittorrentUrl \|\| ''\), config\.qbittorrentUsername\);/;
+  assert.match(live, scopeKey, 'note propre à la connexion qBittorrent');
+  assert.match(live, /return collectTrackerRefusals\(trackerNotes, torrents, scope,\s*hash => qbitGet\(config, `\/api\/v2\/torrents\/trackers\?hash=\$\{encodeURIComponent\(hash\)\}`\)\);/);
   assert.match(live, /const trackerNote = !isQbitError && !isDone \? refusals\.get\(String\(t\.hash\)\) \?\?/);
   assert.match(live, /existing\.errorMessage = trackerNote;/);
 });
