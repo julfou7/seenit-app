@@ -15,6 +15,8 @@ test('refus du tracker lu dans qBittorrent et expliqué en français', () => {
   assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 4, msg: 'Download not allowed for this torrent' }]), 'Bloqué par le tracker : téléchargement refusé.', 'jamais le texte brut anglais');
   assert.equal(trackerRefusal([{ url: 'udp://public.example:1337', status: 4, msg: 'Connection timed out' }]), null, 'revue Codex #1072 : une panne n’est pas un refus');
   assert.equal(trackerRefusal([{ url: 'https://t.example/a', status: 2, msg: 'Bienvenue !' }]), null, 'message anodin d’un tracker qui fonctionne : rien');
+  for (const msg of ['Operation timed out', 'Operation canceled', 'Connection refused', 'Configuration error'])
+    assert.equal(trackerRefusal([{ url: 'udp://public.example:1337', status: 4, msg }]), null, `revue Codex #1072 : « ${msg} » n’est pas un refus`);
   assert.equal(trackerRefusal([{ url: '** [PeX] **', status: 4, msg: 'ratio' }]), null, 'DHT/PeX/LSD ignorés');
   assert.equal(trackerRefusal(null), null);
 

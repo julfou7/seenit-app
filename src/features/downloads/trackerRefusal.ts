@@ -7,7 +7,9 @@ export interface QbitTrackerEntry { url?: unknown; status?: unknown; msg?: unkno
 
 // Revue Codex #1072 : seul un message qui prouve un refus compte — une panne de connexion (« Connection timed out ») d'un
 // tracker, même au statut « ne fonctionne pas », ne prouve pas que le téléchargement est interdit.
-const REFUSAL = /ratio|credit|crédit|not allowed|non autoris|interdit|bloqu|blocked|banned|unregistered|not registered|torrent not found|introuvable/i;
+// Revue Codex #1072 : « ratio » et « credit » sont des mots entiers (« Operation timed out » n'est pas un refus).
+const RATIO = /\bratio\b|\bcredits?\b|\bcrédits?\b/i;
+const REFUSAL = /\bratio\b|\bcredits?\b|\bcrédits?\b|not allowed|non autoris|interdit|bloqu|blocked|banned|unregistered|not registered|torrent not found|introuvable/i;
 
 export function trackerRefusal(trackers: unknown): string | null {
   if (!Array.isArray(trackers)) return null;
@@ -18,7 +20,7 @@ export function trackerRefusal(trackers: unknown): string | null {
     const message = String(entry?.msg ?? '').trim();
     if (!message) continue;
     if (!REFUSAL.test(message)) continue;
-    if (/ratio|credit|crédit/i.test(message)) return 'Bloqué par le tracker : ratio insuffisant.';
+    if (RATIO.test(message)) return 'Bloqué par le tracker : ratio insuffisant.';
     if (/unregistered|not registered|not found|introuvable/i.test(message)) return 'Bloqué par le tracker : ce torrent n’y existe plus.';
     // Revue Codex #1072 : jamais le message brut (souvent anglais) du tracker — une phrase française reconnue ou générique.
     if (/banned|bann|suspen/i.test(message)) return 'Bloqué par le tracker : compte suspendu.';
