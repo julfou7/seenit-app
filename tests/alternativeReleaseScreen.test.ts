@@ -34,3 +34,10 @@ test('« Autre version » : mêmes pastilles et cartes que « Version précise �
   const service = readFileSync('src/services/arrManualReleases.ts', 'utf8');
   assert.match(service, /target: \{ kind: context\.movieId \? 'movie' as const : 'series' as const, id: targetId \}/);
 });
+
+// Retour terrain du 16/11 (v1.4.325, « Autre version » : une fine barre vide par version) : dans la liste en colonne
+// qui défile, une carte de version ne rétrécit jamais — corrige aussi « Version précise » (carte partagée).
+test('carte de version jamais écrasée dans une longue liste', () => {
+  const card = readFileSync('src/components/ReleaseVersionCard.tsx', 'utf8');
+  assert.match(card, /<article data-version-card=\{release\.id\} className=\{cn\('shrink-0 rounded-\[18px\] bg-\[#161619\] overflow-hidden'/);
+});

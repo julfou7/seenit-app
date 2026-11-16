@@ -35,7 +35,9 @@ export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggl
   const leechers = Number(release.leechers) || 0;
   const readable = releaseReadableTitle(release.name);
   const readableTitle = [readable.title, readable.episode, readable.year].filter(Boolean).join(' · ');
-  return <article data-version-card={release.id} className={cn('rounded-[18px] bg-[#161619] overflow-hidden', open && 'bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)]')}>
+  // Retour terrain du 16/11 (« Autre version » : une fine barre par version) : dans une liste en colonne qui défile,
+  // la carte ne rétrécit jamais (`shrink-0`), sinon `overflow-hidden` l'écrase dès qu'il y a beaucoup de versions.
+  return <article data-version-card={release.id} className={cn('shrink-0 rounded-[18px] bg-[#161619] overflow-hidden', open && 'bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_rgba(229,169,61,0.6)]')}>
     <button type="button" aria-expanded={open} onClick={onToggle} className="w-full min-h-[64px] flex items-center gap-3 px-3 py-2.5 text-left">
       <span className={cn('w-16 h-11 shrink-0 rounded-xl grid place-items-center text-[14.5px] font-extrabold', entry.quality === '4K' ? 'bg-zinc-100 text-black' : 'bg-[#2A2A2F] text-zinc-100')}>{entry.quality}</span>
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
