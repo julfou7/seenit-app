@@ -84,7 +84,7 @@ async function loadBatch() {
   const bundle = await build({ entryPoints: ['src/features/downloads/downloadLaunch.ts'], bundle: true, write: false, platform: 'node', format: 'cjs',
     plugins: [{ name: 'launch-ports', setup(builder) {
       builder.onResolve({ filter: /\/(?:shows\/tmdb|services\/sonarrRadarr|downloadLifecycle|qualityProfileSelection|episodeSeasonPackFallback|downloadAvailability|lib\/firebase)$/ }, args => ({ path: args.path, namespace: 'ports' }));
-      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const tmdb={};export const fetchQualityProfiles=0,searchAndDownloadInRadarr=0,searchAndDownloadInSonarr=0,acceptDownloadRequest=0,beginDownloadRequest=0,failDownloadRequest=0,updateDownloadRequest=0,resolveEffectiveQualityProfileId=0,downloadEpisodeWithSeasonPackFallback=0,availabilityHint=0,noReleaseToastAction=0;export const auth={currentUser:null};' }));
+      builder.onLoad({ filter: /.*/, namespace: 'ports' }, () => ({ contents: 'export const tmdb={};export const fetchQualityProfiles=0,searchAndDownloadInRadarr=0,searchAndDownloadInSonarr=0,acceptDownloadRequest=0,beginDownloadRequest=0,failDownloadRequest=0,dismissDownloadRequest=0,isAlreadyAvailableMessage=0,updateDownloadRequest=0,resolveEffectiveQualityProfileId=0,downloadEpisodeWithSeasonPackFallback=0,availabilityHint=0,noReleaseToastAction=0;export const auth={currentUser:null};' }));
     } }] });
   const module = { exports: {} as Record<string, unknown> };
   vm.runInContext(bundle.outputFiles[0].text, vm.createContext({ module, exports: module.exports }));

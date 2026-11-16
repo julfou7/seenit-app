@@ -17,11 +17,15 @@ const rowKind = (item: LiveDownloadItem): RowKind => {
   if (group === 'completed') return 'done';
   if (group === 'attention') return 'attention';
   if (group === 'waiting') return 'waiting';
+  // Revue Codex #1064 : un transfert fini dont l'import attend n'est pas « en attente » de téléchargement.
+  if (importPending(item)) return 'active';
   return item.status === 'downloading' && Number(item.progress) > 0 ? 'active' : 'queued';
 };
+const importPending = (item: LiveDownloadItem) => item.importState === 'pending' && Number(item.progress) >= 100;
 const percent = (item: LiveDownloadItem) => truncateDownloadProgressPercent(Math.min(100, Math.max(0, Number(item.progress) || 0)));
 
-function rowState(item: LiveDownloadItem, kind: RowKind): string {
+function rowState(item: LiveDownloadItem, kind: RowKind, importDiskNote?: string): string {
+  if (kind === 'active' && importPending(item)) return importDiskNote ? `Téléchargé · import en attente : ${importDiskNote}` : 'Téléchargé · import Plex en cours';
   if (kind === 'done') return item.importState === 'pending' ? 'Téléchargé · import Plex en cours' : 'Téléchargé · prêt à regarder';
   if (kind === 'attention') return item.errorMessage || item.statusText || 'Une intervention est nécessaire';
   if (kind === 'waiting') return 'Pas encore disponible';
@@ -50,7 +54,7 @@ const LEGEND: Array<{ kind: RowKind; one: string; many: string }> = [
  * fiche), puis une ligne par épisode avec son état et ✕ pour l'annuler. Le regroupement repose sur
  * l'identité TMDB/TVDB exacte, jamais sur le titre.
  */
-export function SeasonDownloadCard({ seasonNumber, items, onShowClick, onRemove }: { seasonNumber: number; items: LiveDownloadItem[]; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: (item: LiveDownloadItem) => void }) {
+export function SeasonDownloadCard({ seasonNumber, items, onShowClick, onRemove, importDiskNote }: { seasonNumber: number; items: LiveDownloadItem[]; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; onRemove: (item: LiveDownloadItem) => void; importDiskNote?: string }) {
   const first = items[0];
   const library = useShowsStore(state => findMatchingShowForDownload(first, state.shows));
   const poster = useRef<string | undefined>(undefined);
@@ -84,7 +88,7 @@ export function SeasonDownloadCard({ seasonNumber, items, onShowClick, onRemove 
       </button>
       <div className="download-card__body">
         <button type="button" className="download-card__title" disabled={!id || !onShowClick} onClick={open}>{title}</button>
-        <p className="download-card__scope">{[`Saison ${seasonNumber}`, `${items.length} épisodes`, qualities.length === 1 ? qualities[0] : ''].filter(Boolean).join(' · ')}</p>
+        <p className="download-card__scope">{[`Saison ${seasonNumber}`, `${items.length} épisode${items.length > 1 ? 's' : ''}`, qualities.length === 1 ? qualities[0] : ''].filter(Boolean).join(' · ')}</p>
       </div>
     </div>
     <div className="download-season__bar" role="img" aria-label={`Saison ${seasonNumber} : ${legend.join(', ')}`}>
@@ -98,7 +102,7 @@ export function SeasonDownloadCard({ seasonNumber, items, onShowClick, onRemove 
           <span className="download-season__code">{code}</span>
           <span className="download-season__text">
             <span className="download-season__title">{item.episodeTitle || `Épisode ${item.episodeNumber}`}</span>
-            <span className={`download-season__state is-${kind}`}>{[rowState(item, kind), releaseVariantLabel(item.releaseTitle)].filter(Boolean).join(' · ')}</span>
+            <span className={`download-season__state is-${kind}`}>{[rowState(item, kind, importDiskNote), releaseVariantLabel(item.releaseTitle)].filter(Boolean).join(' · ')}</span>
             {kind === 'active' && <span role="progressbar" aria-label={`Progression de ${code}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={percent(item)} className="download-season__progress"><i style={{ width: `${percent(item)}%` }} /></span>}
           </span>
           <button type="button" className="download-season__remove" onClick={() => onRemove(item)}

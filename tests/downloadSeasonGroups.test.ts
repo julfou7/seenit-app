@@ -24,7 +24,7 @@ test('SEENIT-DOWNLOAD-013 #879 onglet Télécharger : une carte par saison, regr
     item('i', { tmdbId: 77, seasonNumber: 1 })
   ]);
   assert.deepEqual(entries.map(entry => entry.kind === 'season' ? `${entry.key}=${entry.items.map(member => member.id).join('+')}` : entry.item.id),
-    ['tmdb:77:s1=b+a', 'm', 'c', 'd', 'tvdb:400:s3=f+e', 'g', 'h', 'i']);
+    ['tmdb:77:s1=b+a', 'm', 'tmdb:99:s1=c', 'tmdb:77:s2=d', 'tvdb:400:s3=f+e', 'g', 'h', 'i'], 'retour du 15/11 : carte de saison dès un épisode ; sans identité exacte, jamais');
 });
 
 test('SEENIT-DOWNLOAD-013 #879 la carte de saison annule épisode par épisode, avec confirmation', () => {
@@ -34,7 +34,7 @@ test('SEENIT-DOWNLOAD-013 #879 la carte de saison annule épisode par épisode, 
   assert.match(screen, /\(groupSeasons \? groupSeasonDownloads\(items\) : items\.map\(item => \(\{ kind: 'single' as const, item \}\)\)\)\.map\(entry => \{/);
   assert.match(screen, /renderSection\('En cours', activeDownloads, undefined, true\)/);
   assert.equal((screen.match(/renderSection\('[^']+', \w+(?:, '\w+')?\)/g) || []).length, 4, 'les quatre autres sections restent en cartes complètes');
-  assert.match(screen, /<SeasonDownloadCard key=\{entry\.key\} seasonNumber=\{entry\.seasonNumber\} items=\{entry\.items\} onShowClick=\{onShowClick\} onRemove=\{handleRemove\} \/>/, 'même confirmation que les cartes');
+  assert.match(screen, /<SeasonDownloadCard key=\{entry\.key\} seasonNumber=\{entry\.seasonNumber\} items=\{entry\.items\} onShowClick=\{onShowClick\} onRemove=\{handleRemove\} importDiskNote=\{importDiskNote\('tv'\)\} \/>/, 'même confirmation que les cartes');
   assert.doesNotMatch(card, /SwipeableCard|onSwipe/, 'aucun geste qui annulerait toute la saison');
   assert.match(card, /aria-label=\{kind === 'done' \|\| kind === 'attention' \? `Retirer \$\{code\} de la liste` : `Annuler le téléchargement de \$\{code\}`\}/);
 });

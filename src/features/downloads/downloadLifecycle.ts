@@ -100,6 +100,24 @@ export function failDownloadRequest(id: string, message: string, failureCode?: D
   requestOwners.delete(id);
 }
 
+/** Réponse de Sonarr/Radarr quand le fichier est déjà là (`sonarrRadarrSearch`, `episodeSeasonPackFallback`). */
+export const isAlreadyAvailableMessage = (message?: string) => /est déjà disponible/i.test(message || '');
+
+/**
+ * Retour terrain du 16/11 (Dexter S02E01 déjà sur Plex, carte « À régler : déjà disponible ») : une demande qui n'a
+ * rien lancé parce que le fichier existe n'est pas un échec. Elle est fermée (retirée de la liste et du partage),
+ * jamais laissée « À régler ».
+ */
+export function dismissDownloadRequest(id: string, message: string): void {
+  const ownerUid = requestOwners.get(id);
+  if (ownerUid && ownerUid !== auth.currentUser?.uid) return;
+  requestOwners.delete(id);
+  const store = useLiveDownloadStore.getState();
+  store.updateDownloadRequest(id, { progress: 0, status: 'error', statusText: 'Déjà disponible', errorMessage: message, isOptimistic: true, isRestored: false });
+  const item = useLiveDownloadStore.getState().downloads.find(download => download.id === id);
+  if (item) void store.removeDownload(item);
+}
+
 export function updateDownloadRequest(
   id: string,
   patch: Partial<LiveDownloadItem>

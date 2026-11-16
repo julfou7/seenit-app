@@ -17,7 +17,7 @@ function seasonKey(item: LiveDownloadItem): string | null {
 
 /**
  * #879 — Onglet Télécharger : les épisodes d'une même saison d'une même série forment une seule carte
- * (maquette DlOngletSuivi), à la place de la première occurrence ; une saison isolée garde sa carte.
+ * (maquette DlOngletSuivi), à la place de la première occurrence ; depuis le 15/11, dès un seul épisode.
  * L'ordre de la section est conservé ; les épisodes sont rangés par numéro.
  */
 export function groupSeasonDownloads(items: readonly LiveDownloadItem[]): DownloadEntry[] {
@@ -31,7 +31,8 @@ export function groupSeasonDownloads(items: readonly LiveDownloadItem[]): Downlo
   for (const item of items) {
     const key = seasonKey(item);
     const members = key ? groups.get(key) || [] : [];
-    if (!key || members.length < 2) { entries.push({ kind: 'single', item }); continue; }
+    // Retour terrain du 15/11 (« j'aime bien cette vue mais elle n'apparaît pas toujours ») : dès un épisode.
+    if (!key || !members.length) { entries.push({ kind: 'single', item }); continue; }
     if (emitted.has(key)) continue;
     emitted.add(key);
     const first = members[0];

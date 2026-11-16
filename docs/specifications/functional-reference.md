@@ -1005,7 +1005,11 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   recherché l'a dans son menu ⋯ (même chemin que la fiche, qualité affichée, jamais en double). Depuis la
   v1.4.321 : un import nouveau rafraîchit la présence du titre (fiche, « Ajouter E… » à jour) ; une série de
   Téléchargés affiche ses épisodes récupérés (« S02 · E01, E03 ») ; un épisode téléchargé dont l'import attend alors
-  qu'un disque est presque plein l'affiche (« Téléchargé · import en attente : disque D: presque plein (3,8 Go libres) »). Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
+  qu'un disque est presque plein l'affiche (« Téléchargé · import en attente : disque D: presque plein (3,8 Go libres) »).
+  Depuis la v1.4.322 : un import bloqué faute de place (transfert terminé) propose « Relancer l'import » — Sonarr/Radarr
+  réimportent ce téléchargement exact, après vérification qu'il y a désormais assez de place (sinon « Il manque encore
+  … ») ; une relance qui trouve le fichier déjà là se ferme (« Déjà disponible : rien n'a été lancé »), sans carte « À
+  régler » ; la carte de saison d'« En cours » apparaît dès un seul épisode. Un épisode compte comme sorti dès son jour de diffusion local. Une série n'a plus qu'une carte :
   les épisodes demandés depuis SeenIt la rejoignent (sorties à venir puis recherchés) et gardent leur demande (✕ d'une
   ligne = annuler l'attente, « Relancer la recherche » dans ⋯). La section se lit en **compact** (par défaut : une ligne régulière par titre, épisodes repliés au
   chevron) ou en **détaillé** (cartes), au choix mémorisé par compte ; sous le titre, plus de « Sonarr » ni
