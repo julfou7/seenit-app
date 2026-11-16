@@ -1,5 +1,5 @@
 import { cleanUrl, executeGet } from '../../services/sonarrRadarr';
-import { executeArrInteractiveGet, executePut } from '../../services/sonarrRadarrTransport';
+import { executeArrInteractiveGet, executeDelete, executePut } from '../../services/sonarrRadarrTransport';
 import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
 import { resolveEffectiveQualityProfileId, type QualityProfileSummary } from './qualityProfileSelection';
 import type { useDownloadConfigStore } from '../../store/downloadConfigStore';
@@ -33,8 +33,9 @@ export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[
 export interface CalendarIo {
   get: (url: string, headers: Record<string, string>) => Promise<unknown>;
   put: (url: string, body: unknown, headers: Record<string, string>) => Promise<unknown>;
+  delete?: (url: string, headers: Record<string, string>) => Promise<unknown>;
 }
-const defaultIo: CalendarIo = { get: executeGet, put: executePut };
+const defaultIo: CalendarIo = { get: executeGet, put: executePut, delete: executeDelete };
 /** Recherche de versions : même transport long que le lancement (jusqu'à 90 s). */
 const releaseIo: CalendarIo = { get: executeArrInteractiveGet, put: executePut };
 
@@ -215,7 +216,12 @@ export function sortProgrammedItems(items: readonly ProgrammedItem[]): Programme
 export const programmedScope = (config: DownloadConfig) => [isDownloadFeatureEnabled(config), cleanUrl(config.sonarrUrl || ''), config.sonarrApiKey || '', cleanUrl(config.radarrUrl || ''), config.radarrApiKey || ''].join('\n');
 
 /** Déprogrammer : l'épisode (ou le film) n'est plus surveillé ; rien n'est supprimé. */
-export async function unprogramItem(config: DownloadConfig, item: ProgrammedItem, io: CalendarIo = defaultIo): Promise<void> {
+/**
+ * Retour terrain du 16/11 (« La Guerre des mondes » retiré de Programmés, resté dans Radarr en non surveillé : « je
+ * voudrais qu'il soit carrément supprimé de Radarr ») : un film sans fichier est supprimé de Radarr (aucun fichier à
+ * effacer, `deleteFiles=false`) ; un film avec fichier et un épisode ne perdent que leur surveillance.
+ */
+export async function unprogramItem(config: DownloadConfig, item: ProgrammedItem, io: CalendarIo = defaultIo): Promise<'removed' | 'unmonitored'> {
   const isEpisode = item.kind === 'episode';
   const url = isEpisode ? config.sonarrUrl : config.radarrUrl;
   const apiKey = isEpisode ? config.sonarrApiKey : config.radarrApiKey;
@@ -223,7 +229,12 @@ export async function unprogramItem(config: DownloadConfig, item: ProgrammedItem
   const resource = `${cleanUrl(url)}/api/v3/${isEpisode ? 'episode' : 'movie'}/${item.id}`;
   const current = await io.get(resource, headersFor(apiKey)) as Record<string, unknown> | null;
   if (!current || typeof current !== 'object') throw new Error(`${isEpisode ? 'Sonarr' : 'Radarr'} n’a pas retrouvé cet élément.`);
+  if (!isEpisode && current.hasFile !== true && io.delete) {
+    await io.delete(`${resource}?deleteFiles=false`, headersFor(apiKey));
+    return 'removed';
+  }
   await io.put(resource, { ...current, monitored: false }, headersFor(apiKey));
+  return 'unmonitored';
 }
 
 /**

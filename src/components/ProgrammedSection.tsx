@@ -155,11 +155,12 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, watching: watch
     const posterPath = first.posterUrl || null;
     const media = first.tmdbId ? { tmdbId: first.tmdbId, mediaType: first.kind === 'movie' ? 'movie' as const : 'tv' as const } : null;
     try {
-      for (const item of targets) await unprogramItem(config, item);
+      let removed = false;
+      for (const item of targets) removed = (await unprogramItem(config, item)) === 'removed' || removed;
       setHidden(previous => new Set([...previous, ...targets.map(item => `${item.kind}:${item.id}`)]));
       // État synchronisé et fiche relus ensemble : l'épisode ou le film redevient programmable dans sa fiche.
       notifyArrWrite({ tmdbId: first.tmdbId, tvdbId: first.kind === 'episode' ? first.tvdbId : undefined, mediaType: first.kind === 'movie' ? 'movie' : 'tv' });
-      toast({ title: first.kind === 'episode' ? first.seriesTitle : first.title, subtitle: first.kind === 'episode' && targets.length === 1 ? `S${first.season} | E${first.episode}` : undefined, action: targets.length > 1 ? `${targets.length} épisodes ne sont plus programmés.` : 'N’est plus programmé.', posterPath, media }, 'info');
+      toast({ title: first.kind === 'episode' ? first.seriesTitle : first.title, subtitle: first.kind === 'episode' && targets.length === 1 ? `S${first.season} | E${first.episode}` : undefined, action: removed ? 'Retiré de Radarr.' : targets.length > 1 ? `${targets.length} épisodes ne sont plus programmés.` : 'N’est plus programmé.', posterPath, media }, 'info');
     } catch (error: unknown) {
       toast({ title: label, action: error instanceof Error ? error.message : 'Impossible de déprogrammer.', posterPath, media }, 'error');
       notifyArrWrite();

@@ -10,14 +10,14 @@ const bundle = await build({ entryPoints: ['src/features/downloads/programmedCal
     builder.onResolve({ filter: /\/(?:sonarrRadarr|sonarrRadarrTransport|downloadFeatureVisibility)$/ }, args => ({ path: args.path.split('/').at(-1) || '', namespace: 'ports' }));
     builder.onLoad({ filter: /.*/, namespace: 'ports' }, args => ({ contents: args.path === 'sonarrRadarr'
       ? 'export const cleanUrl=u=>String(u).replace(/\\/+$/,"");export const executeGet=async()=>{throw new Error("réseau réel interdit")};'
-      : args.path === 'sonarrRadarrTransport' ? 'export const executePut=async()=>{throw new Error("réseau réel interdit")};export const executeArrInteractiveGet=executePut;'
+      : args.path === 'sonarrRadarrTransport' ? 'export const executePut=async()=>{throw new Error("réseau réel interdit")};export const executeArrInteractiveGet=executePut;export const executeDelete=executePut;'
       : 'export const isDownloadFeatureEnabled=c=>c.downloadsEnabled===true;' }));
   } }] });
 type Item = { kind: string; id: number; seriesId?: number; date?: string; title?: string };
 const calendar = await import(`data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString('base64')}`) as {
   fetchProgrammedCalendar: (config: Record<string, unknown>, options: Record<string, unknown>) => Promise<{ items: Item[]; failures: string[] }>;
   programmedScope: (config: Record<string, unknown>) => string;
-  unprogramItem: (config: Record<string, unknown>, item: Item, io: Record<string, unknown>) => Promise<void>;
+  unprogramItem: (config: Record<string, unknown>, item: Item, io: Record<string, unknown>) => Promise<'removed' | 'unmonitored'>;
   programmedDateLabel: (date: string | undefined, now: number) => string;
   movieRelease: (movie: Record<string, string>, now: number) => { date?: string; kind?: string; inCinemasPast: boolean };
   changeProgrammedQuality: (config: Record<string, unknown>, target: { kind: string; id: number }, preference: string, io: Record<string, unknown>) => Promise<void>;
@@ -67,14 +67,18 @@ test('SEENIT-DOWNLOAD-013 #879 Programmés : seuls les éléments surveillés sa
   assert.equal(urls.length, 0);
 });
 
-test('SEENIT-DOWNLOAD-013 #879 Annuler une programmation retire seulement la surveillance', async () => {
+test('SEENIT-DOWNLOAD-013 #879 Annuler une programmation : épisode et film avec fichier perdent la surveillance, film sans fichier quitte Radarr', async () => {
   const puts: Array<{ url: string; body: Record<string, unknown> }> = [];
   const gets: string[] = [];
-  const io = { get: async (url: string) => { gets.push(url); return { id: Number(url.split('/').pop()), monitored: true, title: 'x' }; }, put: async (url: string, body: Record<string, unknown>) => { puts.push({ url, body }); } };
-  await calendar.unprogramItem(config, { kind: 'episode', id: 801, seriesId: 5 }, io);
-  await calendar.unprogramItem(config, { kind: 'movie', id: 9 }, io);
-  assert.deepEqual(puts.map(put => [put.url, put.body.monitored, put.body.title]), [['http://sonarr/api/v3/episode/801', false, 'x'], ['http://radarr/api/v3/movie/9', false, 'x']]);
-  assert.ok(gets.every(url => isAllowedServiceProxyPath(url, 'GET')) && puts.every(put => isAllowedServiceProxyPath(put.url, 'PUT')), 'déprogrammer passe le proxy PWA');
+  const deletes: string[] = [];
+  const io = { get: async (url: string) => { gets.push(url); const id = Number(url.split('/').pop()); return { id, monitored: true, title: 'x', hasFile: id === 10 }; }, put: async (url: string, body: Record<string, unknown>) => { puts.push({ url, body }); }, delete: async (url: string) => { deletes.push(url); } };
+  assert.equal(await calendar.unprogramItem(config, { kind: 'episode', id: 801, seriesId: 5 }, io), 'unmonitored');
+  // Retour terrain du 16/11 (« La Guerre des mondes » resté dans Radarr en non surveillé) : film sans fichier supprimé.
+  assert.equal(await calendar.unprogramItem(config, { kind: 'movie', id: 9 }, io), 'removed');
+  assert.equal(await calendar.unprogramItem(config, { kind: 'movie', id: 10 }, io), 'unmonitored', 'film avec fichier : jamais supprimé');
+  assert.deepEqual(puts.map(put => [put.url, put.body.monitored, put.body.title]), [['http://sonarr/api/v3/episode/801', false, 'x'], ['http://radarr/api/v3/movie/10', false, 'x']]);
+  assert.deepEqual(deletes, ['http://radarr/api/v3/movie/9?deleteFiles=false']);
+  assert.ok(gets.every(url => isAllowedServiceProxyPath(url, 'GET')) && puts.every(put => isAllowedServiceProxyPath(put.url, 'PUT')) && deletes.every(url => isAllowedServiceProxyPath(url, 'DELETE')), 'déprogrammer passe le proxy PWA');
   await assert.rejects(calendar.unprogramItem({ ...config, downloadsEnabled: false }, { kind: 'movie', id: 9 }, io));
   assert.equal(calendar.programmedDateLabel(undefined, now), 'Date à venir');
   assert.equal(calendar.programmedDateLabel('2026-11-08T12:00:00Z', now), 'Demain');
