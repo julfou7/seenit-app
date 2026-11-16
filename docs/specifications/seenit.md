@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.324**
+Version applicative : **1.4.325**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1277,7 +1277,10 @@ pour le cache des sagas et univers.
   française. Ces marqueurs ne servent jamais à identifier le média. « Chercher une autre release »,
   disponible sur une carte terminale identifiée par TMDB, ouvre une recherche interactive du film,
   de la saison ou de l'épisode exact dans son client Arr existant. La consultation ne crée pas de média,
-  ne change pas de profil et ne lance aucun transfert. La liste indique audio, qualité, taille, seeders
+  ne change pas de profil et ne lance aucun transfert ; depuis le retour terrain du 16/11, seul un appui explicite
+  sur « Passer en 4K / 1080p », proposé quand le profil refuse la qualité d'une version, applique le profil
+  SeenIt correspondant au film ou à la série puis relance la consultation. L'écran partage les pastilles de filtre et
+  les cartes de « Version précise » ; les refus du client sont traduits, une raison commune dite une fois. La liste indique audio, qualité, taille, seeders
   et refus du client ; un choix explicite envoie uniquement ce candidat une fois, sans recherche
   automatique ni candidat de secours après un résultat ambigu. Fermer/Retour annule la consultation.
   Si Arr fournit un infohash valide, l'intention le conserve aussi dans le document partagé du même UID ;

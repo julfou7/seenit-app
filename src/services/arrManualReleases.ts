@@ -26,6 +26,8 @@ export interface ManualReleaseCandidate {
 export interface ManualReleaseSearch {
   scope: ManualReleaseScope;
   candidates: ManualReleaseCandidate[];
+  /** Film ou série exacts dans Radarr/Sonarr (retour du 16/11 : changer leur qualité depuis cet écran). */
+  target?: { kind: 'movie' | 'series'; id: number };
 }
 interface Grant {
   uid: string;
@@ -131,7 +133,8 @@ export async function searchManualArrReleases(scope: ManualReleaseScope, config:
       rejections: exactContext ? rejections : ['Identité du résultat incompatible.'], selectable,
       infoHash: isStrongTorrentHash(release.infoHash) ? normalizeDownloadClientId(release.infoHash) || undefined : undefined }];
   }).sort((a, b) => Number(b.audio.vff) - Number(a.audio.vff) || b.seeders - a.seeders);
-  const session: ManualReleaseSearch = { scope: { ...scope }, candidates };
+  const targetId = context.movieId || context.seriesId;
+  const session: ManualReleaseSearch = { scope: { ...scope }, candidates, ...(targetId ? { target: { kind: context.movieId ? 'movie' as const : 'series' as const, id: targetId } } : {}) };
   grants.set(session, { uid, base, headers, payloads, selectableKeys, expiresAt: Date.now() + 20 * 60_000 });
   return session;
 }
