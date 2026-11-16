@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.328**
+Version applicative : **1.4.329**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -1162,8 +1162,10 @@ pour le cache des sagas et univers.
   `qualityprofile`) en font aussi partie, en GET seul, pour prouver qu'un recherché est bloqué par
   un disque plein. Depuis la v1.4.319, `diskspace` (espace libre et total des disques, en GET) et l'état des
   indexers (`indexerstatus`, en GET) en font partie, ainsi que `POST indexer/testall` (« Retester les indexers » :
-  un test seul, aucun réglage d'indexer n'est modifiable). Les tests passent les URL réellement émises par ces
-  modules au prédicat du proxy.
+  un test seul, aucun réglage d'indexer n'est modifiable). Depuis la v1.4.329, `GET torrents/trackers` de
+  qBittorrent en fait partie (lecture seule du message de chaque tracker) pour expliquer un téléchargement bloqué par
+  le tracker, par exemple un ratio insuffisant. Les tests passent les URL réellement émises par ces modules au
+  prédicat du proxy.
 - Le SID qBittorrent est indexé par UID, URL et utilisateur, puis invalidé uniquement sur une
   erreur d'authentification reconnue.
 
