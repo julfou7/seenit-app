@@ -50,7 +50,12 @@ test('« Autre version » : la version actuelle est résumée en tête et marqu�
 test('« Autre version » : mêmes pastilles et cartes que « Version précise », plus de listes déroulantes', () => {
   const screen = readFileSync('src/components/AlternativeReleaseModal.tsx', 'utf8');
   const precise = readFileSync('src/screens/mediaDetail/PreciseVersionPage.tsx', 'utf8');
-  for (const source of [screen, precise]) assert.match(source, /import \{ ReleaseVersionCard, VersionFilterChips \} from '[./]+components\/ReleaseVersionCard'|import \{ ReleaseVersionCard, VersionFilterChips \} from '\.\/ReleaseVersionCard'/);
+  for (const source of [screen, precise]) {
+    assert.match(source, /import \{ ReleaseVersionCard, VersionFilterChips, VersionPageHeader \} from '(?:\.\.\/\.\.\/components\/|\.\/)ReleaseVersionCard'/);
+    // Retour terrain du 16/11 (« place perdue en haut, ça me gêne sur les deux ») : même en-tête compact.
+    assert.match(source, /<VersionPageHeader label="(?:Version précise|Autre version)"/);
+    assert.doesNotMatch(source, /<header /, 'plus d’en-tête propre à une page');
+  }
   assert.doesNotMatch(screen, /<select/, 'les listes déroulantes ne s’ouvraient pas dans l’APK');
   assert.match(screen, /data-shared-rejections/, 'raison commune en tête');
   assert.match(screen, /const own = release\.reasons\.filter\(reason => !shared\.includes\(reason\)\);/, 'jamais répétée sur chaque carte');
@@ -86,5 +91,10 @@ test('remplacer une version : accessible pendant le transfert, annulation vérif
 // qui défile, une carte de version ne rétrécit jamais — corrige aussi « Version précise » (carte partagée).
 test('carte de version jamais écrasée dans une longue liste', () => {
   const card = readFileSync('src/components/ReleaseVersionCard.tsx', 'utf8');
+  // Retour terrain du 16/11 (« vire Rapide et Moyen ; trop simple, il faut plus d'éléments pour choisir »).
+  assert.doesNotMatch(card, /speedLabel|SPEED_COLOR/, 'plus de Rapide / Moyen');
+  assert.match(card, /\{badges\.length > 0 && <span data-release-badges[\s\S]*?badges\.slice\(0, 6\)/, 'type de release visible carte repliée');
+  assert.match(card, /source\{seeders > 1 \? 's' : ''\}/, 'nombre de sources visible');
+  assert.match(card, /data-version-header className="shrink-0 flex items-center gap-1 px-2 pt-\[var\(--seenit-safe-area-top,env\(safe-area-inset-top,0px\)\)\] pb-1"/, 'aucune marge ajoutée à la zone sûre');
   assert.match(card, /<article data-version-card=\{release\.id\} className=\{cn\('shrink-0 rounded-\[18px\] bg-\[#161619\] overflow-hidden'/);
 });

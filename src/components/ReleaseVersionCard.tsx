@@ -1,10 +1,23 @@
 import React, { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronLeft } from 'lucide-react';
 import { formatReleaseSize, VERSION_FILTERS, type DescribedRelease, type ReleaseLike, type VersionFilter } from '../features/downloads/releaseVersions';
 import { releaseBadges, releaseReadableTitle } from '../features/downloads/releaseBadges';
 import { cn } from '../lib/utils';
 
-const SPEED_COLOR = { 3: '#86EFAC', 2: '#FCD34D', 1: '#FB7185' } as const;
+
+/**
+ * En-tête commun de « Version précise » et « Autre version ». Retour terrain du 16/11 (« place perdue en haut, ça me
+ * gêne sur les deux ») : collé à la barre d'état (aucune marge ajoutée à la zone sûre), titre et média sur 2 lignes serrées.
+ */
+export function VersionPageHeader({ label, title, scope, onBack, disabled = false }: { label: string; title: string; scope: string; onBack: () => void; disabled?: boolean }) {
+  return <header data-version-header className="shrink-0 flex items-center gap-1 px-2 pt-[var(--seenit-safe-area-top,env(safe-area-inset-top,0px))] pb-1">
+    <button type="button" onClick={onBack} disabled={disabled} aria-label="Retour" className="w-11 h-11 shrink-0 grid place-items-center rounded-full text-zinc-100 active:bg-white/10"><ChevronLeft size={24} /></button>
+    <div className="min-w-0 leading-[1.15]">
+      <h2 className="text-[17px] font-extrabold">{label}</h2>
+      <p className="truncate text-[13px] text-zinc-400"><span className="seenit-media-title font-bold">{title}</span> · {scope}</p>
+    </div>
+  </header>;
+}
 
 /** Filtres de versions (maquette DlVersion) : une seule rangée de pastilles de 44 px. */
 export function VersionFilterChips({ value, onChange }: { value: VersionFilter; onChange: (filter: VersionFilter) => void }) {
@@ -46,13 +59,20 @@ export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggl
         <span className="flex items-center gap-2 min-w-0"><strong className="truncate text-[15px] font-extrabold">{entry.language}{entry.light ? ' · Light' : ''}</strong>{current && <span className="shrink-0 rounded-md bg-[#86EFAC] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Actuelle</span>}{entry.recommended && !current && <span className="shrink-0 rounded-md bg-[#E5A93D] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Conseillée</span>}</span>
         {technical
           ? <span className="text-[13px] text-zinc-400">{formatReleaseSize(release.size)} · <span data-seeders className="font-bold text-[#86EFAC]"><span aria-hidden="true">↑ </span>{seeders.toLocaleString('fr-FR')}<span className="sr-only"> seeders</span></span> · <span data-leechers className="font-bold text-[#FB7185]"><span aria-hidden="true">↓ </span>{leechers.toLocaleString('fr-FR')}<span className="sr-only"> leechers</span></span></span>
-          : <span className="text-[13px] text-zinc-400">{formatReleaseSize(release.size)} · <span className="font-bold" style={{ color: SPEED_COLOR[entry.speedLevel] }}>{'●'.repeat(entry.speedLevel)}{'○'.repeat(3 - entry.speedLevel)} {entry.speedLabel}</span></span>}
+          // Retour terrain du 16/11 (« vire Rapide et Moyen ; c'est trop simple, il faut plus d'éléments pour choisir ») :
+          // taille et nombre de sources, puis le type de release (source, codec, HDR, son, plateforme) dès la carte repliée.
+          : <>
+            <span className="text-[13px] text-zinc-400">{formatReleaseSize(release.size)}{seeders > 0 && <> · <span data-seeders className="font-bold text-zinc-200">{seeders.toLocaleString('fr-FR')} source{seeders > 1 ? 's' : ''}</span></>}</span>
+            {badges.length > 0 && <span data-release-badges className="mt-0.5 flex flex-wrap gap-1">
+              {badges.slice(0, 6).map(badge => <span key={badge} className="h-6 px-1.5 rounded-md bg-[#26262B] text-[11.5px] font-extrabold leading-6 text-zinc-200">{badge}</span>)}
+            </span>}
+          </>}
       </span>
       <ChevronDown size={20} aria-hidden="true" className={cn('shrink-0 text-zinc-500 transition-transform motion-reduce:transition-none', open && 'rotate-180')} />
     </button>
     {open && <div className="px-3 pb-3 flex flex-col gap-2">
       {!technical && <span data-release-title className="text-[13.5px] font-bold text-zinc-200 break-words">{readableTitle}</span>}
-      {badges.length > 0 && <ul aria-label="Type de release" data-release-badges className="flex flex-wrap gap-1.5">
+      {technical && badges.length > 0 && <ul aria-label="Type de release" data-release-badges className="flex flex-wrap gap-1.5">
         {badges.map(badge => <li key={badge} className="h-7 px-2.5 rounded-lg bg-[#26262B] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] text-[12.5px] font-extrabold text-zinc-100 grid place-items-center">{badge}</li>)}
       </ul>}
       <span className="text-[12.5px] text-zinc-500">{details}</span>
