@@ -16,7 +16,8 @@ export function waitingRetryLaunch(item: LiveDownloadItem): Omit<ArrDownloadLaun
   // Revue Codex #1057 : `importState: 'pending'` est posé dès la demande (`beginDownloadRequest`) ; seul un
   // identifiant, un chemin ou une progression prouvent un transfert.
   const transferStarted = Boolean(item.downloadId || item.transferPath) || Number(item.progress) > 0;
-  const failedRequest = downloadGroup(item) === 'attention' && !transferStarted;
+  // Retour terrain du 16/11 : « déjà disponible » n'est pas un échec à relancer (le fichier est là).
+  const failedRequest = downloadGroup(item) === 'attention' && !transferStarted && !/est déjà disponible/i.test(item.errorMessage || '');
   if ((item.status !== 'waiting' && !failedRequest) || !(Number(item.tmdbId) > 0)) return null;
   // Revue Codex #1051 : une attente créée depuis la fiche garde sa qualité dans `releaseTitle` (« … • 4K ») ;
   // une qualité inconnue n'est jamais devinée (relancer en 1080p remplacerait le profil 4K du média).

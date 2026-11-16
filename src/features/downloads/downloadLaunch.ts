@@ -1,6 +1,6 @@
 import { tmdb } from '../shows/tmdb';
 import { fetchQualityProfiles, searchAndDownloadInRadarr, searchAndDownloadInSonarr } from '../../services/sonarrRadarr';
-import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from './downloadLifecycle';
+import { acceptDownloadRequest, beginDownloadRequest, dismissDownloadRequest, failDownloadRequest, isAlreadyAvailableMessage, updateDownloadRequest } from './downloadLifecycle';
 import { resolveEffectiveQualityProfileId } from './qualityProfileSelection';
 import { downloadEpisodeWithSeasonPackFallback } from './episodeSeasonPackFallback';
 import { type DownloadAvailability } from './downloadAvailability';
@@ -167,6 +167,11 @@ export async function launchArrDownload({ config, mediaType, title, year, tmdbId
       }
 
       return result.packEpisodes || [];
+    } else if (isAlreadyAvailableMessage(result.message)) {
+      // Retour terrain du 16/11 (Dexter S02E01 sur Plex, carte « À régler : déjà disponible ») : rien n'a été lancé
+      // et rien n'est à régler — la demande est fermée et le dit, au lieu de devenir un échec.
+      notify('Déjà disponible : rien n’a été lancé.', 'info');
+      dismissDownloadRequest(requestId, result.message);
     } else {
       failDownloadRequest(requestId, result.message, result.failureCode, result.availability);
     }

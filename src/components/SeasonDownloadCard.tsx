@@ -84,7 +84,7 @@ export function SeasonDownloadCard({ seasonNumber, items, onShowClick, onRemove 
       </button>
       <div className="download-card__body">
         <button type="button" className="download-card__title" disabled={!id || !onShowClick} onClick={open}>{title}</button>
-        <p className="download-card__scope">{[`Saison ${seasonNumber}`, `${items.length} épisodes`, qualities.length === 1 ? qualities[0] : ''].filter(Boolean).join(' · ')}</p>
+        <p className="download-card__scope">{[`Saison ${seasonNumber}`, `${items.length} épisode${items.length > 1 ? 's' : ''}`, qualities.length === 1 ? qualities[0] : ''].filter(Boolean).join(' · ')}</p>
       </div>
     </div>
     <div className="download-season__bar" role="img" aria-label={`Saison ${seasonNumber} : ${legend.join(', ')}`}>
