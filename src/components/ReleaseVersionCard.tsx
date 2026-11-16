@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronLeft } from 'lucide-react';
-import { formatReleaseSize, VERSION_FILTERS, type DescribedRelease, type ReleaseLike, type VersionFilter } from '../features/downloads/releaseVersions';
+import { formatReleaseSize, hasFrenchAudio, VERSION_FILTERS, type DescribedRelease, type ReleaseLike, type VersionFilter } from '../features/downloads/releaseVersions';
+import { frenchVariant } from '../features/downloads/releaseAudio';
 import { releaseBadges, releaseReadableTitle } from '../features/downloads/releaseBadges';
 import { cn } from '../lib/utils';
 
@@ -31,7 +32,10 @@ export function VersionFilterChips({ value, onChange }: { value: VersionFilter; 
 
 // La langue est déjà dans la ligne repliée (« Multi », « Français », « VO sous-titrée ») : ces badges la
 // répéteraient. VFF et VFQ restent, ils précisent la version française.
+// #661 (16/11) : VFF/VFQ passent dans la ligne de langue (« Multi VFF ») ; ils ne sont retirés des badges que
+// lorsque cette ligne les affiche réellement (revue Codex #1080 : « MULTI.VFQ.VOSTFR » reste « VO sous-titrée »).
 const LANGUAGE_REPEATS = new Set(['MULTI', 'VF', 'VOSTFR']);
+const VARIANT_BADGES = new Set(['VFF', 'VFQ']);
 
 /**
  * Carte d'une version (maquette DlVersion), partagée par « Version précise » et la recherche avancée :
@@ -41,11 +45,13 @@ const LANGUAGE_REPEATS = new Set(['MULTI', 'VF', 'VOSTFR']);
  * de la release (pour reconnaître le bon torrent) et ↑ seeders en vert, ↓ leechers en rouge au lieu de
  * la vitesse.
  */
-export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggle, details, technical = false, current = false, children }: { entry: DescribedRelease<T>; open: boolean; onToggle: () => void; details: string; technical?: boolean; current?: boolean; children: React.ReactNode }) {
+export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggle, details, technical = false, current = false, spaceWarning, children }: { entry: DescribedRelease<T>; open: boolean; onToggle: () => void; details: string; technical?: boolean; current?: boolean; /** #1076 : version plus grosse que l'espace libre du disque de destination. */ spaceWarning?: string; children: React.ReactNode }) {
   const { release } = entry;
   const [showName, setShowName] = useState(false);
   // « Light » et la langue sont déjà dans la ligne repliée : pas de badge en double.
-  const badges = releaseBadges(release.name).filter(badge => !LANGUAGE_REPEATS.has(badge));
+  // #661 : une version avec piste française dit toujours laquelle (VFF par défaut, VFQ quand le nom le marque).
+  const variant = hasFrenchAudio(entry.language) ? frenchVariant(release.name) ?? 'VFF' : null;
+  const badges = releaseBadges(release.name).filter(badge => !LANGUAGE_REPEATS.has(badge) && !(variant && VARIANT_BADGES.has(badge)));
   const seeders = Number(release.seeders) || 0;
   const leechers = Number(release.leechers) || 0;
   const readable = releaseReadableTitle(release.name);
@@ -58,13 +64,14 @@ export function ReleaseVersionCard<T extends ReleaseLike>({ entry, open, onToggl
       <span className={cn('w-16 h-11 shrink-0 rounded-xl grid place-items-center text-[14.5px] font-extrabold', entry.quality === '4K' ? 'bg-zinc-100 text-black' : 'bg-[#2A2A2F] text-zinc-100')}>{entry.quality}</span>
       <span className="flex-1 min-w-0 flex flex-col gap-0.5">
         {technical && <span data-release-title className="text-[14px] font-bold leading-snug text-zinc-100 line-clamp-2 break-words">{readableTitle}</span>}
-        <span className="flex items-center gap-2 min-w-0"><strong className="truncate text-[15px] font-extrabold">{entry.language}{entry.light ? ' · Light' : ''}</strong>{current && <span className="shrink-0 rounded-md bg-[#86EFAC] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Actuelle</span>}{entry.recommended && !current && <span className="shrink-0 rounded-md bg-[#E5A93D] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Conseillée</span>}</span>
+        <span className="flex items-center gap-2 min-w-0"><strong className="truncate text-[15px] font-extrabold">{entry.language === 'Français' && variant ? variant : entry.language}{entry.language === 'Multi' && variant ? ` ${variant}` : ''}{entry.light ? ' · Light' : ''}</strong>{current && <span className="shrink-0 rounded-md bg-[#86EFAC] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Actuelle</span>}{entry.recommended && !current && <span className="shrink-0 rounded-md bg-[#E5A93D] px-1.5 text-[11.5px] font-extrabold leading-[1.6] text-black">Conseillée</span>}</span>
         {technical
           ? <span className="text-[13px] text-zinc-400">{formatReleaseSize(release.size)} · <span data-seeders className="font-bold text-[#86EFAC]"><span aria-hidden="true">↑ </span>{seeders.toLocaleString('fr-FR')}<span className="sr-only"> seeders</span></span> · <span data-leechers className="font-bold text-[#FB7185]"><span aria-hidden="true">↓ </span>{leechers.toLocaleString('fr-FR')}<span className="sr-only"> leechers</span></span></span>
           // Retour terrain du 16/11 (« vire Rapide et Moyen ; c'est trop simple, il faut plus d'éléments pour choisir ») :
           // taille et nombre de sources, puis le type de release (source, codec, HDR, son, plateforme) dès la carte repliée.
           : <>
             <span className="text-[13px] text-zinc-400">{formatReleaseSize(release.size)}{seeders > 0 && <> · <span data-seeders className="font-bold text-zinc-200">{seeders.toLocaleString('fr-FR')} source{seeders > 1 ? 's' : ''}</span></>}</span>
+            {spaceWarning && <span data-space-warning className="text-[12.5px] font-bold text-rose-300">{spaceWarning}</span>}
             {badges.length > 0 && <span data-release-badges className="mt-0.5 flex flex-wrap gap-1">
               {/* Revue Codex #1074 : 6 badges repliée, tous une fois dépliée. */}
               {(open ? badges : badges.slice(0, 6)).map(badge => <span key={badge} className="h-6 px-1.5 rounded-md bg-[#26262B] text-[11.5px] font-extrabold leading-6 text-zinc-200">{badge}</span>)}

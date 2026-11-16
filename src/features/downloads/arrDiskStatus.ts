@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { cleanUrl, executeGet } from '../../services/sonarrRadarr';
 import { isDownloadFeatureEnabled } from './downloadFeatureVisibility';
-import { formatFreeSpace, LOW_DISK_BYTES } from './arrDiskSpace';
+import { destinationDisk, formatFreeSpace, LOW_DISK_BYTES } from './arrDiskSpace';
 
 /**
  * Retour du propriétaire du 15/11 : « vu que Sonarr et Radarr ont l'info, peut-on avoir l'espace disque libre en
@@ -72,10 +72,11 @@ export async function fetchDiskStatus(config: DiskConfig, read: Read = executeGe
  * série, Radarr pour un film) n'a qu'un seul disque — et presque plein. Sinon rien : l'avertissement global suffit.
  */
 export function lowImportDisk(disks: readonly DiskStatus[], mediaType: 'tv' | 'movie'): DiskStatus | undefined {
-  const service = mediaType === 'tv' ? 'Sonarr' : 'Radarr';
-  const used = disks.filter(disk => disk.services?.includes(service));
-  return used.length === 1 && diskTone(used[0]) !== 'ok' ? used[0] : undefined;
+  const disk = destinationDisk(disks, mediaType);
+  return disk && diskTone(disk) !== 'ok' ? disk : undefined;
 }
+
+export { destinationDisk, IMPORT_MARGIN_BYTES, spaceShortfall } from './arrDiskSpace';
 
 export type DiskTone = 'ok' | 'warn' | 'error';
 export const diskTone = (disk: DiskStatus): DiskTone => disk.freeSpace < 2 * 1024 ** 3 ? 'error' : disk.freeSpace < LOW_DISK_BYTES ? 'warn' : 'ok';

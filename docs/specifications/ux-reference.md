@@ -335,7 +335,7 @@ exacte si nécessaire. Retour/Garder ferme la confirmation sans effet. Le texte 
 Une carte terminée, annulée ou en erreur avec TMDB exact propose « Chercher une autre release ».
 Le dialogue respecte la pile Retour, le focus et les safe areas existants. Il consulte le client Arr
 configuré, affiche VFF/VFQ/MULTI, qualité, taille, seeders et refus, avec filtre audio ; une série entière
-permet de choisir sa saison. MULTI/FRENCH seul reste une variante inconnue. Le bouton confirme le seul
+permet de choisir sa saison. Une piste française dit toujours VFF ou VFQ (VFF sauf marque québécoise, #661). Le bouton confirme le seul
 candidat sélectionné ; les résultats incompatibles restent non lançables. Pendant l'envoi, la sélection
 est verrouillée. Ouvrir, filtrer ou fermer par Retour/Croix ne lance rien et ne modifie aucun profil.
 Un résultat ambigu n'entraîne jamais l'envoi d'un autre candidat. Les cartes affichent les badges audio

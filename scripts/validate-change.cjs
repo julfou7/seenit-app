@@ -210,6 +210,8 @@ function validatePostinstall() {
       run('node', ['scripts/audit-native-dependencies.cjs'], { label: 'Audit runtime natif embarqué' });
     }
     runNpm(['run', 'build'], { label: 'Build Web + serveur', metric: 'SEENIT_BUILD_SECONDS' });
+    // #1065 : un harnais du smoke PWA qui ne se construit plus (export manquant d'une fixture) échoue ici, en local.
+    run('node', ['scripts/build-browser-harnesses.cjs'], { label: 'Harnais du smoke navigateur (construction)' });
     run('node', ['scripts/quality-bundle-budget.cjs'], {
       label: 'Budgets bundle qualité',
       metric: 'SEENIT_QUALITY_BUNDLE_SECONDS'

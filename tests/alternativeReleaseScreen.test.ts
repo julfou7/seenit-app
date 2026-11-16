@@ -93,6 +93,11 @@ test('carte de version jamais écrasée dans une longue liste', () => {
   const card = readFileSync('src/components/ReleaseVersionCard.tsx', 'utf8');
   // Retour terrain du 16/11 (« vire Rapide et Moyen ; trop simple, il faut plus d'éléments pour choisir »).
   assert.doesNotMatch(card, /speedLabel|SPEED_COLOR/, 'plus de Rapide / Moyen');
+  // #661 (16/11) : « Multi VFF » / « VFQ » dans la ligne de langue, jamais en badge doublon.
+  assert.match(card, /const variant = hasFrenchAudio\(entry\.language\) \? frenchVariant\(release\.name\) \?\? 'VFF' : null;/);
+  // Revue Codex #1080 : VFF/VFQ ne quittent les badges que si la ligne de langue les affiche.
+  assert.match(card, /const badges = releaseBadges\(release\.name\)\.filter\(badge => !LANGUAGE_REPEATS\.has\(badge\) && !\(variant && VARIANT_BADGES\.has\(badge\)\)\);/);
+  assert.ok(card.indexOf('const variant =') < card.indexOf('const badges ='), 'variante calculée avant le filtre');
   assert.match(card, /\{badges\.length > 0 && <span data-release-badges[\s\S]*?\(open \? badges : badges\.slice\(0, 6\)\)/, 'type de release visible repliée, complet dépliée');
   assert.match(card, /source\{seeders > 1 \? 's' : ''\}/, 'nombre de sources visible');
   // Retour du 16/11 sur la v1.4.330 : la page (`seenit-dialog-layer`) réserve déjà la barre d'état — jamais deux fois.

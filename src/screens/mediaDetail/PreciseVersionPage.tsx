@@ -8,6 +8,7 @@ import { isDownloadFeatureEnabled } from '../../features/downloads/downloadFeatu
 import { sendReleaseToClient } from '../../features/downloads/releaseSend';
 import { describeReleases, matchesVersionFilter, releaseAgeLabel, type VersionFilter } from '../../features/downloads/releaseVersions';
 import { ReleaseVersionCard, VersionFilterChips, VersionPageHeader } from '../../components/ReleaseVersionCard';
+import { destinationDisk, spaceShortfall, useDiskStatus } from '../../features/downloads/arrDiskStatus';
 
 export interface PreciseVersionTarget {
   title: string;
@@ -59,7 +60,9 @@ export default function PreciseVersionPage({ target, onClose }: { target: Precis
 
   useEffect(() => { if (editing) searchRef.current?.focus(); }, [editing]);
 
-  const versions = useMemo(() => describeReleases(results, qualityPreference), [results, qualityPreference]);
+  // #1076 : espace libre du disque où Sonarr/Radarr importera (relu à l'ouverture de la page).
+  const disk = destinationDisk(useDiskStatus(useDownloadConfigStore()) || [], isMovie ? 'movie' : 'tv');
+  const versions = useMemo(() => describeReleases(results, qualityPreference, undefined, release => !spaceShortfall(disk, release.size)), [results, qualityPreference, disk]);
   const visible = versions.filter(entry => matchesVersionFilter(entry, filter));
   // Ouvre d'office la conseillée à l'arrivée des résultats.
   useEffect(() => { if (state === 'ready') setOpen(versions[0]?.release.id ?? null); }, [state, versions]);
@@ -99,10 +102,11 @@ export default function PreciseVersionPage({ target, onClose }: { target: Precis
       {state === 'ready' && visible.map(entry => {
         const { release } = entry;
         const isOpen = open === release.id;
-        return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} onToggle={() => setOpen(isOpen ? null : release.id)}
+        const tooBig = spaceShortfall(disk, release.size);
+        return <ReleaseVersionCard key={release.id} entry={entry} open={isOpen} spaceWarning={tooBig} onToggle={() => setOpen(isOpen ? null : release.id)}
           details={['C411', releaseAgeLabel(entry.ageDays)].filter(Boolean).join(' · ')}>
           <button type="button" disabled={sending !== null} onClick={() => void send(release)} className="mt-1 h-12 rounded-[14px] bg-[#E5A93D] text-black text-[15px] font-extrabold flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-60">
-            {sending === release.id && <Loader2 size={18} className="animate-spin" />}Télécharger cette version
+            {sending === release.id && <Loader2 size={18} className="animate-spin" />}{tooBig ? 'Télécharger quand même' : 'Télécharger cette version'}
           </button>
         </ReleaseVersionCard>;
       })}

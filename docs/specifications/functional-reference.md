@@ -551,7 +551,10 @@ coché, « Version précise › » ouvre une page pleine hauteur : versions C411
 la conseillée en tête et dépliée (type de release en badges, sources, date, « Nom du fichier » masqué par défaut,
 **Télécharger cette version**), et « Chercher sous un
 autre nom… ». Depuis la v1.4.331, chaque carte repliée montre taille, nombre de sources et type de release en badges
-(source, codec, HDR, son, plateforme) au lieu de « Rapide / Moyen », sous un en-tête compact commun à « Autre version ». **Fiche film** (maquette DlFilm, 07/11/2026) : sous le gate et tant que le film n'est pas présent,
+(source, codec, HDR, son, plateforme) au lieu de « Rapide / Moyen », sous un en-tête compact commun à « Autre version ».
+Depuis la v1.4.333 (#1076), une version plus grosse que l'espace libre du disque où Sonarr/Radarr importe (disque
+certain : un seul pour le service) l'annonce sur sa carte (« Pas assez de place : 16 Go pour 5 Go libres sur D: »),
+son bouton devient « Télécharger quand même » et la conseillée est choisie parmi les versions qui tiennent. **Fiche film** (maquette DlFilm, 07/11/2026) : sous le gate et tant que le film n'est pas présent,
 un bouton ⬇ de 56 px suit le bouton principal ; il ouvre la même barre (✕, titre et « Version précise › »,
 1080p, 4K). Un film sorti part dans Radarr ; un film à venir se programme en bleu (« Programmer · Dès sa
 sortie » : Radarr le surveille sans recherche immédiate). Le bouton montre ensuite un anneau « 42 % » ou une
@@ -1081,7 +1084,8 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   la même version est relue puis envoyée), sans bouton « Passer en 4K » séparé ni retour sur la page. L'utilisateur
   confirme le seul candidat sélectionné ; fermer ou revenir annule la consultation. Un échec d'envoi
   n'entraîne jamais le lancement d'une autre release. Les cartes du suivi conservent ces badges audio ;
-  MULTI/FRENCH seul reste une variante inconnue.
+  depuis la v1.4.333 (#661), une version avec piste française dit toujours VFF ou VFQ (« Multi VFF ») : VFQ quand
+  le nom porte VFQ, QC ou QUEBEC, VFF + VFQ pour VF2, VFF sinon.
   Une version actuelle reconnue par hash reste non sélectionnable ; une demande active du même scope
   bloque un nouvel envoi. C411 depuis une fiche Film ajoute si nécessaire le film exact sans recherche
   automatique concurrente, vérifie le parseur Radarr et n'envoie que la release choisie.

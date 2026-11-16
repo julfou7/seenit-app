@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.332",
+  "applicationVersion": "1.4.333",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -3926,7 +3926,7 @@
         },
         {
           "file": "tests/releaseAudio.test.ts",
-          "contains": "SEENIT-DOWNLOAD-011 distingue MULTI VFF et MULTI VFQ sans inventer une variante"
+          "contains": "SEENIT-DOWNLOAD-011 dit toujours VFF ou VFQ selon la convention des releases françaises"
         }
       ]
     },
