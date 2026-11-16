@@ -31,6 +31,7 @@ test('« Autre version » : haut compact, réouverture sans nouvelle interrogati
   assert.doesNotMatch(screen, /bg-amber-500\/10[^"]*"[^>]*>Un téléchargement est en cours/, 'plus de second bandeau');
   assert.match(screen, /<section data-current-version[\s\S]*?data-active-request[\s\S]*?<\/section>/, 'règle de remplacement dans l’encadré de la version actuelle');
   assert.match(screen, /const RECENT_SEARCH_MS = 2 \* 60_000;/);
+  assert.match(screen, /const key = JSON\.stringify\(\[config\.scopeUid, config\.radarrUrl, config\.radarrApiKey, config\.sonarrUrl, config\.sonarrApiKey, scope\]\);/, 'revue Codex #1073 : mémoire propre au serveur Arr');
   assert.match(screen, /if \(!forced && recent && Date\.now\(\) - recent\.at < RECENT_SEARCH_MS\) \{\s*try \{ assertManualReleaseSearchCurrent\(recent\.session\);/, 'résultat récent et encore valide réutilisé');
   assert.match(screen, /const forced = lastRefresh\.current !== refresh;/, '« Relancer la recherche » interroge toujours');
   assert.equal((screen.match(/recentSearches\.clear\(\);/g) || []).length, 2, 'envoi ou bascule de qualité : mémoire vidée');

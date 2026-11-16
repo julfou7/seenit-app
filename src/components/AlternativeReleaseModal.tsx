@@ -60,7 +60,8 @@ export function AlternativeReleaseModal({ item, onClose }: { item: LiveDownloadI
     let current = true;
     const scope = { mediaType: item.mediaType, tmdbId: Number(item.tmdbId),
       seasonNumber: item.mediaType === 'tv' ? season : undefined, episodeNumber: item.episodeNumber };
-    const key = JSON.stringify([config.scopeUid, scope]);
+    // Revue Codex #1073 : la mémoire appartient au serveur Arr (URL et clé) — jamais réutilisée après un changement de réglages.
+    const key = JSON.stringify([config.scopeUid, config.radarrUrl, config.radarrApiKey, config.sonarrUrl, config.sonarrApiKey, scope]);
     // « Relancer la recherche » force toujours une nouvelle interrogation ; sinon un résultat de moins de 2 minutes sert.
     const forced = lastRefresh.current !== refresh; lastRefresh.current = refresh;
     const recent = recentSearches.get(key);
