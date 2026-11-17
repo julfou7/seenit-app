@@ -627,7 +627,7 @@ export function DownloadsScreen({ onShowClick, navigationShortcut }: Props) {
             {waitingDownloads.length > 0 && renderSection('En attente', waitingDownloads)}
             {/* #879 : ce que Sonarr/Radarr récupéreront à la sortie (calendrier), déprogrammable. */}
             {isConfigured && <ProgrammedSection refreshKey={programmedRefresh} onShowClick={onShowClick} onEpisodeClick={openProgrammedEpisode} watching={watchedRequests} queued={queuedDownloads} onRemoveWatching={handleRemove} onRetryWatching={item => void handleRetryWaiting(item)} onRetryWatchingGroup={items => void handleRetryWaitingGroup(items)} onForgetWatching={removeDownload} onSearchProgrammed={target => void handleSearchProgrammed(target)} />}
-            <RecentImportsRail items={recentImports.items} failures={recentImports.failures} onShowClick={onShowClick} />
+            <RecentImportsRail items={recentImports.items} failures={recentImports.failures} staleAt={recentImports.staleAt} onShowClick={onShowClick} />
             {/* SEENIT-DOWNLOAD-023 : ni téléchargés ni programmés — aucun titre de Sonarr/Radarr invisible. */}
             <RecentImportsRail variant="undecided" items={undecidedTitles} failures={[]} onShowClick={onShowClick} />
             {openEpisode && <Suspense fallback={null}>

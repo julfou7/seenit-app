@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, X } from 'lucide-react';
+import { arrUnavailableNote } from '../features/downloads/arrWholeOrNothing';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useToastStore } from '../store/toastStore';
 import { auth } from '../lib/firebase';
@@ -18,12 +19,12 @@ import { GridMediaCard } from './GridMediaCard';
  * une copie d'un autre compte ou serveur n'est jamais affichée, et la dernière copie reste affichée pendant une
  * relecture (bug d'affichage du 08/11 : plus de saut à chaque ouverture de l'onglet).
  */
-export function useRecentImports(refreshKey = 0): { items: RecentImport[]; failures: string[]; loaded: boolean } {
+export function useRecentImports(refreshKey = 0): { items: RecentImport[]; failures: string[]; staleAt?: number; loaded: boolean } {
   const scope = recentImportsScope(useDownloadConfigStore());
   const snapshot = useArrSnapshot();
   useEffect(() => { void useArrSyncStore.getState().sync(); }, [refreshKey, scope]);
   const imports = snapshot?.imports;
-  return imports ? { items: imports.items, failures: imports.failures, loaded: true } : { items: [], failures: [], loaded: false };
+  return imports ? { items: imports.items, failures: imports.failures, staleAt: imports.staleAt, loaded: true } : { items: [], failures: [], loaded: false };
 }
 
 /** SEENIT-DOWNLOAD-023 : titres de Sonarr/Radarr ni téléchargés ni programmés, de la même copie synchronisée. */
@@ -56,7 +57,7 @@ export function importMedia(item: RecentImport): TMDBMedia {
  * date, page par page ; « Vider », qui masquait la liste sans rien retirer, disparaît. « À décider » (SEENIT-DOWNLOAD-023)
  * liste ce qui n'est ni téléchargé ni programmé : toucher l'affiche ouvre la fiche pour décider, ou Retirer.
  */
-export function RecentImportsRail({ items, failures, onShowClick, variant = 'imports' }: { items: readonly RecentImport[]; failures: string[]; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; variant?: 'imports' | 'undecided' }) {
+export function RecentImportsRail({ items, failures, staleAt, onShowClick, variant = 'imports' }: { items: readonly RecentImport[]; failures: string[]; staleAt?: number; onShowClick?: (id: string | number, mediaType?: 'tv' | 'movie') => void; variant?: 'imports' | 'undecided' }) {
   const uid = auth.currentUser?.uid;
   const [removed, setRemoved] = useState<Record<string, number>>(() => readUserScopedJson<Record<string, number>>(uid, REMOVED_FIELD, {}) || {});
   const [busy, setBusy] = useState<string | null>(null);
@@ -105,7 +106,8 @@ export function RecentImportsRail({ items, failures, onShowClick, variant = 'imp
       {visible.length > 0 && <span>{visible.length} titre{visible.length > 1 ? 's' : ''}</span>}
     </div>
     {undecided && <p className="downloads-undecided__intro">Dans Sonarr ou Radarr, ni téléchargés ni programmés. Touche une affiche pour décider dans la fiche, ou retire-les.</p>}
-    {failures.length > 0 && <p className="download-card__meta" role="status">{failures.join(' et ')} injoignable pour l’instant : la liste peut être incomplète.</p>}
+    {/* Retour terrain du 17/11 (« tout ou rien ») : dernière liste complète datée, ou liste indisponible. */}
+    {failures.length > 0 && <p className="download-card__meta" role="status">{arrUnavailableNote(failures, staleAt)}</p>}
     {visible.length > 0 && <ul className="grid grid-cols-3 sm:grid-cols-4 gap-x-1.5 gap-y-4" aria-label={undecided ? 'À décider' : 'Téléchargés'}>
       {shown.map(item => <li key={item.key} data-recent-import={undecided ? undefined : item.key} data-undecided-title={undecided ? item.key : undefined} className="min-w-0" title={undecided ? undecidedReason(item as ArrPendingTitle) : recentImportLabel(item)}>
         <GridMediaCard media={importMedia(item)} posterSrc={item.posterUrl}

@@ -26,7 +26,8 @@ export type RecentImport =
  */
 export type ArrPendingTitle = RecentImport & { monitored: boolean; release?: { digitalRelease?: string; physicalRelease?: string; inCinemas?: string; isAvailable?: boolean }; profileId?: number };
 
-export interface RecentImports { items: RecentImport[]; failures: string[]; pending: ArrPendingTitle[] }
+/** `staleAt` : liste gardée de la dernière synchronisation complète (Sonarr/Radarr injoignables), retour du 17/11. */
+export interface RecentImports { items: RecentImport[]; failures: string[]; pending: ArrPendingTitle[]; staleAt?: number }
 export type RecentImportsGet = (url: string, headers: Record<string, string>) => Promise<unknown>;
 
 type SonarrSeries = { id?: number; title?: string; tmdbId?: number; year?: number; monitored?: boolean; added?: string; qualityProfileId?: number; ratings?: { value?: number }; images?: ArrImage[]; statistics?: { episodeFileCount?: number } };

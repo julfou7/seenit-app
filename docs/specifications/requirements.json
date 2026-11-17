@@ -122,6 +122,10 @@
         {
           "file": "tests/arrSync281.test.ts",
           "contains": "SEENIT-DOWNLOAD-016 un seul état Sonarr/Radarr synchronisé : relu en un endroit, après chaque écriture, jamais d’une autre portée"
+        },
+        {
+          "file": "tests/arrWholeOrNothing.test.ts",
+          "contains": "SEENIT-DOWNLOAD-016 tout ou rien : une lecture en échec garde la dernière liste complète, datée"
         }
       ]
     },
