@@ -48,7 +48,8 @@ test('SEENIT-RATING-001 affiche les notes de saison et d’épisode uniquement d
   assert.match(seriesSections, /const ratings = reliableEpisodeRatings\(episodes \|\| \[\]\);/);
   assert.match(planning, /Number\(episode\.vote_average\)/);
   assert.match(core, /★ \{tmdbRating\} TMDB/);
-  assert.match(episodeDetail, /currentEpisode\?\.vote_average/);
+  // Retour du 17/11 : la fiche épisode lit les mêmes notes TMDB fiables que la fiche série (vote_average via la saison).
+  assert.match(episodeDetail, /const seasonRatings = reliableEpisodeRatings\(seasonEpisodes\);/);
   for (const source of [core, seriesSections, episodeSections, episodeDetail, planning]) assert.doesNotMatch(source, /getSeasonImdbRatings|getEpisodeImdbVotes|omdbService|episodeImdbRating|episodeImdbVotes|imdbRating/);
   // Chaque épisode garde une cible de 44 px : ligne et coche dans la fiche série, case de la fiche épisode.
   assert.match(seriesSections, /min-h-\[62px\]/);
@@ -56,7 +57,8 @@ test('SEENIT-RATING-001 affiche les notes de saison et d’épisode uniquement d
   assert.match(seriesSections, /<SeenItCheckButton className="seenit-check--compositor" celebrationLayer=\{<CompositorCelebration \/>\} isWatched=\{watched\}/);
   assert.match(readFileSync(new URL('../src/components/SeenItCheckButton.tsx', import.meta.url), 'utf8'), /min-h-11 min-w-11/);
   assert.match(readFileSync(new URL('../src/components/seenItCheckButton.css', import.meta.url), 'utf8'), /\.seenit-check \{ width:48px; height:48px; min-width:44px; min-height:44px;/);
-  assert.match(episodeSections, /className="flex-1 min-w-0 h-11 flex items-center"/);
+  // Retour du 17/11 : colonne notée par épisode, toujours 44 px de haut au moins (même sans aucune note).
+  assert.match(episodeSections, /className="flex-1 shrink-0 min-w-\[30px\] min-h-11 flex flex-col items-center justify-end gap-1 pb-1\.5"/);
   assert.match(seriesSections, /overflow-x-auto/);
   assert.doesNotMatch(ratings, /createPortal|document\.getElementById|MutationObserver/);
 });
