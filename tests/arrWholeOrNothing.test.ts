@@ -43,7 +43,11 @@ test('le message dit « dernier état connu » ou « liste indisponible »', () 
 
 test('la synchronisation et les sections appliquent « tout ou rien »', () => {
   const store = readFileSync('src/store/arrSyncStore.ts', 'utf8');
-  assert.match(store, /const wholeProgrammed = wholeOrNothing\(labelled\.programmed, prior\?\.programmed, prior\?\.syncedAt\);/);
+  // Revue Codex #1089 : un échec de la bibliothèque (qui complète Programmés) compte pour Programmés ; « À décider »
+  // n'est pas montré pendant une panne.
+  assert.match(store, /const programmedRead = labelled\.programmed \? \{ \.\.\.labelled\.programmed, failures: \[\.\.\.new Set\(\[\.\.\.labelled\.programmed\.failures, \.\.\.\(labelled\.imports\?\.failures \|\| \[\]\)\]\)\] \} : null;/);
+  assert.match(store, /const wholeProgrammed = wholeOrNothing\(programmedRead, prior\?\.programmed, prior\?\.syncedAt\);/);
+  assert.match(store, /const undecided = degraded \? \[\] : labelled\.undecided \|\| \[\];/);
   assert.match(store, /const wholeImports = wholeOrNothing\(labelled\.imports, prior\?\.imports, prior\?\.syncedAt\);/);
   assert.match(store, /programmed: programmed \? \{ items: programmed\.items, failures: programmed\.failures, staleAt: programmed\.staleAt \} : null/, 'la date survit au redémarrage');
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');

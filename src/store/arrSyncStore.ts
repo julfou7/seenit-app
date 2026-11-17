@@ -135,10 +135,15 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       // Retour terrain du 17/11 (« tout ou rien ») : une lecture en échec garde la dernière liste complète, datée ;
       // sans elle, rien n'est montré plutôt qu'une liste partielle.
       const prior = get().snapshot?.key === key ? get().snapshot : null;
-      const wholeProgrammed = wholeOrNothing(labelled.programmed, prior?.programmed, prior?.syncedAt);
+      // Revue Codex #1089 : Programmés est complété par la bibliothèque (films surveillés hors calendrier) ; un échec
+      // de cette lecture rend Programmés incomplet lui aussi.
+      const programmedRead = labelled.programmed ? { ...labelled.programmed, failures: [...new Set([...labelled.programmed.failures, ...(labelled.imports?.failures || [])])] } : null;
+      const wholeProgrammed = wholeOrNothing(programmedRead, prior?.programmed, prior?.syncedAt);
       const wholeImports = wholeOrNothing(labelled.imports, prior?.imports, prior?.syncedAt);
       const degraded = Boolean(wholeProgrammed?.failures.length || wholeImports?.failures.length);
-      const undecided = degraded ? (wholeProgrammed?.staleAt !== undefined || wholeImports?.staleAt !== undefined ? prior?.undecided || [] : []) : labelled.undecided || [];
+      // Revue Codex #1089 : « À décider » n'a pas de date propre ; pendant une panne, rien n'y est montré plutôt qu'une
+      // ancienne classification présentée comme actuelle.
+      const undecided = degraded ? [] : labelled.undecided || [];
       const snapshot = { key, programmed: wholeProgrammed, imports: wholeImports, undecided, watched, syncedAt: Date.now() };
       set({ snapshot });
       persistArrSnapshot(snapshot);
