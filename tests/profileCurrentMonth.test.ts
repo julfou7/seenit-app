@@ -10,6 +10,9 @@ test('Moi : le mois en cours est nommé avec ses heures et sa barre se repère, 
   const css = readFileSync('src/screens/moi.css', 'utf8');
   assert.match(css, /\.moi-month-bar\[data-now\]>b,\.moi-month-bar\[data-now\]>small\{color:#F2C36B\}/);
   assert.match(css, /\.moi-month-bar\[data-now\]>small::after\{/);
+  // Retour du 17/11 : le record ne colore plus son nom ni sa valeur (seul le mois en cours est en or).
+  assert.doesNotMatch(css, /\.moi-month-bar\[data-state=record\]>(?:b|small)/);
+  assert.match(css, /\.moi-month-bar\[data-state=record\]>i\{background:linear-gradient/, 'la barre record reste distincte');
 });
 
 // Retour terrain du 17/11 (À voir : « pas assez d'espace au-dessus des filtres, ça touche presque »).

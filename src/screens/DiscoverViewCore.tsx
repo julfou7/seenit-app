@@ -91,7 +91,9 @@ export function DiscoverView({ model }: DiscoverViewProps) {
       </div>}
       <div className="explorer-controls">
         <div className="explorer-category-row">
-          {!isSearchMode && <>{!heroSearchVisible && <button type="button" className="explorer-control-search" aria-label="Rechercher" onClick={enterSearch}><Search size={20} /></button>}
+          {/* Retour terrain du 17/11 (« le switch de la recherche à côté des filtres est brutal ») : la loupe reste montée et
+              s'ouvre ou se replie en douceur (largeur, opacité, échelle) au lieu d'apparaître d'un coup et de pousser les pastilles. */}
+          {!isSearchMode && <><button type="button" className="explorer-control-search" data-collapsed={heroSearchVisible || undefined} aria-hidden={heroSearchVisible || undefined} tabIndex={heroSearchVisible ? -1 : undefined} aria-label="Rechercher" onClick={enterSearch}><Search size={20} /></button>
             <button type="button" className="explorer-control-filter" aria-label="Filtres" onClick={() => openFilter()}><SlidersHorizontal size={20} />{activeFilterCount > 0 && <span className="explorer-count">{activeFilterCount}</span>}</button></>}
           {CATEGORIES.filter(category => category.id !== 'Top C411' || model.c411Available).map(category => <button type="button" key={category.id} className="explorer-category" aria-pressed={activeCategory === category.id}
             disabled={Boolean(query.trim()) && !isSearchCompatibleCategory(category.id)} onClick={() => setActiveCategory(category.id)}>{category.label}</button>)}

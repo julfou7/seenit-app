@@ -11,7 +11,12 @@
 .explorer-category-row{display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none}
 .explorer-category-row>button{flex-shrink:0;min-height:44px}
 .explorer-control-search,.explorer-control-filter{position:relative;display:grid;place-items:center;width:44px;border-radius:50%;background:#1C1C1F;color:#a1a1aa;border:1px solid #ffffff14}
-.explorer-control-search{color:#E5A93D;background:rgba(229,169,61,.18);border:1.5px solid #E5A93D;box-shadow:0 0 0 4px rgba(229,169,61,.08);margin:4px}
+.explorer-control-search{color:#E5A93D;background:rgba(229,169,61,.18);border:1.5px solid #E5A93D;box-shadow:0 0 0 4px rgba(229,169,61,.08);margin:4px;overflow:hidden;transition:width .22s cubic-bezier(.22,1,.36,1),margin .22s cubic-bezier(.22,1,.36,1),opacity .18s ease,transform .22s cubic-bezier(.22,1,.36,1),border-width .22s ease}
+/* Retour terrain du 17/11 : repliée tant que la barre « Rechercher… » de l'image est visible, la loupe glisse en place. */
+.explorer-control-search[data-collapsed]{width:0;margin:4px 0;border-width:0;opacity:0;transform:scale(.6);box-shadow:none;pointer-events:none}
+.explorer-control-filter{transition:margin-left .22s cubic-bezier(.22,1,.36,1)}
+.explorer-control-search[data-collapsed]+.explorer-control-filter{margin-left:-8px}
+@media (prefers-reduced-motion:reduce){.explorer-control-search,.explorer-control-filter{transition:none}}
 .explorer-count{position:absolute;top:-2px;right:-2px;background:#E5A93D;color:#0B0B0D;min-width:18px;height:18px;padding:0 4px;border-radius:10px;font-size:10px;font-weight:800;display:grid;place-items:center}
 .explorer-category{padding:0 17px;border:1px solid #ffffff14;border-radius:22px;background:#1C1C1F;color:#a1a1aa;font-size:13px;font-weight:700}
 .explorer-category[aria-pressed=true]{background:#E5A93D;color:#0B0B0D;border-color:#E5A93D}

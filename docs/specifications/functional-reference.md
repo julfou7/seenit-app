@@ -345,8 +345,9 @@ Réglages et porte un point or lorsqu'une mise à jour de l'application est disp
 (`SEENIT-PROFILE-001`) :
 
 - **Ton année** : total d'heures, épisodes et films de l'année, douze barres « Heures par mois » portant
-  chacune sa valeur (record en or, mois à venir en pointillé) ; depuis la v1.4.337, le mois en cours est nommé avec
-  ses heures (« Heures par mois · Novembre : 27 h ») et sa barre porte un repère or, record ou non. Puis « Mes chiffres »
+  chacune sa valeur (barre dégradée pour le record, mois à venir en pointillé) ; depuis la v1.4.337, le mois en cours
+  est nommé avec ses heures (« Heures par mois · Novembre : 27 h ») et sa barre porte un repère or, record ou non ;
+  depuis la v1.4.338, seul le mois en cours a son nom et sa valeur en or. Puis « Mes chiffres »
   et « Mon année », qui s'ouvrent comme des pages avec retour (même position de défilement au retour).
 - **N séries laissées en route** (absente à zéro) ouvre la page dédiée (`SEENIT-PROFILE-002`) : constat,
   « Où tu décroches », « Presque finies », « En pause » (une série en cours sans épisode vu depuis 60 jours,
