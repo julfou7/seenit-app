@@ -55,6 +55,8 @@ test('Explorer affiche aussitôt la dernière sélection d’accueil, puis TMDB 
   assert.match(discoverSource, /const \[homeLoading, setHomeLoading\] = useState\(\(\) => homeSeed\.length === 0\);/);
   assert.match(discoverSource, /const keepSeed = seededHome\.current && page === 1 && activeCategory === 'Tout' && !hasActiveFilters;/, 'seulement à la toute première lecture de l’accueil');
   assert.match(discoverSource, /if \(page === 1 && activeCategory === 'Tout' && !hasActiveFilters\) writeExplorerHomeCache\(list\);/);
+  // Revue Codex #1087 : l'effet de remise à zéro ne vide pas la sélection retenue au montage.
+  assert.match(discoverSource, /const firstRun = !resetMounted\.current;[\s\S]*?if \(!\(firstRun && homeSeed\.length\)\) \{\s*setPopular\(\[\]\);\s*setTrending\(\[\]\);\s*\}/);
 });
 
 test('SEENIT-DISCOVER-003 E-01 progression incluse dans le hero de hauteur stable', () => {

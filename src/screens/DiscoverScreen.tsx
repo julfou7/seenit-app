@@ -472,11 +472,18 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     }
   };
 
+  // Revue Codex #1087 : au montage, la sélection retenue n'est pas effacée (elle resterait vide jusqu'à TMDB, ou hors
+  // ligne) ; seuls les changements de catégorie ou de filtres vident les listes.
+  const resetMounted = useRef(false);
   useEffect(() => {
+    const firstRun = !resetMounted.current;
+    resetMounted.current = true;
     setPage(1);
     setHomeHasMore(true);
-    setPopular([]);
-    setTrending([]);
+    if (!(firstRun && homeSeed.length)) {
+      setPopular([]);
+      setTrending([]);
+    }
     setHomeNotice(null);
     setHomePageError(null);
     if (activeCategory === 'Tout') {
