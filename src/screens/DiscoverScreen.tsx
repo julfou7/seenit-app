@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { readExplorerHomeCache, writeExplorerHomeCache } from '../features/discover/explorerHomeCache';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { isDownloadFeatureEnabled } from '../features/downloads/downloadFeatureVisibility';
 import { tmdb, isMovieAtCinema, EXPLORER_TRENDING_MIN_VOTES, type TMDBMedia } from '../features/shows/tmdb';
@@ -58,8 +59,12 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [searchResults, setSearchResults] = useState<TMDBMedia[]>([]);
   const [totalTvCount, setTotalTvCount] = useState<number | null>(null);
   const [totalMovieCount, setTotalMovieCount] = useState<number | null>(null);
-  const [trending, setTrending] = useState<TMDBMedia[]>([]);
-  const [popular, setPopular] = useState<TMDBMedia[]>([]);
+  // Retour terrain du 17/11 : la dernière sélection d'accueil s'affiche aussitôt (à la une + premières cartes), puis
+  // TMDB la remplace ; plus d'écran de squelettes à chaque ouverture.
+  const [homeSeed] = useState(() => readExplorerHomeCache<TMDBMedia>());
+  const seededHome = useRef(homeSeed.length > 0);
+  const [trending, setTrending] = useState<TMDBMedia[]>(homeSeed);
+  const [popular, setPopular] = useState<TMDBMedia[]>(homeSeed);
   const [homeNotice, setHomeNotice] = useState<string | null>(null);
   // Revue Codex (#917) : page suivante du Top C411 en échec, rechargée par « Réessayer ».
   const [homePageError, setHomePageError] = useState<string | null>(null);
@@ -69,7 +74,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
   const [popularPersons, setPopularPersons] = useState<TMDBMedia[]>([]);
   const [recommendations, setRecommendations] = useState<TMDBMedia[]>([]);
   const [heroDetails, setHeroDetails] = useState<Record<number, any>>({});
-  const [homeLoading, setHomeLoading] = useState(true);
+  const [homeLoading, setHomeLoading] = useState(() => homeSeed.length === 0);
   const [searchLoading, setSearchLoading] = useState(false);
   const loading = debouncedQuery.trim() ? searchLoading : homeLoading;
   const [homeEnrichmentReady, setHomeEnrichmentReady] = useState(false);
@@ -500,7 +505,11 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
     }
 
     async function fetchHome() {
-      if (page === 1) setHomeLoading(true);
+      // La sélection retenue reste affichée pendant la toute première lecture (accueil sans filtre) ; ensuite, un
+      // changement de catégorie ou de filtre montre le chargement normal.
+      const keepSeed = seededHome.current && page === 1 && activeCategory === 'Tout' && !hasActiveFilters;
+      seededHome.current = false;
+      if (page === 1 && !keepSeed) setHomeLoading(true);
       // #853 : chargement extrait (explorerHomePages) ; la page préparée à l'avance est reprise telle quelle.
       const query: ExplorerHomeQuery = { activeCategory, selectedPlatforms, selectedGenres, pegi, minRating, movieReleaseAfterYear, sortBy, sortOrder, hasActiveFilters };
       const prefetched = homePrefetchRef.current.take(query, page);
@@ -510,6 +519,7 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
           setTrending(prev => page === 1 ? list : mergeMedia(prev, list));
           setPopular(prev => page === 1 ? list : mergeMedia(prev, list));
           if (page === 1) setHomeLoading(false);
+          if (page === 1 && activeCategory === 'Tout' && !hasActiveFilters) writeExplorerHomeCache(list);
         },
       });
       if (!isCurrentRequest() || !result) return;

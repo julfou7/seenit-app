@@ -20,7 +20,9 @@ export function MoiYearCard({ viewings, onStats, onYear }: { viewings: readonly 
         <div><strong>{formatProfileHours(stats.minutes)}</strong><small>devant l’écran</small></div>
         <p><span>{stats.episodes.toLocaleString('fr-FR')} {stats.episodes > 1 ? 'épisodes' : 'épisode'}</span><span>{stats.films.toLocaleString('fr-FR')} {stats.films > 1 ? 'films' : 'film'}</span></p>
       </div>
-      <span className="moi-year-card-label">Heures par mois</span>
+      {/* Retour terrain du 17/11 (« j'aimerais voir le mois en cours ») : le mois en cours est nommé avec ses heures, et sa
+          barre se distingue (valeur et mois en or, repère dessous) même quand un autre mois détient le record. */}
+      <span className="moi-year-card-label">Heures par mois{currentMonth >= 0 && currentMonth < stats.months.length && <b data-current-month> · {PROFILE_MONTH_LABELS[currentMonth]} : {Math.round(stats.months[currentMonth] / 60)} h</b>}</span>
       <div className="moi-month-bars" role="img" aria-label={`Heures par mois en ${year} : ${summary}`}>
         {MONTH_SHORT.map((label, month) => {
           const known = month < stats.months.length;
@@ -29,7 +31,7 @@ export function MoiYearCard({ viewings, onStats, onYear }: { viewings: readonly 
           const record = known && stats.recordMonth === month;
           const state = !known ? 'future' : record ? 'record' : month === currentMonth ? 'current' : minutes <= 0 ? 'empty' : 'past';
           return (
-            <span key={label} className="moi-month-bar" data-state={state} aria-hidden="true">
+            <span key={label} className="moi-month-bar" data-state={state} data-now={month === currentMonth || undefined} aria-hidden="true">
               <b>{known ? hours : '–'}</b>
               <i style={{ height: known ? Math.max(3, Math.round(minutes / max * BAR_HEIGHT)) : 3 }} />
               <small>{label}</small>
