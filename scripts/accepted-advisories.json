@@ -1,0 +1,10 @@
+[
+  {
+    "id": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch",
+    "reason": "ReDoS par motifs glob fabriqués (picomatch <= 4.0.7, sans version corrigée au 17/11/2026). Atteint via Vite, utilisé seulement au build et en développement (server.ts ne le charge pas en production) ; aucun motif glob ne vient d'un utilisateur.",
+    "acceptedOn": "2026-11-17",
+    "expiresOn": "2026-12-17",
+    "decision": "USR-2026-11-17-002"
+  }
+]

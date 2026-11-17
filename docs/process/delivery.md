@@ -241,6 +241,12 @@ vérifiée et toute divergence est bloquée.
 - lors d'une release APK complète ;
 - lors du contrôle périodique hebdomadaire.
 
+Il passe par `scripts/audit-production-dependencies.cjs` (même seuil high). Décision du 17/11/2026
+(`USR-2026-11-17-002`) : un avis **sans version corrigée** peut être accepté temporairement dans
+`scripts/accepted-advisories.json`, nommé (GHSA et paquet), motivé et daté (30 jours au plus). Une acceptation
+expirée, un autre paquet ou tout autre avis high/critical bloque toujours. À l'expiration, mettre à jour la
+dépendance ou obtenir une nouvelle décision explicite du propriétaire.
+
 Un push sur `main` **ne publie jamais automatiquement une APK**. La poursuite automatique vers
 `/release-terrain` vient du mandat du chantier utilisateur, pas d'un déclencheur aveugle à chaque merge.
 

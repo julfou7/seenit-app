@@ -29,7 +29,8 @@ test('la release manuelle ne paie pas deux fois la validation rapide', () => {
   assert.match(build, /npm run lint/);
   assert.match(build, /npm run test:unit/);
   assert.match(build, /npm run test:android/);
-  assert.match(build, /npm audit --omit=dev --audit-level=high/);
+  // USR-2026-11-17-002 : audit high de production, acceptations datées seulement.
+  assert.match(build, /node scripts\/audit-production-dependencies\.cjs/);
   assert.match(build, /npm run build/);
 });
 

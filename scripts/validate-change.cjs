@@ -206,7 +206,8 @@ function validatePostinstall() {
       runNpm(['run', 'test:android'], { label: 'Contrat Android', metric: 'SEENIT_ANDROID_SECONDS' });
     }
     if (classification.dependenciesChanged || process.env.SEENIT_FORCE_DEPENDENCY_AUDIT === 'true') {
-      runNpm(['audit', '--omit=dev', '--audit-level=high'], { label: 'Audit dépendances production' });
+      // USR-2026-11-17-002 : même seuil high, avec les seules acceptations datées de scripts/accepted-advisories.json.
+      run('node', ['scripts/audit-production-dependencies.cjs'], { label: 'Audit dépendances production' });
       run('node', ['scripts/audit-native-dependencies.cjs'], { label: 'Audit runtime natif embarqué' });
     }
     runNpm(['run', 'build'], { label: 'Build Web + serveur', metric: 'SEENIT_BUILD_SECONDS' });
