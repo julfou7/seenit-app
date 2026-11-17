@@ -76,7 +76,9 @@
 .moi-month-bar>b{font-size:11px;font-weight:800;color:#e4e4e7}
 .moi-month-bar>i{display:block;width:100%;border-radius:5px 5px 2px 2px;background:#8a6a2b}
 .moi-month-bar>small{font-size:10.5px;font-weight:700;color:#a1a1aa}
-.moi-month-bar[data-state=record]>i{background:linear-gradient(180deg,#FFF2B8,#E5A93D 55%,#B37812)}.moi-month-bar[data-state=record]>b,.moi-month-bar[data-state=record]>small{color:#FFF2B8}
+/* Retour terrain du 17/11 (« ne mets pas le nom du mois fort en couleur différente, ça perturbe avec le mois en cours ») :
+   le record garde sa barre dégradée, mais son nom et sa valeur restent neutres ; seul le mois en cours est écrit en or. */
+.moi-month-bar[data-state=record]>i{background:linear-gradient(180deg,#FFF2B8,#E5A93D 55%,#B37812)}
 .moi-month-bar[data-state=current]>i{background:#E5A93D}.moi-month-bar[data-state=current]>small{color:#fff}
 /* Retour terrain du 17/11 : le mois en cours se repère toujours (valeur et mois en or, trait dessous), record ou non. */
 .moi-month-bar[data-now]>b,.moi-month-bar[data-now]>small{color:#F2C36B}

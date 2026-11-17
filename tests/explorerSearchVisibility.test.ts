@@ -24,7 +24,12 @@ test('SEENIT-UX-019 #870 une fiche média ouverte depuis la recherche d’Explor
 test('SEENIT-DISCOVER-008 recherche posée sur l’image à la une, une seule loupe visible à la fois', () => {
   const view = read('src/screens/DiscoverViewCore.tsx'), hero = read('src/screens/DiscoverHero.tsx'), css = read('src/screens/explorer.css');
   assert.match(view, /className="explorer-hero-search" aria-label="Rechercher" onClick=\{enterSearch\}><Search size=\{20\} aria-hidden="true" \/><span>Rechercher un film, une série…<\/span>/);
-  assert.match(view, /\{!heroSearchVisible && <button type="button" className="explorer-control-search" aria-label="Rechercher" onClick=\{enterSearch\}>/);
+  // Retour terrain du 17/11 (« le switch est brutal ») : la loupe reste montée, repliée sans être atteignable tant que la
+  // barre de l'image est visible, et s'ouvre en douceur.
+  assert.match(view, /<button type="button" className="explorer-control-search" data-collapsed=\{heroSearchVisible \|\| undefined\} aria-hidden=\{heroSearchVisible \|\| undefined\} tabIndex=\{heroSearchVisible \? -1 : undefined\} aria-label="Rechercher" onClick=\{enterSearch\}>/);
+  assert.match(css, /\.explorer-control-search\{[^}]*transition:width \.22s/);
+  assert.match(css, /\.explorer-control-search\[data-collapsed\]\{width:0;[^}]*opacity:0;[^}]*pointer-events:none\}/);
+  assert.match(css, /@media \(prefers-reduced-motion:reduce\)\{\.explorer-control-search,\.explorer-control-filter\{transition:none\}\}/);
   assert.match(view, /new IntersectionObserver\(\(\[entry\]\) => setHeroSearchVisible\(entry\.isIntersecting\), \{ root: containerRef\.current, threshold: 0 \}\)/);
   assert.match(css, /\.explorer-hero-search\{position:absolute;z-index:30;left:16px;right:16px;top:14px;height:48px/);
   assert.doesNotMatch(hero, /rounded-bl-\[24px\]/, 'le rang ne masque plus le coin du champ');
