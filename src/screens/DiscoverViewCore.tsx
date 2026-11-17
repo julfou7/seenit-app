@@ -46,14 +46,15 @@ export function DiscoverView({ model }: DiscoverViewProps) {
   // Un seul contrôle de recherche visible : la loupe de la barre collante revient dès que le champ de l'image sort de l'écran.
   const heroSearchRef = useRef<HTMLButtonElement>(null);
   const [heroSearchVisible, setHeroSearchVisible] = useState(false);
-  const heroSearchShown = !isSearchMode && showHeroSurface && visibleHeroItems.length > 0;
+  const heroSearchShown = !isSearchMode && showHeroSurface && (visibleHeroItems.length > 0 || loading);
   useEffect(() => {
     const target = heroSearchRef.current;
     if (!heroSearchShown || !target || typeof IntersectionObserver !== 'function') { setHeroSearchVisible(false); return; }
     const observer = new IntersectionObserver(([entry]) => setHeroSearchVisible(entry.isIntersecting), { root: containerRef.current, threshold: 0 });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [heroSearchShown, containerRef]);
+    // La barre passe du squelette à l'image réelle : l'observateur suit le nouvel élément.
+  }, [heroSearchShown, containerRef, visibleHeroItems.length > 0]);
   const openFilter = (tab?: FilterTab) => { if (tab) setFilterTab(tab); setShowGenreMenu(true); };
   const clearFilters = () => {
     setSelectedPlatforms([]); setSelectedGenres([]); setPegi('Tous'); setMinRating('Toutes');
@@ -70,7 +71,12 @@ export function DiscoverView({ model }: DiscoverViewProps) {
   return <div className="explorer-root relative flex-1 h-full max-w-2xl mx-auto w-full overflow-hidden flex flex-col" data-discover-search-mode={isSearchMode} inert={Boolean(selectedCharacter)}>
     {isOffline && <div className="explorer-offline"><WifiOff size={14} />Mode hors ligne · contenus en cache</div>}
     <div ref={containerRef} data-watch-provider-root="" className="explorer-scroll flex-1 overflow-y-auto hide-scrollbar pb-nav">
-      {showHeroSurface && loading && !visibleHeroItems.length && <HeroSkeleton />}
+      {/* Retour terrain du 17/11 (« skeleton pas à jour pour la barre de recherche, l'afficher d'entrée ») : pendant le
+          chargement, la barre « Rechercher… » est déjà posée sur l'image à la une, et utilisable. */}
+      {showHeroSurface && loading && !visibleHeroItems.length && <div className="explorer-hero" data-hero-loading>
+        {!isSearchMode && <button ref={heroSearchRef} type="button" className="explorer-hero-search" aria-label="Rechercher" onClick={enterSearch}><Search size={20} aria-hidden="true" /><span>Rechercher un film, une série…</span></button>}
+        <HeroSkeleton />
+      </div>}
       {showHeroSurface && visibleHeroItems.length > 0 && <div className="explorer-hero">
         {/* SEENIT-DISCOVER-008 : la recherche est posée sur l'image à la une, sans hauteur ajoutée. */}
         {!isSearchMode && <button ref={heroSearchRef} type="button" className="explorer-hero-search" aria-label="Rechercher" onClick={enterSearch}><Search size={20} aria-hidden="true" /><span>Rechercher un film, une série…</span></button>}

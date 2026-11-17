@@ -248,7 +248,8 @@ rappels et actualités des séries restent visibles.
 - **Pas vu depuis un moment** reçoit les autres séries encore regardables ;
 - **Films à voir** reçoit les films suivis non vus dont la sortie n'est pas future.
   Trois tris (Récents par défaut, Mieux notés, Chez moi) et une carte « À l'affiche » tirée au hasard
-  parmi les dix films les mieux notés, sortis et non vus ; un film dont la sortie s'avère future une fois
+  parmi les dix films les mieux notés, sortis et non vus ; depuis la v1.4.337, le film tiré reste à l'affiche pendant le
+  chargement des notes et toute la journée sur l'appareil (seul le bouton de tirage en change) ; un film dont la sortie s'avère future une fois
   ses détails connus affiche « sortie dans N j » sans bouton Vu (`SEENIT-UX-022`).
 
 Une série n'entre dans **À Regarder** que si SeenIt possède une preuve positive qu'au moins un épisode
@@ -344,7 +345,8 @@ Réglages et porte un point or lorsqu'une mise à jour de l'application est disp
 (`SEENIT-PROFILE-001`) :
 
 - **Ton année** : total d'heures, épisodes et films de l'année, douze barres « Heures par mois » portant
-  chacune sa valeur (record en or, mois en cours en blanc, mois à venir en pointillé), puis « Mes chiffres »
+  chacune sa valeur (record en or, mois à venir en pointillé) ; depuis la v1.4.337, le mois en cours est nommé avec
+  ses heures (« Heures par mois · Novembre : 27 h ») et sa barre porte un repère or, record ou non. Puis « Mes chiffres »
   et « Mon année », qui s'ouvrent comme des pages avec retour (même position de défilement au retour).
 - **N séries laissées en route** (absente à zéro) ouvre la page dédiée (`SEENIT-PROFILE-002`) : constat,
   « Où tu décroches », « Presque finies », « En pause » (une série en cours sans épisode vu depuis 60 jours,
@@ -828,6 +830,8 @@ bibliothèque utilisateur. Cocher/décocher un épisode ou une saison met à jou
 (`seenEpisodes`, prochain épisode, statut/archive et temps restant dérivé) sans relancer une collecte
 TMDB de toutes les saisons. Les changements réels de diffusion ou de catalogue restent pris en charge par
 le worker de métadonnées planifié et par l'actualisation explicite.
+Explorer (v1.4.337) : la dernière sélection d'accueil (à la une + premières cartes, une semaine au plus) s'affiche dès
+l'ouverture puis TMDB la remplace ; sans elle, le squelette porte déjà la barre « Rechercher… » utilisable.
 Le contrat complet est `SEENIT-PERF-001` et son suivi est
 [#146](https://github.com/julfou7/seenit-app/issues/146) pour le premier rendu et
 [#445](https://github.com/julfou7/seenit-app/issues/445) pour la progression incrémentale.

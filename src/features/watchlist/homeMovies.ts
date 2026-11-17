@@ -92,13 +92,35 @@ export function featuredMoviePool(movies: readonly Show[], facts: (show: Show) =
   return pool.length >= FEATURED_MOVIE_MIN_POOL ? pool : [];
 }
 
-/** Tirage stable pour une graine donnée ; le tirage suivant ne retombe jamais sur le film courant. */
-export function pickFeaturedMovie(pool: readonly Show[], seed: number, currentId: string | null = null): Show | null {
-  if (!pool.length) return null;
-  const kept = currentId ? pool.find(show => show.id === currentId) : undefined;
+/**
+ * Tirage stable pour une graine donnée ; le tirage suivant ne retombe jamais sur le film courant.
+ * Retour terrain du 17/11 (« l'image du film à la une change une fois l'app ouverte, c'est très perturbant ») : les notes
+ * arrivent par lots pendant le chargement et recomposent le vivier ; le film déjà tiré reste à l'affiche tant qu'il est
+ * dans la liste, sorti et non vu (`movies`), même s'il quitte le vivier des mieux notés.
+ */
+export function pickFeaturedMovie(pool: readonly Show[], seed: number, currentId: string | null = null, movies: readonly Show[] = pool,
+  /** Revue Codex #1087 : le film gardé doit rester sorti (une date TMDB future arrivée après le tirage l'écarte). */
+  released: (show: Show) => boolean = () => true): Show | null {
+  const kept = currentId ? movies.find(show => show.id === currentId && !show.seenEpisodes?.includes('movie') && show.status !== 'completed' && released(show)) : undefined;
   if (kept) return kept;
+  if (!pool.length) return null;
   const index = Math.abs(Math.floor(seed)) % pool.length;
   return pool[index];
+}
+
+const FEATURED_KEY = 'seenit.home.featured';
+const dayKey = (now: number) => new Date(now).toISOString().slice(0, 10);
+
+/** Film à la une retenu pour la journée sur cet appareil (confort local : absent ou illisible, un tirage a lieu). */
+export function readFeaturedOfDay(now = Date.now(), storage: Pick<Storage, 'getItem'> | undefined = globalThis.localStorage): string | null {
+  try {
+    const saved = JSON.parse(storage?.getItem(FEATURED_KEY) || 'null') as { day?: string; id?: string } | null;
+    return saved?.day === dayKey(now) && typeof saved.id === 'string' ? saved.id : null;
+  } catch { return null; }
+}
+
+export function writeFeaturedOfDay(id: string, now = Date.now(), storage: Pick<Storage, 'setItem'> | undefined = globalThis.localStorage): void {
+  try { storage?.setItem(FEATURED_KEY, JSON.stringify({ day: dayKey(now), id })); } catch { /* stockage indisponible : rien à retenir */ }
 }
 
 export function nextFeaturedSeed(pool: readonly Show[], seed: number, currentId: string | null, random = Math.random): number {

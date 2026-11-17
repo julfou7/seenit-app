@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { Show } from '../src/types.ts';
-import { featuredMoviePool, formatMovieRating, formatMovieRuntime, formatReleaseCountdown, homeMovieRelease, nextFeaturedSeed, pickFeaturedMovie, readHomeMovieFacts, sortHomeMovies, type HomeMovieFacts } from '../src/features/watchlist/homeMovies.ts';
+import { featuredMoviePool, formatMovieRating, formatMovieRuntime, formatReleaseCountdown, homeMovieRelease, nextFeaturedSeed, pickFeaturedMovie, readFeaturedOfDay, readHomeMovieFacts, writeFeaturedOfDay, sortHomeMovies, type HomeMovieFacts } from '../src/features/watchlist/homeMovies.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
 const film = (id: string, extra: Partial<Show> = {}): Show => ({ id, userId: 'u', tmdbId: Number(id.replace(/\D/g, '')) || 1, mediaType: 'movie', title: id, posterPath: null, backdropPath: null, status: 'plan_to_watch', isArchived: false, seenEpisodes: [], episodeRecords: {}, createdAt: 1, updatedAt: 1, ...extra });
@@ -58,6 +58,21 @@ test('SEENIT-UX-022 À l’affiche tire parmi les dix mieux notés, sortis et no
   assert.equal(pickFeaturedMovie(pool, 7, first.id), first, 'le film affiché reste tant qu’il est éligible');
   for (const draw of [0, 0.4, 0.99]) assert.notEqual(pool[nextFeaturedSeed(pool, 3, first.id, () => draw)].id, first.id);
   assert.equal(pickFeaturedMovie([], 1), null);
+  // Retour terrain du 17/11 (« le film à la une change une fois l'app ouverte ») : les notes arrivent par lots et
+  // recomposent le vivier ; le film tiré reste tant qu'il est dans la liste, sorti et non vu.
+  const smallerPool = pool.filter(show => show.id !== first.id);
+  assert.equal(pickFeaturedMovie(smallerPool, 7, first.id, movies), first, 'sorti du vivier, il reste à l’affiche');
+  assert.equal(pickFeaturedMovie([], 7, first.id, movies), first, 'vivier encore vide pendant le chargement');
+  assert.notEqual(pickFeaturedMovie(smallerPool, 7, 'm13', movies)?.id, 'm13', 'un film vu n’est jamais gardé');
+  // Revue Codex #1087 : une sortie future révélée après le tirage écarte le film gardé.
+  assert.notEqual(pickFeaturedMovie(smallerPool, 7, first.id, movies, show => show.id !== first.id)?.id, first.id, 'pas encore sorti : nouveau tirage');
+  const store = new Map<string, string>();
+  const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => { store.set(key, value); } };
+  const day = Date.parse('2026-11-17T09:00:00Z');
+  writeFeaturedOfDay('m5', day, storage);
+  assert.equal(readFeaturedOfDay(day + 3 * 3600_000, storage), 'm5', 'même jour : même film');
+  assert.equal(readFeaturedOfDay(day + 24 * 3600_000, storage), null, 'le lendemain : nouveau tirage');
+  assert.equal(readFeaturedOfDay(day, { getItem: () => { throw new Error('bloqué'); } }), null, 'stockage indisponible : tirage normal');
 });
 
 test('SEENIT-UX-022 l’accueil branche tri, À l’affiche, billets sans coupe et pas de Vu avant la sortie', () => {

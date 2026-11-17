@@ -178,7 +178,9 @@
 .home-notifications-page__hint { margin:4px 4px 0; font-size:13px; line-height:1.45; color:#71717a; }
 
 /* SEENIT-UX-022 : tri des films et carte « À l'affiche ». */
-.home-movie-sort { display:flex; flex-wrap:wrap; gap:8px; margin:2px 0 12px; }
+/* Retour terrain du 17/11 (« pas assez d'espace au-dessus des filtres, ça touche presque ») : les pastilles de tri
+   s'écartent du bouton de vue de l'en-tête. */
+.home-movie-sort { display:flex; flex-wrap:wrap; gap:8px; margin:14px 0 12px; }
 .home-movie-sort button { min-height:44px; padding:0 14px; border-radius:22px; background:#1c1c1f; box-shadow:inset 0 0 0 1px #ffffff14; color:#d4d4d8; font-size:13.5px; font-weight:700; cursor:pointer; }
 .home-movie-sort button[aria-pressed="true"] { background:#e5a93d; color:#000; font-weight:800; box-shadow:none; }
 .home-movie-empty { margin:0 0 12px; color:#a1a1aa; font-size:13px; line-height:1.5; }

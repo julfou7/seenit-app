@@ -35,8 +35,28 @@ test('SEENIT-PERF-001 ne remet pas les enrichissements secondaires sur le chemin
 
 test('SEENIT-PERF-001 E-03 les commandes restent montées pendant le chargement froid', () => {
  assert.match(discoverSource, /aria-label="Rechercher"/);
- assert.match(discoverSource, /showHeroSurface && loading && !visibleHeroItems.length && <HeroSkeleton/);
+ // Retour terrain du 17/11 : la barre « Rechercher… » est posée sur le squelette de l'image à la une dès l'entrée.
+ assert.match(discoverSource, /showHeroSurface && loading && !visibleHeroItems\.length && <div className="explorer-hero" data-hero-loading>\s*\{!isSearchMode && <button ref=\{heroSearchRef\} type="button" className="explorer-hero-search"[\s\S]*?<HeroSkeleton \/>/);
  assert.doesNotMatch(discoverSource, /ExplorerSkeleton|CategorySkeleton|SortSkeleton/);
+});
+
+test('Explorer affiche aussitôt la dernière sélection d’accueil, puis TMDB la remplace (17/11)', async () => {
+  const { readExplorerHomeCache, writeExplorerHomeCache, EXPLORER_HOME_CACHE_SIZE } = await import('../src/features/discover/explorerHomeCache.ts');
+  const store = new Map<string, string>();
+  const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => { store.set(key, value); } };
+  const now = Date.parse('2026-11-17T10:00:00Z');
+  writeExplorerHomeCache(Array.from({ length: 20 }, (_, index) => ({ id: index + 1, title: `Film ${index + 1}` })), now, storage);
+  const seed = readExplorerHomeCache<{ id: number; title: string }>(now + 3600_000, storage);
+  assert.equal(seed.length, EXPLORER_HOME_CACHE_SIZE, 'à la une + premières cartes seulement');
+  assert.equal(seed[0].title, 'Film 1');
+  assert.deepEqual(readExplorerHomeCache(now + 8 * 24 * 3600_000, storage), [], 'au-delà d’une semaine : chargement normal');
+  assert.deepEqual(readExplorerHomeCache(now, { getItem: () => '{oops', setItem: () => {} }), [], 'illisible : chargement normal');
+  assert.match(discoverSource, /const \[homeSeed\] = useState\(\(\) => readExplorerHomeCache<TMDBMedia>\(\)\);/);
+  assert.match(discoverSource, /const \[homeLoading, setHomeLoading\] = useState\(\(\) => homeSeed\.length === 0\);/);
+  assert.match(discoverSource, /const keepSeed = seededHome\.current && page === 1 && activeCategory === 'Tout' && !hasActiveFilters;/, 'seulement à la toute première lecture de l’accueil');
+  assert.match(discoverSource, /if \(page === 1 && activeCategory === 'Tout' && !hasActiveFilters\) writeExplorerHomeCache\(list\);/);
+  // Revue Codex #1087 : l'effet de remise à zéro ne vide pas la sélection retenue au montage.
+  assert.match(discoverSource, /const firstRun = !resetMounted\.current;[\s\S]*?if \(!\(firstRun && homeSeed\.length\)\) \{\s*setPopular\(\[\]\);\s*setTrending\(\[\]\);\s*\}/);
 });
 
 test('SEENIT-DISCOVER-003 E-01 progression incluse dans le hero de hauteur stable', () => {

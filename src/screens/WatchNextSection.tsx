@@ -7,7 +7,7 @@ import { MovieTicketCard } from '../components/cards/MovieTicketCard';
 import { resolveWatchCardResume } from '../features/watchlist/watchCardResume';
 import { type SeriesCardEpisode } from '../features/watchlist/seriesCardPresentation';
 import { mergeWatchGroups, movieRuntime, orderWatchMovies } from '../features/watchlist/watchNext18c';
-import { featuredMoviePool, nextFeaturedSeed, pickFeaturedMovie, readHomeMovieFacts, sortHomeMovies, type HomeMovieFacts, type HomeMovieSort } from '../features/watchlist/homeMovies';
+import { featuredMoviePool, homeMovieRelease, nextFeaturedSeed, pickFeaturedMovie, readFeaturedOfDay, readHomeMovieFacts, writeFeaturedOfDay, sortHomeMovies, type HomeMovieFacts, type HomeMovieSort } from '../features/watchlist/homeMovies';
 import { FeaturedMovieCard } from '../components/cards/FeaturedMovieCard';
 import { extractOfficialStreamingProvider } from '../utils/providerLogos';
 import { readWatchProviderCache } from '../features/providers/watchProviderCache';
@@ -97,7 +97,9 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   const [movieList, setMovieList] = useState(false);
   // SEENIT-UX-022 : tri des films (Récents par défaut) et tirage « À l'affiche » stable jusqu'au prochain tirage.
   const [movieSort, setMovieSort] = useState<HomeMovieSort>('recent');
-  const [featured, setFeatured] = useState<{ seed: number; id: string | null }>(() => ({ seed: Math.floor(Math.random() * 1_000), id: null }));
+  // Retour terrain du 17/11 : le film à la une du jour est retenu sur l'appareil ; rouvrir l'app le retrouve au lieu d'un
+  // nouveau tirage pendant le chargement. Le bouton de tirage reste seul à en changer.
+  const [featured, setFeatured] = useState<{ seed: number; id: string | null }>(() => ({ seed: Math.floor(Math.random() * 1_000), id: readFeaturedOfDay() }));
   const [, setProviderRevision] = useState(0);
   const [, setDetailsRevision] = useState(0);
   const plexCache = usePlexAvailabilityStore(state => state.cache);
@@ -191,9 +193,11 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   };
   const visibleMovies = sortHomeMovies(orderedMovies, movieSort, movieFacts, movieAtHome);
   const featuredPool = featuredMoviePool(orderedMovies, movieFacts, now);
-  const featuredShow = pickFeaturedMovie(featuredPool, featured.seed, featured.id);
+  const featuredShow = pickFeaturedMovie(featuredPool, featured.seed, featured.id, orderedMovies,
+    show => homeMovieRelease(movieFacts(show).releaseDate, false, now).kind !== 'upcoming');
   const featuredId = featuredShow?.id ?? null;
   useEffect(() => { if (featuredId && featuredId !== featured.id) setFeatured(previous => ({ ...previous, id: featuredId })); }, [featuredId, featured.id]);
+  useEffect(() => { if (featuredId) writeFeaturedOfDay(featuredId); }, [featuredId]);
   const shuffleFeatured = () => setFeatured(previous => {
     const seed = nextFeaturedSeed(featuredPool, previous.seed, featuredId);
     return { seed, id: featuredPool[seed]?.id ?? null };
