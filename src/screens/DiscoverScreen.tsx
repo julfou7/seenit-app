@@ -396,20 +396,20 @@ export function DiscoverScreen({ onShowClick, navigationShortcut }: Props) {
       return;
     }
 
-    const newShowData: any = {
+    const newShowData = {
       tmdbId: Number(media.id),
       title: titleToUse,
       posterPath: media.poster_path,
       backdropPath: media.backdrop_path,
       year: (media.first_air_date || media.release_date || '').substring(0, 4),
       rating: media.vote_average,
-      mediaType: isTv ? 'tv' : 'movie',
+      mediaType: isTv ? 'tv' as const : 'movie' as const,
       seasonRecords: {},
       episodeRecords: {},
-      status: 'plan_to_watch',
+      status: 'plan_to_watch' as const,
       updatedAt: Date.now(),
       createdAt: Date.now(),
-      seenEpisodes: [],
+      seenEpisodes: [] as string[],
       isArchived: false,
     };
 
