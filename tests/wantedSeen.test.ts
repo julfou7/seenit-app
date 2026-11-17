@@ -53,7 +53,8 @@ test('SEENIT-DOWNLOAD-020 un vu sans watchedAt se date par lastWatchedAt puis pa
   assert.equal(seenWatchedRequest({ mediaType: 'movie', tmdbId: 1 }, shows, now), false);
   assert.equal(seenWatchedRequest({ mediaType: 'movie', tmdbId: 247718 }, shows, now), false, 'même numéro TMDB, autre type');
   const section = readFileSync('src/components/ProgrammedSection.tsx', 'utf8');
-  assert.match(section, /const watching = watchingRequests\.filter\(entry => !seenWatchedRequest\(entry, shows\)\);/, 'appliqué avant de construire les cartes');
+  // Retour du 17/11 (« tout ou rien ») : sans liste Sonarr/Radarr connue, aucune demande n'est montrée non plus.
+  assert.match(section, /const watching = unavailable \? \[\] : watchingRequests\.filter\(entry => !seenWatchedRequest\(entry, shows\)\);/, 'appliqué avant de construire les cartes');
   for (const file of ['src/screens/LibraryScreen.tsx', 'src/screens/PersonDetailModal.tsx']) {
     assert.match(readFileSync(file, 'utf8'), /movie: \{ \.\.\.\(existingShow\.episodeRecords\?\.movie \|\| \{\}\), watchedAt: seenAt \}/, `${file} horodate le vu`);
   }

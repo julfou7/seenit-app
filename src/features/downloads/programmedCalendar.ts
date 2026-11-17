@@ -28,7 +28,8 @@ export type ProgrammedItem =
   | { kind: 'movie'; id: number; tmdbId?: number; title: string; date?: string; dateKind?: ReleaseKind; posterUrl?: string; quality?: ProgrammedQuality; profileId?: number; wanted?: boolean; diskFull?: boolean; freeSpace?: number; releaseCheckedAt?: number; releaseAttemptAt?: number; releaseScope?: string; inCinemasPast?: boolean; addedAt?: number };
 
 /** `movieQuality` : libellé de qualité d'un profil Radarr de ce serveur (revue Codex #933 : films ajoutés hors calendrier). */
-export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[]; movieQuality?: (profileId?: number) => ProgrammedQuality | undefined }
+/** `staleAt` : liste gardée de la dernière synchronisation complète (Sonarr/Radarr injoignables), retour du 17/11. */
+export interface ProgrammedCalendar { items: ProgrammedItem[]; failures: string[]; staleAt?: number; movieQuality?: (profileId?: number) => ProgrammedQuality | undefined }
 
 export interface CalendarIo {
   get: (url: string, headers: Record<string, string>) => Promise<unknown>;

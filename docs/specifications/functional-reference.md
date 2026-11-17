@@ -996,7 +996,10 @@ se rechargent quand un téléchargement change d'état ou que l'app revient au p
   affichée (« Film · Radarr · 1080p »), date du film selon la sortie (« Sortie numérique… », « Au cinéma… »,
   « Déjà au cinéma · sortie numérique pas encore annoncée »), menu ⋯ sur chaque carte (qualité 1080p/4K,
   annulation). Programmés et Téléchargés affichent l'état Sonarr/Radarr synchronisé (`SEENIT-DOWNLOAD-016`) :
-  plus de saut à l'ouverture, et une annulation rend l'épisode aussitôt programmable dans sa fiche. Un
+  plus de saut à l'ouverture, et une annulation rend l'épisode aussitôt programmable dans sa fiche. Depuis la
+  v1.4.339 (« tout ou rien »), si Sonarr/Radarr ne répondent pas, chaque section garde sa dernière liste complète,
+  datée (« dernier état connu à 19:57 ») ; sans liste complète connue, elle n'affiche que « liste indisponible »,
+  sans aucune carte partielle (pas même les demandes de SeenIt). Un
   transfert sans source connectée reste dans « En cours » (« En attente de sources ») ; les messages du client
   sont en français. Depuis la v1.4.329, un transfert à l'arrêt que le tracker refuse (ratio insuffisant, torrent
   retiré…) passe dans « À régler » avec la raison lue dans qBittorrent et la marche à suivre. Depuis la v1.4.334

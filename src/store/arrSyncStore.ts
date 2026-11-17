@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { auth } from '../lib/firebase';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
+import { wholeOrNothing } from '../features/downloads/arrWholeOrNothing';
 import { useDownloadConfigStore } from './downloadConfigStore';
 import { useMediaPresenceStore } from './mediaPresenceStore';
 import { checkWantedReleases, fetchProgrammedCalendar, fetchWatchedMovie, programmedScope, wantedReleaseReader, type ProgrammedCalendar } from '../features/downloads/programmedCalendar';
@@ -69,7 +70,7 @@ function persistArrSnapshot(snapshot: ArrSnapshot): void {
   if (!uid) return;
   const { key, programmed, ...rest } = snapshot;
   // `movieQuality` n'est utile que pendant la synchronisation : la copie gardée n'en a pas besoin.
-  const stored: PersistedSnapshot = { scope: arrScopeFingerprint(key), snapshot: { ...rest, programmed: programmed ? { items: programmed.items, failures: programmed.failures } : null } };
+  const stored: PersistedSnapshot = { scope: arrScopeFingerprint(key), snapshot: { ...rest, programmed: programmed ? { items: programmed.items, failures: programmed.failures, staleAt: programmed.staleAt } : null } };
   try { writeUserScopedJson(uid, PERSISTED_FIELD, stored); } catch { /* Une copie non gardée n'empêche jamais l'affichage. */ }
 }
 let inFlight: { key: string; promise: Promise<void> } | null = null;
@@ -131,7 +132,19 @@ export const useArrSyncStore = create<ArrSyncState>((set, get) => ({
       // Retour terrain du 15/11 (v1.4.320) : un import nouveau depuis la copie précédente rafraîchit la présence du
       // titre (fiche, « Ajouter E… »), au lieu de garder un état « à télécharger » en cache.
       if (importsReference?.key !== key) importsReference = { key, value: importsReferenceFrom(get().snapshot?.key === key ? get().snapshot?.imports : undefined) };
-      const snapshot = { key, programmed: labelled.programmed, imports: labelled.imports, undecided: labelled.undecided || [], watched, syncedAt: Date.now() };
+      // Retour terrain du 17/11 (« tout ou rien ») : une lecture en échec garde la dernière liste complète, datée ;
+      // sans elle, rien n'est montré plutôt qu'une liste partielle.
+      const prior = get().snapshot?.key === key ? get().snapshot : null;
+      // Revue Codex #1089 : Programmés est complété par la bibliothèque (films surveillés hors calendrier) ; un échec
+      // de cette lecture rend Programmés incomplet lui aussi.
+      const programmedRead = labelled.programmed ? { ...labelled.programmed, failures: [...new Set([...labelled.programmed.failures, ...(labelled.imports?.failures || [])])] } : null;
+      const wholeProgrammed = wholeOrNothing(programmedRead, prior?.programmed, prior?.syncedAt);
+      const wholeImports = wholeOrNothing(labelled.imports, prior?.imports, prior?.syncedAt);
+      const degraded = Boolean(wholeProgrammed?.failures.length || wholeImports?.failures.length);
+      // Revue Codex #1089 : « À décider » n'a pas de date propre ; pendant une panne, rien n'y est montré plutôt qu'une
+      // ancienne classification présentée comme actuelle.
+      const undecided = degraded ? [] : labelled.undecided || [];
+      const snapshot = { key, programmed: wholeProgrammed, imports: wholeImports, undecided, watched, syncedAt: Date.now() };
       set({ snapshot });
       persistArrSnapshot(snapshot);
       // Revue Codex #1063 : relectures une par une, jamais en rafale.

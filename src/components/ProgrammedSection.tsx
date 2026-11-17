@@ -10,6 +10,7 @@ import { DialogLayer } from './ui/DialogLayer';
 import { formatFreeSpace } from '../features/downloads/arrDiskSpace';
 import { useToastStore } from '../store/toastStore';
 import { arrSyncKey, notifyArrWrite, useArrSnapshot, useArrSyncStore, type WatchedMovieDetails } from '../store/arrSyncStore';
+import { arrUnavailableNote } from '../features/downloads/arrWholeOrNothing';
 import { changeProgrammedQuality, dayTime, programmedDateLabel, programmedScope, unprogramItem, type ProgrammedItem, type ReleaseKind } from '../features/downloads/programmedCalendar';
 import type { LiveDownloadItem } from '../services/sonarrRadarrLive';
 import { coveredBy, hideQueuedProgrammed, orderByRecentlyAdded } from '../features/downloads/programmedQueue';
@@ -117,9 +118,13 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, onEpisodeClick,
   // Retour terrain du 09/11 (`USR-2026-11-09-016`) : un recherché déjà vu dans SeenIt depuis 24 h n'est plus listé.
   const shows = useShowsStore(state => state.shows);
   // Revue Codex #928 : une demande suivie d'un film ou d'un épisode vu depuis 24 h suit la même règle.
-  const watching = watchingRequests.filter(entry => !seenWatchedRequest(entry, shows));
-  const items = hideQueuedProgrammed(hideSeenWanted((snapshot?.programmed?.items || []).filter(item => !hidden.has(`${item.kind}:${item.id}`)), shows), queued);
   const failures = snapshot?.programmed?.failures || [];
+  // Retour terrain du 17/11 (« tout ou rien ») : sans liste complète connue, aucune carte (pas même les demandes de
+  // SeenIt) ; avec la dernière liste gardée, tout est montré, daté.
+  const staleAt = snapshot?.programmed?.staleAt;
+  const unavailable = failures.length > 0 && staleAt === undefined;
+  const watching = unavailable ? [] : watchingRequests.filter(entry => !seenWatchedRequest(entry, shows));
+  const items = hideQueuedProgrammed(hideSeenWanted((snapshot?.programmed?.items || []).filter(item => !hidden.has(`${item.kind}:${item.id}`)), shows), queued);
   const [busy, setBusy] = useState<string | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   // Revue Codex #1054 : annuler une série qui contient des attentes SeenIt reste confirmé, avec le dialogue commun
@@ -289,7 +294,7 @@ export function ProgrammedSection({ refreshKey = 0, onShowClick, onEpisodeClick,
         <button type="button" aria-label="Programmés en détaillé" aria-pressed={!compact} onClick={() => switchLayout('detailed')}><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="8" rx="2.5" /><rect x="3" y="13" width="18" height="8" rx="2.5" /></svg></button>
       </div>
     </div>
-    {failures.length > 0 && <p className="download-card__meta" role="status">{failures.join(' et ')} injoignable pour l’instant : la liste peut être incomplète.</p>}
+    {failures.length > 0 && <p className="download-card__meta" role="status" data-arr-unavailable={unavailable || undefined}>{arrUnavailableNote(failures, staleAt)}</p>}
     {orderByRecentlyAdded(cards).map(card => compact
       ? <article key={card.key} className="programmed-compact" {...card.data}>
         <div className="programmed-compact__row">
