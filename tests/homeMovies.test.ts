@@ -64,6 +64,8 @@ test('SEENIT-UX-022 À l’affiche tire parmi les dix mieux notés, sortis et no
   assert.equal(pickFeaturedMovie(smallerPool, 7, first.id, movies), first, 'sorti du vivier, il reste à l’affiche');
   assert.equal(pickFeaturedMovie([], 7, first.id, movies), first, 'vivier encore vide pendant le chargement');
   assert.notEqual(pickFeaturedMovie(smallerPool, 7, 'm13', movies)?.id, 'm13', 'un film vu n’est jamais gardé');
+  // Revue Codex #1087 : une sortie future révélée après le tirage écarte le film gardé.
+  assert.notEqual(pickFeaturedMovie(smallerPool, 7, first.id, movies, show => show.id !== first.id)?.id, first.id, 'pas encore sorti : nouveau tirage');
   const store = new Map<string, string>();
   const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => { store.set(key, value); } };
   const day = Date.parse('2026-11-17T09:00:00Z');

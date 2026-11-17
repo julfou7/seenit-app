@@ -7,7 +7,7 @@ import { MovieTicketCard } from '../components/cards/MovieTicketCard';
 import { resolveWatchCardResume } from '../features/watchlist/watchCardResume';
 import { type SeriesCardEpisode } from '../features/watchlist/seriesCardPresentation';
 import { mergeWatchGroups, movieRuntime, orderWatchMovies } from '../features/watchlist/watchNext18c';
-import { featuredMoviePool, nextFeaturedSeed, pickFeaturedMovie, readFeaturedOfDay, readHomeMovieFacts, writeFeaturedOfDay, sortHomeMovies, type HomeMovieFacts, type HomeMovieSort } from '../features/watchlist/homeMovies';
+import { featuredMoviePool, homeMovieRelease, nextFeaturedSeed, pickFeaturedMovie, readFeaturedOfDay, readHomeMovieFacts, writeFeaturedOfDay, sortHomeMovies, type HomeMovieFacts, type HomeMovieSort } from '../features/watchlist/homeMovies';
 import { FeaturedMovieCard } from '../components/cards/FeaturedMovieCard';
 import { extractOfficialStreamingProvider } from '../utils/providerLogos';
 import { readWatchProviderCache } from '../features/providers/watchProviderCache';
@@ -193,7 +193,8 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
   };
   const visibleMovies = sortHomeMovies(orderedMovies, movieSort, movieFacts, movieAtHome);
   const featuredPool = featuredMoviePool(orderedMovies, movieFacts, now);
-  const featuredShow = pickFeaturedMovie(featuredPool, featured.seed, featured.id, orderedMovies);
+  const featuredShow = pickFeaturedMovie(featuredPool, featured.seed, featured.id, orderedMovies,
+    show => homeMovieRelease(movieFacts(show).releaseDate, false, now).kind !== 'upcoming');
   const featuredId = featuredShow?.id ?? null;
   useEffect(() => { if (featuredId && featuredId !== featured.id) setFeatured(previous => ({ ...previous, id: featuredId })); }, [featuredId, featured.id]);
   useEffect(() => { if (featuredId) writeFeaturedOfDay(featuredId); }, [featuredId]);

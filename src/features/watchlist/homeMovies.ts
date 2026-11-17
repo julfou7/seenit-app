@@ -98,8 +98,10 @@ export function featuredMoviePool(movies: readonly Show[], facts: (show: Show) =
  * arrivent par lots pendant le chargement et recomposent le vivier ; le film déjà tiré reste à l'affiche tant qu'il est
  * dans la liste, sorti et non vu (`movies`), même s'il quitte le vivier des mieux notés.
  */
-export function pickFeaturedMovie(pool: readonly Show[], seed: number, currentId: string | null = null, movies: readonly Show[] = pool): Show | null {
-  const kept = currentId ? movies.find(show => show.id === currentId && !show.seenEpisodes?.includes('movie') && show.status !== 'completed') : undefined;
+export function pickFeaturedMovie(pool: readonly Show[], seed: number, currentId: string | null = null, movies: readonly Show[] = pool,
+  /** Revue Codex #1087 : le film gardé doit rester sorti (une date TMDB future arrivée après le tirage l'écarte). */
+  released: (show: Show) => boolean = () => true): Show | null {
+  const kept = currentId ? movies.find(show => show.id === currentId && !show.seenEpisodes?.includes('movie') && show.status !== 'completed' && released(show)) : undefined;
   if (kept) return kept;
   if (!pool.length) return null;
   const index = Math.abs(Math.floor(seed)) % pool.length;
