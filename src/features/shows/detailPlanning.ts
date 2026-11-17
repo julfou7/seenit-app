@@ -115,6 +115,20 @@ export function episodeRank(ratings: readonly unknown[], current: unknown): { ra
   return { rank: known.filter(rating => rating > value).length + 1, total: known.length };
 }
 
+/**
+ * Retour terrain du 17/11 (fiche épisode : « je ne différencie pas un 8 d'un 3 ») : niveau d'une note pour sa couleur,
+ * sur l'échelle absolue TMDB (jamais relative à la saison).
+ */
+export type RatingTone = 'top' | 'good' | 'fair' | 'poor';
+export function ratingTone(value: number): RatingTone {
+  return value >= 8 ? 'top' : value >= 7 ? 'good' : value >= 6 ? 'fair' : 'poor';
+}
+
+/** Hauteur d'une barre de note sur l'échelle fixe 0–10 (une 3,2 fait le tiers d'une 8,3), jamais sous `minPx`. */
+export function absoluteRatingHeight(value: number, maxPx: number, minPx = 4): number {
+  return Math.max(minPx, Math.round(Math.min(10, Math.max(0, value)) / 10 * maxPx));
+}
+
 export function formatRating(value: number): string {
   return value.toFixed(1).replace('.', ',');
 }

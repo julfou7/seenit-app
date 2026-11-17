@@ -130,21 +130,30 @@ async function testMediaDetailHarness(client) {
     await check(client, 'document.querySelector("[data-episode-detail] h1")?.textContent==="Ozymandias" && document.body.innerText.includes("S05 | E14")', 'fiche épisode titrée');
     await check(client, 'document.querySelector(\'[data-episode-detail] button.seenit-check[aria-label="Marquer vu"] .seenit-ring-glyph\') && !/il est \\d/.test(document.body.innerText)', 'Vu de la fiche épisode = anneau de l’Accueil, sans « il est » (#857)');
     await check(client, 'document.body.innerText.includes("Si tu lances maintenant") && document.querySelectorAll(\'[aria-label^="Ouvrir E"]\').length===3', 'soirée de trois épisodes');
-    await check(client, 'document.body.innerText.includes("Meilleure note de la saison") && document.querySelectorAll("[aria-current=true]").length>=1', 'courbe et rang dans la saison');
+    // Retour terrain du 17/11 : barres notées sur l'échelle 0–10 (note écrite par épisode), moyenne et rang séparés.
+    await check(client, 'document.body.innerText.includes("meilleure note de la saison") && document.body.innerText.includes("Moyenne ★") && document.querySelectorAll("[aria-current=true]").length>=1 && document.querySelectorAll("[data-rating-bar]").length>=2 && [...document.querySelectorAll("[data-rating-cell]")].every(b=>b.getBoundingClientRect().height>=44)', 'notes de la saison et rang');
+    // Une longue saison (16 épisodes à 360 px) défile et s'ouvre sur l'épisode affiché, visible dans la bande.
+    await check(client, '(()=>{const cell=document.querySelector("[data-rating-cell][aria-current=true]");const strip=cell&&cell.parentElement;if(!strip)return false;const a=cell.getBoundingClientRect(),b=strip.getBoundingClientRect();return a.left>=b.left-1&&a.right<=b.right+1})()', 'l’épisode affiché est visible dans la bande des notes');
+    // Capture de la carte des notes (revue visuelle, artefacts quality-reports), sans défilement horizontal ajouté.
+    const ratingsCapture = await client.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    fs.mkdirSync(path.join(process.cwd(), 'quality-reports'), { recursive: true });
+    fs.writeFileSync(path.join(process.cwd(), 'quality-reports', `episode-ratings-${width}.png`), Buffer.from(ratingsCapture.data, 'base64'));
     await check(client, '(document.querySelector("[data-episode-detail]").innerText.match(/^Netflix$/gm) || []).length===1 && !document.body.innerText.includes("with Ads")', 'un seul Netflix, sans « Standard with Ads »');
     for (const label of ['Épisode précédent', 'Épisode suivant']) await check(client, `${byLabel(label)}?.getBoundingClientRect().height>=44`, `${label} garde 44 px (SEENIT-UX-008)`);
-    await click(client, byLabel('Épisode 16'));
+    // Retour du 17/11 : la case porte maintenant sa note dans son libellé (« Épisode 16, note 9,3 ») ; ciblée par son numéro.
+    await click(client, 'document.querySelector(\'[data-rating-cell="16"]\')');
     await check(client, 'document.querySelector("[data-episode-detail] h1")?.textContent==="Felina" && document.body.innerText.includes("Résumé masqué")', 'une case ouvre l’épisode et masque son résumé si le précédent n’est pas vu');
     await click(client, byText('button', 'Résumé masqué'));
     await check(client, 'document.body.innerText.includes("Fin de Walt") && !document.body.innerText.includes("Résumé masqué")', 'le résumé se révèle au toucher');
     await delay(400);
-    await click(client, byLabel('Épisode 14'));
+    await click(client, 'document.querySelector(\'[data-rating-cell="14"]\')');
     await check(client, 'document.querySelector("[data-episode-detail] h1")?.textContent==="Ozymandias"', 'retour sur E14 par la case');
     await delay(400);
     await click(client, byText('button', 'Vu, puis E15'));
     await check(client, 'document.querySelector("[data-episode-detail] h1")?.textContent==="Granite State"', '« Vu, puis E15 » marque et enchaîne');
     await delay(400); // une navigation d’épisode ignore les touches pendant sa transition (300 ms)
-    await click(client, byLabel('Épisode 14, vu'));
+    // Libellé désormais « Épisode 14, note 9,6, vu » : la case vue est ciblée par son numéro et vérifiée « vu ».
+    await click(client, 'document.querySelector(\'[data-rating-cell="14"][aria-label$=", vu"]\')');
     await check(client, 'document.body.innerText.includes("✓ Vu") && ' + byLabel('Ta réaction') + '', 'l’épisode marqué est vu et propose une réaction');
     await click(client, byLabel('J’adore'));
     await check(client, byLabel('J’adore') + '?.getAttribute("aria-pressed")==="true"', 'réaction enregistrée dans l’épisode');

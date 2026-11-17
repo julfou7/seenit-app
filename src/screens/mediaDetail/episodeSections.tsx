@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
-import { settleSeenToggle } from '../../features/shows/detailPlanning';
+import { absoluteRatingHeight, formatRating, ratingTone, settleSeenToggle, type RatingTone } from '../../features/shows/detailPlanning';
 
 /** SEENIT-UX-019 — Sections de la fiche épisode du prototype (« Pellicule + courbe »). */
 export function EpisodeHeaderBlock({ code, title, airLabel, meta, isSeen, isFuture, futureLabel, onToggle }: { code: string; title: string; airLabel: string; meta: string; isSeen: boolean; isFuture: boolean; futureLabel: string; onToggle: () => unknown }) {
@@ -34,24 +34,48 @@ export function EpisodePlannerCard({ heading, end, blocks, text }: { heading: st
   </DetailCard>;
 }
 
-export interface CurveCell { n: number; rating: number | null; seen: boolean; current: boolean; onPick: () => void }
+export interface CurveCell { n: number; rating: number | null; aired: boolean; seen: boolean; current: boolean; onPick: () => void }
 
-/** Courbe des notes TMDB de la saison et cases d'épisode (or = vu, contour or = épisode affiché). */
-export function SeasonCurveCard({ label, rankLabel, cells }: { label: string; rankLabel: string | null; cells: readonly CurveCell[] }) {
+const BAR_MAX = 52;
+const TONE_COLOR: Record<RatingTone, string> = { top: '#F2C36B', good: '#E5A93D', fair: '#8a6a2b', poor: 'rgba(251,113,133,0.75)' };
+/** Chiffre au-dessus de la barre : même famille de couleur, assez claire pour être lue sur le fond sombre. */
+const TONE_TEXT: Record<RatingTone, string> = { top: '#F2C36B', good: '#E5A93D', fair: '#bfa06a', poor: '#FB7185' };
+
+/**
+ * Notes TMDB de la saison et cases d'épisode (or = vu, contour or = épisode affiché). Retour terrain du 17/11 (« je ne
+ * différencie pas un 8 d'un 3 ; sur un épisode pas encore sorti je n'ai aucune idée des précédents ») : une colonne par
+ * épisode, alignée sur sa case, avec la note écrite et une barre sur l'échelle fixe 0–10 colorée par niveau ; un épisode
+ * à venir garde une barre pointillée ; la moyenne de la saison est toujours dite.
+ */
+export function SeasonCurveCard({ label, summary, rankLabel, cells }: { label: string; summary: string | null; rankLabel: string | null; cells: readonly CurveCell[] }) {
+  const strip = React.useRef<HTMLDivElement>(null);
+  const currentN = cells.find(cell => cell.current)?.n;
+  // Une longue saison défile au lieu de serrer les notes (30 px au moins par colonne) ; elle s'ouvre sur l'épisode affiché.
+  React.useEffect(() => {
+    const row = strip.current;
+    const target = row?.querySelector<HTMLElement>(`[data-rating-cell="${currentN}"]`);
+    if (row && target && row.scrollWidth > row.clientWidth) row.scrollLeft = Math.max(0, target.offsetLeft - (row.clientWidth - target.offsetWidth) / 2);
+  }, [currentN, cells.length]);
   if (!cells.length) return null;
-  const rated = cells.filter(cell => cell.rating !== null);
-  const values = rated.map(cell => cell.rating as number);
-  const low = values.length ? Math.min(...values) - 0.1 : 0, high = values.length ? Math.max(...values) + 0.1 : 1;
-  const x = (index: number) => cells.length === 1 ? 170 : 8 + index * (324 / (cells.length - 1));
-  const y = (value: number) => 54 - ((value - low) / Math.max(0.2, high - low)) * 46;
-  const points = cells.map((cell, index) => cell.rating === null ? null : `${x(index).toFixed(1)},${y(cell.rating).toFixed(1)}`).filter(Boolean).join(' ');
-  return <DetailCard className="px-3.5 pt-3.5 pb-3 flex flex-col gap-2">
-    <div className="flex justify-between items-baseline gap-2"><span className="text-[13px] font-bold text-white">{label}</span>{rankLabel && <span className="text-[12px] font-bold text-[#F2C36B]">{rankLabel}</span>}</div>
-    {rated.length >= 2 && <svg viewBox="0 0 340 62" preserveAspectRatio="none" className="w-full h-[62px] overflow-visible" aria-hidden="true">
-      <polyline points={points} fill="none" stroke="#E5A93D" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      {cells.map((cell, index) => cell.rating === null ? null : <circle key={`dot-${cell.n}`} cx={x(index)} cy={y(cell.rating)} r={cell.current ? 6 : 3} fill={cell.current ? '#FFF2B8' : cell.seen ? '#E5A93D' : '#09090b'} stroke={cell.current ? '#fff' : cell.seen ? '#E5A93D' : '#71717a'} strokeWidth="2" vectorEffect="non-scaling-stroke" />)}
-    </svg>}
-    <div className="flex gap-0.5 -my-2.5">{cells.map(cell => <button type="button" key={`cell-${cell.n}`} onClick={cell.onPick} aria-label={`Épisode ${cell.n}${cell.seen ? ', vu' : ''}`} aria-current={cell.current ? 'true' : undefined} className="flex-1 min-w-0 h-11 flex items-center"><span className="w-full h-[26px] rounded-[5px] flex items-center justify-center text-[10px] font-extrabold" style={{ background: cell.current ? 'rgba(229,169,61,0.14)' : cell.seen ? '#E5A93D' : '#27272a', boxShadow: cell.current ? 'inset 0 0 0 2px #E5A93D' : 'none', color: cell.current ? '#F2C36B' : cell.seen ? '#1a1206' : '#a1a1aa' }}>{cell.n}</span></button>)}</div>
+  const rated = cells.some(cell => cell.rating !== null);
+  return <DetailCard className="px-3.5 pt-3.5 pb-1.5 flex flex-col gap-1.5" data-season-ratings>
+    <div className="flex justify-between items-baseline gap-2"><span className="text-[13px] font-bold text-white">{label}</span>{summary && <span className="shrink-0 text-[12px] font-bold text-zinc-300">{summary}</span>}</div>
+    {rankLabel && <span className="text-[12px] font-bold text-[#F2C36B]">{rankLabel}</span>}
+    <div ref={strip} className="flex gap-0.5 overflow-x-auto hide-scrollbar">{cells.map(cell => {
+      const tone = cell.rating !== null ? ratingTone(cell.rating) : null;
+      const value = cell.rating !== null ? formatRating(cell.rating) : cell.aired ? '–' : '';
+      return <button type="button" key={`cell-${cell.n}`} onClick={cell.onPick} data-rating-cell={cell.n}
+        aria-label={`Épisode ${cell.n}${cell.rating !== null ? `, note ${formatRating(cell.rating)}` : cell.aired ? ', note inconnue' : ', pas encore diffusé'}${cell.seen ? ', vu' : ''}`}
+        aria-current={cell.current ? 'true' : undefined} className="flex-1 shrink-0 min-w-[30px] flex flex-col items-center gap-1 pb-1.5">
+        {rated && <span aria-hidden="true" className={cn('text-[10.5px] font-extrabold leading-none tabular-nums h-3', cell.current ? 'text-white' : 'text-zinc-300')} style={tone && !cell.current ? { color: TONE_TEXT[tone] } : undefined}>{value}</span>}
+        {rated && <span aria-hidden="true" className="w-full flex items-end justify-center" style={{ height: BAR_MAX }}>
+          {cell.rating !== null
+            ? <i data-rating-bar className="block w-[70%] rounded-t-[4px]" style={{ height: absoluteRatingHeight(cell.rating, BAR_MAX), background: TONE_COLOR[tone!], boxShadow: cell.current ? '0 0 0 1.5px #fff' : 'none' }} />
+            : <i className="block w-[70%] h-[3px] border-t-2 border-dashed border-zinc-600" />}
+        </span>}
+        <span className="w-full h-[26px] rounded-[5px] flex items-center justify-center text-[10px] font-extrabold" style={{ background: cell.current ? 'rgba(229,169,61,0.14)' : cell.seen ? '#E5A93D' : '#27272a', boxShadow: cell.current ? 'inset 0 0 0 2px #E5A93D' : 'none', color: cell.current ? '#F2C36B' : cell.seen ? '#1a1206' : '#a1a1aa' }}>{cell.n}</span>
+      </button>;
+    })}</div>
   </DetailCard>;
 }
 

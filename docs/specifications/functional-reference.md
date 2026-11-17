@@ -531,7 +531,9 @@ Vu pour une saison finie, saison choisie cerclée d'or), barres de notes et lign
 **Personnages** (six, puis dix par dix). Une note TMDB portée par moins de 3 votes n'est pas affichée : la carte de saison dit « notes
 insuffisantes » et le haut de fiche « Notes TMDB insuffisantes » (v1.4.302). Le film affiche « Si tu lances maintenant · Fin à HH:MM »,
 sa saga en frise et **Similaires, et pourquoi** (raisons prouvées seulement). L'épisode ajoute la soirée de
-trois épisodes, la courbe de la saison, un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
+trois épisodes, les notes de la saison (depuis la v1.4.340 : une colonne par épisode avec sa note écrite, barre sur
+l'échelle fixe 0–10 colorée par niveau, « – » si moins de 3 votes, pointillé si l'épisode n'est pas sorti, moyenne de
+la saison et rang de l'épisode affiché ; une longue saison défile et s'ouvre sur l'épisode affiché), un résumé masqué tant que le précédent n'est pas vu, **Vu, puis Ex**
 et une réaction 👎 👍 ❤️. Les actions de cycle de vie et l'entrée **Téléchargement** sont dans le menu ⋮,
 ancré sous le bouton (290 px, une ligne de détail par action, séparateur avant les actions de cycle de vie,
 jamais de feuille du bas) ;

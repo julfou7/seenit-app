@@ -15,7 +15,7 @@ import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditEpisodeSearchQuery } from '../components/community/redditEpisodeSearch';
 import { auth } from '../lib/firebase';
 import { readUserScopedJson } from '../lib/userIsolation';
-import { episodeRank, formatClock, formatRating, planEpisodes } from '../features/shows/detailPlanning';
+import { averageRating, episodeRank, formatClock, formatRating, planEpisodes, reliableEpisodeRatings } from '../features/shows/detailPlanning';
 import { useClockMinutes, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
 import { originalBroadcasterRow } from '../features/providers/passiveProviderState';
 import { dedupeProvidersByName } from '../features/providers/providerNames';
@@ -859,9 +859,14 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
   const evening = planEpisodes(clockMinutes, currentIndex >= 0 ? upcomingQueue : [], entry => entry.episode.runtime || currentEpisode.runtime);
   const remainingToFinish = activeShow?.totalEpisodes ? Math.max(0, activeShow.totalEpisodes - seenKeys.length) : null;
   const plannerText = `Avant minuit : ${evening.beforeMidnight} épisode${evening.beforeMidnight > 1 ? 's' : ''}.${remainingToFinish ? ` Encore ${remainingToFinish} pour finir la série` : ''} · touche un bloc pour l’ouvrir.`;
-  const seasonRatings = seasonEpisodes.map(episode => episode.vote_average);
-  const rank = episodeRank(seasonRatings, currentEpisode?.vote_average);
-  const rankLabel = rank && currentEpisode?.vote_average ? `★ ${formatRating(Number(currentEpisode.vote_average))} · ${rank.rank === 1 ? '▲ Meilleure note de la saison' : `${rank.rank}e note sur ${rank.total}`}` : null;
+  // Retour terrain du 17/11 : mêmes notes fiables que la fiche série (moins de 3 votes = inconnue), moyenne toujours dite,
+  // rang de l'épisode affiché sur sa propre ligne.
+  const seasonRatings = reliableEpisodeRatings(seasonEpisodes);
+  const currentRating = currentIndex >= 0 ? seasonRatings[currentIndex] : 0;
+  const rank = episodeRank(seasonRatings, currentRating);
+  const rankLabel = rank && currentRating ? `Cet épisode : ★ ${formatRating(currentRating)} · ${rank.rank === 1 ? 'meilleure note de la saison' : `${rank.rank}e note sur ${rank.total}`}` : null;
+  const seasonAverage = averageRating(seasonRatings);
+  const ratingSummary = seasonAverage !== null ? `Moyenne ★ ${formatRating(seasonAverage)}` : null;
   const seenInCurrentSeason = seasonEpisodes.filter(episode => seenKeys.includes(`${currentSeason}x${episode.episode_number}`)).length;
   const previousSeasonEpisodes: EpisodeDetailData[] = (showTmdbId && seasonCacheRef.current[`${showTmdbId}_${currentSeason - 1}`]) || [];
   const previousKey = currentNumber > 1 ? { season: currentSeason, episode: currentNumber - 1 } : previousSeasonEpisodes.length ? { season: currentSeason - 1, episode: Math.max(...previousSeasonEpisodes.map(episode => episode.episode_number)) } : null;
@@ -1088,8 +1093,8 @@ export function EpisodeDetailModal({ show, season: initialSeason, episode: initi
                 {!isFutureEpisode && <EpisodePlannerCard heading={isSeen ? 'Vu · si tu enchaînes maintenant' : 'Si tu lances maintenant'} end={evening.plan.length ? evening.plan[0].end : ''} text={plannerText}
                   blocks={evening.plan.map(entry => ({ key: `${entry.item.season}x${entry.item.episode.episode_number}`, label: shortLabel(entry.item.season, entry.item.episode.episode_number), runtime: entry.runtime, end: entry.end, onPick: () => jumpToEpisode(entry.item.season, entry.item.episode) }))} />}
 
-                <SeasonCurveCard label={`Saison ${currentSeason} · ${seenInCurrentSeason}/${seasonEpisodes.length} vus`} rankLabel={rankLabel}
-                  cells={seasonEpisodes.map(episode => ({ n: episode.episode_number, rating: Number(episode.vote_average) > 0 ? Number(episode.vote_average) : null, seen: seenKeys.includes(`${currentSeason}x${episode.episode_number}`), current: episode.episode_number === currentNumber, onPick: () => jumpToEpisode(currentSeason, episode) }))} />
+                <SeasonCurveCard label={`Saison ${currentSeason} · ${seenInCurrentSeason}/${seasonEpisodes.length} vus`} summary={ratingSummary} rankLabel={rankLabel}
+                  cells={seasonEpisodes.map((episode, index) => ({ n: episode.episode_number, rating: seasonRatings[index] > 0 ? seasonRatings[index] : null, aired: Boolean(episode.air_date) && episode.air_date! <= todayStr, seen: seenKeys.includes(`${currentSeason}x${episode.episode_number}`), current: episode.episode_number === currentNumber, onPick: () => jumpToEpisode(currentSeason, episode) }))} />
 
                 <SpoilerSynopsis text={currentEpisode.overview} hidden={synopsisHidden} why={previousKey ? `Tu n’as pas vu ${episodeCode(previousKey.season, previousKey.episode)}` : ''} onReveal={() => setRevealedSynopsis(current => ({ ...current, [epKey]: true }))} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} />
 
