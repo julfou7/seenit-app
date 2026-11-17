@@ -66,7 +66,7 @@ export function SeasonCurveCard({ label, summary, rankLabel, cells }: { label: s
       const value = cell.rating !== null ? formatRating(cell.rating) : cell.aired ? '–' : '';
       return <button type="button" key={`cell-${cell.n}`} onClick={cell.onPick} data-rating-cell={cell.n}
         aria-label={`Épisode ${cell.n}${cell.rating !== null ? `, note ${formatRating(cell.rating)}` : cell.aired ? ', note inconnue' : ', pas encore diffusé'}${cell.seen ? ', vu' : ''}`}
-        aria-current={cell.current ? 'true' : undefined} className="flex-1 shrink-0 min-w-[30px] flex flex-col items-center gap-1 pb-1.5">
+        aria-current={cell.current ? 'true' : undefined} className="flex-1 shrink-0 min-w-[30px] min-h-11 flex flex-col items-center justify-end gap-1 pb-1.5">
         {rated && <span aria-hidden="true" className={cn('text-[10.5px] font-extrabold leading-none tabular-nums h-3', cell.current ? 'text-white' : 'text-zinc-300')} style={tone && !cell.current ? { color: TONE_TEXT[tone] } : undefined}>{value}</span>}
         {rated && <span aria-hidden="true" className="w-full flex items-end justify-center" style={{ height: BAR_MAX }}>
           {cell.rating !== null
