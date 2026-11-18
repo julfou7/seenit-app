@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Calendar, Bell } from 'lucide-react';
 import { type Show } from '../../types';
 import { auth } from '../../lib/firebase';
-import { readEpisodeReminder, writeEpisodeReminder } from '../../features/notifications/episodeReminder';
+import { EPISODE_REMINDER_CHANGED_EVENT, readEpisodeReminder, writeEpisodeReminder } from '../../features/notifications/episodeReminder';
 import { useToastStore } from '../../store/toastStore';
 import { useShowActions } from '../../hooks/useShows';
 import { useShowsStore } from '../../store/showsStore';
@@ -109,6 +109,12 @@ export const UpcomingShowCard = React.memo(function UpcomingShowCard({ show, onS
 function UpcomingShowCardContent({ show, ep, onShowClick, onEpisodeClick, actions, compact, ensureTracked }: Props & { ep: UpcomingEpisodeInfo }) {
   // Même état que les autres cloches : les rappels réels de la série (décision du 09/11, #910).
   const [isReminderSet, setIsReminderSet] = useState<boolean>(() => readEpisodeReminder(show, ep));
+  // Revue Codex #1099 : une cloche basculée ailleurs (fiche série, fiche épisode) se relit ici.
+  useEffect(() => {
+    const sync = () => setIsReminderSet(readEpisodeReminder(show, ep));
+    window.addEventListener(EPISODE_REMINDER_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(EPISODE_REMINDER_CHANGED_EVENT, sync);
+  }, [show, ep]);
   const [loadingReminder, setLoadingReminder] = useState(false);
   const reminderFlight = useRef(false);
   const [optimisticReminder, setOptimisticReminder] = useState<boolean | null>(null);

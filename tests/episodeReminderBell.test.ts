@@ -164,4 +164,7 @@ test('SEENIT-NOTIFICATION-009 une bascule de cloche relance la planification des
   const notifier = read('src/hooks/useRemindersNotifier.ts');
   assert.match(notifier, /window\.addEventListener\(EPISODE_REMINDER_CHANGED_EVENT, bump\);/);
   assert.match(notifier, /\}, \[shows, showToast, reminderRevision\]\);/);
+  // Revue Codex #1099 : les cloches déjà affichées (liste, carte À venir) se relisent à chaque bascule faite ailleurs.
+  assert.match(reminder, /const sync = \(\) => setStored\(null\);\n    window\.addEventListener\(EPISODE_REMINDER_CHANGED_EVENT, sync\);/);
+  assert.match(read('src/components/cards/UpcomingShowCard.tsx'), /const sync = \(\) => setIsReminderSet\(readEpisodeReminder\(show, ep\)\);\n    window\.addEventListener\(EPISODE_REMINDER_CHANGED_EVENT, sync\);/);
 });

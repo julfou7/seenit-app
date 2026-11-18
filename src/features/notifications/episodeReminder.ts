@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import type { Show } from '../../types';
 import { requestNotificationPermission, auth, db } from '../../lib/firebase';
@@ -109,6 +109,13 @@ export function useEpisodeReminder(show: Show | null | undefined, episode: Remin
   const [optimistic, setOptimistic] = useState<boolean | null>(null);
   const [pending, setPending] = useState(false);
   const flight = useRef(false);
+  // Revue Codex #1099 : la bascule ne modifie plus la fiche ; à chaque bascule (ici ou ailleurs), la cloche oublie son
+  // dernier clic et relit le choix enregistré de son épisode.
+  useEffect(() => {
+    const sync = () => setStored(null);
+    window.addEventListener(EPISODE_REMINDER_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(EPISODE_REMINDER_CHANGED_EVENT, sync);
+  }, []);
   const current = displayedEpisodeReminder(stored, show, episode);
   const toggle = async () => {
     const ownerUid = auth.currentUser?.uid;
