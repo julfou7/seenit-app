@@ -65,7 +65,7 @@ test('retour terrain du 18/11 : à 2 ou 3 saisons, la moyenne vit dans la tuile 
   // saison vue : anneau Vu en haut à droite et « Vue » au bout des segments.
   assert.doesNotMatch(pills, /RATING_TONE_TEXT|ratingTone/, 'plus de note colorée par niveau dans la tuile');
   assert.match(pills, /text-white"><span className="text-\[#E5A93D\]">★<\/span> \{formatRating\(entry\.average\)\}/);
-  assert.match(pills, /change > 0 \? 'text-emerald-400' : 'text-rose-400'\)\}>\{formatRatingChange\(change\)\}/);
+  assert.match(pills, /change && change > 0 \? 'text-emerald-400' : 'text-rose-400'\)\}>\{change \? formatRatingChange\(change\) : ''\}<\/span>/, 'évolution colorée, rangée réservée même vide (alignement à 3 saisons)');
   // « Mets le logo à la place du Vue, ça fait doublon » : l'anneau Vu seul, au bout des segments.
   assert.match(pills, /\{complete && <SeenItRing size=\{16\} className="shrink-0" \/>\}/);
   assert.doesNotMatch(pills, />Vue<\/span>/);
