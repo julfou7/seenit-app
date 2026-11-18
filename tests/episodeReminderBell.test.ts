@@ -156,3 +156,12 @@ test('SEENIT-NOTIFICATION-009 la cloche d’un film reste le réglage du film', 
   await writeEpisodeReminder({ target: { id: 's1', title: 'Série', mediaType: 'tv' } as never, ownerUid: 'u1', nextState: true, episode: { season_number: 1, episode_number: 2 }, updateShow });
   assert.equal(calls.updates.length, 2, 'une série n’est jamais modifiée par une cloche d’épisode');
 });
+
+// Revue Codex #1099 : couper une cloche relance la planification locale (alarme de l'appareil annulée).
+test('SEENIT-NOTIFICATION-009 une bascule de cloche relance la planification des notifications', () => {
+  const reminder = read('src/features/notifications/episodeReminder.ts');
+  assert.match(reminder, /writeUserScopedJson\(ownerUid, reminderStorageField\(target\.id, episode\), nextState\);\n  if \(typeof window !== 'undefined'\) window\.dispatchEvent\(new Event\(EPISODE_REMINDER_CHANGED_EVENT\)\);/);
+  const notifier = read('src/hooks/useRemindersNotifier.ts');
+  assert.match(notifier, /window\.addEventListener\(EPISODE_REMINDER_CHANGED_EVENT, bump\);/);
+  assert.match(notifier, /\}, \[shows, showToast, reminderRevision\]\);/);
+});

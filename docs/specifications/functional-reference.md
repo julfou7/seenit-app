@@ -309,7 +309,8 @@ annulation.
 - Permet d'activer/désactiver un rappel pour l'épisode présenté.
 - La carte série 8f, sans badge de statut, affiche J-X (auj. aujourd’hui), une pastille rectangulaire sombre 48×40 dans une cible 52×48 et une cloche or si le rappel est actif ;
   cette cible de rappel est indépendante de l'ouverture de fiche.
-- Un rappel spécifique met à jour l'intention de notification du média et son document Firestore.
+- Un rappel d'épisode (depuis la v1.4.348) écrit ou supprime seulement le document Firestore de cet épisode et garde son
+  choix (allumé ou coupé), prioritaire sur la règle de la série ; un rappel de film règle le film lui-même et son document.
 - Sur Android, un rappel de nouvelle saison affiche aussi « Saison N » et un rappel de nouvel épisode
   affiche son code « Sxx | Eyy ». Si la série est en retard, le contexte visible bascule sur le prochain
   épisode réellement à voir et son compteur de reprise « + X épisode(s) », indépendant de l'affichage
@@ -608,8 +609,10 @@ Depuis les retours de la v1.4.251 (#857) :
   puis « Annuler la programmation » (`SEENIT-DOWNLOAD-018`), et l'épisode suivant n'est plus entouré ; depuis
   la v1.4.282, la cloche reste en or (dans la liste, cloche seule au trait de l'anneau Vu depuis la v1.4.346) et, dans la fiche
   épisode, elle est ronde à côté de la croix ; depuis la
-  v1.4.283, toute cloche règle les rappels de la série et montre l'état réel (allumée par défaut pour une série
-  suivie quand « Sortie du jour » est activée), sans toast de confirmation (seul un échec est signalé) ;
+  v1.4.283, la cloche montre l'état réel (allumée par défaut pour une série suivie quand « Sortie du jour » est
+  activée), sans toast de confirmation (seul un échec est signalé) ; depuis la v1.4.348, chaque cloche n'agit que sur
+  son épisode : son choix (allumé ou coupé) l'emporte sur la règle de la série et relance aussitôt la planification
+  des notifications de l'appareil (alarme posée ou annulée) ;
 - la fiche épisode charge avec un squelette à son gabarit actuel, garde la barre de navigation (v1.4.282,
   ouverte depuis À voir comme depuis la fiche série) et ne change d'épisode que sur un geste nettement
   horizontal : un défilement vertical en biais n'y change plus d'épisode (`SEENIT-UX-008`).

@@ -11,6 +11,9 @@ import { readEffectiveNotificationPreferences } from './notificationPreferences'
 
 export interface ReminderEpisode { season_number: number; episode_number: number; name?: string | null; air_date?: string | null }
 
+/** Émis après chaque bascule réussie d'une cloche : la planification des notifications locales se relance. */
+export const EPISODE_REMINDER_CHANGED_EVENT = 'seenit:episode-reminder-changed';
+
 export const reminderStorageField = (showId: string, episode: ReminderEpisode) => `reminder_${showId}_S${episode.season_number}E${episode.episode_number}`;
 export const reminderEpisodeString = (episode: ReminderEpisode) => `S${String(episode.season_number).padStart(2, '0')}E${String(episode.episode_number).padStart(2, '0')}`;
 
@@ -84,6 +87,7 @@ export async function writeEpisodeReminder(options: { target: Show; ownerUid: st
   }
   if (auth.currentUser?.uid !== ownerUid) return false;
   writeUserScopedJson(ownerUid, reminderStorageField(target.id, episode), nextState);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(EPISODE_REMINDER_CHANGED_EVENT));
   return true;
 }
 /** Écriture réussie de cette cloche, valable seulement pour la fiche sur laquelle elle a été faite. */
