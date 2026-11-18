@@ -20,11 +20,11 @@ export function EpisodeReminderBell({ show, episode, variant = 'icon' }: { show:
   const label = `${reminder ? 'Couper' : 'Activer'} les rappels de ${show?.title || 'la série'} (${code})`;
   const press = (event: React.MouseEvent) => { event.stopPropagation(); void toggle(); };
   // Retour terrain du 18/11 (« la cloche est trop grosse par rapport au Vu », « aussi épaisse que Vu et Télécharger ») :
-  // dans la liste, la cloche seule, sans rond, au trait de l'anneau Vu (42 px dans une cible de 48 px), or si active ;
+  // dans la liste, la cloche seule, sans rond, au trait de l'anneau Vu (36 px, « un poil plus petit », dans une cible de 48 px), or si active ;
   // sur la fiche épisode, elle reste une pastille ronde à côté de la croix.
   const icon = variant === 'icon';
   return <button type="button" data-episode-reminder={code} aria-pressed={reminder} aria-busy={pending || undefined} disabled={pending} onClick={press} aria-label={label}
     className={cn('shrink-0 rounded-full grid place-items-center active:scale-95', icon ? 'w-12 h-12' : reminder ? 'w-11 h-11 bg-[#E5A93D] text-black' : 'w-11 h-11 bg-[rgba(9,9,11,0.88)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]')}>
-    {icon ? <SeenItBellRing size={42} active={reminder} /> : reminder ? <BellRing size={18} aria-hidden="true" /> : <Bell size={18} aria-hidden="true" />}
+    {icon ? <SeenItBellRing size={36} active={reminder} /> : reminder ? <BellRing size={18} aria-hidden="true" /> : <Bell size={18} aria-hidden="true" />}
   </button>;
 }

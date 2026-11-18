@@ -151,6 +151,11 @@ export const requestNotificationPermission = async () => 'fixture-token';
 export const sendNativeNotification = async () => {};
 export const setDoc = async (path: string[], payload: Record<string, unknown>) => { telemetry.writes.push({path,payload}); };
 export const deleteDoc = async (path: string[]) => { telemetry.writes.push({path,payload:{deleted:true}}); };
+// Retour terrain du 18/11 : couper une cloche liste les rappels de la série pour les retirer tous (aucun dans ce harnais).
+export const collection = (_db: unknown, ...path: string[]) => path;
+export const where = (field: string, op: string, value: unknown) => ({ field, op, value });
+export const query = (col: string[], clause: unknown) => ({ col, clause });
+export const getDocs = async () => ({ docs: [] as Array<{ id: string; ref: string[] }> });
 
 export function makePaginationBatch() {
  useShowsStore.setState(state=>({shows:[...state.shows,...Array.from({length:18},(_,i)=>({...base,id:`series-more-${i}`,tmdbId:800+i,title:`Pagination ${i}`}))]}));

@@ -84,7 +84,22 @@ export function removeUserScopedValue(uid: string | null | undefined, field: str
   }
 }
 
-function migrateLegacyValue(uid: string, legacyKey: string, field: string, transform?: (value: any) => any): void {
+/** Retire tous les champs d'un compte qui commencent par `prefix` (ex. les rappels d'épisode d'une série). */
+export function removeUserScopedPrefix(uid: string | null | undefined, prefix: string): void {
+  if (!uid) return;
+  try {
+    const scoped = getUserScopedStorageKey(uid, prefix);
+    const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index)).filter((key): key is string => Boolean(key?.startsWith(scoped)));
+    for (const key of keys) {
+      localStorage.removeItem(key);
+      notifyUserScopedStorageUpdated(uid, key.slice(getUserScopedStorageKey(uid, '').length));
+    }
+  } catch {
+    // Aucun impact sur la donnée Cloud.
+  }
+}
+
+function migrateLegacyValue(uid: string, legacyKey: string, field: string, transform?: (value: unknown) => unknown): void {
   const destination = getUserScopedStorageKey(uid, field);
   if (localStorage.getItem(destination) !== null) return;
   const raw = localStorage.getItem(legacyKey);
@@ -108,7 +123,7 @@ export function purgeLegacyUnscopedUserData(uid?: string | null): void {
     if (uid && localStorage.getItem('last_active_uid') === uid) {
       migrateLegacyValue(uid, 'user_platforms', 'platforms');
       migrateLegacyValue(uid, 'user_notifications', 'notifications');
-      migrateLegacyValue(uid, 'favorite-people-storage', 'favorite_people', (value) => value?.state?.people);
+      migrateLegacyValue(uid, 'favorite-people-storage', 'favorite_people', (value) => (value as { state?: { people?: unknown } } | null)?.state?.people);
       const news = localStorage.getItem('read_news_ids') !== null ? 'read_news_ids' : 'dismissed_news';
       migrateLegacyValue(uid, news, 'read_news_ids');
     }

@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
 import type { Show } from '../../types';
 import { requestNotificationPermission, auth, db } from '../../lib/firebase';
-import { readUserScopedJson, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
+import { readUserScopedJson, removeUserScopedPrefix, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
 import { useShowActions } from '../../hooks/useShows';
 import { useToastStore } from '../../store/toastStore';
 import { appLogger } from '../../store/logStore';
@@ -30,9 +30,13 @@ export function seriesRemindersActive(show: Show | null | undefined, uid = auth.
   return show.mediaType === 'movie' ? prefs.movie_theater || prefs.movie_dvd_vod : prefs.release_today_tv;
 }
 
-/** Rappel actif pour cet épisode : rappels de la série, ou rappel posé sur l'épisode lui-même. */
+/**
+ * Rappel actif pour cet épisode : rappels de la série, ou rappel posé sur l'épisode lui-même. Retour terrain du 18/11
+ * (« une cloche les coche toutes, mais pas toujours, c'est un peu random ») : un ancien repère d'épisode gardait sa cloche
+ * allumée après « couper » sur une autre ; un choix explicite de la série (`false`) l'emporte désormais.
+ */
 export function readEpisodeReminder(show: Show | null | undefined, episode: ReminderEpisode): boolean {
-  if (!show?.id) return false;
+  if (!show?.id || show.notificationsEnabled === false) return false;
   if (seriesRemindersActive(show)) return true;
   return readUserScopedJson(auth.currentUser?.uid, reminderStorageField(show.id, episode), false);
 }
@@ -65,7 +69,12 @@ export async function writeEpisodeReminder(options: { target: Show; ownerUid: st
       episodeTitle: episode.name || '', air_date: episode.air_date,
       fcmToken: fcmToken || '', createdAt: Date.now(),
     });
-    else await deleteDoc(reminderRef);
+    else {
+      // Retour terrain du 18/11 : couper agit sur toute la série, y compris les rappels posés avant sur d'autres épisodes
+      // (le serveur envoie chaque document `reminders` le jour de sa sortie, quel que soit le choix de la série).
+      const others = await getDocs(query(collection(db, 'users', ownerUid, 'reminders'), where('showId', '==', target.id)));
+      await Promise.all([deleteDoc(reminderRef), ...others.docs.filter(entry => entry.id !== reminderRef.id).map(entry => deleteDoc(entry.ref))]);
+    }
   } catch (error) {
     if (preferenceChanged && auth.currentUser?.uid === ownerUid) {
       // Revue Codex #922 : restaurer la valeur exacte. Une série sans choix explicite (prévenue par défaut) le reste ;
@@ -80,8 +89,10 @@ export async function writeEpisodeReminder(options: { target: Show; ownerUid: st
   if (nextState) writeUserScopedJson(ownerUid, field, true);
   else {
     removeUserScopedValue(ownerUid, field);
-    // Ancien repère local « rappels de la série » : couper la série le retire aussi (09/11).
+    // Ancien repère local « rappels de la série » : couper la série le retire aussi (09/11), ainsi que les repères des
+    // autres épisodes de la série (18/11).
     removeUserScopedValue(ownerUid, `reminder_${target.id}`);
+    removeUserScopedPrefix(ownerUid, `reminder_${target.id}_S`);
   }
   return true;
 }

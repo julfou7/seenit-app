@@ -8,14 +8,14 @@ import { build } from 'esbuild';
 // « vue liste, je descends, je remets la vue horizontale : j'ai un grand espace dessous ».
 const read = (path: string) => readFileSync(path, 'utf8');
 
-type Calls = { writes: Array<[string, unknown]>; deletes: string[]; updates: Array<[string, unknown]>; local: Array<[string, string, unknown]>; failSet: boolean; failDelete?: boolean; uid: string | null; switchOnPermission: boolean; prefs?: Record<string, boolean> };
+type Calls = { writes: Array<[string, unknown]>; deletes: string[]; updates: Array<[string, unknown]>; local: Array<[string, string, unknown]>; failSet: boolean; failDelete?: boolean; uid: string | null; switchOnPermission: boolean; prefs?: Record<string, boolean>; flags?: Record<string, boolean>; stored?: string[] };
 const calls: Calls = (globalThis as unknown as { __reminder: Calls }).__reminder = { writes: [], deletes: [], updates: [], local: [], failSet: false, uid: 'u1', switchOnPermission: false };
 
 async function loadModule() {
   const stubs: Record<string, string> = {
-    'firebase/firestore': `const c=()=>globalThis.__reminder;export const doc=(_db,...path)=>path.join('/');export const setDoc=async(ref,data)=>{if(c().failSet)throw new Error('refusé');c().writes.push([ref,data]);};export const deleteDoc=async ref=>{if(c().failDelete)throw new Error('refusé');c().deletes.push(ref);};`,
+    'firebase/firestore': `const c=()=>globalThis.__reminder;export const doc=(_db,...path)=>path.join('/');export const setDoc=async(ref,data)=>{if(c().failSet)throw new Error('refusé');c().writes.push([ref,data]);};export const deleteDoc=async ref=>{if(c().failDelete)throw new Error('refusé');c().deletes.push(ref);};export const collection=(_db,...path)=>path.join('/');export const where=(field,op,value)=>({field,op,value});export const query=(col,clause)=>({col,clause});export const getDocs=async q=>({docs:(c().stored||[]).filter(id=>id.startsWith(q.clause.value+'_')).map(id=>({id,ref:q.col+'/'+id}))});`,
     'lib/firebase': `const c=()=>globalThis.__reminder;export const db={};export const auth={get currentUser(){return c().uid?{uid:c().uid}:null}};export const requestNotificationPermission=async()=>{if(c().switchOnPermission)c().uid='u2';return 'fcm';};`,
-    'lib/userIsolation': `const c=()=>globalThis.__reminder;export const readUserScopedJson=(_uid,field,fallback)=>field==='notifications'&&c().prefs?c().prefs:fallback;export const writeUserScopedJson=(uid,field,value)=>c().local.push(['set',uid+':'+field,value]);export const removeUserScopedValue=(uid,field)=>c().local.push(['remove',uid+':'+field,null]);`,
+    'lib/userIsolation': `const c=()=>globalThis.__reminder;export const readUserScopedJson=(_uid,field,fallback)=>field==='notifications'&&c().prefs?c().prefs:(c().flags&&field in c().flags?c().flags[field]:fallback);export const removeUserScopedPrefix=(uid,prefix)=>c().local.push(['prefix',uid+':'+prefix,null]);export const writeUserScopedJson=(uid,field,value)=>c().local.push(['set',uid+':'+field,value]);export const removeUserScopedValue=(uid,field)=>c().local.push(['remove',uid+':'+field,null]);`,
     'hooks/useShows': 'export const useShowActions=()=>({updateShow:async()=>{}});',
     'store/toastStore': 'export const useToastStore={getState:()=>({showToast(){}})};',
     'store/logStore': 'export const appLogger={warn(){}};',
@@ -48,7 +48,7 @@ test('SEENIT-NOTIFICATION-009 cloche d’épisode à venir : même écriture que
   calls.updates.length = 0; calls.local.length = 0;
   assert.equal(await writeEpisodeReminder({ target: { ...show as object, notificationsEnabled: true } as never, ownerUid: 'u1', nextState: false, episode, updateShow }), true);
   assert.deepEqual(calls.deletes, ['users/u1/reminders/s1_S01E03']);
-  assert.deepEqual(calls.local, [['remove', 'u1:reminder_s1_S1E3', null], ['remove', 'u1:reminder_s1', null]], 'couper la série retire aussi l’ancien repère de série');
+  assert.deepEqual(calls.local, [['remove', 'u1:reminder_s1_S1E3', null], ['remove', 'u1:reminder_s1', null], ['prefix', 'u1:reminder_s1_S', null]], 'couper la série retire aussi l’ancien repère de série et ceux des autres épisodes');
 
   calls.updates.length = 0; calls.failSet = true;
   await assert.rejects(writeEpisodeReminder({ target: show, ownerUid: 'u1', nextState: true, episode, updateShow }), /refusé/);
@@ -132,4 +132,21 @@ test('SEENIT-NOTIFICATION-009 la cloche agit sur toute la série et montre les r
   const notifier = read('src/hooks/useRemindersNotifier.ts');
   assert.match(notifier, /if \(userPrefs\.release_today_tv \|\| isSpecificReminder \|\| s\.notificationsEnabled === true\) \{/, 'une série activée à la cloche est prévenue même sans « Sortie du jour »');
   assert.match(read('src/components/EpisodeReminderBell.tsx'), /const label = `\$\{reminder \? 'Couper' : 'Activer'\} les rappels de \$\{show\?\.title \|\| 'la série'\} \(\$\{code\}\)`;/, 'le nom accessible dit que la cloche agit sur la série');
+});
+
+// Retour terrain du 18/11 (« une cloche les coche toutes, mais pas toujours, c'est un peu random ») : un repère posé
+// avant sur un autre épisode gardait sa cloche allumée (et sa notification) après « couper » la série.
+test('SEENIT-NOTIFICATION-009 couper une cloche coupe toutes celles de la série, anciens rappels d’épisode compris', async () => {
+  const { readEpisodeReminder, writeEpisodeReminder } = await loadModule();
+  Object.assign(calls, { uid: 'u1', switchOnPermission: false, failSet: false, failDelete: false, prefs: { release_today_tv: false }, flags: { reminder_s1_S2E5: true }, stored: ['s1_S02E05', 's1_S02E06', 's2_S01E01'] });
+  const coupe = { id: 's1', title: 'Dexter', mediaType: 'tv', notificationsEnabled: false } as never;
+  assert.equal(readEpisodeReminder(coupe, { season_number: 2, episode_number: 5 }), false, 'choix explicite « coupé » : l’ancien repère d’épisode ne rallume pas la cloche');
+  assert.equal(readEpisodeReminder({ id: 's1', mediaType: 'tv' } as never, { season_number: 2, episode_number: 5 }), true, 'sans choix explicite, le rappel posé sur l’épisode compte encore');
+  calls.deletes.length = 0; calls.local.length = 0;
+  await writeEpisodeReminder({ target: { id: 's1', title: 'Dexter', mediaType: 'tv', notificationsEnabled: true } as never, ownerUid: 'u1', nextState: false, episode: { season_number: 2, episode_number: 4 }, updateShow: async () => {} });
+  assert.deepEqual(calls.deletes.sort(), ['users/u1/reminders/s1_S02E04', 'users/u1/reminders/s1_S02E05', 'users/u1/reminders/s1_S02E06'], 'tous les rappels serveur de la série, pas ceux d’une autre');
+  assert.ok(calls.local.some(([kind, key]) => kind === 'prefix' && key === 'u1:reminder_s1_S'));
+  const notifier = read('src/hooks/useRemindersNotifier.ts');
+  assert.match(notifier, /\/\/ Retour terrain du 18\/11 : un choix explicite « coupé » de la série l'emporte sur un ancien repère d'épisode\.\n\s+if \(s\.notificationsEnabled === false\) \{/);
+  Object.assign(calls, { prefs: undefined, flags: undefined, stored: undefined });
 });

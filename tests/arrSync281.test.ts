@@ -134,5 +134,5 @@ test('SEENIT-DOWNLOAD-018 fiche épisode : programmer ou annuler le télécharge
   assert.doesNotMatch(read('src/screens/mediaDetail/downloadMode.tsx'), /EpisodePassiveChip/);
   const bell = read('src/components/EpisodeReminderBell.tsx');
   // Retour terrain du 09/11 : la cloche reste en or ; c'est le mode téléchargement qui est bleu (SEENIT-DOWNLOAD-019).
-  assert.match(bell, /\{icon \? <SeenItBellRing size=\{42\} active=\{reminder\} \/>/, 'liste : dessinée comme l’anneau Vu, or si active (18/11)');
+  assert.match(bell, /\{icon \? <SeenItBellRing size=\{36\} active=\{reminder\} \/>/, 'liste : dessinée comme l’anneau Vu, or si active (18/11)');
 });
