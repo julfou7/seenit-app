@@ -49,14 +49,16 @@ export function CastRows({ cast, isSeries, totalEpisodes, loading, onOpenPerson 
  * Genres et thèmes juste sous le synopsis, en une rangée de pastilles de même hauteur (32 px) alignées ;
  * « +N thèmes » a l'allure d'une pastille et garde une cible de 44 px (SEENIT-UX-009).
  */
-export function ThemesCard({ genres, keywords, expanded, onToggle, loading }: { genres: ReadonlyArray<{ id: number; name: string }>; keywords: readonly string[]; expanded: boolean; onToggle: () => void; loading: boolean }) {
-  if (loading) return <div className="flex flex-wrap gap-1.5" aria-hidden="true"><div className="h-8 w-20 rounded-lg bg-zinc-800/80 animate-pulse" /><div className="h-8 w-24 rounded-lg bg-zinc-800/80 animate-pulse" /></div>;
+/**
+ * Retour terrain du 18/11 (« les thèmes sont déjà en haut de la page, inutile de les répéter ») : plus de rangée sous le
+ * synopsis. Les genres du haut de fiche s'ouvrent sur tous les genres puis les thèmes secondaires (mots-clés TMDB).
+ */
+export function ThemesCard({ genres, keywords }: { genres: ReadonlyArray<{ id: number; name: string }>; keywords: readonly string[] }) {
   if (!genres.length && !keywords.length) return null;
   const chip = 'inline-flex h-8 items-center rounded-lg px-3 text-[12px] font-bold whitespace-nowrap';
-  return <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Genres et thèmes">
+  return <div id="detail-themes" className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Genres et thèmes">
     {genres.map((genre, index) => <span key={`genre-${genre.id}-${index}`} className={cn(chip, 'bg-[#18181b] text-zinc-100 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]')}>{genre.name}</span>)}
-    <span id="series-theme-keywords" className="contents">{expanded && keywords.map((keyword, index) => <span key={`kw-${index}`} className={cn(chip, 'bg-transparent text-zinc-300 font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] first-letter:uppercase')}>{keyword}</span>)}</span>
-    {keywords.length > 0 && <button type="button" onClick={onToggle} aria-expanded={expanded} aria-controls="series-theme-keywords" className="relative inline-flex h-8 items-center rounded-lg px-3 text-[12px] font-bold text-[#F2C36B] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.4)] before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-['']">{expanded ? 'Masquer les thèmes' : `+${keywords.length} thèmes`}</button>}
+    {keywords.map((keyword, index) => <span key={`kw-${index}`} className={cn(chip, 'bg-transparent text-zinc-300 font-semibold shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] first-letter:uppercase')}>{keyword}</span>)}
   </div>;
 }
 

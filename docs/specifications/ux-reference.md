@@ -284,12 +284,15 @@ pas les pixels d'une capture particulière.
   sélectionne sa saison (état annoncé par `aria-pressed`) et ne la referme jamais ; la carte de la saison
   et ses lignes d'épisode s'affichent dessous.
 - L'action de masse emploie **Tout marquer vu** ou **Tout marquer non vu** selon l'intention réelle.
-  Elle reste secondaire et compacte visuellement sans réduire sa compréhension.
+  Elle reste secondaire et compacte visuellement sans réduire sa compréhension. Depuis le 18/11/2026, elle ouvre
+  la liste des épisodes, son anneau aligné sur la colonne des coches qu'il remplit ; elle s'efface en mode
+  téléchargement. La saison n'est plus une carte et sa bande-annonce est une petite pastille (cible 44 px).
 - Les portraits du casting gardent `object-fit: cover` avec un cadrage vertical orienté vers le haut
   (`50% 25%`) plutôt qu'une détection de visage. Noms et rôles peuvent occuper deux lignes ; le compteur
   d'épisodes est visuellement secondaire.
-- Les genres TMDB restent visibles en premier. Les mots-clés/thèmes supplémentaires sont repliés par
-  défaut derrière **+N thèmes** et le contrôle de dépliage conserve une cible d'au moins 44 px.
+- Les genres TMDB restent visibles en premier, dans le haut de fiche. Depuis le 18/11/2026, ils ne sont plus
+  répétés sous le synopsis : les toucher ouvre, sous le hero, tous les genres et les thèmes secondaires ; leur
+  zone tactile déborde le texte pour atteindre 44 px.
 - Une classification d'âge courte reste l'information principale. Lorsqu'une provenance US doit être
   conservée pour audit, elle est affichée en information secondaire et reste disponible au lecteur
   d'écran ; elle n'est jamais présentée comme une certification française.

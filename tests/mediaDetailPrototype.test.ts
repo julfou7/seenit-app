@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { averageRating, reliableEpisodeRatings, reliableTitleRating, episodeRank, formatClock, planEpisodes, planMovieEnd, seasonAverages, seasonAveragesView, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
+import { averageRating, reliableEpisodeRatings, reliableTitleRating, episodeRank, formatClock, planEpisodes, planMovieEnd, seasonAverageLabel, seasonAverages, seasonAveragesView, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
 import { buildVerifiedSimilar, directedMovies, movieIdsFromCredits, similarReasonFor } from '../src/features/shows/similarReasons.ts';
 
 test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée', () => {
@@ -40,7 +40,7 @@ test('SEENIT-UX-019 moyennes de saison et rang à partir des seules notes TMDB c
   // Retour terrain du 18/11 : la carte saison ne répète plus les notes d'épisode (elles vivent sur la fiche épisode).
   assert.doesNotMatch(seasonPanel, /ratingBarHeight|h-10 flex items-end|key=\{`bar-/);
   // Retour v1.4.301 : « notes insuffisantes » à la place de la moyenne, et la note du titre en haut de fiche suit la même règle.
-  assert.match(seasonPanel, /<span className="text-\[13px\] text-zinc-500">notes insuffisantes<\/span>/);
+  assert.match(seasonPanel, /<span className="text-\[12px\] text-zinc-500">notes insuffisantes<\/span>/);
   assert.deepEqual(reliableTitleRating(10, 2), { value: null, insufficient: true });
   assert.deepEqual(reliableTitleRating(7.8, 1200), { value: 7.8, insufficient: false });
   assert.deepEqual(reliableTitleRating(7.8, undefined), { value: 7.8, insufficient: false }, 'sans nombre de votes connu, la note reste');
@@ -60,6 +60,18 @@ test('retour terrain du 18/11 : tuiles de moyenne à 2 ou 3 saisons, courbe à p
   const sections = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
   assert.match(sections, /const view = seasonAveragesView\(averages\.length\);/);
   assert.match(sections, /const tiles = view === 'tiles';/);
+  // Retour terrain du 18/11 : nom entier et année à deux tuiles, forme courte à trois ; l'année seulement si TMDB la donne.
+  assert.deepEqual(seasonAverages([{ season_number: 1, vote_average: 7.5, air_date: '2025-03-02' }, { season_number: 2, vote_average: 8.1, air_date: null }]), [{ season: 1, average: 7.5, year: '2025' }, { season: 2, average: 8.1 }]);
+  assert.equal(seasonAverageLabel({ season: 1, average: 7.5, year: '2025' }, 2), 'Saison 1 (2025)');
+  assert.equal(seasonAverageLabel({ season: 2, average: 8.1 }, 2), 'Saison 2');
+  assert.equal(seasonAverageLabel({ season: 3, average: 6, year: '2026' }, 3), 'S3 (2026)');
+  assert.match(sections, /\{seasonAverageLabel\(entry, averages\.length\)\}/);
+  assert.match(sections, /const Box: React\.ElementType = tiles \? 'div' : DetailCard;/, 'tuiles hors carte, courbe dans la sienne');
+  // Saison : plus de carte, bande-annonce en petite pastille (cible 44 px gardée), « Tout marquer vu » en tête de liste.
+  const panel = sections.slice(sections.indexOf('export function SeasonPanel'));
+  assert.doesNotMatch(panel, /<DetailCard/);
+  assert.match(panel, /data-season-trailer className="shrink-0 min-h-11 inline-flex items-center"><span className="inline-flex h-7 /);
+  assert.match(panel, /<span className="w-12 h-12 shrink-0 flex items-center justify-center"><SeenItRing size=\{42\} active=\{fullyWatched\} \/><\/span>/, 'anneau à la taille et à la place des coches');
   assert.match(sections, /data-season-averages=\{view\}/);
   // La note d'une tuile prend la couleur de son niveau, comme la fiche épisode.
   assert.match(sections, /RATING_TONE_TEXT\[ratingTone\(entry\.average\)\]/);
@@ -68,7 +80,7 @@ test('retour terrain du 18/11 : tuiles de moyenne à 2 ou 3 saisons, courbe à p
   const view = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
   assert.match(view, /averageShownAbove=\{seasonAveragesView\(averages\.length\) !== 'none' && averages\.some\(entry => entry\.season === selectedSeason\.season_number\)\}/);
   assert.match(sections, /const showMean = !averageShownAbove;/);
-  assert.match(sections, /\{showMean && <div className="flex items-center gap-1">\{mean !== null/);
+  assert.match(sections, /\{showMean && \(mean !== null/);
 });
 
 const director = { name: 'Denis Villeneuve', movieIds: new Set([335984, 329865]) };
@@ -152,7 +164,9 @@ test('SEENIT-UX-019 une seule fiche acteur, la barre visible sur la fiche et un 
   assert.match(readFileSync('src/components/bottomNav.css', 'utf8'), /:not\(\[data-media-layer\]\)\) \.bottom-nav-shell\{display:none\}/);
   const view = readFileSync('src/screens/ShowDetailView.tsx', 'utf8');
   assert.match(view, /label=\{`Voir \$\{code\}`\}[^\n]*onClick=\{handleWatchNextEpisode\}/, 'le bouton or ouvre l’épisode, il ne marque rien');
-  assert.ok(view.indexOf('<ThemesCard') > view.indexOf('<DetailSynopsis') && view.indexOf('<ThemesCard') < view.indexOf('<SeasonAverageChart'), 'genres et thèmes juste sous le synopsis');
+  // Retour terrain du 18/11 : genres et thèmes s'ouvrent depuis le haut de fiche, juste sous le hero, plus sous le synopsis.
+  assert.ok(view.indexOf('<ThemesCard') > view.indexOf('<DetailHero') && view.indexOf('<ThemesCard') < view.indexOf('<DetailSynopsis'), 'genres et thèmes sous le hero');
+  assert.equal(view.split('<ThemesCard').length, 2, 'une seule rangée de genres et thèmes');
   assert.match(readFileSync('src/screens/MediaDetailColdShell.tsx', 'utf8'), /style=\{\{ height: isSeries \? 300 : 380 \}\}/);
 });
 
