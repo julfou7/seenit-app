@@ -151,12 +151,13 @@ export function formatRating(value: number): string {
 
 /**
  * Retour terrain du 18/11 (« l'évolution entre saisons, c'est bien, mais à 1, 2 ou 3 saisons cette vue est vraiment
- * moyenne ; au-delà, c'est cool ») : sous deux saisons notées, rien (la carte saison dit sa moyenne) ; à deux ou trois,
- * une tuile par saison ; à partir de quatre, la courbe.
+ * moyenne ; au-delà, c'est cool », puis « autant fusionner les deux ») : à deux ou trois saisons, la moyenne vit dans la
+ * tuile de chaque saison ; à partir de quatre saisons, la courbe, si quatre saisons au moins sont notées ; sinon rien
+ * (la saison choisie dit sa moyenne).
  */
 export type SeasonAveragesView = 'none' | 'tiles' | 'chart';
-export function seasonAveragesView(count: number): SeasonAveragesView {
-  return count < 2 ? 'none' : count <= 3 ? 'tiles' : 'chart';
+export function seasonAveragesView(seasonCount: number, ratedCount: number): SeasonAveragesView {
+  return seasonCount >= 2 && seasonCount <= 3 ? 'tiles' : seasonCount >= 4 && ratedCount >= 4 ? 'chart' : 'none';
 }
 
 /**

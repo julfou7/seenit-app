@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.342**
+Version applicative : **1.4.343**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -622,14 +622,15 @@ n'est rouverte que par une nouvelle décision produit explicite.
   - **Série** : carte de progression (épisodes vus, temps restant, un segment par saison), bouton or
     **Marquer SxxEyy vu** qui marque directement le prochain épisode, une seule tuile diffuseur
     (`SEENIT-PROVIDER-003`) ; chips note TMDB, âge et bande-annonce ; synopsis ; **Moyenne par saison**
-    (retour terrain du 18/11 : une tuile par saison à deux ou trois saisons, hors carte, « Saison 1 (2025) » à deux et
-    « S1 (2025) » à trois, l'année seulement si TMDB la donne, note colorée par niveau et écart avec la précédente ;
-    courbe à partir de quatre ; rien sous deux saisons notées) ;
+    (retour terrain du 18/11, « autant fusionner les deux » : à deux ou trois saisons, la tuile de chaque saison est aussi
+    sa pastille, « Saison 1 (2025) » à deux et « S1 (2025) » à trois, l'année seulement si TMDB la donne, note colorée
+    par niveau, écart avec la saison notée précédente et avancement ; à partir de quatre saisons, courbe si quatre
+    saisons au moins sont notées) ;
     pastilles de saison (sélection, jamais fermeture ; saison finie = anneau Vu de SeenIt, saison choisie
     cerclée d'or sur fond sombre, « Bientôt » en bleu) ; saison sans carte (retour du 18/11, « bloc sur bloc ») : titre
     « Saison N · vus/total », moyenne seulement si la saison n'est pas déjà dans **Moyenne par saison**, petite pastille
-    bande-annonce de saison (cible 44 px), puis **Tout marquer vu / non vu** en tête de liste, son anneau aligné sur la
-    colonne des coches et masqué en mode téléchargement ; plus de barres de notes par épisode) et lignes d'épisode
+    bande-annonce de saison (cible 44 px), puis **Tout marquer vu / non vu** en texte seul (sans icône) en tête de liste,
+    au-dessus de la colonne des coches et masqué en mode téléchargement ; plus de barres de notes par épisode) et lignes d'épisode
     (vignette libre de tout
     repère, code « Sxx | Eyy » en or, bleu à venir, gris vu, puis durée ou date ; les notes d'épisode se lisent sur la
     fiche épisode ; coche 44 px ; retour v1.4.300 : une note d'épisode portée par moins de 3 votes TMDB ne compte
@@ -651,8 +652,12 @@ n'est rouverte que par une nouvelle décision produit explicite.
   saison : seulement le bouton ⬇ de la carte de progression d'une série, sous le gate personnel. Dans la
   liste d'une saison, toutes les lignes gardent la même taille et leur photo : un épisode vu a sa photo
   grisée, le tampon VU de l'accueil, son titre barré et sa date de visionnage quand elle est connue ; un
-  épisode à venir a un fond hachuré, sa date de sortie sous le titre et le délai (« Dans 8 jours ») à
-  droite, sans bouton Vu. Les cibles tactiles restent d'au moins 44 px.
+  épisode à venir dit sous son titre quand il sort, sans bouton Vu. Depuis le 18/11/2026 (`USR-2026-11-18-002`,
+  « les tailles des épisodes varient, ce n'est pas homogène » ; « la forme arrondie fait bloc sur bloc ») : toutes les
+  lignes font exactement deux lignes de texte (titre sur une ligne, infos sur une ligne), à plat, sans fond ni arrondi,
+  séparées par un filet ; à venir, la ligne d'infos porte le délai jusqu'à 7 jours (« S02 | E04 · Dans 4 jours ») puis
+  la date (« S02 | E07 · sam. 13 déc. »), et seule la cloche reste à droite, en contour or sans fond quand les rappels
+  sont actifs (gris sinon), alignée sur la colonne des coches. Les cibles tactiles restent d'au moins 44 px.
   Retours terrain v1.4.247 (03/11/2026) :
   - le bouton or de la série est **Voir SxxEyy** : il ouvre la fiche du prochain épisode à voir, sans
     le marquer ; on le marque depuis cette fiche ;

@@ -47,11 +47,12 @@ test('SEENIT-DOWNLOAD-019 le mode téléchargement est bleu ; le rappel et le Vu
   assert.match(mode, /\{picked \? <circle cx="50" cy="50" r="42" fill=\{SKY\} \/>/, 'épisode coché');
   assert.match(mode, /if \(state === 'seen'\) return \{ background: '#E5A93D' \};/, 'le Vu reste en or');
   assert.doesNotMatch(mode, /rgba\(229,169,61/, 'plus d’or dans le panneau du mode');
-  assert.match(read('src/screens/mediaDetail/seriesSections.tsx'), /picked \? 'bg-\[#0E1A20\] shadow-\[inset_0_0_0_1\.5px_rgba\(125,211,252,0\.8\)\]' :/, 'ligne cochée');
+  assert.match(read('src/screens/mediaDetail/seriesSections.tsx'), /picked && 'rounded-\[14px\] border-transparent bg-\[#0E1A20\] shadow-\[inset_0_0_0_1\.5px_rgba\(125,211,252,0\.8\)\]'/, 'ligne cochée');
   assert.match(read('src/screens/mediaDetail/movieDownloadMode.tsx'), /state === 'mode' \? 'bg-\[#7DD3FC\] text-black'/, 'mode du film');
   const popup = read('src/components/DownloadModal.tsx');
   assert.equal((popup.match(/\? 'bg-\[#7DD3FC\] text-black'/g) || []).length, 2, 'choix de saison et d’épisode');
   assert.doesNotMatch(popup, /bg-\[#E5A93D\]/);
   assert.match(read('src/components/download-dialog.css'), /\.download-dialog__quality-icon \{[^}]*color:#7dd3fc/);
-  assert.match(read('src/components/EpisodeReminderBell.tsx'), /reminder \? 'bg-\[#E5A93D\] text-black' : idle/, 'la cloche reste en or');
+  // Retour terrain du 18/11 : la cloche reste en or (contour sans fond dans la liste, pastille pleine sur la fiche épisode).
+  assert.match(read('src/components/EpisodeReminderBell.tsx'), /const on = overlay \? 'bg-\[#E5A93D\] text-black' : 'text-\[#F2C36B\] shadow-\[inset_0_0_0_2px_#E5A93D\]';/, 'la cloche reste en or');
 });

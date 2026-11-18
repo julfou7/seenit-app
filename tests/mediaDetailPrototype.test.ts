@@ -50,37 +50,46 @@ test('SEENIT-UX-019 moyennes de saison et rang à partir des seules notes TMDB c
   assert.match(view, /\{titleRating\.insufficient && <DetailChip className="text-zinc-400">Notes TMDB insuffisantes<\/DetailChip>\}/);
 });
 
-test('retour terrain du 18/11 : tuiles de moyenne à 2 ou 3 saisons, courbe à partir de 4, rien sous 2', () => {
-  assert.equal(seasonAveragesView(0), 'none');
-  assert.equal(seasonAveragesView(1), 'none', 'une seule saison : la carte saison dit déjà sa moyenne');
-  assert.equal(seasonAveragesView(2), 'tiles');
-  assert.equal(seasonAveragesView(3), 'tiles');
-  assert.equal(seasonAveragesView(4), 'chart');
-  assert.equal(seasonAveragesView(9), 'chart');
+test('retour terrain du 18/11 : à 2 ou 3 saisons, la moyenne vit dans la tuile de saison ; courbe à partir de 4 saisons notées', () => {
+  assert.equal(seasonAveragesView(1, 1), 'none', 'une seule saison : la saison dit sa moyenne');
+  assert.equal(seasonAveragesView(2, 2), 'tiles');
+  assert.equal(seasonAveragesView(3, 0), 'tiles', 'les tuiles restent les pastilles de saison, même sans note');
+  assert.equal(seasonAveragesView(4, 4), 'chart');
+  assert.equal(seasonAveragesView(6, 3), 'none', 'quatre saisons ou plus mais moins de quatre notées : pas de courbe à trois points');
   const sections = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
-  assert.match(sections, /const view = seasonAveragesView\(averages\.length\);/);
-  assert.match(sections, /const tiles = view === 'tiles';/);
-  // Retour terrain du 18/11 : nom entier et année à deux tuiles, forme courte à trois ; l'année seulement si TMDB la donne.
+  // « Autant fusionner les deux » : la pastille devient la tuile (nom et année, note colorée, écart, avancement).
+  const pills = sections.slice(sections.indexOf('export function SeasonPills'), sections.indexOf('export function SeasonPanel'));
+  assert.match(pills, /const tiles = Boolean\(averages\) && seasons\.length <= 3;/);
+  assert.match(pills, /\{seasonAverageLabel\(\{ season: season\.season_number, average: 0, year: season\.air_date\?\.slice\(0, 4\) \}, seasons\.length\)\}/);
+  assert.match(pills, /RATING_TONE_TEXT\[ratingTone\(entry\.average\)\]/, 'note colorée par niveau, comme la fiche épisode');
+  assert.match(pills, /\{future \? 'Bientôt' : 'Pas de note'\}/);
+  assert.doesNotMatch(sections.slice(sections.indexOf('export function SeasonAverageChart'), sections.indexOf('export function SeasonPills')), /seasonAverageLabel|data-season-delta/, 'la courbe ne porte plus de tuiles');
+  // Nom entier et année à deux tuiles, forme courte à trois ; l'année seulement si TMDB la donne.
   assert.deepEqual(seasonAverages([{ season_number: 1, vote_average: 7.5, air_date: '2025-03-02' }, { season_number: 2, vote_average: 8.1, air_date: null }]), [{ season: 1, average: 7.5, year: '2025' }, { season: 2, average: 8.1 }]);
   assert.equal(seasonAverageLabel({ season: 1, average: 7.5, year: '2025' }, 2), 'Saison 1 (2025)');
   assert.equal(seasonAverageLabel({ season: 2, average: 8.1 }, 2), 'Saison 2');
   assert.equal(seasonAverageLabel({ season: 3, average: 6, year: '2026' }, 3), 'S3 (2026)');
-  assert.match(sections, /\{seasonAverageLabel\(entry, averages\.length\)\}/);
-  assert.match(sections, /const Box: React\.ElementType = tiles \? 'div' : DetailCard;/, 'tuiles hors carte, courbe dans la sienne');
-  // Saison : plus de carte, bande-annonce en petite pastille (cible 44 px gardée), « Tout marquer vu » en tête de liste.
-  const panel = sections.slice(sections.indexOf('export function SeasonPanel'));
-  assert.doesNotMatch(panel, /<DetailCard/);
-  assert.match(panel, /data-season-trailer className="shrink-0 min-h-11 inline-flex items-center"><span className="inline-flex h-7 /);
-  assert.match(panel, /<span className="w-12 h-12 shrink-0 flex items-center justify-center"><SeenItRing size=\{42\} active=\{fullyWatched\} \/><\/span>/, 'anneau à la taille et à la place des coches');
-  assert.match(sections, /data-season-averages=\{view\}/);
-  // La note d'une tuile prend la couleur de son niveau, comme la fiche épisode.
-  assert.match(sections, /RATING_TONE_TEXT\[ratingTone\(entry\.average\)\]/);
   assert.match(readFileSync(new URL('../src/screens/mediaDetail/episodeSections.tsx', import.meta.url), 'utf8'), /const TONE_TEXT = RATING_TONE_TEXT;/);
-  // La carte saison ne répète pas une moyenne déjà affichée au-dessus ; elle la garde quand la saison n'y figure pas.
   const view = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
-  assert.match(view, /averageShownAbove=\{seasonAveragesView\(averages\.length\) !== 'none' && averages\.some\(entry => entry\.season === selectedSeason\.season_number\)\}/);
+  assert.match(view, /const averagesView = seasonAveragesView\(seasons\.length, averages\.length\);/);
+  assert.match(view, /\{averagesView === 'chart' && <SeasonAverageChart averages=\{averages\} \/>\}/);
+  assert.match(view, /<SeasonPills seasons=\{seasons\} averages=\{averagesView === 'tiles' \? averages : undefined\}/);
+  // La saison ne répète pas une moyenne déjà affichée au-dessus ; elle la garde quand la saison n'y figure pas.
+  assert.match(view, /averageShownAbove=\{averagesView !== 'none' && averages\.some\(entry => entry\.season === selectedSeason\.season_number\)\}/);
   assert.match(sections, /const showMean = !averageShownAbove;/);
   assert.match(sections, /\{showMean && \(mean !== null/);
+  // Saison sans carte, bande-annonce en petite pastille (cible 44 px), « Tout marquer vu » en texte seul (plus d'anneau).
+  const panel = sections.slice(sections.indexOf('export function SeasonPanel'));
+  assert.doesNotMatch(panel, /<DetailCard|<SeenItRing/);
+  assert.match(panel, /data-season-trailer className="shrink-0 min-h-11 inline-flex items-center"><span className="inline-flex h-7 /);
+  assert.match(panel, /className="self-end min-h-11 px-3 text-\[13px\] font-bold text-\[#F2C36B\] active:opacity-80">\{fullyWatched \? 'Tout marquer non vu' : 'Tout marquer vu'\}<\/button>/);
+  // Lignes à plat de même hauteur, séparées par un filet ; titre et infos sur une ligne chacun.
+  assert.match(panel, /'flex items-center gap-2 h-\[62px\] pl-1 pr-1\.5 cursor-pointer border-b border-white\/\[0\.07\] last:border-b-0'/);
+  assert.doesNotMatch(panel, /seenit-episode--upcoming|line-clamp-2|repeating-linear-gradient/);
+  assert.match(panel, /text-\[14px\] leading-\[1\.35\] font-bold truncate/);
+  // À venir : le délai dans la ligne d'infos jusqu'à 7 jours, puis la date ; plus de délai à droite.
+  assert.match(panel, /const releaseDay = relative && relative\.includes\(' · '\) \? new Date\(/);
+  assert.doesNotMatch(panel, /const until =/);
 });
 
 const director = { name: 'Denis Villeneuve', movieIds: new Set([335984, 329865]) };
