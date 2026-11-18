@@ -4,17 +4,17 @@ export type SeenItSymbolType = 'check' | 'play' | 'watch' | 'library' | 'discove
 export interface SeenItLogoProps { className?: string; size?: number; variant?: 'glyph' | 'icon' | 'horizontal' | 'badge' | 'text'; symbol?: SeenItSymbolType; animated?: boolean; active?: boolean }
 const BrandGold = ({ id }: { id: string }) => <defs><linearGradient id={id} x1="10%" y1="5%" x2="90%" y2="95%"><stop offset="0%" stopColor="#FFF2B8"/><stop offset="32%" stopColor="#F5C518"/><stop offset="70%" stopColor="#E5A93D"/><stop offset="100%" stopColor="#B37812"/></linearGradient></defs>;
 /**
- * Cloche de rappel dessinée comme l'anneau Vu (retour terrain du 18/11 : « une cloche aussi épaisse que Vu et Télécharger,
- * pour une identité commune ») : même cercle, même épaisseur, cloche au trait du coche ; or quand les rappels sont actifs.
+ * Cloche de rappel au trait de l'anneau Vu (retour terrain du 18/11 : « une cloche aussi épaisse que Vu et Télécharger,
+ * pour une identité commune », puis « enlève le rond, c'est trop imposant ») : la cloche seule, même épaisseur que le
+ * coche ; or quand les rappels sont actifs.
  */
 export function SeenItBellRing({ size = 42, active = false, className = '' }: { size?: number; active?: boolean; className?: string }) {
   const id = useId();
   const ink = active ? 'url(#' + id + ')' : '#A1A1AA';
   return <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={className} aria-hidden="true" data-brand-bell data-active={active}>
     {active && <BrandGold id={id}/>}
-    <circle cx="50" cy="50" r="38" stroke={ink} strokeWidth="10"/>
-    <path d="M37 44a13 13 0 0 1 26 0c0 9 5 12 5 12H32s5-3 5-12" stroke={ink} strokeWidth="8" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M44.5 64.5a6 6 0 0 0 11 0" stroke={ink} strokeWidth="8" strokeLinecap="round"/>
+    <path d="M28 44a22 22 0 0 1 44 0c0 15 8 20 8 20H20s8-5 8-20" stroke={ink} strokeWidth="9" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M41 77a10 10 0 0 0 18 0" stroke={ink} strokeWidth="9" strokeLinecap="round"/>
   </svg>;
 }
 export function SeenItRing({ size = 42, active = true, className = '' }: { size?: number; active?: boolean; className?: string }) {
