@@ -582,7 +582,9 @@ Vu (depuis la v1.4.343 : lignes à plat de même hauteur séparées par un filet
 puis la date dans la ligne d'infos, cloche seule à droite en contour or). Depuis les retours de la v1.4.247, le bouton
 or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, les genres du haut de fiche ouvrent tous les genres et
 thèmes juste sous le hero (depuis la v1.4.342, plus de rangée sous le synopsis), tout est
-traduit (genres, « Self »), Où regarder n'affiche qu'un Netflix, la barre de navigation reste visible sur la
+traduit (genres, « Self »), Où regarder n'affiche qu'un Netflix (et, depuis la v1.4.344, range une chaîne vendue
+par Amazon, Apple TV, Roku ou YouTube sous le service qu'elle vend : jamais « Prime Video » ni « Apple TV+ » pour une
+chaîne Paramount+), la barre de navigation reste visible sur la
 fiche et une seule fiche acteur est utilisée partout (fiches, Explorer, Moi, À voir).
 La fiche acteur laisse la barre de navigation visible (changer d'onglet la ferme) ; « Vus ensemble » et sa
 filmographie prennent la carte habituelle de Ma liste et d'Explorer, et ses filtres Tout · Films · Séries · Non vus
