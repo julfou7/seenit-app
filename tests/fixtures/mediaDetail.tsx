@@ -9,8 +9,10 @@ import { recommendationControl, seriesSeason, telemetry, useShowsStore } from '.
  * Fixture SEENIT-UX-019 : la vraie `ShowDetailView` montée avec un modèle de fiche (série façon
  * Breaking Bad, film avec saga et similaires prouvés). Les handlers modifient réellement l'état.
  */
-type Kind = 'series' | 'movie' | 'episode' | 'episodeSkeleton';
+// `seriesShort` : même série réduite aux saisons notées 1 à 3 (retour terrain du 18/11 : tuiles au lieu de la courbe).
+type Kind = 'series' | 'seriesShort' | 'movie' | 'episode' | 'episodeSkeleton';
 const seasonsMeta = [1, 2, 3, 4, 5].map(season => ({ season_number: season, episode_count: season === 5 ? 16 : 13, air_date: `${2007 + season}-01-20`, vote_average: [7.9, 8.2, 8.4, 8.6, 8.8][season - 1] }));
+const shortSeasonsMeta = seasonsMeta.slice(0, 3).map((season, index) => ({ ...season, vote_average: [7.5, 8.1, 5.9][index] }));
 const seriesDetails = {
   id: 1396, name: 'Breaking Bad', overview: 'Un professeur de chimie atteint d’un cancer devient fabricant de méthamphétamine pour assurer l’avenir de sa famille.', first_air_date: '2008-01-20', last_air_date: '2013-09-29', status: 'Ended', number_of_seasons: 5, number_of_episodes: 68, vote_average: 8.9, episode_run_time: [47],
   genres: [{ id: 18, name: 'Drame' }, { id: 80, name: 'Crime' }, { id: 10764, name: 'Reality' }], seasons: [{ season_number: 0, episode_count: 9 }, ...seasonsMeta],
@@ -21,14 +23,15 @@ const movieDetails = {
   genres: [{ id: 878, name: 'Science-fiction' }, { id: 12, name: 'Aventure' }], belongs_to_collection: { id: 726871, name: 'Saga Dune' },
   credits: { cast: [{ id: 1190668, name: 'Timothée Chalamet', character: 'Paul Atréides', profile_path: null }, { id: 505710, name: 'Zendaya', character: 'Chani', profile_path: null }], crew: [{ id: 1001, name: 'Denis Villeneuve', job: 'Director' }] },
 };
-const library = (kind: Kind): Show | null => kind === 'series'
+const seriesKind = (kind: Kind) => kind === 'series' || kind === 'seriesShort';
+const library = (kind: Kind): Show | null => seriesKind(kind)
   ? { id: 'bb', userId: 'fixture', tmdbId: 1396, title: 'Breaking Bad', mediaType: 'tv', status: 'watching', seenEpisodes: [...[1, 2, 3, 4].flatMap(season => Array.from({ length: 13 }, (_, index) => `${season}x${index + 1}`)), ...Array.from({ length: 13 }, (_, index) => `5x${index + 1}`)], episodeRecords: {}, totalEpisodes: 68, createdAt: 0, updatedAt: 0, isArchived: false } as unknown as Show
   : null;
 
 function Harness({ kind }: { kind: Kind }) {
   const [show, setShow] = useState<Show | null>(library(kind));
-  const [expandedSeason, setExpandedSeason] = useState<number | null>(kind === 'series' ? 5 : null);
-  const [seasonsCache, setSeasonsCache] = useState<Record<number, unknown>>(kind === 'series' ? { 5: seriesSeason(5) } : {});
+  const [expandedSeason, setExpandedSeason] = useState<number | null>(kind === 'series' ? 5 : kind === 'seriesShort' ? 1 : null);
+  const [seasonsCache, setSeasonsCache] = useState<Record<number, unknown>>(kind === 'series' ? { 5: seriesSeason(5) } : kind === 'seriesShort' ? { 1: seriesSeason(1) } : {});
   const [showMenu, setShowMenu] = useState(false);
   const [isSynopsisExpanded, setIsSynopsisExpanded] = useState(false);
   const [areThemesExpanded, setAreThemesExpanded] = useState(false);
@@ -36,7 +39,7 @@ function Harness({ kind }: { kind: Kind }) {
   const [selectedEpisode, setSelectedEpisode] = useState<{ season: number; episode: { episode_number: number } } | null>(null);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const seen = show?.seenEpisodes || [];
-  const isSeries = kind === 'series';
+  const isSeries = seriesKind(kind);
   const hasSeenMedia = isSeries ? seen.length > 0 : seen.includes('movie');
   const nextNumber = isSeries ? Array.from({ length: 16 }, (_, index) => index + 1).find(episode => !seen.includes(`5x${episode}`)) : undefined;
   const nextEp = isSeries && nextNumber ? { season_number: 5, episode_number: nextNumber, name: seriesSeason(5).episodes[nextNumber - 1].name, runtime: 47 } : null;
@@ -58,7 +61,7 @@ function Harness({ kind }: { kind: Kind }) {
     show, showMenu, showToast: (message: string) => telemetry.opens.push(`toast:${message}`),
     presence: { loading: false, hasFile: false, seasonsHasFile: {}, episodesHasFile: {}, lastChecked: 0 }, getEpisodeDownload: () => null,
     sortedProviders: [{ provider_id: 8, provider_name: 'Netflix', logo_path: '/pbpMk2JmcoNnQwx5JGpXngfoWtp.jpg' }, { provider_id: 999999, provider_name: 'Plex (Julien-NAS)', isPlex: true, serverName: 'Julien-NAS' }],
-    title: isSeries ? 'Breaking Bad' : 'Dune : Deuxième partie', tmdbDetails: isSeries ? seriesDetails : movieDetails,
+    title: isSeries ? 'Breaking Bad' : 'Dune : Deuxième partie', tmdbDetails: kind === 'seriesShort' ? { ...seriesDetails, number_of_seasons: 3, seasons: shortSeasonsMeta } : isSeries ? seriesDetails : movieDetails,
     toggleEpisodeSeen: (event: { stopPropagation: () => void }, season: number, episode: number) => { event.stopPropagation(); toggleKey(`${season}x${episode}`); },
     toggleFavorite: () => setShow(current => current ? { ...current, isFavorite: !current.isFavorite } : current),
     toggleMovieSeen: () => setShow(current => current?.seenEpisodes?.includes('movie') ? { ...current, seenEpisodes: [], status: 'plan_to_watch' } : { ...(current || { id: 'dune2', userId: 'fixture', tmdbId: 693134, title: 'Dune', mediaType: 'movie', episodeRecords: {}, createdAt: 0, updatedAt: 0 }), seenEpisodes: ['movie'], status: 'completed' } as Show),

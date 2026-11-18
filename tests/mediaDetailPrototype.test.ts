@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { averageRating, reliableEpisodeRatings, reliableTitleRating, episodeRank, formatClock, planEpisodes, planMovieEnd, ratingBarHeight, seasonAverages, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
+import { averageRating, reliableEpisodeRatings, reliableTitleRating, episodeRank, formatClock, planEpisodes, planMovieEnd, seasonAverages, seasonAveragesView, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
 import { buildVerifiedSimilar, directedMovies, movieIdsFromCredits, similarReasonFor } from '../src/features/shows/similarReasons.ts';
 
 test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée', () => {
@@ -24,23 +24,21 @@ test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée',
   assert.equal(planEpisodes(20 * 60, episodes.slice(0, 2).concat(episodes[3]), episode => episode.runtime, 2).plan.length, 2, 'au plus la limite demandée');
 });
 
-test('SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules notes TMDB connues', () => {
+test('SEENIT-UX-019 moyennes de saison et rang à partir des seules notes TMDB connues', () => {
   assert.deepEqual(seasonAverages([{ season_number: 0, vote_average: 9 }, { season_number: 2, vote_average: 8.2 }, { season_number: 1, vote_average: 7.9 }, { season_number: 3, vote_average: 0 }]), [{ season: 1, average: 7.9 }, { season: 2, average: 8.2 }], 'saison 0 et notes absentes exclues, ordre des saisons');
   assert.equal(averageRating([8, 9, 0, undefined, 'x']), 8.5);
   assert.equal(averageRating([0, null]), null);
   assert.deepEqual(episodeRank([8.4, 9.6, 9.1, 0], 9.6), { rank: 1, total: 3 }, 'meilleure note de la saison');
   assert.deepEqual(episodeRank([8.4, 9.6, 9.1], 8.4), { rank: 3, total: 3 });
   assert.equal(episodeRank([8.4], 0), null, 'épisode non noté : pas de rang');
-  assert.equal(ratingBarHeight(9.6, [8, 9.6]), 40);
-  assert.equal(ratingBarHeight(8, [8, 9.6]), 6);
-  assert.equal(ratingBarHeight(undefined, [8, 9.6]), 6, 'note absente : barre minimale, jamais inventée');
   // Retour v1.4.300 (Le Gang des souris vertes) : deux épisodes notés 10 par une poignée de votes ne font pas une « moyenne 10,0 ».
   assert.deepEqual(reliableEpisodeRatings([{ vote_average: 10, vote_count: 2 }, { vote_average: 10, vote_count: 1 }, { vote_average: 0, vote_count: 0 }]), [0, 0, 0]);
   assert.equal(averageRating(reliableEpisodeRatings([{ vote_average: 10, vote_count: 2 }, { vote_average: 0, vote_count: 0 }])), null);
   assert.deepEqual(reliableEpisodeRatings([{ vote_average: 8.4, vote_count: 12 }, { vote_average: 7 }, { vote_average: 9, vote_count: 2 }]), [8.4, 7, 0], 'sans vote_count connu, la note reste');
   const seasonPanel = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
   assert.match(seasonPanel, /const mean = episodes \? averageRating\(ratings\) : \(season\.vote_average/);
-  assert.match(seasonPanel, /ratingBarHeight\(ratings\[index\], ratings\)/);
+  // Retour terrain du 18/11 : la carte saison ne répète plus les notes d'épisode (elles vivent sur la fiche épisode).
+  assert.doesNotMatch(seasonPanel, /ratingBarHeight|h-10 flex items-end|key=\{`bar-/);
   // Retour v1.4.301 : « notes insuffisantes » à la place de la moyenne, et la note du titre en haut de fiche suit la même règle.
   assert.match(seasonPanel, /<span className="text-\[13px\] text-zinc-500">notes insuffisantes<\/span>/);
   assert.deepEqual(reliableTitleRating(10, 2), { value: null, insufficient: true });
@@ -50,6 +48,27 @@ test('SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules note
   const view = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
   assert.match(view, /reliableTitleRating\(tmdbDetails\?\.vote_average, tmdbDetails\?\.vote_count\)/);
   assert.match(view, /\{titleRating\.insufficient && <DetailChip className="text-zinc-400">Notes TMDB insuffisantes<\/DetailChip>\}/);
+});
+
+test('retour terrain du 18/11 : tuiles de moyenne à 2 ou 3 saisons, courbe à partir de 4, rien sous 2', () => {
+  assert.equal(seasonAveragesView(0), 'none');
+  assert.equal(seasonAveragesView(1), 'none', 'une seule saison : la carte saison dit déjà sa moyenne');
+  assert.equal(seasonAveragesView(2), 'tiles');
+  assert.equal(seasonAveragesView(3), 'tiles');
+  assert.equal(seasonAveragesView(4), 'chart');
+  assert.equal(seasonAveragesView(9), 'chart');
+  const sections = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
+  assert.match(sections, /const view = seasonAveragesView\(averages\.length\);/);
+  assert.match(sections, /const tiles = view === 'tiles';/);
+  assert.match(sections, /data-season-averages=\{view\}/);
+  // La note d'une tuile prend la couleur de son niveau, comme la fiche épisode.
+  assert.match(sections, /RATING_TONE_TEXT\[ratingTone\(entry\.average\)\]/);
+  assert.match(readFileSync(new URL('../src/screens/mediaDetail/episodeSections.tsx', import.meta.url), 'utf8'), /const TONE_TEXT = RATING_TONE_TEXT;/);
+  // La carte saison ne répète pas une moyenne déjà affichée au-dessus ; elle la garde quand la saison n'y figure pas.
+  const view = readFileSync(new URL('../src/screens/ShowDetailView.tsx', import.meta.url), 'utf8');
+  assert.match(view, /averageShownAbove=\{seasonAveragesView\(averages\.length\) !== 'none' && averages\.some\(entry => entry\.season === selectedSeason\.season_number\)\}/);
+  assert.match(sections, /const showMean = !averageShownAbove;/);
+  assert.match(sections, /\{showMean && <div className="flex items-center gap-1">\{mean !== null/);
 });
 
 const director = { name: 'Denis Villeneuve', movieIds: new Set([335984, 329865]) };

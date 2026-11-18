@@ -124,6 +124,9 @@ export function ratingTone(value: number): RatingTone {
   return value >= 8 ? 'top' : value >= 7 ? 'good' : value >= 6 ? 'fair' : 'poor';
 }
 
+/** Couleur d'une note écrite, par niveau : assez claire pour être lue sur le fond sombre (fiche épisode, moyennes de saison). */
+export const RATING_TONE_TEXT: Readonly<Record<RatingTone, string>> = { top: '#F2C36B', good: '#E5A93D', fair: '#bfa06a', poor: '#FB7185' };
+
 /** Hauteur d'une barre de note sur l'échelle fixe 0–10 (une 3,2 fait le tiers d'une 8,3), jamais sous `minPx`. */
 export function absoluteRatingHeight(value: number, maxPx: number, minPx = 4): number {
   return Math.max(minPx, Math.round(Math.min(10, Math.max(0, value)) / 10 * maxPx));
@@ -133,14 +136,14 @@ export function formatRating(value: number): string {
   return value.toFixed(1).replace('.', ',');
 }
 
-/** Hauteur relative d'une barre de note dans [minPx, maxPx] selon l'écart de la saison. */
-export function ratingBarHeight(value: unknown, ratings: readonly unknown[], minPx = 6, maxPx = 40): number {
-  const rating = Number(value);
-  const known = ratings.map(Number).filter(entry => Number.isFinite(entry) && entry > 0);
-  if (!Number.isFinite(rating) || rating <= 0 || !known.length) return minPx;
-  const low = Math.min(...known), high = Math.max(...known);
-  if (high - low < 0.05) return Math.round((minPx + maxPx) / 2);
-  return Math.round(minPx + ((rating - low) / (high - low)) * (maxPx - minPx));
+/**
+ * Retour terrain du 18/11 (« l'évolution entre saisons, c'est bien, mais à 1, 2 ou 3 saisons cette vue est vraiment
+ * moyenne ; au-delà, c'est cool ») : sous deux saisons notées, rien (la carte saison dit sa moyenne) ; à deux ou trois,
+ * une tuile par saison ; à partir de quatre, la courbe.
+ */
+export type SeasonAveragesView = 'none' | 'tiles' | 'chart';
+export function seasonAveragesView(count: number): SeasonAveragesView {
+  return count < 2 ? 'none' : count <= 3 ? 'tiles' : 'chart';
 }
 
 /**

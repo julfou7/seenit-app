@@ -20,7 +20,7 @@ import { RedditSection } from '../components/community/RedditSection';
 import { buildRedditMovieSearchQuery } from '../components/community/redditEpisodeSearch';
 import { getProviderLinkPresentation } from '../features/providers/providerLink';
 import { pickHeroProvider } from '../features/providers/heroProvider';
-import { seasonAverages, formatRating, reliableTitleRating } from '../features/shows/detailPlanning';
+import { seasonAverages, seasonAveragesView, formatRating, reliableTitleRating } from '../features/shows/detailPlanning';
 import { frenchGenres } from '../features/shows/frenchLabels';
 import { DetailChip, DetailHero, DetailSynopsis, GoldCta, RoundHeaderButton, WhereToWatchCard, type WhereToWatchProvider } from './mediaDetail/detailUi';
 import { CastRows, RelationList, RelationsLoading, ThemesCard } from './mediaDetail/detailSections';
@@ -439,7 +439,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           <SeasonPills seasons={seasons} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }}
             downloading={canUseDownloadMode ? season => Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season })) : undefined} />
           {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={toggleAllHere} onSegment={pickSegment} />}
-          {selectedSeason && <SeasonPanel season={selectedSeason} episodes={selectedEpisodes} show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
+          {selectedSeason && <SeasonPanel season={selectedSeason} averageShownAbove={seasonAveragesView(averages.length) !== 'none' && averages.some(entry => entry.season === selectedSeason.season_number)} episodes={selectedEpisodes}show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
             downloadMode={canUseDownloadMode ? { active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode } : null}
             episodesHasFile={model.presence.episodesHasFile} episodesMonitored={model.presence.episodesMonitored}
             getEpisodeDownload={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)} />}

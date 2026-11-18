@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.340",
+  "applicationVersion": "1.4.341",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -513,7 +513,7 @@
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",
-          "contains": "SEENIT-UX-019 moyennes de saison, rang et barres à partir des seules notes TMDB connues"
+          "contains": "SEENIT-UX-019 moyennes de saison et rang à partir des seules notes TMDB connues"
         },
         {
           "file": "tests/mediaDetailPrototype.test.ts",

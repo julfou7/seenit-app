@@ -30,7 +30,7 @@ import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
-import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
+import type { TrailerVideo } from '../features/trailers/trailerPolicy';
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { noReleaseToastAction } from '../features/downloads/downloadAvailability';
 import { hasExplicitDownloadError, isDownloadCompleted } from '../features/downloads/downloadStatePolicy';
@@ -139,7 +139,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       downloadClient: 'Sonarr', statusText: 'Préparation du téléchargement…', releaseTitle: `${showTitle} • ${code} • 1080p`
     });
     try {
-      const res = await downloadEpisodeWithSeasonPackFallback({
+      const res = await (await import('../features/downloads/episodeSeasonPackFallback')).downloadEpisodeWithSeasonPackFallback({ // chargé au lancement : 12 % du chunk de la fiche
         url: config.sonarrUrl, apiKey: config.sonarrApiKey, title: showTitle, tmdbId: effectiveTmdbId, tvdbId, imdbId,
         season: seasonNumber, episode: episodeNumber, qualityPreference: '1080p', qbittorrentUrl: config.qbittorrentUrl,
         qbittorrentUsername: config.qbittorrentUsername, qbittorrentPassword: config.qbittorrentPassword
@@ -264,7 +264,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   const [visibleSeasons, setVisibleSeasons] = useState(5);
   const [visibleCast, setVisibleCast] = useState(12);
   const [showAllCast, setShowAllCast] = useState(false);
-  const [trailerModalVideos, setTrailerModalVideos] = useState<any[] | null>(null);
+  const [trailerModalVideos, setTrailerModalVideos] = useState<TrailerVideo[] | null>(null);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [downloadTargetSeason, setDownloadTargetSeason] = useState<number | undefined>(undefined);
   const [downloadTargetEpisode, setDownloadTargetEpisode] = useState<number | undefined>(undefined);

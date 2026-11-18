@@ -4,7 +4,7 @@ import { cn } from '../../lib/utils';
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
-import { absoluteRatingHeight, formatRating, ratingTone, settleSeenToggle, type RatingTone } from '../../features/shows/detailPlanning';
+import { absoluteRatingHeight, formatRating, RATING_TONE_TEXT, ratingTone, settleSeenToggle, type RatingTone } from '../../features/shows/detailPlanning';
 
 /** SEENIT-UX-019 — Sections de la fiche épisode du prototype (« Pellicule + courbe »). */
 export function EpisodeHeaderBlock({ code, title, airLabel, meta, isSeen, isFuture, futureLabel, onToggle }: { code: string; title: string; airLabel: string; meta: string; isSeen: boolean; isFuture: boolean; futureLabel: string; onToggle: () => unknown }) {
@@ -39,7 +39,7 @@ export interface CurveCell { n: number; rating: number | null; aired: boolean; s
 const BAR_MAX = 52;
 const TONE_COLOR: Record<RatingTone, string> = { top: '#F2C36B', good: '#E5A93D', fair: '#8a6a2b', poor: 'rgba(251,113,133,0.75)' };
 /** Chiffre au-dessus de la barre : même famille de couleur, assez claire pour être lue sur le fond sombre. */
-const TONE_TEXT: Record<RatingTone, string> = { top: '#F2C36B', good: '#E5A93D', fair: '#bfa06a', poor: '#FB7185' };
+const TONE_TEXT = RATING_TONE_TEXT;
 
 /**
  * Notes TMDB de la saison et cases d'épisode (or = vu, contour or = épisode affiché). Retour terrain du 17/11 (« je ne

@@ -525,8 +525,11 @@ dans la pile Retour.
 
 Depuis le 03/11/2026 (`SEENIT-UX-019`), les fiches série, film et épisode reprennent le prototype : un seul
 défilement sans onglets, hero titré en or, carte de progression avec **Marquer SxxEyy vu** et une seule
-tuile diffuseur (ta plateforme choisie, sinon Plex), **Moyenne par saison**, pastilles de saison (anneau
-Vu pour une saison finie, saison choisie cerclée d'or), barres de notes et lignes d'épisode (code
+tuile diffuseur (ta plateforme choisie, sinon Plex), **Moyenne par saison** (depuis la v1.4.341 : une tuile par
+saison à deux ou trois saisons, note colorée par niveau et écart avec la précédente ; courbe à partir de quatre),
+pastilles de saison (anneau Vu pour une saison finie, saison choisie cerclée d'or), carte de la saison sans barres de
+notes (les notes d'épisode se lisent sur la fiche épisode ; sa moyenne n'est pas répétée quand **Moyenne par saison**
+la montre déjà) et lignes d'épisode (code
 « Sxx | Eyy » coloré, durée ou date, sans note ni repère sur l'image), **Où regarder** en lignes,
 **Personnages** (six, puis dix par dix). Une note TMDB portée par moins de 3 votes n'est pas affichée : la carte de saison dit « notes
 insuffisantes » et le haut de fiche « Notes TMDB insuffisantes » (v1.4.302). Le film affiche « Si tu lances maintenant · Fin à HH:MM »,

@@ -67,6 +67,8 @@ async function testMediaDetailHarness(client) {
     await check(client, byText('[aria-labelledby=detail-cast-title] button', 'Elle-même') + ' && !document.body.innerText.match(/\\bSelf\\b/)', 'rôle « Self » traduit et accordé');
     await check(client, '(()=>{const themes=document.querySelector("[aria-label=\\"Genres et thèmes\\"]"),chart=[...document.querySelectorAll("span")].find(el=>el.textContent==="Moyenne par saison");return themes&&chart&&(themes.compareDocumentPosition(chart)&Node.DOCUMENT_POSITION_FOLLOWING)&&new Set([...themes.children].filter(el=>el.getBoundingClientRect().height>0).map(el=>Math.round(el.getBoundingClientRect().height))).size===1})()', 'genres et thèmes sous le synopsis, pastilles alignées');
     await check(client, 'document.body.innerText.includes("Moyenne par saison") && document.querySelectorAll("[role=group][aria-label=Saisons] button").length===5', 'courbe des saisons et pastilles');
+    // Retour terrain du 18/11 : à cinq saisons, la courbe ; la carte saison ne répète plus les notes d'épisode.
+    await check(client, 'document.querySelector("[data-season-averages=chart]") && !document.querySelector("[data-season-averages=tiles]") && !document.querySelector("section[id^=season-panel] .h-10.items-end") && !/moyenne/.test(document.querySelector("section[id^=season-panel]")?.innerText||"x moyenne")', 'cinq saisons : courbe, carte saison sans barres de notes ni moyenne répétée (18/11)');
     await check(client, '(()=>{const rows=[...document.querySelectorAll("[data-episode-row]")];return rows.length===16&&rows[0]?.querySelector("[data-episode-code]")?.textContent==="S05 | E01"&&rows[13]?.querySelector("[data-episode-code]")?.textContent==="S05 | E14"})()', 'saison 5 : les lignes affichent S05 | E01 à S05 | E14 (#935)');
     await click(client, byLabel('Saison 1, vue'));
     await check(client, '' + byLabel('Saison 1, vue') + '?.getAttribute("aria-pressed")==="true" && document.body.innerText.includes("Saison 1 · 13/13")', 'une pastille sélectionne sa saison');
@@ -105,6 +107,16 @@ async function testMediaDetailHarness(client) {
     await evaluate(client, 'document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true}))');
     const seriesGeometry = await evaluate(client, geometry);
     if (seriesGeometry.overflow) throw new Error(`SEENIT-UX-019 série ${width}px déborde ${JSON.stringify(seriesGeometry)}`);
+
+    // Retour terrain du 18/11 : à deux ou trois saisons, une tuile par saison (note colorée, écart avec la précédente).
+    await mount(client, width, 'seriesShort');
+    await check(client, '(()=>{const card=document.querySelector("[data-season-averages=tiles]");if(!card||document.querySelector("[data-season-averages=chart]"))return false;const tiles=[...card.querySelectorAll("[data-season-average]")];const deltas=tiles.map(t=>t.querySelector("[data-season-delta]")?.textContent.trim()||"");return tiles.length===3&&tiles[0].innerText.includes("★ 7,5")&&deltas.join("|")==="|▲ 0,6|▼ 2,2"&&tiles.every(t=>t.scrollWidth<=t.clientWidth+1&&t.getBoundingClientRect().height<=64)})()', 'trois saisons : tuiles de moyenne avec écart, sans courbe (18/11)');
+    await evaluate(client, 'document.querySelector("[data-season-averages=tiles]").scrollIntoView({block:"center"})');
+    const averagesCapture = await client.send('Page.captureScreenshot', { format: 'png', fromSurface: true });
+    fs.mkdirSync(path.join(process.cwd(), 'quality-reports'), { recursive: true });
+    fs.writeFileSync(path.join(process.cwd(), 'quality-reports', `season-averages-${width}.png`), Buffer.from(averagesCapture.data, 'base64'));
+    const shortGeometry = await evaluate(client, geometry);
+    if (shortGeometry.overflow) throw new Error(`SEENIT-UX-019 série courte ${width}px déborde ${JSON.stringify(shortGeometry)}`);
 
     await mount(client, width, 'movie');
     await check(client, 'document.querySelector("h1")?.textContent==="Dune : Deuxième partie" && document.body.innerText.includes("2024 · 2 h 46 · Science-fiction, Aventure")', 'hero film');

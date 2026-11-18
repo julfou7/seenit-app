@@ -4,7 +4,7 @@ import { episodeDownloadPresentation } from '../../features/downloads/episodeDow
 import type { LiveDownloadItem } from '../../services/sonarrRadarr';
 import { type Show } from '../../types';
 import { cn, formatAirDateSafe, getTodayStr } from '../../lib/utils';
-import { averageRating, formatRating, ratingBarHeight, reliableEpisodeRatings, settleSeenToggle, upcomingEpisodeLabel, type SeasonAverage } from '../../features/shows/detailPlanning';
+import { averageRating, formatRating, RATING_TONE_TEXT, ratingTone, reliableEpisodeRatings, seasonAveragesView, settleSeenToggle, upcomingEpisodeLabel, type SeasonAverage } from '../../features/shows/detailPlanning';
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
@@ -36,22 +36,35 @@ export function SeriesProgressCard({ seenCount, totalEpisodes, remainingMinutes,
   </DetailCard>;
 }
 
-/** Courbe « Moyenne par saison » (notes TMDB des saisons, SEENIT-RATING-001), masquée sous deux saisons notées. */
+/**
+ * « Moyenne par saison » (notes TMDB des saisons, SEENIT-RATING-001). Retour terrain du 18/11 : à deux ou trois saisons,
+ * une tuile par saison (note colorée par niveau comme sur la fiche épisode, écart avec la précédente, omis s'il
+ * s'arrondit à 0,0) ; la courbe ne sert qu'à partir de quatre saisons ; rien sous deux saisons notées.
+ */
 export function SeasonAverageChart({ averages }: { averages: readonly SeasonAverage[] }) {
-  if (averages.length < 2) return null;
+  const view = seasonAveragesView(averages.length);
+  if (view === 'none') return null;
+  const tiles = view === 'tiles';
+  const deltas = averages.map((entry, index) => { const delta = index ? entry.average - averages[index - 1].average : 0; return Math.abs(delta) >= 0.05 ? delta : null; });
+  const label = `Moyennes TMDB par saison : ${averages.map((entry, index) => `saison ${entry.season} ${formatRating(entry.average)}${tiles && deltas[index] ? `, ${deltas[index]! > 0 ? 'en hausse' : 'en baisse'} de ${formatRating(Math.abs(deltas[index]!))}` : ''}`).join(', ')}`;
   const values = averages.map(entry => entry.average);
   const low = Math.min(...values) - 0.15, high = Math.max(...values) + 0.15;
   const x = (index: number) => 24 + index * (292 / (averages.length - 1));
   const y = (value: number) => 82 - ((value - low) / (high - low)) * 58;
-  return <DetailCard className="px-3.5 pt-3.5 pb-2 flex flex-col gap-1.5">
+  return <DetailCard className={cn('px-3.5 flex flex-col', tiles ? 'py-3 gap-2' : 'pt-3.5 pb-2 gap-1.5')} data-season-averages={view}>
     <span className="text-[15px] font-bold text-white">Moyenne par saison</span>
-    <div className="relative h-[110px]" role="img" aria-label={`Moyennes TMDB par saison : ${averages.map(entry => `saison ${entry.season} ${formatRating(entry.average)}`).join(', ')}`}>
+    {tiles ? <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${averages.length},minmax(0,1fr))` }} role="img" aria-label={label}>
+      {averages.map((entry, index) => <div key={entry.season} data-season-average={entry.season} aria-hidden="true" className="min-w-0 rounded-xl bg-[#18181b] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] px-2.5 py-2 flex flex-col gap-1.5">
+        <span className="flex items-center justify-between gap-1 text-[11px] font-bold leading-none"><span className="text-zinc-400">S{entry.season}</span>{deltas[index] && <span data-season-delta className={deltas[index]! > 0 ? 'text-emerald-400' : 'text-rose-400'}>{deltas[index]! > 0 ? '▲' : '▼'} {formatRating(Math.abs(deltas[index]!))}</span>}</span>
+        <span className="text-[18px] font-extrabold leading-none tabular-nums whitespace-nowrap" style={{ color: RATING_TONE_TEXT[ratingTone(entry.average)] }}>★ {formatRating(entry.average)}</span>
+      </div>)}
+    </div> : <div className="relative h-[110px]" role="img" aria-label={label}>
       <svg viewBox="0 0 340 110" preserveAspectRatio="none" className="absolute inset-0 w-full h-full overflow-visible" aria-hidden="true">
         <polyline points={averages.map((entry, index) => `${x(index).toFixed(1)},${y(entry.average).toFixed(1)}`).join(' ')} fill="none" stroke="#E5A93D" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         {averages.map((entry, index) => <circle key={entry.season} cx={x(index)} cy={y(entry.average)} r="5" fill="#09090b" stroke="#E5A93D" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />)}
       </svg>
       {averages.map((entry, index) => <React.Fragment key={`label-${entry.season}`}><span className="absolute -translate-x-1/2 text-[12px] font-extrabold leading-none text-white" style={{ left: `${(x(index) / 340) * 100}%`, top: `${y(entry.average) - 21}px` }}>{formatRating(entry.average)}</span><span className="absolute -translate-x-1/2 text-[10px] font-bold leading-none text-zinc-400" style={{ left: `${(x(index) / 340) * 100}%`, top: '96px' }}>S{entry.season}</span></React.Fragment>)}
-    </div>
+    </div>}
   </DetailCard>;
 }
 
@@ -82,25 +95,26 @@ export function SeasonPills({ seasons, show, selected, onSelect, downloading }: 
 }
 
 /**
- * Saison sélectionnée : barres de notes TMDB par épisode (or = vu, contour blanc = prochain), moyenne,
- * « Tout marquer vu / non vu » et bande-annonce de saison, puis les lignes d'épisode.
+ * Saison sélectionnée : avancement, moyenne, « Tout marquer vu / non vu » et bande-annonce de saison, puis les lignes
+ * d'épisode. Retour terrain du 18/11 : plus de barres de notes par épisode ici, elles vivent sur la fiche épisode.
  */
-export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, onToggleSeason, onToggleEpisode, onOpenEpisode, onSeasonTrailer, episodesHasFile, episodesMonitored, getEpisodeDownload, downloadMode }: { season: SeasonMeta; episodes: readonly EpisodeData[] | null; show: Show | null | undefined; nextKey: string | null; runtimeFallback: number; onToggleSeason: (event: React.MouseEvent) => void; onToggleEpisode: (event: React.MouseEvent, episode: number) => unknown; onOpenEpisode: (episode: EpisodeData) => void; onSeasonTrailer?: () => void;  episodesHasFile?: Record<string, boolean>; episodesMonitored?: Record<string, boolean>; getEpisodeDownload?: (episode: number) => LiveDownloadItem | null; downloadMode?: { active: boolean; picked: ReadonlySet<number>; onToggle: (episode: number) => void } | null }) {
+export function SeasonPanel({ season, averageShownAbove = false, episodes, show, nextKey, runtimeFallback, onToggleSeason, onToggleEpisode, onOpenEpisode, onSeasonTrailer, episodesHasFile, episodesMonitored, getEpisodeDownload, downloadMode }: { season: SeasonMeta; averageShownAbove?: boolean; episodes: readonly EpisodeData[] | null; show: Show | null | undefined; nextKey: string | null; runtimeFallback: number; onToggleSeason: (event: React.MouseEvent) => void; onToggleEpisode: (event: React.MouseEvent, episode: number) => unknown; onOpenEpisode: (episode: EpisodeData) => void; onSeasonTrailer?: () => void;  episodesHasFile?: Record<string, boolean>; episodesMonitored?: Record<string, boolean>; getEpisodeDownload?: (episode: number) => LiveDownloadItem | null; downloadMode?: { active: boolean; picked: ReadonlySet<number>; onToggle: (episode: number) => void } | null }) {
   const number = season.season_number, count = season.episode_count || 0, today = getTodayStr();
   const seen = seenInSeason(show, number);
   const future = count === 0 || Boolean(season.air_date && season.air_date > today) || (episodes ? episodes.length > 0 && episodes.every(episode => episode.air_date && episode.air_date > today) : false);
-  // Retour v1.4.300 : une note sur une poignée de votes ne fait ni moyenne ni barre ; la note de saison TMDB (sans
+  // Retour v1.4.300 : une note sur une poignée de votes ne fait pas la moyenne ; la note de saison TMDB (sans
   // nombre de votes) ne sert que tant que les épisodes ne sont pas chargés.
   const ratings = reliableEpisodeRatings(episodes || []);
   const mean = episodes ? averageRating(ratings) : (season.vote_average && season.vote_average > 0 ? season.vote_average : null);
+  // Retour terrain du 18/11 : la moyenne de la saison est déjà dans « Moyenne par saison » juste au-dessus ; la carte ne
+  // la répète pas (et n'affiche donc pas deux valeurs voisines, 8,1 en TMDB saison contre 8,2 en épisodes fiables).
+  const showMean = !averageShownAbove;
   const fullyWatched = count > 0 && seen >= count;
   const isSeen = (episode: number) => Boolean(show?.seenEpisodes?.includes(`${number}x${episode}`));
   return <section id={`season-panel-${number}`} className="flex flex-col gap-1" aria-label={`Saison ${number}`}>
     <DetailCard className="px-3.5 py-3 flex flex-col gap-2.5">
-      <div className="flex justify-between items-center gap-2"><span className="text-[16px] font-bold text-white">Saison {number}{count > 0 ? ` · ${seen}/${count}` : ''}</span><div className="flex items-center gap-1">{mean !== null ? <span className="text-[13px] text-zinc-400">moyenne <b className="text-white">{formatRating(mean)}</b></span> : episodes && episodes.some(episode => Number(episode.vote_average) > 0) ? <span className="text-[13px] text-zinc-500">notes insuffisantes</span> : null}</div></div>
-      {future ? <p className="text-[13px] text-zinc-400">Saison annoncée{season.air_date ? ` · prochainement, le ${formatAirDateSafe(season.air_date, 'long')}` : ' · les épisodes arrivent bientôt'}</p>
-        : episodes ? <div className="h-10 flex items-end gap-0.5" aria-hidden="true">{episodes.map((episode, index) => { const key = `${number}x${episode.episode_number}`; const watched = isSeen(episode.episode_number); const aired = !episode.air_date || episode.air_date <= today; return <span key={`bar-${key}`} className="flex-1 rounded-[2px]" style={{ height: `${ratingBarHeight(ratings[index], ratings)}px`, background: watched ? '#E5A93D' : 'transparent', boxShadow: key === nextKey ? 'inset 0 0 0 2px #fff' : watched ? 'none' : `inset 0 0 0 1.5px ${aired ? '#a1a1aa' : '#3f3f46'}` }} />; })}</div>
-        : <div className="h-10 rounded bg-zinc-800/60 animate-pulse" aria-hidden="true" />}
+      <div className="flex justify-between items-center gap-2"><span className="text-[16px] font-bold text-white">Saison {number}{count > 0 ? ` · ${seen}/${count}` : ''}</span>{showMean && <div className="flex items-center gap-1">{mean !== null ? <span className="text-[13px] text-zinc-400">moyenne <b className="text-white">{formatRating(mean)}</b></span> : episodes && episodes.some(episode => Number(episode.vote_average) > 0) ? <span className="text-[13px] text-zinc-500">notes insuffisantes</span> : null}</div>}</div>
+      {future && <p className="text-[13px] text-zinc-400">Saison annoncée{season.air_date ? ` · prochainement, le ${formatAirDateSafe(season.air_date, 'long')}` : ' · les épisodes arrivent bientôt'}</p>}
       {!future && <div className="flex gap-2">
         {count > 0 && <button type="button" onClick={onToggleSeason} className="flex-1 min-h-11 rounded-[11px] shadow-[inset_0_0_0_1px_rgba(229,169,61,0.5)] text-[13px] font-bold text-[#F2C36B] active:scale-[0.98]" aria-label={fullyWatched ? 'Marquer toute la saison comme non vue' : 'Marquer toute la saison comme vue'}>{fullyWatched ? 'Tout marquer non vu' : 'Tout marquer vu'}</button>}
         {onSeasonTrailer && <button type="button" onClick={onSeasonTrailer} className="min-h-11 px-3 rounded-[11px] bg-[#18181b] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)] text-[13px] font-bold text-zinc-100 inline-flex items-center gap-1.5"><Play size={14} className="fill-current" />Bande-annonce</button>}
@@ -120,7 +134,7 @@ export function SeasonPanel({ season, episodes, show, nextKey, runtimeFallback, 
         const watchedAt = watched ? Number(show?.episodeRecords?.[key]?.watchedAt) : NaN;
         const watchedOn = watched && Number.isFinite(watchedAt) && watchedAt > 0 ? `Vu le ${new Date(watchedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : null;
         const runtime = episode.runtime || runtimeFallback;
-        // Retour terrain du 08/11 : la note est déjà dans les barres de la saison ; la ligne reprend le numéro
+        // Retour terrain du 08/11 puis du 18/11 : la note se lit sur la fiche épisode ; la ligne reprend le numéro
         // (« Sxx | Eyy », or à voir, bleu à venir, gris vu) et l'image reste libre de tout repère.
         const episodeCode = `S${String(number).padStart(2, '0')} | E${String(episode.episode_number).padStart(2, '0')}`;
         const download = episodeDownloadPresentation(episode.episode_number, aired, Boolean(episodesHasFile?.[key]), getEpisodeDownload?.(episode.episode_number), Boolean(episodesMonitored?.[key]));
