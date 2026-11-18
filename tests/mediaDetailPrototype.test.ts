@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { averageRating, reliableEpisodeRatings, reliableTitleRating, episodeRank, formatClock, planEpisodes, planMovieEnd, seasonAverageLabel, seasonAverages, seasonAveragesView, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
+import { averageRating, reliableEpisodeRatings, reliableTitleRating, episodeRank, formatClock, planEpisodes, planMovieEnd, formatRatingChange, seasonAverageLabel, seasonAverages, seasonAveragesView, seasonRatingChange, seasonSegmentStates, settleSeenToggle, upcomingEpisodeLabel } from '../src/features/shows/detailPlanning.ts';
 import { buildVerifiedSimilar, directedMovies, movieIdsFromCredits, similarReasonFor } from '../src/features/shows/similarReasons.ts';
 
 test('SEENIT-UX-019 calcule « Fin à » et la soirée sans inventer de durée', () => {
@@ -61,7 +61,22 @@ test('retour terrain du 18/11 : à 2 ou 3 saisons, la moyenne vit dans la tuile 
   const pills = sections.slice(sections.indexOf('export function SeasonPills'), sections.indexOf('export function SeasonPanel'));
   assert.match(pills, /const tiles = Boolean\(averages\) && seasons\.length <= 3;/);
   assert.match(pills, /\{seasonAverageLabel\(\{ season: season\.season_number, average: 0, year: season\.air_date\?\.slice\(0, 4\) \}, seasons\.length\)\}/);
-  assert.match(pills, /RATING_TONE_TEXT\[ratingTone\(entry\.average\)\]/, 'note colorée par niveau, comme la fiche épisode');
+  // Retour suivant (« trop de couleurs ») : note en blanc et étoile or ; évolution en % colorée ; segments des cartes ;
+  // saison vue : anneau Vu en haut à droite et « Vue » au bout des segments.
+  assert.doesNotMatch(pills, /RATING_TONE_TEXT|ratingTone/, 'plus de note colorée par niveau dans la tuile');
+  assert.match(pills, /text-white"><span className="text-\[#E5A93D\]">★<\/span> \{formatRating\(entry\.average\)\}/);
+  assert.match(pills, /change > 0 \? 'text-emerald-400' : 'text-rose-400'\)\}>\{formatRatingChange\(change\)\}/);
+  assert.match(pills, /\{complete && <SeenItRing size=\{18\} className="shrink-0" \/>\}/);
+  assert.match(pills, /\{complete && <span className="text-\[11px\] font-extrabold leading-none text-\[#F2C36B\]">Vue<\/span>\}/);
+  assert.match(pills, /data-season-segments/);
+  assert.equal(seasonRatingChange(8.1, 7.5), 8);
+  assert.equal(seasonRatingChange(5.9, 8.1), -27);
+  assert.equal(seasonRatingChange(8.02, 8), null, 'écart arrondi à 0 % : rien');
+  assert.equal(seasonRatingChange(8, 0), null, 'saison précédente sans note : rien');
+  assert.equal(formatRatingChange(8), '+8 %');
+  assert.equal(formatRatingChange(-27), '−27 %');
+  assert.deepEqual(seasonSegmentStates({ season: 2, count: 6, seenKeys: ['2x1', '2x2', '1x3'], nextKey: '2x3', episodes: [{ episode_number: 5, air_date: '2026-11-29' }, { episode_number: 6, air_date: '2026-12-06' }], seasonFuture: false, today: '2026-11-18' }), ['seen', 'seen', 'current', 'unseen', 'future', 'future']);
+  assert.deepEqual(seasonSegmentStates({ season: 3, count: 0, seenKeys: [], nextKey: null, episodes: null, seasonFuture: true, today: '2026-11-18' }), ['future'], 'saison annoncée sans épisodes : un segment à venir');
   assert.match(pills, /\{future \? 'Bientôt' : 'Pas de note'\}/);
   assert.doesNotMatch(sections.slice(sections.indexOf('export function SeasonAverageChart'), sections.indexOf('export function SeasonPills')), /seasonAverageLabel|data-season-delta/, 'la courbe ne porte plus de tuiles');
   // Nom entier et année à deux tuiles, forme courte à trois ; l'année seulement si TMDB la donne.
@@ -88,8 +103,11 @@ test('retour terrain du 18/11 : à 2 ou 3 saisons, la moyenne vit dans la tuile 
   assert.doesNotMatch(panel, /seenit-episode--upcoming|line-clamp-2|repeating-linear-gradient/);
   assert.match(panel, /text-\[14px\] leading-\[1\.35\] font-bold truncate/);
   // À venir : le délai dans la ligne d'infos jusqu'à 7 jours, puis la date ; plus de délai à droite.
-  assert.match(panel, /const releaseDay = relative && relative\.includes\(' · '\) \? new Date\(/);
-  assert.doesNotMatch(panel, /const until =/);
+  // Retour suivant (« les minutes sur les non vus, dans X jours sur les à venir : pas cohérent ») : code · durée partout,
+  // puis la date de sortie d'un épisode à venir ; plus de délai relatif, et le code reste en or, sorti ou pas.
+  assert.match(panel, /const release = !aired && episode\.air_date \? new Date\(/);
+  assert.match(panel, /<>\{runtime\} min\{release \? <span data-episode-release> · <span className="max-\[379px\]:hidden">/);
+  assert.doesNotMatch(panel, /const until =|upcomingEpisodeLabel|text-sky-300'\)\}>\{episodeCode/);
 });
 
 const director = { name: 'Denis Villeneuve', movieIds: new Set([335984, 329865]) };

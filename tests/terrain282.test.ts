@@ -54,5 +54,6 @@ test('SEENIT-DOWNLOAD-019 le mode téléchargement est bleu ; le rappel et le Vu
   assert.doesNotMatch(popup, /bg-\[#E5A93D\]/);
   assert.match(read('src/components/download-dialog.css'), /\.download-dialog__quality-icon \{[^}]*color:#7dd3fc/);
   // Retour terrain du 18/11 : la cloche reste en or (contour sans fond dans la liste, pastille pleine sur la fiche épisode).
-  assert.match(read('src/components/EpisodeReminderBell.tsx'), /const on = overlay \? 'bg-\[#E5A93D\] text-black' : 'text-\[#F2C36B\] shadow-\[inset_0_0_0_2px_#E5A93D\]';/, 'la cloche reste en or');
+  assert.match(read('src/components/EpisodeReminderBell.tsx'), /reminder \? 'w-11 h-11 bg-\[#E5A93D\] text-black'/, 'la cloche reste en or');
+  assert.match(read('src/components/SeenItLogo.tsx'), /const ink = active \? 'url\(#' \+ id \+ '\)' : '#A1A1AA';/, 'liste : cloche or de l’anneau Vu quand elle est active');
 });

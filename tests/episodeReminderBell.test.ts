@@ -93,7 +93,7 @@ test('SEENIT-NOTIFICATION-009 cloche câblée sur les épisodes à venir de la f
   assert.match(bell, /if \(!available\) return null;/);
   assert.match(bell, /const press = \(event: React\.MouseEvent\) => \{ event\.stopPropagation\(\); void toggle\(\); \};/, 'la cloche n’ouvre pas l’épisode');
   assert.match(bell, /aria-pressed=\{reminder\}/);
-  assert.match(bell, /'w-11 h-11 shrink-0 rounded-full/, 'cible tactile de 44 px');
+  assert.match(bell, /icon \? 'w-12 h-12' : reminder \? 'w-11 h-11 /, 'cible tactile de 48 px dans la liste, 44 px sur la fiche épisode');
 });
 
 test('SEENIT-UX-014 carte en pause sans ligne sous le titre ; retour en vue horizontale sans marge ajoutée', () => {
