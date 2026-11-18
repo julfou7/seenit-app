@@ -80,6 +80,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
 
   const seasons = useMemo(() => seasonsOf(tmdbDetails), [tmdbDetails]);
   const averages = useMemo(() => seasonAverages(tmdbDetails?.seasons), [tmdbDetails?.seasons]);
+  const averagesView = seasonAveragesView(seasons.length, averages.length);
   const runtimeFallback = Number(tmdbDetails?.episode_run_time?.[0]) || 45;
   const genres: Array<{ id: number; name: string }> = frenchGenres(tmdbDetails?.genres); // « Reality » → « Téléréalité »
   const year = (tmdbDetails?.first_air_date || tmdbDetails?.release_date || show?.firstAirDate || '').slice(0, 4);
@@ -438,11 +439,11 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         {tmdbDetails ? <DetailSynopsis text={tmdbDetails.overview || 'Aucun synopsis disponible.'} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} /> : <div className="space-y-2 animate-pulse" aria-hidden="true"><div className="h-3.5 w-full rounded bg-zinc-800/80" /><div className="h-3.5 w-4/5 rounded bg-zinc-800/80" /></div>}
 
         {isSeries && <>
-          <SeasonAverageChart averages={averages} />
-          <SeasonPills seasons={seasons} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }}
+          {averagesView === 'chart' && <SeasonAverageChart averages={averages} />}
+          <SeasonPills seasons={seasons} averages={averagesView === 'tiles' ? averages : undefined} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }}
             downloading={canUseDownloadMode && downloadMode ? season => Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season })) : undefined} />
           {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={toggleAllHere} onSegment={pickSegment} />}
-          {selectedSeason && <SeasonPanel season={selectedSeason} averageShownAbove={seasonAveragesView(averages.length) !== 'none' && averages.some(entry => entry.season === selectedSeason.season_number)} episodes={selectedEpisodes}show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
+          {selectedSeason && <SeasonPanel season={selectedSeason} averageShownAbove={averagesView !== 'none' && averages.some(entry => entry.season === selectedSeason.season_number)} episodes={selectedEpisodes}show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
             downloadMode={canUseDownloadMode ? { active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode } : null}
             episodesHasFile={model.presence.episodesHasFile} episodesMonitored={model.presence.episodesMonitored}
             getEpisodeDownload={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)} />}

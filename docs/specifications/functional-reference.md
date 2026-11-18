@@ -527,10 +527,11 @@ Depuis le 03/11/2026 (`SEENIT-UX-019`), les fiches série, film et épisode repr
 défilement sans onglets, hero titré en or, carte de progression avec **Marquer SxxEyy vu** et une seule
 tuile diffuseur (ta plateforme choisie, sinon Plex), **Moyenne par saison** (depuis la v1.4.341 : une tuile par
 saison à deux ou trois saisons, note colorée par niveau et écart avec la précédente ; courbe à partir de quatre ;
-depuis la v1.4.342 les tuiles sont hors carte et disent « Saison 1 (2025) » à deux saisons, « S1 (2025) » à trois),
+depuis la v1.4.342 les tuiles disent « Saison 1 (2025) » à deux saisons, « S1 (2025) » à trois ; depuis la v1.4.343, à
+deux ou trois saisons, la tuile est aussi la pastille de sa saison, avec son avancement),
 pastilles de saison (anneau Vu pour une saison finie, saison choisie cerclée d'or), saison sans carte depuis la
-v1.4.342 (titre « Saison N · vus/total », petite pastille bande-annonce, **Tout marquer vu** en tête de liste avec son
-anneau dans la colonne des coches, masqué en mode téléchargement ; plus de barres de notes : elles se lisent sur la
+v1.4.342 (titre « Saison N · vus/total », petite pastille bande-annonce, **Tout marquer vu** en tête de liste, en texte
+seul depuis la v1.4.343, masqué en mode téléchargement ; plus de barres de notes : elles se lisent sur la
 fiche épisode ; sa moyenne n'est pas répétée quand **Moyenne par saison** la montre déjà ; hors mode téléchargement,
 aucun état de téléchargement sur les vignettes ni sur les pastilles de saison) et lignes d'épisode (code
 « Sxx | Eyy » coloré, durée ou date, sans note ni repère sur l'image), **Où regarder** en lignes,
@@ -576,8 +577,9 @@ sortie ») avec **Annuler** (confirmé sur place pour un téléchargement ; dép
 Chaque pastille de saison montre sa part vue en mini-barre et, avec
 Téléchargements activé, un point bleu quand un téléchargement de cette saison est actif. Un épisode
 présent dans Sonarr est reconnu comme téléchargé dans la fiche et la popup. Dans la liste d'une saison, un épisode vu
-a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »
-à droite, sans bouton Vu. Depuis les retours de la v1.4.247, le bouton
+a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir dit sous son titre quand il sort, sans bouton
+Vu (depuis la v1.4.343 : lignes à plat de même hauteur séparées par un filet, délai « Dans 4 jours » jusqu'à 7 jours
+puis la date dans la ligne d'infos, cloche seule à droite en contour or). Depuis les retours de la v1.4.247, le bouton
 or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, les genres du haut de fiche ouvrent tous les genres et
 thèmes juste sous le hero (depuis la v1.4.342, plus de rangée sous le synopsis), tout est
 traduit (genres, « Self »), Où regarder n'affiche qu'un Netflix, la barre de navigation reste visible sur la
@@ -600,7 +602,8 @@ Depuis les retours de la v1.4.251 (#857) :
   à la sortie » à la place de « Bientôt disponible » (v1.4.280, `SEENIT-NOTIFICATION-009`) ; depuis la v1.4.281,
   la fiche d'un épisode à venir propose « Télécharger à la sortie » en 1080p ou 4K
   puis « Annuler la programmation » (`SEENIT-DOWNLOAD-018`), et l'épisode suivant n'est plus entouré ; depuis
-  la v1.4.282, la cloche reste en or et, dans la fiche épisode, elle est ronde à côté de la croix ; depuis la
+  la v1.4.282, la cloche reste en or (dans la liste, contour or sans fond depuis la v1.4.343) et, dans la fiche
+  épisode, elle est ronde à côté de la croix ; depuis la
   v1.4.283, toute cloche règle les rappels de la série et montre l'état réel (allumée par défaut pour une série
   suivie quand « Sortie du jour » est activée), sans toast de confirmation (seul un échec est signalé) ;
 - la fiche épisode charge avec un squelette à son gabarit actuel, garde la barre de navigation (v1.4.282,

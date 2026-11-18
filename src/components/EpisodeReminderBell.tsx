@@ -18,11 +18,15 @@ export function EpisodeReminderBell({ show, episode, variant = 'icon' }: { show:
   // Décision du 09/11 (#910) : la cloche agit sur toute la série, son nom accessible le dit.
   const label = `${reminder ? 'Couper' : 'Activer'} les rappels de ${show?.title || 'la série'} (${code})`;
   const press = (event: React.MouseEvent) => { event.stopPropagation(); void toggle(); };
-  const idle = variant === 'overlay'
+  const overlay = variant === 'overlay';
+  const idle = overlay
     ? 'bg-[rgba(9,9,11,0.88)] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]'
-    : 'bg-[#18181b] text-zinc-400 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.14)]';
+    : 'text-zinc-400 shadow-[inset_0_0_0_2px_rgba(161,161,170,0.45)]';
+  // Retour terrain du 18/11 (« la cloche est trop visible par rapport au non vu ») : dans la liste, la cloche active est
+  // un contour or sans fond, du même poids que l'anneau Vu, et sa colonne est alignée sur les coches (48 px).
+  const on = overlay ? 'bg-[#E5A93D] text-black' : 'text-[#F2C36B] shadow-[inset_0_0_0_2px_#E5A93D]';
   return <button type="button" data-episode-reminder={code} aria-pressed={reminder} aria-busy={pending || undefined} disabled={pending} onClick={press} aria-label={label}
-    className={cn('w-11 h-11 shrink-0 rounded-full grid place-items-center active:scale-95', reminder ? 'bg-[#E5A93D] text-black' : idle)}>
+    className={cn('w-11 h-11 shrink-0 rounded-full grid place-items-center active:scale-95', !overlay && 'mx-0.5', reminder ? on : idle)}>
     {reminder ? <BellRing size={variant === 'overlay' ? 18 : 19} aria-hidden="true" /> : <Bell size={variant === 'overlay' ? 18 : 19} aria-hidden="true" />}
   </button>;
 }

@@ -285,8 +285,8 @@ pas les pixels d'une capture particulière.
   et ses lignes d'épisode s'affichent dessous.
 - L'action de masse emploie **Tout marquer vu** ou **Tout marquer non vu** selon l'intention réelle.
   Elle reste secondaire et compacte visuellement sans réduire sa compréhension. Depuis le 18/11/2026, elle ouvre
-  la liste des épisodes, son anneau aligné sur la colonne des coches qu'il remplit ; elle s'efface en mode
-  téléchargement. La saison n'est plus une carte et sa bande-annonce est une petite pastille (cible 44 px).
+  la liste des épisodes, en texte seul au-dessus de la colonne des coches ; elle s'efface en mode
+  téléchargement. Les lignes d'épisode sont à plat, de même hauteur, séparées par un filet. La saison n'est plus une carte et sa bande-annonce est une petite pastille (cible 44 px).
 - Les portraits du casting gardent `object-fit: cover` avec un cadrage vertical orienté vers le haut
   (`50% 25%`) plutôt qu'une détection de visage. Noms et rôles peuvent occuper deux lignes ; le compteur
   d'épisodes est visuellement secondaire.
