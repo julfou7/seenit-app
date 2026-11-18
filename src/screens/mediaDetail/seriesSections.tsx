@@ -36,46 +36,35 @@ export function SeriesProgressCard({ seenCount, totalEpisodes, remainingMinutes,
   </DetailCard>;
 }
 
-/** Écart avec la saison précédente, omis quand il s'arrondit à 0,0. */
-const seasonDelta = (averages: readonly SeasonAverage[], index: number): number | null => {
-  if (index === 0) return null;
-  const delta = averages[index].average - averages[index - 1].average;
-  return Math.abs(delta) >= 0.05 ? delta : null;
-};
-
 /**
  * « Moyenne par saison » (notes TMDB des saisons, SEENIT-RATING-001). Retour terrain du 18/11 : à deux ou trois saisons,
- * une tuile par saison (note colorée par niveau comme sur la fiche épisode, écart avec la précédente) ; la courbe ne
- * sert qu'à partir de quatre saisons ; rien sous deux saisons notées.
+ * une tuile par saison (note colorée par niveau comme sur la fiche épisode, écart avec la précédente, omis s'il
+ * s'arrondit à 0,0) ; la courbe ne sert qu'à partir de quatre saisons ; rien sous deux saisons notées.
  */
 export function SeasonAverageChart({ averages }: { averages: readonly SeasonAverage[] }) {
   const view = seasonAveragesView(averages.length);
   if (view === 'none') return null;
-  if (view === 'tiles') return <DetailCard className="px-3.5 py-3 flex flex-col gap-2" data-season-averages="tiles">
-    <span className="text-[15px] font-bold text-white">Moyenne par saison</span>
-    <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${averages.length}, minmax(0, 1fr))` }} role="img" aria-label={`Moyennes TMDB par saison : ${averages.map((entry, index) => { const delta = seasonDelta(averages, index); return `saison ${entry.season} ${formatRating(entry.average)}${delta === null ? '' : `, ${delta > 0 ? 'en hausse' : 'en baisse'} de ${formatRating(Math.abs(delta))}`}`; }).join(', ')}`}>
-      {averages.map((entry, index) => {
-        const delta = seasonDelta(averages, index);
-        return <div key={entry.season} data-season-average={entry.season} aria-hidden="true" className="min-w-0 rounded-xl bg-[#18181b] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] px-2.5 py-2 flex flex-col gap-1.5">
-          <span className="flex items-center justify-between gap-1 text-[11px] font-bold leading-none"><span className="text-zinc-400">S{entry.season}</span>{delta !== null && <span data-season-delta className={delta > 0 ? 'text-emerald-400' : 'text-rose-400'}>{delta > 0 ? '▲' : '▼'} {formatRating(Math.abs(delta))}</span>}</span>
-          <span className="text-[18px] font-extrabold leading-none tabular-nums whitespace-nowrap" style={{ color: RATING_TONE_TEXT[ratingTone(entry.average)] }}>★ {formatRating(entry.average)}</span>
-        </div>;
-      })}
-    </div>
-  </DetailCard>;
+  const tiles = view === 'tiles';
+  const deltas = averages.map((entry, index) => { const delta = index ? entry.average - averages[index - 1].average : 0; return Math.abs(delta) >= 0.05 ? delta : null; });
+  const label = `Moyennes TMDB par saison : ${averages.map((entry, index) => `saison ${entry.season} ${formatRating(entry.average)}${tiles && deltas[index] ? `, ${deltas[index]! > 0 ? 'en hausse' : 'en baisse'} de ${formatRating(Math.abs(deltas[index]!))}` : ''}`).join(', ')}`;
   const values = averages.map(entry => entry.average);
   const low = Math.min(...values) - 0.15, high = Math.max(...values) + 0.15;
   const x = (index: number) => 24 + index * (292 / (averages.length - 1));
   const y = (value: number) => 82 - ((value - low) / (high - low)) * 58;
-  return <DetailCard className="px-3.5 pt-3.5 pb-2 flex flex-col gap-1.5" data-season-averages="chart">
+  return <DetailCard className={cn('px-3.5 flex flex-col', tiles ? 'py-3 gap-2' : 'pt-3.5 pb-2 gap-1.5')} data-season-averages={view}>
     <span className="text-[15px] font-bold text-white">Moyenne par saison</span>
-    <div className="relative h-[110px]" role="img" aria-label={`Moyennes TMDB par saison : ${averages.map(entry => `saison ${entry.season} ${formatRating(entry.average)}`).join(', ')}`}>
+    {tiles ? <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${averages.length},minmax(0,1fr))` }} role="img" aria-label={label}>
+      {averages.map((entry, index) => <div key={entry.season} data-season-average={entry.season} aria-hidden="true" className="min-w-0 rounded-xl bg-[#18181b] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)] px-2.5 py-2 flex flex-col gap-1.5">
+        <span className="flex items-center justify-between gap-1 text-[11px] font-bold leading-none"><span className="text-zinc-400">S{entry.season}</span>{deltas[index] && <span data-season-delta className={deltas[index]! > 0 ? 'text-emerald-400' : 'text-rose-400'}>{deltas[index]! > 0 ? '▲' : '▼'} {formatRating(Math.abs(deltas[index]!))}</span>}</span>
+        <span className="text-[18px] font-extrabold leading-none tabular-nums whitespace-nowrap" style={{ color: RATING_TONE_TEXT[ratingTone(entry.average)] }}>★ {formatRating(entry.average)}</span>
+      </div>)}
+    </div> : <div className="relative h-[110px]" role="img" aria-label={label}>
       <svg viewBox="0 0 340 110" preserveAspectRatio="none" className="absolute inset-0 w-full h-full overflow-visible" aria-hidden="true">
         <polyline points={averages.map((entry, index) => `${x(index).toFixed(1)},${y(entry.average).toFixed(1)}`).join(' ')} fill="none" stroke="#E5A93D" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         {averages.map((entry, index) => <circle key={entry.season} cx={x(index)} cy={y(entry.average)} r="5" fill="#09090b" stroke="#E5A93D" strokeWidth="2.5" vectorEffect="non-scaling-stroke" />)}
       </svg>
       {averages.map((entry, index) => <React.Fragment key={`label-${entry.season}`}><span className="absolute -translate-x-1/2 text-[12px] font-extrabold leading-none text-white" style={{ left: `${(x(index) / 340) * 100}%`, top: `${y(entry.average) - 21}px` }}>{formatRating(entry.average)}</span><span className="absolute -translate-x-1/2 text-[10px] font-bold leading-none text-zinc-400" style={{ left: `${(x(index) / 340) * 100}%`, top: '96px' }}>S{entry.season}</span></React.Fragment>)}
-    </div>
+    </div>}
   </DetailCard>;
 }
 

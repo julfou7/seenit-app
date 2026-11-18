@@ -59,8 +59,8 @@ test('retour terrain du 18/11 : tuiles de moyenne à 2 ou 3 saisons, courbe à p
   assert.equal(seasonAveragesView(9), 'chart');
   const sections = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
   assert.match(sections, /const view = seasonAveragesView\(averages\.length\);/);
-  assert.match(sections, /data-season-averages="tiles"/);
-  assert.match(sections, /data-season-averages="chart"/);
+  assert.match(sections, /const tiles = view === 'tiles';/);
+  assert.match(sections, /data-season-averages=\{view\}/);
   // La note d'une tuile prend la couleur de son niveau, comme la fiche épisode.
   assert.match(sections, /RATING_TONE_TEXT\[ratingTone\(entry\.average\)\]/);
   assert.match(readFileSync(new URL('../src/screens/mediaDetail/episodeSections.tsx', import.meta.url), 'utf8'), /const TONE_TEXT = RATING_TONE_TEXT;/);

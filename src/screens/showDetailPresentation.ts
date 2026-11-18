@@ -25,7 +25,6 @@ import { LiveDownloadBanner } from '../components/LiveDownloadBanner';
 import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useMediaPresenceStore } from '../store/mediaPresenceStore';
 import { searchAndDownloadInSonarr, searchAndDownloadInRadarr } from '../services/sonarrRadarr';
-import { downloadEpisodeWithSeasonPackFallback } from '../features/downloads/episodeSeasonPackFallback';
 import { acceptDownloadRequest, beginDownloadRequest, failDownloadRequest, updateDownloadRequest } from '../features/downloads/downloadLifecycle';
 import { readUserScopedJson } from '../lib/userIsolation';
 import { mediaKeyFrom, toMediaKey } from '../features/shows/mediaRelations';
