@@ -64,14 +64,27 @@ export function planEpisodes<T>(nowMinutes: number, episodes: readonly T[], runt
 export interface SeasonAverage {
   season: number;
   average: number;
+  /** Année de diffusion de la saison (`air_date` TMDB), absente si inconnue. */
+  year?: string;
 }
 
 /** Moyennes TMDB par saison (saisons spéciales et notes absentes exclues, SEENIT-RATING-001). */
-export function seasonAverages(seasons: ReadonlyArray<{ season_number?: unknown; vote_average?: unknown }> | null | undefined): SeasonAverage[] {
+export function seasonAverages(seasons: ReadonlyArray<{ season_number?: unknown; vote_average?: unknown; air_date?: unknown }> | null | undefined): SeasonAverage[] {
   return (seasons || [])
-    .map(season => ({ season: Number(season.season_number), average: Number(season.vote_average) }))
+    .map(season => {
+      const year = typeof season.air_date === 'string' && /^\d{4}/.test(season.air_date) ? season.air_date.slice(0, 4) : '';
+      return { season: Number(season.season_number), average: Number(season.vote_average), ...(year ? { year } : {}) };
+    })
     .filter(entry => Number.isInteger(entry.season) && entry.season > 0 && Number.isFinite(entry.average) && entry.average > 0)
     .sort((a, b) => a.season - b.season);
+}
+
+/**
+ * Retour terrain du 18/11 (« affiche saison en entier pour combler le vide, et l'année : Saison 1 (2025), sinon
+ * S1 (2026) ») : à deux tuiles, le nom entier ; à trois, la forme courte ; l'année seulement si TMDB la connaît.
+ */
+export function seasonAverageLabel(entry: SeasonAverage, tiles: number): string {
+  return `${tiles <= 2 ? 'Saison ' : 'S'}${entry.season}${entry.year ? ` (${entry.year})` : ''}`;
 }
 
 /** Minimum de votes TMDB pour qu'une note d'épisode compte (retour v1.4.300 : « moyenne 10,0 » sur deux votes). */

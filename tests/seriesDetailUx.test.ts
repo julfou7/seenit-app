@@ -25,8 +25,10 @@ test('issue #216 simplifie saisons, thèmes et casting sans modifier leurs actio
   assert.match(core, /Tout marquer non vu/);
   assert.match(core, /object-\[50%_25%\]/);
   assert.match(core, /line-clamp-2/);
-  assert.match(core, /expanded && keywords\.map/);
-  assert.match(core, /`\+\$\{keywords\.length\} thèmes`/);
+  // Retour terrain du 18/11 : les genres du haut de fiche ouvrent tous les genres et thèmes, plus répétés sous le synopsis.
+  assert.match(core, /\{areThemesExpanded && <ThemesCard genres=\{genres\} keywords=\{keywords\} \/>\}/);
+  assert.match(core, /data-open-themes onClick=\{\(\) => setAreThemesExpanded\(\(expanded: boolean\) => !expanded\)\} aria-expanded=\{areThemesExpanded\} aria-controls="detail-themes"/);
+  assert.match(core, /\{keywords\.map\(\(keyword, index\) =>/);
   assert.match(core, /aria-label=\{fullyWatched \? 'Marquer toute la saison comme non vue' : 'Marquer toute la saison comme vue'\}/);
 });
 

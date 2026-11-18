@@ -526,10 +526,13 @@ dans la pile Retour.
 Depuis le 03/11/2026 (`SEENIT-UX-019`), les fiches série, film et épisode reprennent le prototype : un seul
 défilement sans onglets, hero titré en or, carte de progression avec **Marquer SxxEyy vu** et une seule
 tuile diffuseur (ta plateforme choisie, sinon Plex), **Moyenne par saison** (depuis la v1.4.341 : une tuile par
-saison à deux ou trois saisons, note colorée par niveau et écart avec la précédente ; courbe à partir de quatre),
-pastilles de saison (anneau Vu pour une saison finie, saison choisie cerclée d'or), carte de la saison sans barres de
-notes (les notes d'épisode se lisent sur la fiche épisode ; sa moyenne n'est pas répétée quand **Moyenne par saison**
-la montre déjà) et lignes d'épisode (code
+saison à deux ou trois saisons, note colorée par niveau et écart avec la précédente ; courbe à partir de quatre ;
+depuis la v1.4.342 les tuiles sont hors carte et disent « Saison 1 (2025) » à deux saisons, « S1 (2025) » à trois),
+pastilles de saison (anneau Vu pour une saison finie, saison choisie cerclée d'or), saison sans carte depuis la
+v1.4.342 (titre « Saison N · vus/total », petite pastille bande-annonce, **Tout marquer vu** en tête de liste avec son
+anneau dans la colonne des coches, masqué en mode téléchargement ; plus de barres de notes : elles se lisent sur la
+fiche épisode ; sa moyenne n'est pas répétée quand **Moyenne par saison** la montre déjà ; hors mode téléchargement,
+aucun état de téléchargement sur les vignettes ni sur les pastilles de saison) et lignes d'épisode (code
 « Sxx | Eyy » coloré, durée ou date, sans note ni repère sur l'image), **Où regarder** en lignes,
 **Personnages** (six, puis dix par dix). Une note TMDB portée par moins de 3 votes n'est pas affichée : la carte de saison dit « notes
 insuffisantes » et le haut de fiche « Notes TMDB insuffisantes » (v1.4.302). Le film affiche « Si tu lances maintenant · Fin à HH:MM »,
@@ -575,7 +578,8 @@ Téléchargements activé, un point bleu quand un téléchargement de cette sais
 présent dans Sonarr est reconnu comme téléchargé dans la fiche et la popup. Dans la liste d'une saison, un épisode vu
 a sa photo grisée, le tampon VU et son titre barré ; un épisode à venir a un fond hachuré et « Dans X jours »
 à droite, sans bouton Vu. Depuis les retours de la v1.4.247, le bouton
-or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, genres et thèmes sont sous le synopsis, tout est
+or de la série s'appelle **Voir SxxEyy** et ouvre l'épisode, les genres du haut de fiche ouvrent tous les genres et
+thèmes juste sous le hero (depuis la v1.4.342, plus de rangée sous le synopsis), tout est
 traduit (genres, « Self »), Où regarder n'affiche qu'un Netflix, la barre de navigation reste visible sur la
 fiche et une seule fiche acteur est utilisée partout (fiches, Explorer, Moi, À voir).
 La fiche acteur laisse la barre de navigation visible (changer d'onglet la ferme) ; « Vus ensemble » et sa
@@ -755,8 +759,8 @@ swipes de suppression/abandon sur les cartes.
 - Le titre d'une saison porte lui-même le repli/dépliage avec `aria-expanded`; aucun chevron séparé ne
   réduit sa largeur. L'action de progression reste distincte et se nomme explicitement **« Tout marquer
   vu »** ou **« Tout marquer non vu »**.
-- Les genres TMDB restent visibles. Les mots-clés secondaires sont repliés derrière **« +N thèmes »** et
-  peuvent être masqués à nouveau sans perdre les genres.
+- Les deux premiers genres TMDB restent visibles dans le haut de fiche. Les toucher (▾) ouvre, sous le hero, tous
+  les genres puis les thèmes secondaires (mots-clés) ; les toucher à nouveau les replie (v1.4.342).
 - Les portraits du casting utilisent un cadrage orienté vers le haut, conservent leur fallback et laissent
   le nom et le rôle occuper deux lignes. Le nombre d'épisodes reste une information discrète.
 - Les notes d'épisodes utilisent uniquement TMDB. Le graphique complet est affiché exclusivement dans

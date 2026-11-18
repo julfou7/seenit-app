@@ -88,9 +88,12 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const lastYear = (tmdbDetails?.last_air_date || '').slice(0, 4);
   const years = isSeries && year && lastYear && lastYear !== year && (rawStatus === 'Ended' || rawStatus === 'Canceled') ? `${year}–${lastYear}` : year;
   const seasonCount = tmdbDetails?.number_of_seasons || seasons.length;
-  const meta = isSeries
-    ? [years, seasonCount ? `${seasonCount} saison${seasonCount > 1 ? 's' : ''}` : '', genres.slice(0, 2).map(genre => genre.name).join(', ')].filter(Boolean).join(' · ')
-    : [year, formatDuration(tmdbDetails?.runtime), genres.slice(0, 2).map(genre => genre.name).join(', ')].filter(Boolean).join(' · ');
+  const metaHead = (isSeries ? [years, seasonCount ? `${seasonCount} saison${seasonCount > 1 ? 's' : ''}` : ''] : [year, formatDuration(tmdbDetails?.runtime)]).filter(Boolean).join(' · ');
+  // Retour terrain du 18/11 : les genres du haut de fiche s'ouvrent sur tous les genres et les thèmes secondaires,
+  // qui ne sont plus répétés sous le synopsis.
+  const genreText = genres.slice(0, 2).map(genre => genre.name).join(', ') || (keywords.length ? 'Thèmes' : '');
+  const canOpenThemes = genres.length > 2 || keywords.length > 0;
+  const meta = <>{metaHead}{metaHead && genreText ? ' · ' : ''}{canOpenThemes ? <button type="button" data-open-themes onClick={() => setAreThemesExpanded((expanded: boolean) => !expanded)} aria-expanded={areThemesExpanded} aria-controls="detail-themes" aria-label={`${genreText} : ${areThemesExpanded ? 'masquer' : 'voir'} tous les genres et thèmes`} className="relative font-semibold text-zinc-100 underline decoration-dotted decoration-zinc-400 underline-offset-4 before:absolute before:-inset-x-1 before:-inset-y-3 before:content-['']">{genreText}<span aria-hidden="true" className="ml-1 text-[#F2C36B]">{areThemesExpanded ? '▴' : '▾'}</span></button> : genreText}</>;
   // Retour v1.4.301 : une note TMDB sur une poignée de votes n'est pas affichée (« notes insuffisantes »).
   const titleRating = reliableTitleRating(tmdbDetails?.vote_average, tmdbDetails?.vote_count);
   const tmdbRating = titleRating.value !== null ? formatRating(titleRating.value) : null;
@@ -413,6 +416,7 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
       <DetailHero imageUrl={backdropUrl || posterPath} title={title} meta={tmdbDetails || year ? meta : null} height={isSeries ? 300 : 380} />
 
       <div className="px-4 pt-1.5 pb-8 flex flex-col gap-3.5">
+        {areThemesExpanded && <ThemesCard genres={genres} keywords={keywords} />}
         {/* #857 : note, âge et bande-annonce en tête, au-dessus du bouton principal (film comme série). */}
         <div className="flex flex-wrap gap-1.5 min-h-7">
           {!tmdbDetails ? <><div className="h-7 w-20 rounded-lg bg-zinc-800/80 animate-pulse" /><div className="h-7 w-14 rounded-lg bg-zinc-800/80 animate-pulse" /></> : <>
@@ -432,12 +436,11 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
         {canUseFilmMode && (filmState === 'active' || filmState === 'waiting' || filmState === 'programmed') && <div ref={filmTrackRef}><MovieDownloadTrack state={filmState} quality={filmItem?.quality} progress={Number(filmItem?.progress) || 0} timeleft={filmItem?.timeleft} waitingHint={filmItem ? availabilityHint(filmItem.availability) : undefined} onCancel={cancelFilm} /></div>}
 
         {tmdbDetails ? <DetailSynopsis text={tmdbDetails.overview || 'Aucun synopsis disponible.'} expanded={isSynopsisExpanded} onToggle={() => setIsSynopsisExpanded(!isSynopsisExpanded)} /> : <div className="space-y-2 animate-pulse" aria-hidden="true"><div className="h-3.5 w-full rounded bg-zinc-800/80" /><div className="h-3.5 w-4/5 rounded bg-zinc-800/80" /></div>}
-        <ThemesCard genres={genres} keywords={keywords} expanded={areThemesExpanded} onToggle={() => setAreThemesExpanded((expanded: boolean) => !expanded)} loading={!tmdbDetails} />
 
         {isSeries && <>
           <SeasonAverageChart averages={averages} />
           <SeasonPills seasons={seasons} show={show} selected={expandedSeason} onSelect={season => { if (season !== expandedSeason) void loadSeason(season); }}
-            downloading={canUseDownloadMode ? season => Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season })) : undefined} />
+            downloading={canUseDownloadMode && downloadMode ? season => Boolean(model.hasActiveDownloadInScope?.({ mediaType: 'tv', tmdbId: Number(effectiveTmdbId), seasonNumber: season })) : undefined} />
           {downloadMode && selectedSeason && <DownloadModeBanner season={selectedSeason.season_number} states={modeStates} progress={episode => model.getEpisodeDownload(effectiveTmdbId || undefined, tmdbDetails?.external_ids?.tvdb_id || show?.tvdbId, selectedSeason.season_number, episode)?.progress} picked={pickedEpisodes} allPicked={allPicked} canPick={selectableEpisodes.length > 0} onToggleAll={toggleAllHere} onSegment={pickSegment} />}
           {selectedSeason && <SeasonPanel season={selectedSeason} averageShownAbove={seasonAveragesView(averages.length) !== 'none' && averages.some(entry => entry.season === selectedSeason.season_number)} episodes={selectedEpisodes}show={show} nextKey={nextKey} runtimeFallback={runtimeFallback} onToggleSeason={event => toggleSeasonSeen(event, selectedSeason.season_number, selectedSeason.episode_count || 0)} onToggleEpisode={(event, episode) => toggleEpisodeSeen(event, selectedSeason.season_number, episode)} onOpenEpisode={episode => openEpisodeModal(selectedSeason.season_number, episode)} onSeasonTrailer={seasonVideos.length ? () => setTrailerModalVideos(seasonVideos) : undefined}
             downloadMode={canUseDownloadMode ? { active: downloadMode, picked: pickedEpisodes, onToggle: togglePickedEpisode } : null}

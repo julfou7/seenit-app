@@ -36,7 +36,13 @@ test('SEENIT-DOWNLOAD-014 #879 hors mode la fiche reste propre ; en mode le cont
   assert.doesNotMatch(rows, /onDownloadEpisode|onDownloadSeason/, 'plus de commande de téléchargement par ligne ni de saison');
   assert.match(rows, /\{aired && inMode && <EpisodeModeControl /);
   assert.match(rows, /\{aired && !inMode && <SeenItCheckButton /);
-  assert.match(rows, /\{downloadMode && !inMode && <EpisodePassiveChip /, 'pastille passive seulement hors mode');
+  // Retour terrain du 18/11 : hors mode, aucun état de téléchargement (ni « ✓ Prêt », ni « Programmé », ni %) ; le mode
+  // le montre déjà.
+  assert.doesNotMatch(rows, /EpisodePassiveChip/, 'plus de pastille passive hors mode');
+  assert.doesNotMatch(readFileSync('src/screens/mediaDetail/downloadMode.tsx', 'utf8'), /export function EpisodePassiveChip/);
+  assert.match(rows, /\{inMode && modeState === 'active' && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-\[3px\]/, 'barre de progression sur la vignette en mode seulement');
+  // « Tout marquer vu » vit en tête de liste, aligné sur les coches, et s'efface en mode (la colonne porte le téléchargement).
+  assert.match(rows, /\{!future && count > 0 && !inMode && <button type="button" onClick=\{onToggleSeason\} data-season-all/);
   // Retour terrain du 16/11 : en mode, un épisode non cochable ouvre sa fiche au lieu de ne rien faire.
   assert.match(rows, /const activate = \(\) => \{ if \(inMode && selectable\) downloadMode!\.onToggle\(episode\.episode_number\); else onOpenEpisode\(episode\); \}/);
   // Un seul point d'entrée visible : le bouton ⬇ de la carte de progression, sous le gate personnel.
@@ -185,6 +191,6 @@ test('SEENIT-DOWNLOAD-014 #879 les pastilles de saison montrent la part vue et u
   assert.match(pills, /data-season-bar/);
   assert.match(pills, /\{active && <i aria-hidden="true" data-season-downloading/);
   assert.match(pills, /aria-label=\{`Saison \$\{season\.season_number\}, \$\{state\}\$\{active \? ', téléchargement en cours' : ''\}`\}/);
-  // Le point n'apparaît que sous le gate téléchargement, avec la même garde que le mode.
-  assert.match(view, /downloading=\{canUseDownloadMode \? season => Boolean\(model\.hasActiveDownloadInScope\?\.\(\{ mediaType: 'tv', tmdbId: Number\(effectiveTmdbId\), seasonNumber: season \}\)\) : undefined\}/);
+  // Le point n'apparaît que sous le gate téléchargement, et seulement en mode (retour terrain du 18/11).
+  assert.match(view, /downloading=\{canUseDownloadMode && downloadMode \? season => Boolean\(model\.hasActiveDownloadInScope\?\.\(\{ mediaType: 'tv', tmdbId: Number\(effectiveTmdbId\), seasonNumber: season \}\)\) : undefined\}/);
 });
