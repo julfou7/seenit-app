@@ -66,8 +66,9 @@ test('retour terrain du 18/11 : à 2 ou 3 saisons, la moyenne vit dans la tuile 
   assert.doesNotMatch(pills, /RATING_TONE_TEXT|ratingTone/, 'plus de note colorée par niveau dans la tuile');
   assert.match(pills, /text-white"><span className="text-\[#E5A93D\]">★<\/span> \{formatRating\(entry\.average\)\}/);
   assert.match(pills, /change > 0 \? 'text-emerald-400' : 'text-rose-400'\)\}>\{formatRatingChange\(change\)\}/);
-  assert.match(pills, /\{complete && <SeenItRing size=\{18\} className="shrink-0" \/>\}/);
-  assert.match(pills, /\{complete && <span className="text-\[11px\] font-extrabold leading-none text-\[#F2C36B\]">Vue<\/span>\}/);
+  // « Mets le logo à la place du Vue, ça fait doublon » : l'anneau Vu seul, au bout des segments.
+  assert.match(pills, /\{complete && <SeenItRing size=\{16\} className="shrink-0" \/>\}/);
+  assert.doesNotMatch(pills, />Vue<\/span>/);
   assert.match(pills, /data-season-segments/);
   assert.equal(seasonRatingChange(8.1, 7.5), 8);
   assert.equal(seasonRatingChange(5.9, 8.1), -27);
@@ -106,7 +107,7 @@ test('retour terrain du 18/11 : à 2 ou 3 saisons, la moyenne vit dans la tuile 
   // Retour suivant (« les minutes sur les non vus, dans X jours sur les à venir : pas cohérent ») : code · durée partout,
   // puis la date de sortie d'un épisode à venir ; plus de délai relatif, et le code reste en or, sorti ou pas.
   assert.match(panel, /const release = !aired && episode\.air_date \? new Date\(/);
-  assert.match(panel, /<>\{runtime\} min\{release \? <span data-episode-release> · <span className="max-\[379px\]:hidden">/);
+  assert.match(panel, /<>\{runtime\} min\{release \? <span data-episode-release className="font-bold text-sky-300"> · <span className="max-\[379px\]:hidden">/);
   assert.doesNotMatch(panel, /const until =|upcomingEpisodeLabel|text-sky-300'\)\}>\{episodeCode/);
 });
 

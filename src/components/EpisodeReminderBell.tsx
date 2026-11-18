@@ -20,7 +20,7 @@ export function EpisodeReminderBell({ show, episode, variant = 'icon' }: { show:
   const label = `${reminder ? 'Couper' : 'Activer'} les rappels de ${show?.title || 'la série'} (${code})`;
   const press = (event: React.MouseEvent) => { event.stopPropagation(); void toggle(); };
   // Retour terrain du 18/11 (« la cloche est trop grosse par rapport au Vu », « aussi épaisse que Vu et Télécharger ») :
-  // dans la liste, la cloche est dessinée comme l'anneau Vu (42 px dans une cible de 48 px, même trait), or si active ;
+  // dans la liste, la cloche seule, sans rond, au trait de l'anneau Vu (42 px dans une cible de 48 px), or si active ;
   // sur la fiche épisode, elle reste une pastille ronde à côté de la croix.
   const icon = variant === 'icon';
   return <button type="button" data-episode-reminder={code} aria-pressed={reminder} aria-busy={pending || undefined} disabled={pending} onClick={press} aria-label={label}

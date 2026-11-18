@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.345**
+Version applicative : **1.4.346**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -626,8 +626,8 @@ n'est rouverte que par une nouvelle décision produit explicite.
     sa pastille, « Saison 1 (2025) » à deux et « S1 (2025) » à trois, l'année seulement si TMDB la donne ; depuis le
     retour suivant (`USR-2026-11-18-004` : « trop de couleurs », « reprendre les segments des cartes », « mieux identifier
     les saisons vues ») : note en blanc et étoile or, évolution en % par rapport à la saison notée précédente, en vert ou
-    en rouge, segments d'épisode de l'accueil (vu, prochain, non vu, à venir), et pour une saison vue l'anneau Vu en haut
-    à droite et « Vue » au bout des segments ; à partir de quatre saisons, courbe si quatre
+    en rouge, segments d'épisode de l'accueil (vu, prochain, non vu, à venir), et pour une saison vue l'anneau Vu au bout
+    des segments (sans « Vue », doublon) ; à partir de quatre saisons, courbe si quatre
     saisons au moins sont notées) ;
     pastilles de saison (sélection, jamais fermeture ; saison finie = anneau Vu de SeenIt, saison choisie
     cerclée d'or sur fond sombre, « Bientôt » en bleu) ; saison sans carte (retour du 18/11, « bloc sur bloc ») : titre
@@ -660,9 +660,9 @@ n'est rouverte que par une nouvelle décision produit explicite.
   lignes font exactement deux lignes de texte (titre sur une ligne, infos sur une ligne), à plat, sans fond ni arrondi,
   séparées par un filet. Depuis `USR-2026-11-18-004` (« pas cohérent ») : la ligne d'infos a une seule forme, « code ·
   durée », suivie pour un épisode à venir de sa date de sortie (« S02 | E04 · 50 min · dim. 22 nov. », le jour de la
-  semaine s'effaçant sous 380 px), sans délai relatif ; le code « Sxx | Eyy » reste en or, sorti ou pas (gris une fois
-  vu) ; seule la cloche reste à droite, dessinée comme l'anneau Vu (même cercle, même trait que Vu et Télécharger,
-  or quand les rappels sont actifs, gris sinon), alignée sur la colonne des coches. Les cibles tactiles restent d'au moins 44 px.
+  semaine s'effaçant sous 380 px), en bleu, sans délai relatif ; le code « Sxx | Eyy » reste en or, sorti ou pas (gris une fois
+  vu) ; seule la cloche reste à droite, sans rond (« trop imposant »), au trait de l'anneau Vu et de Télécharger,
+  or quand les rappels sont actifs, grise sinon, alignée sur la colonne des coches. Les cibles tactiles restent d'au moins 44 px.
   Retours terrain v1.4.247 (03/11/2026) :
   - le bouton or de la série est **Voir SxxEyy** : il ouvre la fiche du prochain épisode à voir, sans
     le marquer ; on le marque depuis cette fiche ;
