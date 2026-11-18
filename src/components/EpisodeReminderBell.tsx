@@ -16,8 +16,8 @@ export function EpisodeReminderBell({ show, episode, variant = 'icon' }: { show:
   const { reminder, pending, toggle, available } = useEpisodeReminder(show, episode);
   if (!available) return null;
   const code = reminderEpisodeString(episode);
-  // Décision du 09/11 (#910) : la cloche agit sur toute la série, son nom accessible le dit.
-  const label = `${reminder ? 'Couper' : 'Activer'} les rappels de ${show?.title || 'la série'} (${code})`;
+  // Retour terrain du 18/11 (« une cloche = cet épisode seul ») : son nom accessible le dit.
+  const label = `${reminder ? 'Couper' : 'Activer'} le rappel de ${code}`;
   const press = (event: React.MouseEvent) => { event.stopPropagation(); void toggle(); };
   // Retour terrain du 18/11 (« la cloche est trop grosse par rapport au Vu », « aussi épaisse que Vu et Télécharger ») :
   // dans la liste, la cloche seule, sans rond, au trait de l'anneau Vu (36 px, « un poil plus petit », dans une cible de 48 px), or si active ;

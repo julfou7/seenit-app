@@ -1,5 +1,6 @@
+import { EPISODE_REMINDER_CHANGED_EVENT } from '../features/notifications/episodeReminder';
 import { getNotificationProvider } from '../features/notifications/notificationProvider.ts';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useShowsStore } from '../store/showsStore';
 import { useToastStore } from '../store/toastStore';
 import { getUpcomingEpisodeInfo } from '../components/cards/UpcomingShowCard';
@@ -45,6 +46,14 @@ function toLocalDateKey(date: Date): string {
 export function useRemindersNotifier() {
   const shows = useShowsStore(state => state.shows);
   const { showToast } = useToastStore();
+  // Revue Codex #1099 : une cloche d'épisode ne modifie plus la série ; son événement relance la planification pour
+  // annuler ou poser l'alarme de cet épisode.
+  const [reminderRevision, setReminderRevision] = useState(0);
+  useEffect(() => {
+    const bump = () => setReminderRevision(revision => revision + 1);
+    window.addEventListener(EPISODE_REMINDER_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(EPISODE_REMINDER_CHANGED_EVENT, bump);
+  }, []);
 
   useEffect(() => {
     if (!shows || shows.length === 0) return;
@@ -81,7 +90,8 @@ export function useRemindersNotifier() {
         }
 
         const isShowNotification = s.notificationsEnabled === true || readUserScopedJson(uid, `reminder_${s.id}`, false);
-        if (!isShowNotification && s.notificationsEnabled === false) {
+        // Retour terrain du 18/11 (« une cloche = cet épisode seul ») : pour une série, le choix de l'épisode est lu plus bas.
+        if (s.mediaType === 'movie' && !isShowNotification && s.notificationsEnabled === false) {
           await prunePendingMediaReminderNotifications(s.id, s.mediaType, []);
           continue;
         }
@@ -232,9 +242,11 @@ export function useRemindersNotifier() {
         const sNum = String(upcoming.season_number).padStart(2, '0');
         const eNum = String(upcoming.episode_number).padStart(2, '0');
 
-        const isSpecificReminder = readUserScopedJson(uid, `reminder_${s.id}_S${upcoming.season_number}E${upcoming.episode_number}`, false);
-        // Retour terrain du 18/11 : un choix explicite « coupé » de la série l'emporte sur un ancien repère d'épisode.
-        if (s.notificationsEnabled === false) {
+        // Retour terrain du 18/11 (« une cloche = cet épisode seul ») : le choix posé sur l'épisode (allumé ou coupé)
+        // l'emporte sur celui de la série ; sans choix, la règle de la série s'applique.
+        const episodeChoice = readUserScopedJson<boolean | null>(uid, `reminder_${s.id}_S${upcoming.season_number}E${upcoming.episode_number}`, null);
+        const isSpecificReminder = episodeChoice === true;
+        if (episodeChoice === false || (!isSpecificReminder && !isShowNotification && s.notificationsEnabled === false)) {
           await prunePendingMediaReminderNotifications(s.id, 'tv', []);
           continue;
         }
@@ -412,5 +424,5 @@ export function useRemindersNotifier() {
     };
     processReminders().catch(err => localConsole.warn('Reminder scheduling error:', err));
     return () => { cancelled = true; };
-  }, [shows, showToast]);
+  }, [shows, showToast, reminderRevision]);
 }

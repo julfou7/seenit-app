@@ -10,6 +10,7 @@ import { useDownloadConfigStore } from '../store/downloadConfigStore';
 import { useUpdateStore } from '../store/updateStore';
 import type { LiveDownloadItem } from '../services/sonarrRadarr';
 import { getUpcomingEpisodeInfo } from './cards/UpcomingShowCard';
+import { EPISODE_REMINDER_CHANGED_EVENT, readEpisodeChoice } from '../features/notifications/episodeReminder';
 import { canOfferPlexWatchedAction } from '../features/watchlist/homePresentation';
 import { getTodayStr } from '../lib/utils';
 import { receivedEpisode, releaseReminderAlreadyReceived } from '../features/notifications/notificationDedup';
@@ -89,6 +90,13 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
     window.addEventListener('focus', collect); document.addEventListener('visibilitychange', visible);
     return () => { unsubscribe(); window.removeEventListener('focus', collect); document.removeEventListener('visibilitychange', visible); };
   }, [uid, open]);
+  // Revue Codex #1099 : une cloche d'épisode basculée rafraîchit les rappels calculés de la page.
+  const [, setReminderRevision] = useState(0);
+  useEffect(() => {
+    const bump = () => setReminderRevision(revision => revision + 1);
+    window.addEventListener(EPISODE_REMINDER_CHANGED_EVENT, bump);
+    return () => window.removeEventListener(EPISODE_REMINDER_CHANGED_EVENT, bump);
+  }, []);
   const today = getTodayStr(new Date(clock));
   const userShows = shows.filter(show => show.userId === uid);
   const notices: Notice[] = [];
@@ -101,7 +109,9 @@ export function HomeNotifications({ shows, onOpen }: { shows: Show[]; onOpen: (i
     const upcoming = getUpcomingEpisodeInfo(show);
     // Le rappel calculé n'est qu'un repli : la notification déjà reçue pour cette sortie suffit (jamais deux cartes).
     const alreadyReceived = upcoming && releaseReminderAlreadyReceived(upcoming, receivedFor(show), today, time => getTodayStr(new Date(time)));
-    if (upcoming && show.notificationsEnabled && upcoming.air_date === today && !alreadyReceived) notices.push({ id: `reminder:${show.id}:${today}`, title: show.title, detail: 'Rappel de sortie · aujourd’hui', show, episode: show.mediaType === 'tv' ? { season: upcoming.season_number, episode: upcoming.episode_number } : undefined });
+    // « Une cloche = cet épisode seul » : le choix posé sur l'épisode annoncé l'emporte sur le réglage de la série.
+    const reminderOn = upcoming && show.mediaType === 'tv' ? readEpisodeChoice(show, upcoming, uid) ?? show.notificationsEnabled === true : show.notificationsEnabled === true;
+    if (upcoming && reminderOn && upcoming.air_date === today && !alreadyReceived) notices.push({ id: `reminder:${show.id}:${today}`, title: show.title, detail: 'Rappel de sortie · aujourd’hui', show, episode: show.mediaType === 'tv' ? { season: upcoming.season_number, episode: upcoming.episode_number } : undefined });
     if (show.mediaType === 'movie' && upcoming && show.firstAirDate && show.firstAirDate >= today) notices.push({ id: `date:${show.id}:${show.firstAirDate}`, title: show.title, detail: `Sortie confirmée · ${new Date(`${show.firstAirDate}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}`, show });
   }
   for (const download of downloads) {

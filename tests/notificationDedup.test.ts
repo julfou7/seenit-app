@@ -29,7 +29,7 @@ test('Retour terrain 07/11 : un rappel de sortie déjà reçu n’apparaît pas 
 test('Retour terrain 07/11 : une notification d’épisode montre l’image de cet épisode', () => {
   const list = readFileSync('src/components/HomeNotifications.tsx', 'utf8');
   const page = readFileSync('src/components/HomeNotificationsPage.tsx', 'utf8');
-  assert.match(list, /if \(upcoming && show\.notificationsEnabled && upcoming\.air_date === today && !alreadyReceived\)/);
+  assert.match(list, /if \(upcoming && reminderOn && upcoming\.air_date === today && !alreadyReceived\)/);
   assert.match(list, /episode: show\.mediaType === 'tv' \? receivedEpisode\(item\) : undefined/);
   // Image d'épisode TMDB en priorité, visuel de la série en repli.
   assert.match(page, /return still \|\| notice\.show\?\.backdropPath \|\| notice\.show\?\.posterPath \|\| null;/);

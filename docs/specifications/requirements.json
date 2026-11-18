@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.347",
+  "applicationVersion": "1.4.348",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -183,7 +183,7 @@
         },
         {
           "file": "tests/episodeReminderBell.test.ts",
-          "contains": "SEENIT-NOTIFICATION-009 la cloche agit sur toute la série et montre les rappels réellement planifiés"
+          "contains": "SEENIT-NOTIFICATION-009 la cloche agit sur son seul épisode et montre les rappels réellement planifiés"
         },
         {
           "file": "tests/episodeReminderBell.test.ts",
