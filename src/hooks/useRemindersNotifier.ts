@@ -233,7 +233,8 @@ export function useRemindersNotifier() {
         const eNum = String(upcoming.episode_number).padStart(2, '0');
 
         const isSpecificReminder = readUserScopedJson(uid, `reminder_${s.id}_S${upcoming.season_number}E${upcoming.episode_number}`, false);
-        if (!isSpecificReminder && !isShowNotification && s.notificationsEnabled === false) {
+        // Retour terrain du 18/11 : un choix explicite « coupé » de la série l'emporte sur un ancien repère d'épisode.
+        if (s.notificationsEnabled === false) {
           await prunePendingMediaReminderNotifications(s.id, 'tv', []);
           continue;
         }

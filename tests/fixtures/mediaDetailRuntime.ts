@@ -55,6 +55,11 @@ export const getDoc = async () => ({ exists: () => false, data: () => ({}) });
 export const setDoc = async () => {};
 // Cloche des épisodes à venir (episodeReminder, 08/11) : écriture simulée, sans Firebase.
 export const deleteDoc = async () => {};
+// Retour terrain du 18/11 : couper une cloche liste les rappels de la série pour les retirer tous (aucun dans ce harnais).
+export const collection = () => [];
+export const where = () => ({});
+export const query = () => ({});
+export const getDocs = async () => ({ docs: [] as Array<{ id: string; ref: unknown }> });
 export const requestNotificationPermission = async () => null;
 export const onSnapshot = () => () => {};
 export const onAuthStateChanged = () => () => {};
