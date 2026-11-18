@@ -22,7 +22,11 @@ export function isObsoleteMediaAlert(alert: DeliveredMediaAlert, uid: string, sh
   const known = data.season !== undefined && Number.isInteger(season) && season >= 0 && Number.isInteger(episode) && episode > 0;
   if (known && show.seenEpisodes.includes(`${season}x${episode}`)) return true;
   // Revue Codex #1099 (« une cloche = cet épisode seul ») : le choix de l'épisode l'emporte sur la série coupée.
-  const choice = known ? episodeChoice?.(show, season, episode) ?? null : null;
+  // Revue Codex #1099 : l'alerte porte l'épisode à reprendre (`season`/`episode`, action « Vu ») et l'épisode annoncé
+  // (`releasedSeason`/`releasedEpisode`) ; la cloche se lit sur l'épisode annoncé, sinon sur l'épisode de l'alerte.
+  const releasedSeason = Number(data.releasedSeason), releasedEpisode = Number(data.releasedEpisode);
+  const released = data.releasedSeason !== undefined && Number.isInteger(releasedSeason) && releasedSeason >= 0 && Number.isInteger(releasedEpisode) && releasedEpisode > 0;
+  const choice = released ? episodeChoice?.(show, releasedSeason, releasedEpisode) ?? null : known ? episodeChoice?.(show, season, episode) ?? null : null;
   return choice === false || (choice !== true && show.notificationsEnabled === false);
 }
 

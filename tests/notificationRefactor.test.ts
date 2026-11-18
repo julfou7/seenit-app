@@ -85,6 +85,12 @@ test('SEENIT-NOTIFICATION-007 retire seulement les alertes exactes vues ou archi
   assert.equal(isObsoleteMediaAlert(pending, 'alice', [{ ...show, seenEpisodes: [] }], choice(false)), true, 'épisode coupé : retiré');
   assert.equal(isObsoleteMediaAlert(pending, 'alice', [{ ...coupee, isArchived: true }], choice(true)), true, 'série archivée : toujours retiré');
   assert.match(readFileSync('src/features/notifications/mediaReminderNotification.ts', 'utf8'), /isObsoleteMediaAlert\(item, uid, shows, episodeChoice\)\);/);
+  // L'alerte de E08 (annoncé) porte E02 (à reprendre) pour « Vu » : la cloche se lit sur E08.
+  const announced = { ...alert, extra: { ...alert.extra, season: 1, episode: 2, releasedSeason: 1, releasedEpisode: 8 } };
+  const onlyE08 = (_show: unknown, season: number, episode: number) => season === 1 && episode === 8 ? true : null;
+  assert.equal(isObsoleteMediaAlert(announced, 'alice', [coupee], onlyE08), false, 'E08 allumé : gardé, même si E02 est à reprendre');
+  const onlyE02Off = (_show: unknown, season: number, episode: number) => season === 1 && episode === 2 ? false : null;
+  assert.equal(isObsoleteMediaAlert(announced, 'alice', [{ ...show, seenEpisodes: [] }], onlyE02Off), false, 'E02 coupé ne retire pas l’alerte de E08');
 });
 
 test('SEENIT-NOTIFICATION-008 actualise la reprise sans inventer de disponibilité', () => {
