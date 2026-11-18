@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
-import { collection, doc, setDoc, deleteDoc, getDocs, query, where } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import type { Show } from '../../types';
 import { requestNotificationPermission, auth, db } from '../../lib/firebase';
-import { readUserScopedJson, removeUserScopedPrefix, removeUserScopedValue, writeUserScopedJson } from '../../lib/userIsolation';
+import { readUserScopedJson, writeUserScopedJson } from '../../lib/userIsolation';
 import { useShowActions } from '../../hooks/useShows';
 import { useToastStore } from '../../store/toastStore';
 import { appLogger } from '../../store/logStore';
@@ -15,8 +15,7 @@ export const reminderStorageField = (showId: string, episode: ReminderEpisode) =
 export const reminderEpisodeString = (episode: ReminderEpisode) => `S${String(episode.season_number).padStart(2, '0')}E${String(episode.episode_number).padStart(2, '0')}`;
 
 /**
- * Décision du propriétaire du 09/11 (#910) : « c'est ok si ça active toute la série, c'est mieux même ». La cloche
- * est un réglage de série, et elle montre ce qui sera réellement notifié (même règle que useRemindersNotifier) :
+ * Règle de la série, appliquée aux épisodes sans choix propre (même règle que useRemindersNotifier) :
  * - choix explicite de la série (`notificationsEnabled` vrai ou faux) ;
  * - sinon, une série suivie, ni archivée ni abandonnée, est prévenue par défaut quand la préférence « Sortie du
  *   jour » (épisodes) ou une préférence de sortie de film est active ;
@@ -30,25 +29,32 @@ export function seriesRemindersActive(show: Show | null | undefined, uid = auth.
   return show.mediaType === 'movie' ? prefs.movie_theater || prefs.movie_dvd_vod : prefs.release_today_tv;
 }
 
-/**
- * Rappel actif pour cet épisode : rappels de la série, ou rappel posé sur l'épisode lui-même. Retour terrain du 18/11
- * (« une cloche les coche toutes, mais pas toujours, c'est un peu random ») : un ancien repère d'épisode gardait sa cloche
- * allumée après « couper » sur une autre ; un choix explicite de la série (`false`) l'emporte désormais.
- */
-export function readEpisodeReminder(show: Show | null | undefined, episode: ReminderEpisode): boolean {
-  if (!show?.id || show.notificationsEnabled === false) return false;
-  if (seriesRemindersActive(show)) return true;
-  return readUserScopedJson(auth.currentUser?.uid, reminderStorageField(show.id, episode), false);
+/** Choix posé sur l'épisode lui-même : allumé (`true`), coupé (`false`) ou aucun (`null`). */
+export function readEpisodeChoice(show: Show | null | undefined, episode: ReminderEpisode, uid = auth.currentUser?.uid): boolean | null {
+  if (!show?.id) return null;
+  const value = readUserScopedJson<unknown>(uid, reminderStorageField(show.id, episode), null);
+  return typeof value === 'boolean' ? value : null;
 }
 
 /**
- * Cloche d'un épisode à venir, partagée par la carte À venir, les lignes de la fiche série et la fiche épisode
- * (retour terrain du 08/11 : pas de cloche sur un épisode à venir de la fiche). Même écriture qu'avant :
- * préférence de la série, document `users/{uid}/reminders/{showId}_SxxEyy` et repère local, avec retour
- * arrière de la préférence si l'écriture échoue ; rien n'est écrit sous un autre compte.
+ * Rappel actif pour cet épisode. Retour terrain du 18/11 (« une cloche = cet épisode seul », remplace la décision du
+ * 09/11 #910 « toute la série ») : le choix posé sur l'épisode l'emporte ; sans choix, la règle de la série s'applique
+ * (choix explicite de la série, sinon « Sortie du jour » pour une série suivie).
  */
-export async function writeEpisodeReminder(options: { target: Show; ownerUid: string; nextState: boolean; episode: ReminderEpisode; updateShow: (id: string, updates: Partial<Show>) => Promise<unknown> }): Promise<boolean> {
-  const { target, ownerUid, nextState, episode, updateShow } = options;
+export function readEpisodeReminder(show: Show | null | undefined, episode: ReminderEpisode): boolean {
+  if (!show?.id) return false;
+  return readEpisodeChoice(show, episode) ?? seriesRemindersActive(show);
+}
+
+/**
+ * Cloche d'un épisode à venir, partagée par la carte À venir, les lignes de la fiche série et la fiche épisode.
+ * Retour terrain du 18/11 : elle n'agit que sur cet épisode. Allumer écrit le document `users/{uid}/reminders/
+ * {showId}_SxxEyy` (envoyé par le serveur le jour de la sortie) ; couper le supprime ; dans les deux cas, le choix de
+ * l'épisode est gardé localement (`true` ou `false`) pour l'emporter sur la règle de la série. Rien n'est écrit sous un
+ * autre compte, et le choix local n'est posé qu'après l'écriture réussie.
+ */
+export async function writeEpisodeReminder(options: { target: Show; ownerUid: string; nextState: boolean; episode: ReminderEpisode; updateShow?: (id: string, updates: Partial<Show>) => Promise<unknown> }): Promise<boolean> {
+  const { target, ownerUid, nextState, episode } = options;
   const episodeString = reminderEpisodeString(episode);
   let fcmToken: string | null = null;
   if (nextState) {
@@ -56,47 +62,18 @@ export async function writeEpisodeReminder(options: { target: Show; ownerUid: st
     catch (error) { appLogger.warn('system', 'Autorisation des notifications indisponible', error); }
   }
   if (auth.currentUser?.uid !== ownerUid) return false;
-  // Le choix de la série devient explicite (vrai ou faux), même quand il valait la règle par défaut : couper une
-  // série prévenue par défaut écrit bien `false` (09/11).
-  const preferenceChanged = target.notificationsEnabled !== nextState;
-  try {
-    if (preferenceChanged) await updateShow(target.id, { notificationsEnabled: nextState });
-    if (auth.currentUser?.uid !== ownerUid) return false;
-    const reminderRef = doc(db, 'users', ownerUid, 'reminders', `${target.id}_${episodeString}`);
-    if (nextState) await setDoc(reminderRef, {
-      showId: target.id, showTitle: target.title, episodeString,
-      seasonNumber: episode.season_number, episodeNumber: episode.episode_number,
-      episodeTitle: episode.name || '', air_date: episode.air_date,
-      fcmToken: fcmToken || '', createdAt: Date.now(),
-    });
-    else {
-      // Retour terrain du 18/11 : couper agit sur toute la série, y compris les rappels posés avant sur d'autres épisodes
-      // (le serveur envoie chaque document `reminders` le jour de sa sortie, quel que soit le choix de la série).
-      const others = await getDocs(query(collection(db, 'users', ownerUid, 'reminders'), where('showId', '==', target.id)));
-      await Promise.all([deleteDoc(reminderRef), ...others.docs.filter(entry => entry.id !== reminderRef.id).map(entry => deleteDoc(entry.ref))]);
-    }
-  } catch (error) {
-    if (preferenceChanged && auth.currentUser?.uid === ownerUid) {
-      // Revue Codex #922 : restaurer la valeur exacte. Une série sans choix explicite (prévenue par défaut) le reste ;
-      // `undefined` est écrit `null`, que tous les lecteurs traitent comme « pas de choix ».
-      try { await updateShow(target.id, { notificationsEnabled: target.notificationsEnabled }); }
-      catch (rollbackError) { appLogger.warn('system', 'Restauration du rappel impossible', rollbackError); }
-    }
-    throw error;
-  }
+  const reminderRef = doc(db, 'users', ownerUid, 'reminders', `${target.id}_${episodeString}`);
+  if (nextState) await setDoc(reminderRef, {
+    showId: target.id, showTitle: target.title, episodeString,
+    seasonNumber: episode.season_number, episodeNumber: episode.episode_number,
+    episodeTitle: episode.name || '', air_date: episode.air_date,
+    fcmToken: fcmToken || '', createdAt: Date.now(),
+  });
+  else await deleteDoc(reminderRef);
   if (auth.currentUser?.uid !== ownerUid) return false;
-  const field = reminderStorageField(target.id, episode);
-  if (nextState) writeUserScopedJson(ownerUid, field, true);
-  else {
-    removeUserScopedValue(ownerUid, field);
-    // Ancien repère local « rappels de la série » : couper la série le retire aussi (09/11), ainsi que les repères des
-    // autres épisodes de la série (18/11).
-    removeUserScopedValue(ownerUid, `reminder_${target.id}`);
-    removeUserScopedPrefix(ownerUid, `reminder_${target.id}_S`);
-  }
+  writeUserScopedJson(ownerUid, reminderStorageField(target.id, episode), nextState);
   return true;
 }
-
 /** Écriture réussie de cette cloche, valable seulement pour la fiche sur laquelle elle a été faite. */
 export interface StoredReminder { value: boolean; basis: Show | null | undefined }
 
