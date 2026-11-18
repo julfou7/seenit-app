@@ -168,3 +168,11 @@ test('SEENIT-NOTIFICATION-009 une bascule de cloche relance la planification des
   assert.match(reminder, /const sync = \(\) => setStored\(null\);\n    window\.addEventListener\(EPISODE_REMINDER_CHANGED_EVENT, sync\);/);
   assert.match(read('src/components/cards/UpcomingShowCard.tsx'), /const sync = \(\) => setIsReminderSet\(readEpisodeReminder\(show, ep\)\);\n    window\.addEventListener\(EPISODE_REMINDER_CHANGED_EVENT, sync\);/);
 });
+
+// Revue Codex #1099 : la page Notifications lit aussi la cloche de l'épisode annoncé, et se rafraîchit à chaque bascule.
+test('SEENIT-NOTIFICATION-009 la page Notifications suit la cloche de l’épisode', () => {
+  const page = read('src/components/HomeNotifications.tsx');
+  assert.match(page, /const reminderOn = upcoming && show\.mediaType === 'tv' \? readEpisodeChoice\(show, upcoming, uid\) \?\? show\.notificationsEnabled === true : show\.notificationsEnabled === true;/);
+  assert.match(page, /if \(upcoming && reminderOn && upcoming\.air_date === today && !alreadyReceived\)/);
+  assert.match(page, /window\.addEventListener\(EPISODE_REMINDER_CHANGED_EVENT, bump\);/);
+});
