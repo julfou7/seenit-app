@@ -176,3 +176,12 @@ test('SEENIT-NOTIFICATION-009 la page Notifications suit la cloche de l’épiso
   assert.match(page, /if \(upcoming && reminderOn && upcoming\.air_date === today && !alreadyReceived\)/);
   assert.match(page, /window\.addEventListener\(EPISODE_REMINDER_CHANGED_EVENT, bump\);/);
 });
+
+// Retour terrain du 18/11 : « recocher en favoris doit tout réactiver par défaut, même celles décochées à la main ».
+test('SEENIT-NOTIFICATION-009 remettre la série en favoris réactive toutes ses cloches', async () => {
+  const { resetEpisodeChoices } = await loadModule();
+  calls.local.length = 0;
+  resetEpisodeChoices('u1', 's1');
+  assert.deepEqual(calls.local, [['prefix', 'u1:reminder_s1_S', null]], 'tous les choix d’épisode de la série oubliés');
+  assert.match(read('src/screens/ShowDetailScreenCore.tsx'), /await updateShow\(currentShow\.id, \{ isFavorite: newFav, \.\.\.\(newFav \? \{ notificationsEnabled: true \} : \{\}\), updatedAt: Date\.now\(\) \}\); if \(newFav\) resetEpisodeChoices\(auth\.currentUser\?\.uid, currentShow\.id\);/);
+});
