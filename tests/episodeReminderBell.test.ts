@@ -140,3 +140,19 @@ test('SEENIT-NOTIFICATION-009 une cloche n’allume ni ne coupe les autres épis
   assert.match(notifier, /if \(episodeChoice === false \|\| \(!isSpecificReminder && !isShowNotification && s\.notificationsEnabled === false\)\) \{/);
   Object.assign(calls, { prefs: undefined, flags: undefined });
 });
+
+// Un film n'a pas d'épisode : sa cloche (fiche acteur, carte À venir) reste le réglage du film, restauré en cas d'échec.
+test('SEENIT-NOTIFICATION-009 la cloche d’un film reste le réglage du film', async () => {
+  const { writeEpisodeReminder } = await loadModule();
+  Object.assign(calls, { uid: 'u1', switchOnPermission: false, failSet: false, failDelete: false, updates: [], writes: [], deletes: [], local: [] });
+  const updateShow = async (id: string, updates: unknown) => { calls.updates.push([id, updates]); };
+  const film = { id: 'm1', title: 'Film', mediaType: 'movie' } as never;
+  assert.equal(await writeEpisodeReminder({ target: film, ownerUid: 'u1', nextState: true, episode: { season_number: 0, episode_number: 0 }, updateShow }), true);
+  assert.deepEqual(calls.updates, [['m1', { notificationsEnabled: true }]]);
+  calls.updates.length = 0; calls.failSet = true;
+  await assert.rejects(writeEpisodeReminder({ target: film, ownerUid: 'u1', nextState: true, episode: { season_number: 0, episode_number: 0 }, updateShow }));
+  assert.deepEqual(calls.updates, [['m1', { notificationsEnabled: true }], ['m1', { notificationsEnabled: undefined }]], 'réglage du film restauré');
+  calls.failSet = false;
+  await writeEpisodeReminder({ target: { id: 's1', title: 'Série', mediaType: 'tv' } as never, ownerUid: 'u1', nextState: true, episode: { season_number: 1, episode_number: 2 }, updateShow });
+  assert.equal(calls.updates.length, 2, 'une série n’est jamais modifiée par une cloche d’épisode');
+});

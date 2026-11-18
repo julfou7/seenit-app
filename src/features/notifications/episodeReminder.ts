@@ -54,7 +54,7 @@ export function readEpisodeReminder(show: Show | null | undefined, episode: Remi
  * autre compte, et le choix local n'est posé qu'après l'écriture réussie.
  */
 export async function writeEpisodeReminder(options: { target: Show; ownerUid: string; nextState: boolean; episode: ReminderEpisode; updateShow?: (id: string, updates: Partial<Show>) => Promise<unknown> }): Promise<boolean> {
-  const { target, ownerUid, nextState, episode } = options;
+  const { target, ownerUid, nextState, episode, updateShow } = options;
   const episodeString = reminderEpisodeString(episode);
   let fcmToken: string | null = null;
   if (nextState) {
@@ -62,14 +62,26 @@ export async function writeEpisodeReminder(options: { target: Show; ownerUid: st
     catch (error) { appLogger.warn('system', 'Autorisation des notifications indisponible', error); }
   }
   if (auth.currentUser?.uid !== ownerUid) return false;
+  // Un film n'a pas d'épisode : son rappel reste le réglage du film (`notificationsEnabled`), restauré si l'écriture échoue.
+  const filmChanged = target.mediaType === 'movie' && Boolean(updateShow) && target.notificationsEnabled !== nextState;
   const reminderRef = doc(db, 'users', ownerUid, 'reminders', `${target.id}_${episodeString}`);
-  if (nextState) await setDoc(reminderRef, {
-    showId: target.id, showTitle: target.title, episodeString,
-    seasonNumber: episode.season_number, episodeNumber: episode.episode_number,
-    episodeTitle: episode.name || '', air_date: episode.air_date,
-    fcmToken: fcmToken || '', createdAt: Date.now(),
-  });
-  else await deleteDoc(reminderRef);
+  try {
+    if (filmChanged) await updateShow!(target.id, { notificationsEnabled: nextState });
+    if (auth.currentUser?.uid !== ownerUid) return false;
+    if (nextState) await setDoc(reminderRef, {
+      showId: target.id, showTitle: target.title, episodeString,
+      seasonNumber: episode.season_number, episodeNumber: episode.episode_number,
+      episodeTitle: episode.name || '', air_date: episode.air_date,
+      fcmToken: fcmToken || '', createdAt: Date.now(),
+    });
+    else await deleteDoc(reminderRef);
+  } catch (error) {
+    if (filmChanged && auth.currentUser?.uid === ownerUid) {
+      try { await updateShow!(target.id, { notificationsEnabled: target.notificationsEnabled }); }
+      catch (rollbackError) { appLogger.warn('system', 'Restauration du rappel impossible', rollbackError); }
+    }
+    throw error;
+  }
   if (auth.currentUser?.uid !== ownerUid) return false;
   writeUserScopedJson(ownerUid, reminderStorageField(target.id, episode), nextState);
   return true;
