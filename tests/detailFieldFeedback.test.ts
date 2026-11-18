@@ -135,7 +135,8 @@ test('Fiche série (08/11) : pastilles de saison avec l’anneau Vu, lignes d’
   assert.doesNotMatch(rows, /SeenItWatchedStamp|rounded-tr-md bg-black\/80/, 'image d’épisode libre : ni tampon, ni « E2 »');
   assert.doesNotMatch(rows, /★ \{formatRating\(Number\(episode\.vote_average\)\)\}/, 'la note se lit sur la fiche épisode');
   assert.ok(rows.includes("const episodeCode = `S${String(number).padStart(2, '0')} | E${String(episode.episode_number).padStart(2, '0')}`;"), 'la saison est visible dans le code de chaque épisode (#935)');
-  assert.match(rows, /<b data-episode-code className=\{cn\('font-extrabold', watched \? 'text-zinc-500' : aired \? 'text-\[#F2C36B\]' : 'text-sky-300'\)\}>\{episodeCode\}<\/b>/);
+  // Retour terrain du 18/11 : « S0X | E0X » garde la même couleur, sorti ou pas ; seul un épisode vu passe en gris.
+  assert.match(rows, /<b data-episode-code className=\{cn\('font-extrabold', watched \? 'text-zinc-500' : 'text-\[#F2C36B\]'\)\}>\{episodeCode\}<\/b>/);
   assert.match(read('src/screens/mediaDetail/downloadMode.tsx'), /<DownloadMark size=\{34\} strokeWidth=\{1\.9\} \/>/);
   assert.match(read('src/screens/mediaDetail/movieDownloadMode.tsx'), /: <DownloadMark size=\{34\} strokeWidth=\{1\.9\} \/>\}/);
 });

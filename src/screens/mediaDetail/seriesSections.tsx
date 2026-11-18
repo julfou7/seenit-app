@@ -4,7 +4,7 @@ import { episodeDownloadPresentation } from '../../features/downloads/episodeDow
 import type { LiveDownloadItem } from '../../services/sonarrRadarr';
 import { type Show } from '../../types';
 import { cn, formatAirDateSafe, getTodayStr } from '../../lib/utils';
-import { averageRating, formatRating, RATING_TONE_TEXT, ratingTone, reliableEpisodeRatings, seasonAverageLabel, seasonAveragesView, settleSeenToggle, upcomingEpisodeLabel, type SeasonAverage } from '../../features/shows/detailPlanning';
+import { averageRating, formatRating, formatRatingChange, reliableEpisodeRatings, seasonAverageLabel, seasonRatingChange, seasonSegmentStates, type EpisodeSegmentState, settleSeenToggle, type SeasonAverage } from '../../features/shows/detailPlanning';
 import { DetailCard } from './detailUi';
 import { SeenItCheckButton } from '../../components/SeenItCheckButton';
 import { CompositorCelebration } from '../../components/SeenItCheckCelebration';
@@ -64,10 +64,18 @@ export function SeasonAverageChart({ averages }: { averages: readonly SeasonAver
  * (sous le gate téléchargement). Retour terrain du 08/11 : plus de coche « vue » en texte, le même anneau Vu que
  * le reste de l'app ; la saison choisie est cerclée d'or sur fond sombre, comme le prochain épisode.
  * Retour terrain du 18/11 (« autant fusionner les deux ») : avec `averages` (deux ou trois saisons), la pastille devient
- * une tuile qui porte aussi la moyenne TMDB de sa saison : « Saison 1 (2025) » ou « S1 (2025) », note colorée par
- * niveau, écart avec la saison notée précédente (omis s'il s'arrondit à 0,0), puis l'avancement.
+ * une tuile qui porte aussi la moyenne TMDB de sa saison : « Saison 1 (2025) » ou « S1 (2025) », puis la note. Retour
+ * suivant (« trop de couleurs », « reprendre les segments des cartes », « mieux identifier les saisons vues ») : note
+ * en blanc et étoile or, évolution en % colorée, segments d'épisode de l'accueil, et pour une saison vue l'anneau Vu en
+ * haut à droite et « Vue » au bout des segments.
  */
-export function SeasonPills({ seasons, show, selected, onSelect, downloading, averages }: { seasons: readonly SeasonMeta[]; show: Show | null | undefined; selected: number | null; onSelect: (season: number) => void; downloading?: (season: number) => boolean; averages?: readonly SeasonAverage[] }) {
+const SEGMENT_STYLE: Record<EpisodeSegmentState, React.CSSProperties> = {
+  seen: { background: '#E5A93D' },
+  current: { boxShadow: 'inset 0 0 0 1.5px #fff' },
+  future: { background: 'repeating-linear-gradient(45deg,#3f3f46 0 2px,transparent 2px 5px)', boxShadow: 'inset 0 0 0 1px #3f3f46' },
+  unseen: { background: '#3f3f46' },
+};
+export function SeasonPills({ seasons, show, selected, onSelect, downloading, averages, nextKey = null, episodesOf }: { seasons: readonly SeasonMeta[]; show: Show | null | undefined; selected: number | null; onSelect: (season: number) => void; downloading?: (season: number) => boolean; averages?: readonly SeasonAverage[]; nextKey?: string | null; episodesOf?: (season: number) => ReadonlyArray<{ episode_number: number; air_date?: string | null }> | null }) {
   if (seasons.length < 2) return null;
   const today = getTodayStr();
   const tiles = Boolean(averages) && seasons.length <= 3;
@@ -81,18 +89,18 @@ export function SeasonPills({ seasons, show, selected, onSelect, downloading, av
       const seenPct = count > 0 ? Math.min(100, Math.round((seen / count) * 100)) : 0;
       const index = tiles ? averages!.findIndex(entry => entry.season === season.season_number) : -1;
       const entry = index >= 0 ? averages![index] : null;
-      const delta = entry && index > 0 && Math.abs(entry.average - averages![index - 1].average) >= 0.05 ? entry.average - averages![index - 1].average : null;
-      const rating = entry ? `, note ${formatRating(entry.average)}${delta ? `, ${delta > 0 ? 'en hausse' : 'en baisse'} de ${formatRating(Math.abs(delta))}` : ''}` : '';
+      const change = entry && index > 0 ? seasonRatingChange(entry.average, averages![index - 1].average) : null;
+      const rating = entry ? `, note ${formatRating(entry.average)}${change ? `, ${change > 0 ? 'en hausse' : 'en baisse'} de ${Math.abs(change)} %` : ''}` : '';
       const ring = on ? 'bg-[#1E1A12] shadow-[inset_0_0_0_1.5px_#E5A93D]' : 'bg-[#18181b] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]';
       const dot = active && <i aria-hidden="true" data-season-downloading className="block h-[7px] w-[7px] rounded-full bg-white" />;
       const bar = (className: string) => <span aria-hidden="true" data-season-bar className={cn('block h-[3px] overflow-hidden rounded-sm bg-zinc-700', className)}><i className="block h-full bg-[#E5A93D]" style={{ width: `${seenPct}%` }} /></span>;
       return <button type="button" key={`pill-${season.season_number}`} onClick={() => onSelect(season.season_number)} aria-pressed={on} aria-label={`Saison ${season.season_number}, ${state}${rating}${active ? ', téléchargement en cours' : ''}`} data-season-average={tiles ? season.season_number : undefined}
         className={cn(tiles ? 'min-w-0 px-3 py-2.5 rounded-xl flex flex-col gap-1.5 text-left' : 'min-w-[58px] shrink-0 h-[56px] px-2 rounded-xl flex flex-col items-center justify-center gap-px', ring)}>
         {tiles ? <>
-          <span className="flex items-center gap-1"><span className={cn('text-[12px] font-bold leading-none whitespace-nowrap', on ? 'text-[#F2C36B]' : 'text-zinc-400')}>{seasonAverageLabel({ season: season.season_number, average: 0, year: season.air_date?.slice(0, 4) }, seasons.length)}</span>{dot}</span>
-          {entry ? <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1"><b className="text-[20px] font-extrabold leading-none tabular-nums whitespace-nowrap" style={{ color: RATING_TONE_TEXT[ratingTone(entry.average)] }}>★ {formatRating(entry.average)}</b>{delta && <span data-season-delta className={cn('text-[11px] font-bold leading-none whitespace-nowrap', delta > 0 ? 'text-emerald-400' : 'text-rose-400')}>{delta > 0 ? '▲' : '▼'} {formatRating(Math.abs(delta))}</span>}</span>
+          <span className="flex items-center justify-between gap-1 min-h-[18px]"><span className={cn('text-[12px] font-bold leading-none whitespace-nowrap', on ? 'text-white' : 'text-zinc-400')}>{seasonAverageLabel({ season: season.season_number, average: 0, year: season.air_date?.slice(0, 4) }, seasons.length)}</span>{dot}{complete && <SeenItRing size={18} className="shrink-0" />}</span>
+          {entry ? <span className="flex flex-wrap items-baseline gap-x-2 gap-y-1"><b className="text-[20px] font-extrabold leading-none tabular-nums whitespace-nowrap text-white"><span className="text-[#E5A93D]">★</span> {formatRating(entry.average)}</b>{change && <span data-season-delta className={cn('text-[12px] font-bold leading-none whitespace-nowrap', change > 0 ? 'text-emerald-400' : 'text-rose-400')}>{formatRatingChange(change)}</span>}</span>
             : <span className={cn('text-[13px] font-bold leading-5', future ? 'text-sky-300' : 'text-zinc-500')}>{future ? 'Bientôt' : 'Pas de note'}</span>}
-          <span className="flex items-center gap-1.5 h-3.5">{bar('flex-1')}{complete ? <SeenItRing size={14} /> : !future && <span className="text-[11px] font-bold leading-none tabular-nums text-zinc-400">{seen}/{count}</span>}</span>
+          <span className="flex items-center gap-1.5 h-3.5"><span aria-hidden="true" data-season-segments className={cn('flex flex-1 min-w-0 h-1.5', count <= 16 && 'gap-[2px]')}>{seasonSegmentStates({ season: season.season_number, count, seenKeys: show?.seenEpisodes || [], nextKey, episodes: episodesOf?.(season.season_number) || null, seasonFuture: future, today }).map((segment, position) => <i key={position} data-segment={segment} className="flex-1 min-w-0 rounded-[2px]" style={SEGMENT_STYLE[segment]} />)}</span>{complete && <span className="text-[11px] font-extrabold leading-none text-[#F2C36B]">Vue</span>}</span>
         </> : <>
           <span className="flex items-center gap-1"><span className={cn('text-[13px] font-extrabold', on ? 'text-[#F2C36B]' : 'text-white')}>S{season.season_number}</span>{dot}</span>
           {complete ? <SeenItRing size={17} className="my-px" /> : <span className={cn('text-[10.5px] font-bold whitespace-nowrap', future ? 'text-sky-300' : on ? 'text-zinc-200' : 'text-zinc-400')}>{state}</span>}
@@ -138,16 +146,14 @@ export function SeasonPanel({ season, averageShownAbove = false, episodes, show,
         // téléchargement) ; « · prochain » dans sa ligne suffit.
         const key = `${number}x${episode.episode_number}`, watched = isSeen(episode.episode_number), isNext = key === nextKey;
         const aired = !episode.air_date || episode.air_date <= today;
-        // #857 : à venir = ligne nette (plus de demi-grisé) et libellé relatif, daté au-delà de 7 jours.
-        const relative = !aired && episode.air_date ? upcomingEpisodeLabel(episode.air_date, today) : null;
-        // Retour terrain du 18/11 (lignes de hauteur égale) : le délai rejoint la ligne d'infos jusqu'à 7 jours (« Dans 4
-        // jours »), puis la date (« sam. 13 déc. ») ; à droite, seulement la cloche.
-        const releaseDay = relative && relative.includes(' · ') ? new Date(`${episode.air_date}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }) : relative;
+        // Retour terrain du 18/11 (« sur les non vus les minutes, sur les à venir dans X jours : pas cohérent ») : une seule
+        // forme, code · durée, puis la date de sortie d'un épisode à venir (« dim. 22 nov. », le jour s'efface sous 380 px).
+        const release = !aired && episode.air_date ? new Date(`${episode.air_date}T12:00:00`) : null;
         const watchedAt = watched ? Number(show?.episodeRecords?.[key]?.watchedAt) : NaN;
         const watchedOn = watched && Number.isFinite(watchedAt) && watchedAt > 0 ? `Vu le ${new Date(watchedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : null;
         const runtime = episode.runtime || runtimeFallback;
         // Retour terrain du 08/11 puis du 18/11 : la note se lit sur la fiche épisode ; la ligne reprend le numéro
-        // (« Sxx | Eyy », or à voir, bleu à venir, gris vu) et l'image reste libre de tout repère.
+        // (« Sxx | Eyy » en or, sorti ou pas depuis le 18/11, gris vu) et l'image reste libre de tout repère.
         const episodeCode = `S${String(number).padStart(2, '0')} | E${String(episode.episode_number).padStart(2, '0')}`;
         const download = episodeDownloadPresentation(episode.episode_number, aired, Boolean(episodesHasFile?.[key]), getEpisodeDownload?.(episode.episode_number), Boolean(episodesMonitored?.[key]));
         // #879 : état unique de l'épisode pour le mode téléchargement et les pastilles passives.
@@ -164,7 +170,7 @@ export function SeasonPanel({ season, averageShownAbove = false, episodes, show,
         // #845 : seule la ligne elle-même ouvre l'épisode au clavier ; Entrée sur le bouton Vu imbriqué ne fait que le basculer.
         return <div key={`ep-${key}`} data-episode-row={episode.episode_number} role="button" tabIndex={0} onClick={activate} onKeyDown={event => { if (event.target !== event.currentTarget || (event.key !== 'Enter' && event.key !== ' ')) return; event.preventDefault(); activate(); }} aria-label={`Épisode ${episode.episode_number} : ${episode.name || ''}`} data-mode-inert={inert || undefined} className={cn('flex items-center gap-2 h-[62px] pl-1 pr-1.5 cursor-pointer border-b border-white/[0.07] last:border-b-0', inert && 'opacity-50', picked && 'rounded-[14px] border-transparent bg-[#0E1A20] shadow-[inset_0_0_0_1.5px_rgba(125,211,252,0.8)]')}>
           <span className="relative w-[76px] h-[47px] rounded-lg overflow-hidden bg-zinc-800 shrink-0">{episode.still_path && <img src={`https://image.tmdb.org/t/p/w300${episode.still_path}`} alt="" loading="lazy" decoding="async" className="w-full h-full object-cover" style={{ opacity: watched ? 0.55 : 1, filter: watched ? 'grayscale(1)' : undefined }} />}{inMode && modeState === 'active' && <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[3px] bg-black/60"><i className="block h-full bg-zinc-100" style={{ width: `${Math.max(0, Math.min(100, Number(live?.progress) || 0))}%` }} /></span>}</span>
-          <span className="flex-1 min-w-0 flex flex-col gap-[3px]"><span className={cn('text-[14px] leading-[1.35] font-bold truncate decoration-[1.5px]', watched ? 'text-zinc-500 line-through' : 'text-white')}>{episode.name || `Épisode ${episode.episode_number}`}</span><span className="text-[12px] text-zinc-400 truncate"><b data-episode-code className={cn('font-extrabold', watched ? 'text-zinc-500' : aired ? 'text-[#F2C36B]' : 'text-sky-300')}>{episodeCode}</b>{' · '}{watchedOn ? <span className="text-zinc-500">{watchedOn}</span> : releaseDay ? <span>{releaseDay}</span> : <>{runtime} min{isNext && <b className="font-extrabold text-[#F2C36B]"> · prochain</b>}</>}</span></span>
+          <span className="flex-1 min-w-0 flex flex-col gap-[3px]"><span className={cn('text-[14px] leading-[1.35] font-bold truncate decoration-[1.5px]', watched ? 'text-zinc-500 line-through' : 'text-white')}>{episode.name || `Épisode ${episode.episode_number}`}</span><span className="text-[12px] text-zinc-400 truncate"><b data-episode-code className={cn('font-extrabold', watched ? 'text-zinc-500' : 'text-[#F2C36B]')}>{episodeCode}</b>{' · '}{watchedOn ? <span className="text-zinc-500">{watchedOn}</span> : <>{runtime} min{release ? <span data-episode-release> · <span className="max-[379px]:hidden">{release.toLocaleDateString('fr-FR', { weekday: 'short' })} </span>{release.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span> : isNext && <b className="font-extrabold text-[#F2C36B]"> · prochain</b>}</>}</span></span>
           {/* #857 : même bouton Vu que l'Accueil ; #859 : animation au toucher, dessinée par le compositeur. */}
           {/* Retour terrain du 08/11 : cloche de rappel sur un épisode à venir (hors mode téléchargement). */}
           {!aired && !inMode && <EpisodeReminderBell show={show} episode={{ season_number: number, episode_number: episode.episode_number, name: episode.name, air_date: episode.air_date }} />}

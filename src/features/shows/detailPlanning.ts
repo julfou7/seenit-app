@@ -137,6 +137,31 @@ export function ratingTone(value: number): RatingTone {
   return value >= 8 ? 'top' : value >= 7 ? 'good' : value >= 6 ? 'fair' : 'poor';
 }
 
+/**
+ * Retour terrain du 18/11 (« un % peut-être », en couleurs) : évolution de la note d'une saison par rapport à la saison
+ * notée précédente, en pourcentage entier ; `null` sans note ou quand l'écart s'arrondit à 0 %.
+ */
+export function seasonRatingChange(current: number, previous: number): number | null {
+  if (!(current > 0) || !(previous > 0)) return null;
+  const percent = Math.round(((current - previous) / previous) * 100);
+  return percent === 0 ? null : percent;
+}
+export const formatRatingChange = (percent: number): string => `${percent > 0 ? '+' : '−'}${Math.abs(percent)} %`;
+
+/** Segments d'épisode d'une saison, comme sur les cartes de l'accueil : vu (or), prochain (contour), à venir, non vu. */
+export type EpisodeSegmentState = 'seen' | 'current' | 'future' | 'unseen';
+export function seasonSegmentStates({ season, count, seenKeys, nextKey, episodes, seasonFuture, today }: { season: number; count: number; seenKeys: readonly string[]; nextKey: string | null; episodes: ReadonlyArray<{ episode_number: number; air_date?: string | null }> | null; seasonFuture: boolean; today: string }): EpisodeSegmentState[] {
+  if (count <= 0) return ['future'];
+  const seen = new Set(seenKeys);
+  return Array.from({ length: count }, (_, index) => {
+    const key = `${season}x${index + 1}`;
+    if (seen.has(key)) return 'seen';
+    if (key === nextKey) return 'current';
+    const airDate = episodes?.find(episode => episode.episode_number === index + 1)?.air_date;
+    return seasonFuture || (airDate && airDate > today) ? 'future' : 'unseen';
+  });
+}
+
 /** Couleur d'une note écrite, par niveau : assez claire pour être lue sur le fond sombre (fiche épisode, moyennes de saison). */
 export const RATING_TONE_TEXT: Readonly<Record<RatingTone, string>> = { top: '#F2C36B', good: '#E5A93D', fair: '#bfa06a', poor: '#FB7185' };
 

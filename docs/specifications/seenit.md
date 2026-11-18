@@ -623,8 +623,11 @@ n'est rouverte que par une nouvelle décision produit explicite.
     **Marquer SxxEyy vu** qui marque directement le prochain épisode, une seule tuile diffuseur
     (`SEENIT-PROVIDER-003`) ; chips note TMDB, âge et bande-annonce ; synopsis ; **Moyenne par saison**
     (retour terrain du 18/11, « autant fusionner les deux » : à deux ou trois saisons, la tuile de chaque saison est aussi
-    sa pastille, « Saison 1 (2025) » à deux et « S1 (2025) » à trois, l'année seulement si TMDB la donne, note colorée
-    par niveau, écart avec la saison notée précédente et avancement ; à partir de quatre saisons, courbe si quatre
+    sa pastille, « Saison 1 (2025) » à deux et « S1 (2025) » à trois, l'année seulement si TMDB la donne ; depuis le
+    retour suivant (`USR-2026-11-18-004` : « trop de couleurs », « reprendre les segments des cartes », « mieux identifier
+    les saisons vues ») : note en blanc et étoile or, évolution en % par rapport à la saison notée précédente, en vert ou
+    en rouge, segments d'épisode de l'accueil (vu, prochain, non vu, à venir), et pour une saison vue l'anneau Vu en haut
+    à droite et « Vue » au bout des segments ; à partir de quatre saisons, courbe si quatre
     saisons au moins sont notées) ;
     pastilles de saison (sélection, jamais fermeture ; saison finie = anneau Vu de SeenIt, saison choisie
     cerclée d'or sur fond sombre, « Bientôt » en bleu) ; saison sans carte (retour du 18/11, « bloc sur bloc ») : titre
@@ -632,7 +635,7 @@ n'est rouverte que par une nouvelle décision produit explicite.
     bande-annonce de saison (cible 44 px), puis **Tout marquer vu / non vu** en texte seul (sans icône) en tête de liste,
     au-dessus de la colonne des coches et masqué en mode téléchargement ; plus de barres de notes par épisode) et lignes d'épisode
     (vignette libre de tout
-    repère, code « Sxx | Eyy » en or, bleu à venir, gris vu, puis durée ou date ; les notes d'épisode se lisent sur la
+    repère, code « Sxx | Eyy » en or, sorti ou pas, gris vu, puis durée et, à venir, date ; les notes d'épisode se lisent sur la
     fiche épisode ; coche 44 px ; retour v1.4.300 : une note d'épisode portée par moins de 3 votes TMDB ne compte
     pas dans la moyenne ; sans note fiable, la carte dit « notes insuffisantes », et la note du titre en
     haut de fiche suit la même règle (« Notes TMDB insuffisantes ») ; dans l'ordre de visionnage, un titre pas encore sorti
@@ -655,9 +658,11 @@ n'est rouverte que par une nouvelle décision produit explicite.
   épisode à venir dit sous son titre quand il sort, sans bouton Vu. Depuis le 18/11/2026 (`USR-2026-11-18-002`,
   « les tailles des épisodes varient, ce n'est pas homogène » ; « la forme arrondie fait bloc sur bloc ») : toutes les
   lignes font exactement deux lignes de texte (titre sur une ligne, infos sur une ligne), à plat, sans fond ni arrondi,
-  séparées par un filet ; à venir, la ligne d'infos porte le délai jusqu'à 7 jours (« S02 | E04 · Dans 4 jours ») puis
-  la date (« S02 | E07 · sam. 13 déc. »), et seule la cloche reste à droite, en contour or sans fond quand les rappels
-  sont actifs (gris sinon), alignée sur la colonne des coches. Les cibles tactiles restent d'au moins 44 px.
+  séparées par un filet. Depuis `USR-2026-11-18-004` (« pas cohérent ») : la ligne d'infos a une seule forme, « code ·
+  durée », suivie pour un épisode à venir de sa date de sortie (« S02 | E04 · 50 min · dim. 22 nov. », le jour de la
+  semaine s'effaçant sous 380 px), sans délai relatif ; le code « Sxx | Eyy » reste en or, sorti ou pas (gris une fois
+  vu) ; seule la cloche reste à droite, dessinée comme l'anneau Vu (même cercle, même trait que Vu et Télécharger,
+  or quand les rappels sont actifs, gris sinon), alignée sur la colonne des coches. Les cibles tactiles restent d'au moins 44 px.
   Retours terrain v1.4.247 (03/11/2026) :
   - le bouton or de la série est **Voir SxxEyy** : il ouvre la fiche du prochain épisode à voir, sans
     le marquer ; on le marque depuis cette fiche ;
