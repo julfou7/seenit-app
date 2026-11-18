@@ -6,18 +6,24 @@ export interface DeliveredMediaAlert {
   data?: Record<string, unknown>;
 }
 
-export function isObsoleteMediaAlert(alert: DeliveredMediaAlert, uid: string, shows: readonly Show[]): boolean {
+/** Choix posé sur un épisode (cloche allumée ou coupée), `null` sans choix ; fourni par l'appelant. */
+export type EpisodeChoiceReader = (show: Show, season: number, episode: number) => boolean | null;
+
+export function isObsoleteMediaAlert(alert: DeliveredMediaAlert, uid: string, shows: readonly Show[], episodeChoice?: EpisodeChoiceReader): boolean {
   const data = alert.extra || alert.data || {};
   // Ne jamais retirer un téléchargement en cours ni une alerte d'un autre compte.
   if (data.ownerUid !== uid || data.notificationScope !== 'media') return false;
   const show = shows.find(item => item.userId === uid && item.mediaType === data.mediaType
     && String(item.id) === String(data.showId));
   if (!show) return false;
-  if (show.isArchived || show.status === 'dropped' || show.notificationsEnabled === false) return true;
-  if (show.mediaType === 'movie') return show.seenEpisodes.includes('movie');
+  if (show.isArchived || show.status === 'dropped') return true;
+  if (show.mediaType === 'movie') return show.notificationsEnabled === false || show.seenEpisodes.includes('movie');
   const season = Number(data.season), episode = Number(data.episode);
-  return data.season !== undefined && Number.isInteger(season) && season >= 0
-    && Number.isInteger(episode) && episode > 0 && show.seenEpisodes.includes(`${season}x${episode}`);
+  const known = data.season !== undefined && Number.isInteger(season) && season >= 0 && Number.isInteger(episode) && episode > 0;
+  if (known && show.seenEpisodes.includes(`${season}x${episode}`)) return true;
+  // Revue Codex #1099 (« une cloche = cet épisode seul ») : le choix de l'épisode l'emporte sur la série coupée.
+  const choice = known ? episodeChoice?.(show, season, episode) ?? null : null;
+  return choice === false || (choice !== true && show.notificationsEnabled === false);
 }
 
 export function isSameVisibleMediaAlert(left: DeliveredMediaAlert, right: DeliveredMediaAlert): boolean {

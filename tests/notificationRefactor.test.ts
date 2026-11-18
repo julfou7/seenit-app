@@ -75,6 +75,16 @@ test('SEENIT-NOTIFICATION-007 retire seulement les alertes exactes vues ou archi
   assert.equal(isSameVisibleMediaAlert(alert, { ...alert, id: 456, extra: { ...alert.extra, episode: 3 } }), true);
   assert.equal(isSameVisibleMediaAlert(alert, { ...alert, extra: { ...alert.extra, ownerUid: 'bob' } }), false);
   assert.equal(isObsoleteMediaAlert({ ...alert, extra: { ...alert.extra, season: 0, episode: 1 } }, 'alice', [{ ...show, seenEpisodes: ['0x1'] }]), true);
+  // Revue Codex #1099 (« une cloche = cet épisode seul ») : série coupée mais épisode allumé, l'alerte reste ; épisode
+  // coupé dans une série prévenue, elle part ; archivage et visionnage l'emportent toujours.
+  const coupee = { ...show, seenEpisodes: [], notificationsEnabled: false };
+  const pending = { ...alert, extra: { ...alert.extra, episode: 5 } };
+  const choice = (value: boolean | null) => () => value;
+  assert.equal(isObsoleteMediaAlert(pending, 'alice', [coupee], choice(true)), false, 'épisode allumé : gardé malgré la série coupée');
+  assert.equal(isObsoleteMediaAlert(pending, 'alice', [coupee], choice(null)), true, 'sans choix : la série coupée décide');
+  assert.equal(isObsoleteMediaAlert(pending, 'alice', [{ ...show, seenEpisodes: [] }], choice(false)), true, 'épisode coupé : retiré');
+  assert.equal(isObsoleteMediaAlert(pending, 'alice', [{ ...coupee, isArchived: true }], choice(true)), true, 'série archivée : toujours retiré');
+  assert.match(readFileSync('src/features/notifications/mediaReminderNotification.ts', 'utf8'), /isObsoleteMediaAlert\(item, uid, shows, episodeChoice\)\);/);
 });
 
 test('SEENIT-NOTIFICATION-008 actualise la reprise sans inventer de disponibilité', () => {

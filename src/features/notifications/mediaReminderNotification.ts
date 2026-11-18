@@ -7,7 +7,8 @@ import {
   type NativeNotificationOptions,
 } from '../../lib/firebase';
 import { resolveMediaReminderSchedule } from './mediaReminderSchedule';
-import { isObsoleteMediaAlert } from './notificationLifecycle.ts';
+import { isObsoleteMediaAlert, type EpisodeChoiceReader } from './notificationLifecycle.ts';
+import { readUserScopedJson } from '../../lib/userIsolation.ts';
 import type { Show } from '../../types.ts';
 import { recordClientOperationalSignal } from '../logging/clientOperationalDiagnostics.ts';
 import {
@@ -219,14 +220,16 @@ export async function sendMediaReminderNotification(
 /** Retire les alertes vues/archivées sans toucher aux téléchargements ni aux autres UID. */
 export async function reconcileDeliveredMediaAlerts(uid: string, shows: readonly Show[]): Promise<void> {
   if (!Capacitor.isNativePlatform() || auth.currentUser?.uid !== uid) return;
+  // Revue Codex #1099 : le choix posé sur un épisode (cloche) l'emporte sur la série coupée.
+  const episodeChoice: EpisodeChoiceReader = (show, season, episode) => { const value = readUserScopedJson<unknown>(uid, `reminder_${show.id}_S${season}E${episode}`, null); return typeof value === 'boolean' ? value : null; };
   try {
     const delivered = await LocalNotifications.getDeliveredNotifications();
     if (auth.currentUser?.uid !== uid) return;
-    const obsolete = delivered.notifications.filter(item => isObsoleteMediaAlert(item, uid, shows));
+    const obsolete = delivered.notifications.filter(item => isObsoleteMediaAlert(item, uid, shows, episodeChoice));
     if (obsolete.length) await LocalNotifications.removeDeliveredNotifications({ notifications: obsolete });
     const pending = await LocalNotifications.getPending();
     if (auth.currentUser?.uid !== uid) return;
-    const staleReminders = pending.notifications.filter(item => item.extra?.reminderPurpose === 'tonight' && isObsoleteMediaAlert(item, uid, shows));
+    const staleReminders = pending.notifications.filter(item => item.extra?.reminderPurpose === 'tonight' && isObsoleteMediaAlert(item, uid, shows, episodeChoice));
     if (staleReminders.length) await LocalNotifications.cancel({ notifications: staleReminders.map(item => ({ id: item.id })) });
   } catch { /* Un panneau indisponible ne bloque pas le planificateur. */ }
 }
