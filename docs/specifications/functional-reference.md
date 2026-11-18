@@ -529,7 +529,8 @@ défilement sans onglets, hero titré en or, carte de progression avec **Marquer
 tuile diffuseur (ta plateforme choisie, sinon Plex), **Moyenne par saison** (depuis la v1.4.341 : une tuile par
 saison à deux ou trois saisons, note colorée par niveau et écart avec la précédente ; courbe à partir de quatre ;
 depuis la v1.4.342 les tuiles disent « Saison 1 (2025) » à deux saisons, « S1 (2025) » à trois ; depuis la v1.4.343, à
-deux ou trois saisons, la tuile est aussi la pastille de sa saison ; depuis la v1.4.345 : note blanche et étoile or,
+deux ou trois saisons, la tuile est aussi la pastille de sa saison, quatre rangées alignées d'une tuile à l'autre depuis la
+v1.4.349 ; depuis la v1.4.345 : note blanche et étoile or,
 évolution en % colorée, segments d'épisode de l'accueil, anneau Vu au bout des segments pour une saison vue),
 pastilles de saison (anneau Vu pour une saison finie, saison choisie cerclée d'or), saison sans carte depuis la
 v1.4.342 (titre « Saison N · vus/total », petite pastille bande-annonce, **Tout marquer vu** en tête de liste, en texte
@@ -612,7 +613,8 @@ Depuis les retours de la v1.4.251 (#857) :
   v1.4.283, la cloche montre l'état réel (allumée par défaut pour une série suivie quand « Sortie du jour » est
   activée), sans toast de confirmation (seul un échec est signalé) ; depuis la v1.4.348, chaque cloche n'agit que sur
   son épisode : son choix (allumé ou coupé) l'emporte sur la règle de la série et relance aussitôt la planification
-  des notifications de l'appareil (alarme posée ou annulée) ;
+  des notifications de l'appareil (alarme posée ou annulée) ; depuis la v1.4.349, remettre la série en favoris (cœur)
+  oublie ces choix d'épisode : toutes les cloches de la série se rallument, même celles coupées à la main ;
 - la fiche épisode charge avec un squelette à son gabarit actuel, garde la barre de navigation (v1.4.282,
   ouverte depuis À voir comme depuis la fiche série) et ne change d'épisode que sur un geste nettement
   horizontal : un défilement vertical en biais n'y change plus d'épisode (`SEENIT-UX-008`).

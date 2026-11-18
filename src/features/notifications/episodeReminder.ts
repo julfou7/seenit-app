@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import type { Show } from '../../types';
 import { requestNotificationPermission, auth, db } from '../../lib/firebase';
-import { readUserScopedJson, writeUserScopedJson } from '../../lib/userIsolation';
+import { readUserScopedJson, removeUserScopedPrefix, writeUserScopedJson } from '../../lib/userIsolation';
 import { useShowActions } from '../../hooks/useShows';
 import { useToastStore } from '../../store/toastStore';
 import { appLogger } from '../../store/logStore';
@@ -90,6 +90,15 @@ export async function writeEpisodeReminder(options: { target: Show; ownerUid: st
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(EPISODE_REMINDER_CHANGED_EVENT));
   return true;
 }
+/**
+ * Retour terrain du 18/11 (« recocher en favoris doit tout réactiver par défaut, même celles décochées à la main ») :
+ * oublie les choix posés sur les épisodes de la série, qui reprennent tous la règle de la série.
+ */
+export function resetEpisodeChoices(uid: string | null | undefined, showId: string): void {
+  removeUserScopedPrefix(uid, `reminder_${showId}_S`);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(EPISODE_REMINDER_CHANGED_EVENT));
+}
+
 /** Écriture réussie de cette cloche, valable seulement pour la fiche sur laquelle elle a été faite. */
 export interface StoredReminder { value: boolean; basis: Show | null | undefined }
 

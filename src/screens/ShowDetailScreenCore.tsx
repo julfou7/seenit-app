@@ -14,7 +14,7 @@ import { EpisodeRatingsChart } from '../components/EpisodeRatingsChart';
 import { useShows } from '../hooks/useShows';
 import { useToastStore } from '../store/toastStore';
 import { syncSingleItem } from '../hooks/useDetailsSyncWorker';
-import { auth, db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase'; import { resetEpisodeChoices } from '../features/notifications/episodeReminder';
 import { doc, setDoc } from 'firebase/firestore';
 import { appLogger } from '../store/logStore';
 import { TrailerModal } from '../components/TrailerModal';
@@ -101,7 +101,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
   });
   const [keywords, setKeywords] = useState<string[]>(getKeywordsFromDetails(cachedInitialDetails, requestedMediaType));
   const [activeTab, setActiveTab] = useState<'about' | 'episodes' | 'casting'>('about');
-  const [seasonsCache, setSeasonsCache] = useState<Record<number, any>>({});
+  const [seasonsCache, setSeasonsCache] = useState<Record<number, import('./mediaDetail/showDetailViewModel').SeasonCacheEntry>>({});
   const [expandedSeason, setExpandedSeason] = useState<number | null>(null);
   const [selectedEpisode, setSelectedEpisode] = useState<{season: number, episode: any} | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
@@ -889,7 +889,7 @@ export function ShowDetailScreen({ showId, tmdbId: externalTmdbId, mediaType: ex
       return;
     }
     if (currentShow.id) {
-      await updateShow(currentShow.id, { isFavorite: newFav, ...(newFav ? { notificationsEnabled: true } : {}), updatedAt: Date.now() });
+      await updateShow(currentShow.id, { isFavorite: newFav, ...(newFav ? { notificationsEnabled: true } : {}), updatedAt: Date.now() }); if (newFav) resetEpisodeChoices(auth.currentUser?.uid, currentShow.id); // 18/11 : favori = toutes les cloches
       showToast(newFav ? `« ${currentShow.title} » ${isSeries ? 'ajoutée' : 'ajouté'} aux favoris • Notifications activées 🔔` : `« ${currentShow.title} » ${isSeries ? 'retirée' : 'retiré'} des favoris`, 'favorite', currentShow);
     }
   };

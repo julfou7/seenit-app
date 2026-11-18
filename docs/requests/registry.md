@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-18-008 | 2026-11-18 | « Recocher en favoris doit tout réactiver par défaut, même celles que j'avais décochées manuellement » : remettre une série en favoris oublie les choix de cloche de ses épisodes. | `SEENIT-NOTIFICATION-009` | active |
 | USR-2026-11-18-007 | 2026-11-18 | Retour 1.4.347 : « si je coupe E05 ça me coupe tout », « je mets E08 et tous les autres, avant et après, passent avec la cloche » — choix du propriétaire : **une cloche = cet épisode seul**. Remplace la décision du 09/11 (#910, « toute la série ») et `USR-2026-11-18-006`. | `SEENIT-NOTIFICATION-009` | active |
 | USR-2026-11-18-006 | 2026-11-18 | « Bug sur les cloches, des fois une les coche toutes, mais pas toujours, c'est un peu random » : couper une cloche coupe toute la série, anciens rappels d'épisode compris (écran, notifications locales et rappels serveur) ; cloche « un poil plus petite ». | `SEENIT-NOTIFICATION-009` | remplacée par USR-2026-11-18-007 |
 | USR-2026-11-18-005 | 2026-11-18 | Retour 1.4.345 : « mets le logo à la place du Vue, ça fait doublon » ; cloche « enlève le rond, c'est trop imposant, laisse que la cloche » ; date de sortie « pas en gris ». | `SEENIT-UX-019`, `SEENIT-NOTIFICATION-009` | active |
