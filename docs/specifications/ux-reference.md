@@ -294,8 +294,8 @@ pas les pixels d'une capture particulière.
   conservée pour audit, elle est affichée en information secondaire et reste disponible au lecteur
   d'écran ; elle n'est jamais présentée comme une certification française.
 - Les notes visibles utilisent **TMDB uniquement** conformément à `SEENIT-RATING-001`. La fiche ne
-  préchauffe plus IMDb/OMDb et n'affiche plus de badge IMDb. **Moyenne par saison** et les barres de la
-  saison utilisent `vote_average` TMDB ; il n'y a plus d'onglets (un seul défilement, `SEENIT-UX-019`)
+  préchauffe plus IMDb/OMDb et n'affiche plus de badge IMDb. **Moyenne par saison**, la moyenne de la
+  carte saison et les notes de la fiche épisode utilisent `vote_average` TMDB ; il n'y a plus d'onglets (un seul défilement, `SEENIT-UX-019`)
   et chaque épisode garde une cible de 44 px (ligne et coche).
 
 Ces règles décrivent le runtime commun PWA/APK. Les captures 360/412 px, le clavier, le texte agrandi

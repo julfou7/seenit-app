@@ -391,7 +391,7 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   `vote_average` / `vote_count` du film, de la série ou de l'épisode exact. SeenIt ne normalise et ne
   substitue jamais une note IMDb à une note TMDB.
 - Les graphiques de notes d'une série utilisent uniquement les valeurs TMDB disponibles : **Moyenne par
-  saison** (`seasons[].vote_average`), barres de la saison sélectionnée et courbe de la fiche épisode
+  saison** (`seasons[].vote_average`), moyenne de la carte saison et notes de la fiche épisode
   (`episode.vote_average`). Une note absente est ignorée, jamais estimée. Ils vivent dans la section
   saisons de la fiche série et dans la fiche épisode (`SEENIT-UX-019`), conservent les nombres comme
   information principale et utilisent la couleur seulement comme renfort. Chaque épisode reste atteignable
@@ -621,13 +621,16 @@ n'est rouverte que par une nouvelle décision produit explicite.
   durée · genres), puis :
   - **Série** : carte de progression (épisodes vus, temps restant, un segment par saison), bouton or
     **Marquer SxxEyy vu** qui marque directement le prochain épisode, une seule tuile diffuseur
-    (`SEENIT-PROVIDER-003`) ; chips note TMDB, âge et bande-annonce ; synopsis ; **Moyenne par saison** ;
+    (`SEENIT-PROVIDER-003`) ; chips note TMDB, âge et bande-annonce ; synopsis ; **Moyenne par saison**
+    (retour terrain du 18/11 : une tuile par saison à deux ou trois saisons, note colorée par niveau et écart avec la
+    précédente ; courbe à partir de quatre ; rien sous deux saisons notées) ;
     pastilles de saison (sélection, jamais fermeture ; saison finie = anneau Vu de SeenIt, saison choisie
-    cerclée d'or sur fond sombre, « Bientôt » en bleu) ; carte de la saison (barres de notes,
-    **Tout marquer vu / non vu**, bande-annonce de saison) et lignes d'épisode (vignette libre de tout
-    repère, code « Sxx | Eyy » en or, bleu à venir, gris vu, puis durée ou date ; la note reste dans les
-    barres de la saison ; coche 44 px ; retour v1.4.300 : une note d'épisode portée par moins de 3 votes TMDB ne compte
-    ni dans la moyenne ni dans les barres ; sans note fiable, la carte dit « notes insuffisantes », et la note du titre en
+    cerclée d'or sur fond sombre, « Bientôt » en bleu) ; carte de la saison (avancement, moyenne seulement si la saison
+    n'est pas déjà dans **Moyenne par saison**, **Tout marquer vu / non vu**, bande-annonce de saison ; plus de barres de
+    notes par épisode depuis le 18/11) et lignes d'épisode (vignette libre de tout
+    repère, code « Sxx | Eyy » en or, bleu à venir, gris vu, puis durée ou date ; les notes d'épisode se lisent sur la
+    fiche épisode ; coche 44 px ; retour v1.4.300 : une note d'épisode portée par moins de 3 votes TMDB ne compte
+    pas dans la moyenne ; sans note fiable, la carte dit « notes insuffisantes », et la note du titre en
     haut de fiche suit la même règle (« Notes TMDB insuffisantes ») ; dans l'ordre de visionnage, un titre pas encore sorti
     ou sans date est « À venir », jamais « À voir ») ; **Où regarder** en lignes ; **Personnages** (personnage,
     épisodes, présence, interprète ; six, puis dix par dix) ; univers TVDB ; catégories et thèmes ; Reddit.

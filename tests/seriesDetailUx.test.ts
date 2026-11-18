@@ -41,7 +41,7 @@ test('SEENIT-RATING-001 affiche les notes de saison et d’épisode uniquement d
   const seriesSections = readFileSync(new URL('../src/screens/mediaDetail/seriesSections.tsx', import.meta.url), 'utf8');
   const episodeSections = readFileSync(new URL('../src/screens/mediaDetail/episodeSections.tsx', import.meta.url), 'utf8');
   const planning = readFileSync(new URL('../src/features/shows/detailPlanning.ts', import.meta.url), 'utf8');
-  // Moyenne par saison : seasons[].vote_average TMDB ; barres de saison : episode.vote_average TMDB.
+  // Moyenne par saison : seasons[].vote_average TMDB ; moyenne de la carte saison et notes de la fiche épisode : episode.vote_average TMDB.
   assert.match(core, /seasonAverages\(tmdbDetails\?\.seasons\)/);
   assert.match(planning, /vote_average/);
   // Retour v1.4.300 : les notes d'épisode passent par reliableEpisodeRatings (TMDB seul, minimum de votes).
