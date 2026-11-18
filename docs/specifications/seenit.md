@@ -667,7 +667,11 @@ n'est rouverte que par une nouvelle décision produit explicite.
   - tout est en français : genres traduits par identifiant TMDB (« Reality » → « Téléréalité ») et rôles
     génériques traduits et accordés (« Self » → « Lui-même » / « Elle-même », « (voice) » → « · voix ») ;
   - **Où regarder** dédoublonne les plateformes par nom (« Netflix » et « Netflix Standard with Ads » ne
-    font qu'un), sur la fiche comme sur l'épisode ;
+    font qu'un), sur la fiche comme sur l'épisode ; depuis le 18/11/2026 (`USR-2026-11-18-003`, Dexter: Resurrection :
+    « Apple TV n'est pas du tout diffuseur », « Prime ne fait que du on demand »), une chaîne vendue par une boutique
+    (« Paramount+ Amazon Channel », « Paramount Plus Apple TV Channel », Roku, YouTube) est le service qu'elle vend :
+    elle prend son nom et se range sous lui, le service direct gardant son logo et son identifiant ; la boutique
+    (Prime Video, Apple TV+) n'apparaît jamais à ce titre ;
   - **SEENIT-PLEX-013** (#255) — la ligne Plex d'une **série** porte sa couverture : « Sur <serveur> · 1 épisode
     sur 34 » quand le serveur possède moins d'épisodes que TMDB n'en a diffusé (hors spéciaux), « · 34
     épisodes » sinon, rien quand le décompte est inconnu. Le mot « complet » n'est jamais affiché : le décompte
