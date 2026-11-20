@@ -247,6 +247,12 @@ Il passe par `scripts/audit-production-dependencies.cjs` (même seuil high). Dé
 expirée, un autre paquet ou tout autre avis high/critical bloque toujours. À l'expiration, mettre à jour la
 dépendance ou obtenir une nouvelle décision explicite du propriétaire.
 
+L'audit natif (`scripts/audit-native-dependencies.cjs`) inclut les dépendances de développement
+Capacitor. Son processus est limité à 120 secondes, sans relance automatique. Un timeout, un code
+de sortie inattendu, un rapport JSON invalide ou une erreur du registre bloque la validation avec
+un diagnostic borné : code technique reconnu et explication contrôlée, sans sortie brute ni secret.
+Les avis natifs high/critical restent bloquants, indépendamment des acceptations de production.
+
 Un push sur `main` **ne publie jamais automatiquement une APK**. La poursuite automatique vers
 `/release-terrain` vient du mandat du chantier utilisateur, pas d'un déclencheur aveugle à chaque merge.
 

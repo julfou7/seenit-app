@@ -2718,6 +2718,10 @@
         },
         {
           "file": "tests/nativeDependencyAudit.test.ts",
+          "contains": "SEENIT-RELEASE-002 borne et diagnostique les audits natifs indisponibles sans secret"
+        },
+        {
+          "file": "tests/nativeDependencyAudit.test.ts",
           "contains": "SEENIT-RELEASE-002 branche le contrôle natif dans la validation et la release"
         },
         {
