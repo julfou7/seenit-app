@@ -2003,6 +2003,8 @@ implémentées restent suivis par #178 à #181 et #15 ; ce document ne vaut pas 
   l'APK. L'audit des dépendances de production est limité aux changements de dépendances, au contrôle
   périodique et aux releases. Le runtime natif Capacitor est également audité, même déclaré dans
   `devDependencies` : une alerte high/critical Android/iOS ou un rapport invalide bloque la livraison.
+  L'audit natif est borné à 120 secondes ; une panne de processus, de registre ou de JSON reste
+  bloquante et produit un diagnostic court sans URL, jeton ni contenu brut du registre (#728).
   Le parseur HTTP Express utilise une version corrigée de body-parser (branche 1.x : au moins
   1.20.9, GHSA-27r3-jxmh-p828). Le smoke du serveur construit vérifie que des octets résiduels
   après un corps compressé JSON ou formulaire ne terminent pas le processus.
