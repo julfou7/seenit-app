@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { Show } from '../src/types.ts';
-import { characterSearchSubtitle, characterUniverseLabel } from '../src/features/discover/characters.ts';
+import { characterSearchSubtitle, characterTotalLabel, characterUniverseLabel, performerWorkSummary } from '../src/features/discover/characters.ts';
 import { buildCachedTrackedCharacterResults } from '../src/features/discover/characterSearch.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -45,4 +45,24 @@ test('SEENIT-DISCOVER-004 retour du 21/11 : la fiche défile au-dessus de la bar
   assert.notEqual(characterSearchSubtitle(venom), characterSearchSubtitle(nwh));
   assert.equal(characterSearchSubtitle({ universe: '', actors: [], works: [] }), '');
   assert.match(read('src/components/DiscoverSearchResults.tsx'), /<small>\{characterSearchSubtitle\(character\)\}<\/small>/);
+});
+
+test('SEENIT-DISCOVER-004 retour du 21/11 : fiche personnage au style de l’app, photos, interprètes compacts et barre de navigation', () => {
+  const film = (id: number, title: string) => ({ key: `movie:${id}`, id, type: 'movie' as const, title, poster: null, creditCount: 1 });
+  const works = [film(671, 'Harry Potter à l’école des sorciers'), film(672, 'Harry Potter et la Chambre des secrets'), { key: 'tv:250307', id: 250307, type: 'tv' as const, title: 'Harry Potter', poster: null, creditCount: 8 }];
+  // Plus de liste de huit titres dans la ligne d'un interprète : un décompte, ou le titre seul.
+  assert.equal(performerWorkSummary({ id: 1, name: 'Daniel Radcliffe', photo: null, works: ['movie:671', 'movie:672'] }, works), '2 films');
+  assert.equal(performerWorkSummary({ id: 2, name: 'Dominic McLaughlin', photo: null, works: ['tv:250307'] }, works), 'Harry Potter');
+  assert.equal(performerWorkSummary({ id: 3, name: 'Mixte', photo: null, works: ['movie:671', 'tv:250307'] }, works), '2 œuvres');
+  // « 8 épisodes » pour huit films et une série : le total dit apparitions quand films et séries se mêlent.
+  assert.equal(characterTotalLabel(works.slice(0, 2), true), 'films');
+  assert.equal(characterTotalLabel(works, true), 'apparitions');
+  assert.equal(characterTotalLabel([works[2]], true), 'épisodes');
+  const sheet = read('src/components/CharacterDetailModal.tsx');
+  assert.match(sheet, /className="character-overlay" data-media-layer=""/, 'la barre de navigation reste visible sur la fiche');
+  assert.match(sheet, /className="history-entry-list character-parcours"/, 'le parcours reprend les cartes de l’Historique');
+  assert.match(sheet, /<article className="history-entry character-work"/);
+  assert.match(sheet, /detail\.actors\[0\]\?\.photo \? <img src=\{'https:\/\/image\.tmdb\.org\/t\/p\/w185'\+detail\.actors\[0\]\.photo\}/, 'photo de l’interprète au lieu des initiales');
+  assert.match(read('src/components/bottomNav.css'), /:not\(\[data-media-layer\]\)\) \.bottom-nav-shell\{display:none\}/);
+  assert.match(read('src/screens/explorer.css'), /\.character-overlay \.character-sheet\{padding-bottom:calc\(6rem \+ var\(--seenit-safe-area-bottom/, 'la dernière carte défile au-dessus de la barre de navigation');
 });

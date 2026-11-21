@@ -133,14 +133,7 @@
 .character-stats .is-gold strong{color:#F2C36B}
 .character-sheet h2{font-size:14px;font-weight:800;color:#fafafa;margin:18px 0 10px}
 .character-status{font-size:11px;color:#a1a1aa;line-height:1.5;padding:6px 0}
-.character-works{display:flex;flex-direction:column;gap:10px}
-.character-works>button{display:flex;align-items:center;gap:10px;min-height:88px;width:100%;border-radius:12px;padding:10px;text-align:left;background:#141417}
-.character-works img,.character-work-poster{width:44px;height:66px;object-fit:cover;border-radius:6px;flex-shrink:0;background:#E5A93D12}
-.character-works button>div{flex:1;min-width:0}
-.character-works strong{font-size:13px;font-weight:700;color:var(--seenit-media-title);display:block}
-.character-works small{font-size:10px;color:#71717a;display:block;margin:3px 0}
-.character-works em{font-style:normal;font-size:10px;font-weight:700;color:#F2C36B}
-.character-progress{height:3px;border-radius:4px;background:#ffffff14;margin:7px 0 4px;overflow:hidden}
+.character-progress{height:3px;border-radius:4px;background:#ffffff14;margin:4px 0 2px;overflow:hidden;max-width:180px}
 .character-progress i{height:100%;display:block;background:#E5A93D}
 .character-neighbors{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .character-neighbors button{display:flex;flex-direction:column;align-items:center;min-height:100px;text-align:center}
@@ -165,14 +158,9 @@
 .character-actors strong{font-size:14px}
 .character-stats>div{padding:10px;border-radius:12px}
 .character-stats strong{font-size:21px}
-.character-works>button{border-radius:16px;background:#18181bb3;border:1px solid #ffffff14}
-.character-works img,.character-work-poster{width:48px;height:72px;border-radius:8px}
 .character-work-title{display:flex;align-items:flex-start;gap:8px}
 .character-work-title strong{flex:1;font-size:15px;line-height:1.3}
 .character-work-title small{flex-shrink:0;font-size:11px;white-space:nowrap}
-.character-works button>div>small{font-size:12px;line-height:1.45}
-.character-works em{font-size:12px;color:#d4d4d8}
-.character-works em.is-gold{color:#F2C36B}
 .character-progress{height:4px}
 .character-neighbors span{width:56px;height:56px}
 .character-neighbors [data-available=true] span{border:1.5px solid #E5A93D}
@@ -187,3 +175,21 @@
 .explorer-hero-search>svg{color:#F2C36B;flex-shrink:0}
 .explorer-hero-search>span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .explorer-hero-rank{display:inline-flex;align-items:center;height:24px;padding:0 9px;border-radius:7px;background:#E5A93D;color:#000;font-size:13px;font-weight:800;line-height:1}
+
+/* Retour terrain du 21/11 : fiche personnage au style de l'app (photos, interprètes compacts, parcours en cartes
+   de l'Historique) et barre de navigation conservée. */
+.character-overlay .character-sheet{padding-bottom:calc(6rem + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px)))}
+.character-avatar{position:relative;overflow:visible}
+.character-avatar[data-photo=true]{background:#141417;border-color:#E5A93D88}
+.character-avatar>img:first-child{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:11px}
+.character-avatar-extra{position:absolute;right:calc(-10px + var(--extra-index) * -26px);bottom:-10px;width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid #09090b;box-shadow:0 0 0 1px #E5A93D66}
+.character-identity p{font-size:12px;letter-spacing:.02em}
+.character-identity h1{font-size:28px}
+.character-actors button>div{gap:2px}
+.character-actors strong{font-size:15px}
+.character-actors small{font-size:12px;color:#a1a1aa}
+.character-actors button>span{width:44px;height:44px}
+.character-parcours .history-entry-host::before{display:none}
+.character-parcours .history-entry__text h3{color:var(--seenit-media-title)}
+.character-parcours .history-entry__text p{font-size:13px;font-weight:700;color:#d4d4d8}
+.character-parcours .history-entry__text p.is-gold{color:#F2C36B}
