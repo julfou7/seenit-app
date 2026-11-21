@@ -71,6 +71,22 @@ export function characterSearchSubtitle(character: Pick<CharacterRecord, 'univer
  const where = character.universe || character.works[0]?.title || '';
  return [where, character.actors[0]?.name].filter(Boolean).join(' · ');
 }
+/**
+ * Retour terrain du 21/11 : ligne d'un interprète sur la fiche personnage. Un titre seul reste nommé ; au-delà, un
+ * décompte (« 8 films », « 2 séries », « 9 œuvres ») remplace la liste complète des titres, qui faisait un gros bloc.
+ */
+export function performerWorkSummary(actor: CharacterActor, works: readonly CharacterWork[]): string {
+ const own = works.filter(work => actor.works?.includes(work.key));
+ if (own.length <= 1) return own[0]?.title || '';
+ const kind = own.every(work => work.type === 'movie') ? 'films' : own.every(work => work.type === 'tv') ? 'séries' : 'œuvres';
+ return own.length + ' ' + kind;
+}
+/** Libellé du total de la fiche : films seuls, épisodes seuls, ou apparitions quand films et séries se mêlent. */
+export function characterTotalLabel(works: readonly Pick<CharacterWork, 'type'>[], complete: boolean): string {
+ if (works.length > 0 && works.every(work => work.type === 'movie')) return 'films';
+ if (works.some(work => work.type === 'movie')) return complete ? 'apparitions' : 'crédits';
+ return complete ? 'épisodes' : 'ép. crédités';
+}
 /** #398 : œuvres où un interprète joue ce personnage, par clé exacte, dans l'ordre du parcours. */
 export const performerWorkTitles = (actor: CharacterActor, works: readonly CharacterWork[]) =>
  works.filter(work => actor.works?.includes(work.key)).map(work => work.title).join(' · ');

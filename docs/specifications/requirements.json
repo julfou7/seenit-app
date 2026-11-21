@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.350",
+  "applicationVersion": "1.4.351",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -4043,6 +4043,10 @@
         {
           "file": "tests/characterSheetAnomalies.test.ts",
           "contains": "SEENIT-DISCOVER-004 retour du 21/11 : la fiche défile au-dessus de la barre Android et deux Eddie Brock se distinguent"
+        },
+        {
+          "file": "tests/characterSheetAnomalies.test.ts",
+          "contains": "SEENIT-DISCOVER-004 retour du 21/11 : fiche personnage au style de l’app, photos, interprètes compacts et barre de navigation"
         },
         {
           "file": "tests/characters.test.ts",

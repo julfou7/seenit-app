@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-21-002 | 2026-11-21 | Fiche personnage refaite au style de l'app : parcours en cartes de l'Historique (sans l'heure), plus de gros bloc de titres sous l'interprète, barre de navigation présente, photos au lieu des initiales. | `SEENIT-DISCOVER-004` | active |
 | USR-2026-11-21-001 | 2026-11-21 | Retour terrain : la fiche personnage de Venom ne défile pas jusqu'en bas (dernière carte sous la barre Android) ; deux « Eddie Brock » identiques dans la recherche. | `SEENIT-DISCOVER-004` | active |
 | USR-2026-11-18-008 | 2026-11-18 | « Recocher en favoris doit tout réactiver par défaut, même celles que j'avais décochées manuellement » : remettre une série en favoris oublie les choix de cloche de ses épisodes. | `SEENIT-NOTIFICATION-009` | active |
 | USR-2026-11-18-007 | 2026-11-18 | Retour 1.4.347 : « si je coupe E05 ça me coupe tout », « je mets E08 et tous les autres, avant et après, passent avec la cloche » — choix du propriétaire : **une cloche = cet épisode seul**. Remplace la décision du 09/11 (#910, « toute la série ») et `USR-2026-11-18-006`. | `SEENIT-NOTIFICATION-009` | active |

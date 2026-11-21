@@ -21,7 +21,7 @@ test('SEENIT-UX-020 #874 un seul jeton « titre média » en or, utilisé par to
   assert.match(explorer, /\.explorer-row-text strong\{font-size:15px;font-weight:600;line-height:1\.35;color:#d4d4d8;/);
   assert.match(explorer, /\.explorer-row-text mark\{color:#F2C36B;font-weight:800;background:transparent\}/);
   // Fiche personnage (Son parcours), fiche acteur (Vus ensemble, filmographie), saga et franchise, fiche épisode, Télécharger.
-  assert.match(explorer, /\.character-works strong\{[^}]*color:var\(--seenit-media-title\)/);
+  assert.match(explorer, /\.character-parcours \.history-entry__text h3\{color:var\(--seenit-media-title\)\}/);
   // Retour v1.4.295 : la fiche acteur reprend la carte d'Explorer (GridMediaCard), donc le même jeton or.
   assert.equal((read('src/components/MovieActorProfile.tsx').match(/<GridMediaCard media=\{toMedia\(credit\)\}/g) || []).length, 2);
   assert.doesNotMatch(read('src/components/movieActorProfile.css'), /--seenit-media-title:#fff/);
