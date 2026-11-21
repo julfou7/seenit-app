@@ -115,6 +115,13 @@ async function testWatchNextHarness(client, root) {
     await check(client, '(()=>{const more=document.querySelector(".actor-profile__filmography [data-load-more]")?.textContent||"";return more.includes("Afficher les 9")&&!more.includes("en attente")})()', 'filmographie : le seul « Afficher plus » de l’app, sans compte répété (#873, 08/11)');
     await click(client, '.actor-profile__filmography [data-load-more]');
     await check(client, 'document.querySelectorAll(".actor-profile__grid > .actor-profile__card").length>9', 'filmographie neuf puis neuf');
+    // #1102 : clic réel du footer sur la fiche acteur, pas seulement un callback isolé.
+    await check(client, 'document.querySelector(\'[data-actor-credit="movie:281957"] button[aria-label="Ajouter The Revenant"]\')', 'The Revenant dans Sa filmographie : bouton Ajouter présent');
+    await evaluate(client, 'window.__watch18c.telemetry.holdAddNext=true');
+    await evaluate(client, '(()=>{const button=document.querySelector(\'[data-actor-credit="movie:281957"] button[aria-label="Ajouter The Revenant"]\');button.click();button.click()})()');
+    await check(client, 'window.__watch18c.snapshot().filter(show=>show.tmdbId===281957 && show.mediaType==="movie").length===1', 'double clic Ajouter : une seule fiche exacte The Revenant suivie');
+    await evaluate(client, 'window.__watch18c.releaseAddWrite()');
+    await check(client, 'document.querySelector(\'[data-actor-credit="movie:281957"].actor-profile__todo-row .actor-profile__bookmark\')', 'The Revenant rejoint À voir dans la même fiche après ajout');
     await click(client, '.actor-profile__heart');
     await check(client, 'document.querySelector(".actor-profile__heart").getAttribute("aria-pressed")==="true"', 'favori écrit dans le vrai store partagé');
     await click(client, '.actor-profile__add');

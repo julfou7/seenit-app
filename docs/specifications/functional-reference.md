@@ -592,7 +592,9 @@ chaîne Paramount+), la barre de navigation reste visible sur la
 fiche et une seule fiche acteur est utilisée partout (fiches, Explorer, Moi, À voir).
 La fiche acteur laisse la barre de navigation visible (changer d'onglet la ferme) ; « Vus ensemble » et sa
 filmographie prennent la carte habituelle de Ma liste et d'Explorer, et ses filtres Tout · Films · Séries · Non vus
-les pastilles de l'accueil.
+les pastilles de l'accueil. Les footers « Ajouter » suivent un média par type + TMDB ID exact ; les
+états de suivi des cartes déjà ajoutées sont actionnables et « Commencer/Continuer » ouvre la fiche.
+Depuis #1102, aucun footer n'est un bouton visuellement actif mais sans callback.
 Depuis les retours de la v1.4.251 (#857) :
 - la note TMDB, l'âge et le bouton entier **Bande-annonce** sont en tête de fiche, au-dessus de
   **Marquer vu** (film) ou de la carte de progression (série) ;

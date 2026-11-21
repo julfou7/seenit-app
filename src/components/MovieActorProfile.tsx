@@ -6,6 +6,7 @@ import { LoadMore, useRevealFocus } from './cards/HomeLoadMore';
 import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { useToastStore } from '../store/toastStore';
 import { useShowActions } from '../hooks/useShows';
+import { useShowsStore } from '../store/showsStore';
 import { auth } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
 import { tmdb, type TMDBMedia } from '../features/shows/tmdb';
@@ -52,11 +53,12 @@ const BLANK_ORIGIN = { id: '', userId: '', tmdbId: 0, title: '', mediaType: 'mov
 export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, historyMode = 'local' }: Props) {
   const uid = auth.currentUser?.uid;
   const favorite = useFavoritePeopleStore(state => state.people.some(person => person.id === actor.id));
-  const { addShow } = useShowActions();
+  const { addShow, updateShow } = useShowActions();
   const [person, setPerson] = useState(() => cachedActorPerson(uid, actor.id));
   const [credits, setCredits] = useState<ActorCredit[]>([]);
   const [error, setError] = useState(false), [attempt, setAttempt] = useState(0);
   const [adding, setAdding] = useState<string | null>(null);
+  const pendingCardAction = useRef<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'movie' | 'tv'>('all');
   const [onlyUnseen, setOnlyUnseen] = useState(false), [limit, setLimit] = useState(9);
   // Retour terrain v1.4.295 : la barre de navigation reste visible ; changer d'onglet ferme la fiche, comme les autres fiches.
@@ -137,12 +139,40 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
     if (!id || auth.currentUser?.uid !== uid) throw new Error('Ajout non confirmé');
     return { ...data, id, userId: uid };
   };
-  const add = async (credit: ActorCredit) => {
-    if (adding) return;
-    setAdding(actorCreditKey(credit));
-    try { await track(credit); if (auth.currentUser?.uid === uid) useToastStore.getState().showToast('Ajouté à ta liste', 'info'); }
-    catch { if (auth.currentUser?.uid === uid) useToastStore.getState().showToast('Ajout impossible. Réessaie.', 'error'); }
-    finally { if (live.current) setAdding(null); }
+  // Les lignes « À voir avec… » et les footers des cartes partagent la même action.
+  // Un verrou synchrone empêche deux intentions pendant l'attente de la confirmation.
+  const runCardAction = async (credit: ActorCredit, operation: () => Promise<unknown>, message: string) => {
+    if (pendingCardAction.current || !uid || auth.currentUser?.uid !== uid) return;
+    pendingCardAction.current = actorCreditKey(credit);
+    setAdding(pendingCardAction.current);
+    try {
+      await operation();
+      if (auth.currentUser?.uid === uid) useToastStore.getState().showToast(message, 'info');
+    } catch {
+      if (auth.currentUser?.uid === uid) useToastStore.getState().showToast('Action impossible. Réessaie.', 'error');
+    } finally {
+      pendingCardAction.current = null;
+      if (live.current) setAdding(null);
+    }
+  };
+  const add = (credit: ActorCredit) => runCardAction(credit, () => track(credit), 'Ajouté à ta liste');
+  const toggleWatched = (credit: ActorCredit) => {
+    if (!uid || auth.currentUser?.uid !== uid) return;
+    // L'identité canonique n'utilise ni le titre ni le rôle joué.
+    const current = useShowsStore.getState().shows.find(show => show.mediaType === credit.media_type && Number(show.tmdbId) === credit.id);
+    if (!current) return;
+    const at = Date.now();
+    if (credit.media_type === 'tv') {
+      return runCardAction(credit, () => updateShow(current.id, { status: 'plan_to_watch', seenEpisodes: [], isArchived: false, updatedAt: at }), 'Série remise dans « À voir »');
+    }
+    const seen = current.status === 'completed' || current.seenEpisodes?.includes('movie');
+    const episodes = current.seenEpisodes || [];
+    return runCardAction(credit, () => updateShow(current.id, {
+      status: seen ? 'plan_to_watch' : 'completed',
+      seenEpisodes: seen ? episodes.filter(key => key !== 'movie') : [...new Set([...episodes, 'movie'])],
+      ...(!seen ? { lastWatchedAt: at, episodeRecords: { ...(current.episodeRecords || {}), movie: { ...(current.episodeRecords?.movie || {}), watchedAt: at } } } : {}),
+      updatedAt: at,
+    }), seen ? 'Film marqué comme non vu' : 'Film marqué comme vu');
   };
   const provider = (credit: ActorCredit) => {
     const data = tmdb.peekWatchProviders(credit.id, credit.media_type) || readWatchProviderCache(credit.id, credit.media_type, { allowStale: true })?.data;
@@ -173,8 +203,8 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
           const end = credit.media_type === 'movie' ? movieEndTime(Date.now(), movieRuntime(show || {} as Show, details)) : null;
           return <div className="actor-profile__todo-row" data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)}><button type="button" className="actor-profile__todo-media" onClick={() => navigate(credit)}>{credit.poster_path && <img src={imageUrl(credit.poster_path)!} alt="" loading="lazy" />}<span><strong>{credit.title || credit.name}</strong><small>{provider(credit)}<span>{[actorRole(credit.character, person?.gender), credit.media_type === 'movie' ? end?.label ? end.label.replace(/^fin /, 'fin à ') : '' : details?.number_of_seasons ? `${details.number_of_seasons} saison${details.number_of_seasons > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ')}</span></small></span></button>{show ? <span className="actor-profile__bookmark" aria-label="Dans ta liste"><Bookmark size={20} fill="currentColor" /></span> : <button type="button" className="actor-profile__add" disabled={adding !== null} onClick={() => void add(credit)}><Plus size={15} />{adding === actorCreditKey(credit) ? 'Ajout…' : 'À voir'}</button>}</div>;
         })}</div></section>}
-        {sections.seen.length > 0 && <section><h3>Vus ensemble</h3><div className="actor-profile__seen">{sections.seen.map(credit => <div className="actor-profile__card" data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)}><GridMediaCard media={toMedia(credit)} show={inList.get(actorCreditKey(credit))} onShowClick={() => navigate(credit)} /><small>{actorRole(credit.character, person?.gender)}</small></div>)}</div></section>}
-        {sections.rest.length > 0 && <section ref={filmographyReveal.containerRef} className="actor-profile__filmography"><h3>Sa filmographie</h3>{(bothTypes || gridHasSeen) && <div className="actor-profile__tabs" role="group" aria-label="Filtrer la filmographie">{bothTypes && (['all', 'movie', 'tv'] as const).map(type => <button key={type} type="button" aria-pressed={filter === type} onClick={() => { setFilter(type); setLimit(9); }}>{type === 'all' ? 'Tout' : type === 'movie' ? 'Films' : 'Séries'}</button>)}{gridHasSeen && <button type="button" aria-pressed={onlyUnseen} onClick={() => { setOnlyUnseen(value => !value); setLimit(9); }}>Non vus</button>}</div>}<div className="actor-profile__grid">{grid.slice(0, limit).map(credit => <div className="actor-profile__card" data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)}><GridMediaCard media={toMedia(credit)} show={inList.get(actorCreditKey(credit))} onShowClick={() => navigate(credit)} /><small>{actorRole(credit.character, person?.gender)}</small></div>)}</div><LoadMore previews={grid.slice(limit, limit + 3).map(credit => ({ key: actorCreditKey(credit), initial: (credit.title || credit.name || '?')[0], imagePath: credit.poster_path }))} remainingCount={grid.length - limit} step={9} onLoad={() => { filmographyReveal.focusItem(limit); setLimit(value => value + 9); }} /></section>}
+        {sections.seen.length > 0 && <section><h3>Vus ensemble</h3><div className="actor-profile__seen">{sections.seen.map(credit => <div className="actor-profile__card" data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)}><GridMediaCard media={toMedia(credit)} show={inList.get(actorCreditKey(credit))} onShowClick={() => navigate(credit)} onAddClick={() => { void add(credit); }} onToggleWatched={() => { void toggleWatched(credit); }} /><small>{actorRole(credit.character, person?.gender)}</small></div>)}</div></section>}
+        {sections.rest.length > 0 && <section ref={filmographyReveal.containerRef} className="actor-profile__filmography"><h3>Sa filmographie</h3>{(bothTypes || gridHasSeen) && <div className="actor-profile__tabs" role="group" aria-label="Filtrer la filmographie">{bothTypes && (['all', 'movie', 'tv'] as const).map(type => <button key={type} type="button" aria-pressed={filter === type} onClick={() => { setFilter(type); setLimit(9); }}>{type === 'all' ? 'Tout' : type === 'movie' ? 'Films' : 'Séries'}</button>)}{gridHasSeen && <button type="button" aria-pressed={onlyUnseen} onClick={() => { setOnlyUnseen(value => !value); setLimit(9); }}>Non vus</button>}</div>}<div className="actor-profile__grid">{grid.slice(0, limit).map(credit => <div className="actor-profile__card" data-actor-credit={actorCreditKey(credit)} key={actorCreditKey(credit)}><GridMediaCard media={toMedia(credit)} show={inList.get(actorCreditKey(credit))} onShowClick={() => navigate(credit)} onAddClick={() => { void add(credit); }} onToggleWatched={() => { void toggleWatched(credit); }} /><small>{actorRole(credit.character, person?.gender)}</small></div>)}</div><LoadMore previews={grid.slice(limit, limit + 3).map(credit => ({ key: actorCreditKey(credit), initial: (credit.title || credit.name || '?')[0], imagePath: credit.poster_path }))} remainingCount={grid.length - limit} step={9} onLoad={() => { filmographyReveal.focusItem(limit); setLimit(value => value + 9); }} /></section>}
         {error && <p className="actor-profile__error">Certains détails sont indisponibles. <button type="button" onClick={() => { setError(false); setAttempt(value => value + 1); }}>Réessayer</button></p>}
         {person?.biography && <Biography text={person.biography} />}
       </div>

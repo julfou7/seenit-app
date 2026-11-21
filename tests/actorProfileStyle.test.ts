@@ -21,6 +21,11 @@ test('SEENIT-UX-019 fiche acteur : barre de navigation visible, cartes et filtre
   // Plus l'ancien glyphe Vu : la carte habituelle porte l'état Vu actuel.
   assert.doesNotMatch(profile, /SeenGlyph/);
   assert.equal((profile.match(/<GridMediaCard media=\{toMedia\(credit\)\}/g) || []).length, 2);
+  // #1102 : aucun footer d'acteur n'est présenté sans action.
+  assert.equal((profile.match(/onAddClick=\{\(\) => \{ void add\(credit\); \}\}/g) || []).length, 2);
+  assert.equal((profile.match(/onToggleWatched=\{\(\) => \{ void toggleWatched\(credit\); \}\}/g) || []).length, 2);
+  assert.match(profile, /pendingCardAction\.current = actorCreditKey\(credit\)/);
+  assert.match(profile, /show\.mediaType === credit\.media_type && Number\(show\.tmdbId\) === credit\.id/);
   // Filtres au style des pastilles de l'accueil, « Non vus » compris.
   assert.match(profile, /aria-pressed=\{onlyUnseen\}/);
   assert.doesNotMatch(profile, /type="checkbox"/);
