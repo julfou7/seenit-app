@@ -62,7 +62,10 @@ test('SEENIT-DISCOVER-004 retour du 21/11 : fiche personnage au style de l’app
   assert.match(sheet, /className="character-overlay" data-media-layer=""/, 'la barre de navigation reste visible sur la fiche');
   assert.match(sheet, /className="history-entry-list character-parcours"/, 'le parcours reprend les cartes de l’Historique');
   assert.match(sheet, /<article className="history-entry character-work"/);
-  assert.match(sheet, /detail\.actors\[0\]\?\.photo \? <img src=\{'https:\/\/image\.tmdb\.org\/t\/p\/w185'\+detail\.actors\[0\]\.photo\}/, 'photo de l’interprète au lieu des initiales');
+  assert.match(sheet, /detail\.actors\[0\]\?\.photo \? <img className="character-avatar-photo" src=\{'https:\/\/image\.tmdb\.org\/t\/p\/w185'\+detail\.actors\[0\]\.photo\}/, 'photo de l’interprète au lieu des initiales');
+  // Revue Codex #1105 : le plein format ne vise que la photo principale, jamais un médaillon devenu premier enfant.
+  assert.match(read('src/screens/explorer.css'), /\.character-avatar-photo\{position:absolute;inset:0/);
+  assert.doesNotMatch(read('src/screens/explorer.css'), /\.character-avatar>img:first-child/);
   assert.match(read('src/components/bottomNav.css'), /:not\(\[data-media-layer\]\)\) \.bottom-nav-shell\{display:none\}/);
   assert.match(read('src/screens/explorer.css'), /\.character-overlay \.character-sheet\{padding-bottom:calc\(6rem \+ var\(--seenit-safe-area-bottom/, 'la dernière carte défile au-dessus de la barre de navigation');
 });

@@ -181,7 +181,7 @@
 .character-overlay .character-sheet{padding-bottom:calc(6rem + var(--seenit-safe-area-bottom, env(safe-area-inset-bottom, 0px)))}
 .character-avatar{position:relative;overflow:visible}
 .character-avatar[data-photo=true]{background:#141417;border-color:#E5A93D88}
-.character-avatar>img:first-child{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:11px}
+.character-avatar-photo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:11px}
 .character-avatar-extra{position:absolute;right:calc(-10px + var(--extra-index) * -26px);bottom:-10px;width:38px;height:38px;border-radius:50%;object-fit:cover;border:2px solid #09090b;box-shadow:0 0 0 1px #E5A93D66}
 .character-identity p{font-size:12px;letter-spacing:.02em}
 .character-identity h1{font-size:28px}

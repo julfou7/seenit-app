@@ -57,7 +57,7 @@ export function CharacterDetailModal({ character, shows, onClose, onPersonClick,
       onClick={() => writeUserScopedJson(uid,'favorite-characters', favorites.includes(detail.id) ? favorites.filter(id => id !== detail.id) : [...favorites,detail.id])}><Heart size={20} fill={favorites.includes(detail.id) ? 'currentColor' : 'none'} /></button>
     </header>
     {/* Retour terrain du 21/11 : la photo de l'interprète principal (et des suivants en médaillons) remplace les initiales. */}
-    <div className="character-identity"><span className="character-avatar" data-photo={Boolean(detail.actors[0]?.photo)}>{detail.actors[0]?.photo ? <img src={'https://image.tmdb.org/t/p/w185'+detail.actors[0].photo} alt="" /> : characterInitials(detail.name)}
+    <div className="character-identity"><span className="character-avatar" data-photo={Boolean(detail.actors[0]?.photo)}>{detail.actors[0]?.photo ? <img className="character-avatar-photo" src={'https://image.tmdb.org/t/p/w185'+detail.actors[0].photo} alt="" /> : characterInitials(detail.name)}
      {detail.actors.slice(1,3).filter(actor => actor.photo).map((actor,index) => <img key={actor.id} className="character-avatar-extra" style={{ '--extra-index': index } as CSSProperties} src={'https://image.tmdb.org/t/p/w92'+actor.photo} alt="" />)}</span><div>
      <p>{detail.universe ? 'Personnage · univers ' + detail.universe : 'Personnage'}</p><h1>{detail.name}</h1>
      {detail.aliases.filter(alias => alias !== detail.name).length > 0 && <small>alias {detail.aliases.filter(alias => alias !== detail.name).join(' · ')}</small>}
