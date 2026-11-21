@@ -169,7 +169,7 @@ async function testCharacterJourney(client,root,width,shot) {
  await check(client,'document.querySelector(".character-stats").getAttribute("aria-busy")==="false" && document.querySelector(".character-stats").textContent.includes("0/3")','preuves exactes avant ratio');
  // #872 : zone visible restée « clavier ouvert » (décalée de 300 px) sans champ actif : la fiche occupe tout l'écran et se lit jusqu'en bas.
  await evaluate(client,'window.__explorer.staleKeyboard(500,300);document.activeElement?.blur();window.dispatchEvent(new Event("resize"))');
- await check(client,'(()=>{const layer=document.querySelector(".character-overlay"),sheet=document.querySelector(".character-sheet"),r=layer.getBoundingClientRect();sheet.scrollTop=sheet.scrollHeight;const last=document.querySelector(".character-works").lastElementChild.getBoundingClientRect();return r.top===0&&Math.abs(r.height-innerHeight)<=1&&last.bottom<=innerHeight+1})()','#872 fiche personnage plein écran et lisible jusqu’en bas après le clavier');
+ await check(client,'(()=>{const layer=document.querySelector(".character-overlay"),sheet=document.querySelector(".character-sheet"),r=layer.getBoundingClientRect();sheet.scrollTop=sheet.scrollHeight;const last=document.querySelector(".character-parcours").lastElementChild.getBoundingClientRect();return r.top===0&&Math.abs(r.height-innerHeight)<=1&&last.bottom<=innerHeight+1})()','#872 fiche personnage plein écran et lisible jusqu’en bas après le clavier');
  await evaluate(client,'window.__explorer.keyboard(915);document.querySelector(".character-sheet").scrollTop=0');
  await shot('explorer-personnage-'+width);
  await click(q('[aria-label="Suivre ce personnage"]'));
@@ -193,7 +193,7 @@ async function testCharacterJourney(client,root,width,shot) {
  await check(client,'[...document.querySelectorAll("[data-dialog-layer]")].some(n=>/^Acteur : /.test(n.getAttribute("aria-label")||"") && n.textContent.includes("Game of Thrones") && n.textContent.includes("Ton lien avec"))','filmographie acteur chargée dans la fiche unique');
  await evaluate(client,'history.back()');
  await check(client,'![...document.querySelectorAll("[data-dialog-layer]")].some(n=>/^Acteur : /.test(n.getAttribute("aria-label")||"")) && document.querySelector(".character-sheet h1")?.textContent==="Saul Goodman"','retour acteur vers personnage');
- await click(q('.character-works>button'));
+ await click(q('.character-parcours .history-entry__open'));
  await check(client,'Boolean(document.querySelector("#media-target")) && history.state.selectedShow?.id===1396 && history.state.selectedShow?.episode===2','P-06 épisode propre au personnage');
  await click(q('#mark-character-seen'));
  await click(q('#back-from-media'));
