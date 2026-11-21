@@ -62,6 +62,15 @@ export function buildCharacters(media: CharacterMedia[]): CharacterRecord[] {
  }
  return [...results.values()];
 }
+/**
+ * Retour terrain du 21/11 : sous-titre d'un personnage dans la recherche. Deux personnages de même nom dans deux
+ * univers restent distincts (jamais fusionnés sur un nom) ; sans univers nommé (groupe du catalogue), l'œuvre où il
+ * apparaît les distingue, au lieu de deux lignes « Eddie Brock · Tom Hardy » identiques.
+ */
+export function characterSearchSubtitle(character: Pick<CharacterRecord, 'universe' | 'works' | 'actors'>): string {
+ const where = character.universe || character.works[0]?.title || '';
+ return [where, character.actors[0]?.name].filter(Boolean).join(' · ');
+}
 /** #398 : œuvres où un interprète joue ce personnage, par clé exacte, dans l'ordre du parcours. */
 export const performerWorkTitles = (actor: CharacterActor, works: readonly CharacterWork[]) =>
  works.filter(work => actor.works?.includes(work.key)).map(work => work.title).join(' · ');
