@@ -4041,6 +4041,10 @@
           "contains": "SEENIT-DISCOVER-004 #872 l’univers d’un personnage vient d’une source exacte, sinon il est masqué"
         },
         {
+          "file": "tests/characterSheetAnomalies.test.ts",
+          "contains": "SEENIT-DISCOVER-004 retour du 21/11 : la fiche défile au-dessus de la barre Android et deux Eddie Brock se distinguent"
+        },
+        {
           "file": "tests/characters.test.ts",
           "contains": "SEENIT-DISCOVER-004"
         }
