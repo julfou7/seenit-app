@@ -128,7 +128,7 @@ async function testWatchNextHarness(client, root) {
     await click(client, '[data-actor-credit="tv:10"] button[aria-label^="À jour"]');
     await check(client, 'window.__watch18c.snapshot().find(show=>show.tmdbId===10)?.seenEpisodes.length===0 && window.__watch18c.toasts().some(toast=>toast.message==="Série remise dans « À voir »" && typeof toast.onUndo==="function")', 'remise à zéro : un bouton Annuler conserve la possibilité de récupérer la progression');
     await evaluate(client, 'window.__watch18c.toasts().find(toast=>toast.message==="Série remise dans « À voir »").onUndo()');
-    await check(client, 'window.__watch18c.snapshot().find(show=>show.tmdbId===10)?.seenEpisodes.length===3 && window.__watch18c.snapshot().find(show=>show.tmdbId===10)?.status==="up_to_date"', 'Annuler restaure exactement les trois épisodes et le statut');
+    await check(client, 'window.__watch18c.snapshot().find(show=>show.tmdbId===10)?.seenEpisodes.length===3 && window.__watch18c.snapshot().find(show=>show.tmdbId===10)?.status==="completed"', 'Annuler restaure exactement les trois épisodes et le statut');
     await click(client, '.actor-profile__heart');
     await check(client, 'document.querySelector(".actor-profile__heart").getAttribute("aria-pressed")==="true"', 'favori écrit dans le vrai store partagé');
     await click(client, '.actor-profile__add');
