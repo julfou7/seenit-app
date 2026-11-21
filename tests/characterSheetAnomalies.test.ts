@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import type { Show } from '../src/types.ts';
-import { characterUniverseLabel } from '../src/features/discover/characters.ts';
+import { characterSearchSubtitle, characterUniverseLabel } from '../src/features/discover/characters.ts';
 import { buildCachedTrackedCharacterResults } from '../src/features/discover/characterSearch.ts';
 
 const read = (path: string) => readFileSync(new URL('../' + path, import.meta.url), 'utf8');
@@ -31,4 +31,18 @@ test('SEENIT-DISCOVER-004 #872 l’univers d’un personnage vient d’une sourc
   assert.match(layer, /surface\.style\.setProperty\('--dialog-top', `\$\{editing && viewport \? viewport\.offsetTop : 0\}px`\);/);
   assert.match(layer, /document\.addEventListener\('focusout', updateAfterFocus\);/);
   assert.match(read('scripts/search-keyboard-browser-checks.cjs'), /#872 fiche personnage plein écran et lisible jusqu’en bas après le clavier/);
+});
+
+test('SEENIT-DISCOVER-004 retour du 21/11 : la fiche défile au-dessus de la barre Android et deux Eddie Brock se distinguent', () => {
+  // La fiche réserve la barre système : sinon sa dernière carte (Venom : The Last Dance) passe dessous sans défiler.
+  assert.match(read('src/screens/explorer.css'), /\.character-sheet\{[^}]*padding:8px 18px calc\(28px \+ var\(--seenit-safe-area-bottom, env\(safe-area-inset-bottom, 0px\)\)\)/);
+  // Même nom, deux univers : jamais fusionnés ; sans univers nommé, l'œuvre les distingue.
+  const actors = [{ id: 2524, name: 'Tom Hardy', photo: null, works: [] }];
+  const venom = { universe: 'Venom - Saga', actors, works: [{ key: 'movie:335983', id: 335983, type: 'movie' as const, title: 'Venom', poster: null, creditCount: 1 }] };
+  const nwh = { universe: '', actors, works: [{ key: 'movie:634649', id: 634649, type: 'movie' as const, title: 'Spider-Man : No Way Home', poster: null, creditCount: 1 }] };
+  assert.equal(characterSearchSubtitle(venom), 'Venom - Saga · Tom Hardy');
+  assert.equal(characterSearchSubtitle(nwh), 'Spider-Man : No Way Home · Tom Hardy');
+  assert.notEqual(characterSearchSubtitle(venom), characterSearchSubtitle(nwh));
+  assert.equal(characterSearchSubtitle({ universe: '', actors: [], works: [] }), '');
+  assert.match(read('src/components/DiscoverSearchResults.tsx'), /<small>\{characterSearchSubtitle\(character\)\}<\/small>/);
 });
