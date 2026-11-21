@@ -7,6 +7,7 @@ import { useFavoritePeopleStore } from '../store/favoritePeopleStore';
 import { useToastStore } from '../store/toastStore';
 import { useShowActions } from '../hooks/useShows';
 import { useShowsStore } from '../store/showsStore';
+import { markMovieWatched, markWatchRecordUnseen } from '../features/watchlist/watchProgressActions';
 import { auth } from '../lib/firebase';
 import { getTodayStr } from '../lib/utils';
 import { tmdb, type TMDBMedia } from '../features/shows/tmdb';
@@ -141,13 +142,13 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
   };
   // Les lignes « À voir avec… » et les footers des cartes partagent la même action.
   // Un verrou synchrone empêche deux intentions pendant l'attente de la confirmation.
-  const runCardAction = async (credit: ActorCredit, operation: () => Promise<unknown>, message: string) => {
+  const runCardAction = async (credit: ActorCredit, operation: () => Promise<unknown>, message: string | null = null, original?: Show, onUndo?: () => Promise<void>) => {
     if (pendingCardAction.current || !uid || auth.currentUser?.uid !== uid) return;
     pendingCardAction.current = actorCreditKey(credit);
     setAdding(pendingCardAction.current);
     try {
       await operation();
-      if (auth.currentUser?.uid === uid) useToastStore.getState().showToast(message, 'info');
+      if (message && auth.currentUser?.uid === uid) useToastStore.getState().showToast(message, 'info', original, onUndo);
     } catch {
       if (auth.currentUser?.uid === uid) useToastStore.getState().showToast('Action impossible. Réessaie.', 'error');
     } finally {
@@ -161,18 +162,24 @@ export function MovieActorProfile({ actor, origin, shows, onClose, onOpen, histo
     // L'identité canonique n'utilise ni le titre ni le rôle joué.
     const current = useShowsStore.getState().shows.find(show => show.mediaType === credit.media_type && Number(show.tmdbId) === credit.id);
     if (!current) return;
-    const at = Date.now();
     if (credit.media_type === 'tv') {
-      return runCardAction(credit, () => updateShow(current.id, { status: 'plan_to_watch', seenEpisodes: [], isArchived: false, updatedAt: at }), 'Série remise dans « À voir »');
+      const previous = { status: current.status, seenEpisodes: current.seenEpisodes || [], isArchived: current.isArchived };
+      const undo = async () => {
+        if (auth.currentUser?.uid !== uid) return;
+        await updateShow(current.id, { ...previous, updatedAt: Date.now() });
+      };
+      return runCardAction(credit, () => updateShow(current.id, { status: 'plan_to_watch', seenEpisodes: [], isArchived: false, updatedAt: Date.now() }), 'Série remise dans « À voir »', current, undo);
     }
-    const seen = current.status === 'completed' || current.seenEpisodes?.includes('movie');
-    const episodes = current.seenEpisodes || [];
-    return runCardAction(credit, () => updateShow(current.id, {
-      status: seen ? 'plan_to_watch' : 'completed',
-      seenEpisodes: seen ? episodes.filter(key => key !== 'movie') : [...new Set([...episodes, 'movie'])],
-      ...(!seen ? { lastWatchedAt: at, episodeRecords: { ...(current.episodeRecords || {}), movie: { ...(current.episodeRecords?.movie || {}), watchedAt: at } } } : {}),
-      updatedAt: at,
-    }), seen ? 'Film marqué comme non vu' : 'Film marqué comme vu');
+    // Réutiliser les actions canoniques : provenance manuelle SeenIt et Annuler sans perte de l'historique.
+    if (current.seenEpisodes?.includes('movie')) return runCardAction(credit, () => markWatchRecordUnseen(current, null, updateShow));
+    if (current.status === 'completed') {
+      const undo = async () => {
+        if (auth.currentUser?.uid !== uid) return;
+        await updateShow(current.id, { status: current.status, seenEpisodes: current.seenEpisodes || [], isArchived: current.isArchived, updatedAt: Date.now() });
+      };
+      return runCardAction(credit, () => updateShow(current.id, { status: 'plan_to_watch', seenEpisodes: [], isArchived: false, updatedAt: Date.now() }), 'Film remis dans « À voir »', current, undo);
+    }
+    return runCardAction(credit, () => markMovieWatched(current, updateShow));
   };
   const provider = (credit: ActorCredit) => {
     const data = tmdb.peekWatchProviders(credit.id, credit.media_type) || readWatchProviderCache(credit.id, credit.media_type, { allowStale: true })?.data;

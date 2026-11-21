@@ -26,6 +26,10 @@ test('SEENIT-UX-019 fiche acteur : barre de navigation visible, cartes et filtre
   assert.equal((profile.match(/onToggleWatched=\{\(\) => \{ void toggleWatched\(credit\); \}\}/g) || []).length, 2);
   assert.match(profile, /pendingCardAction\.current = actorCreditKey\(credit\)/);
   assert.match(profile, /show\.mediaType === credit\.media_type && Number\(show\.tmdbId\) === credit\.id/);
+  // #1102, revue Codex : undo série + provenance SeenIt des films via la voie canonique.
+  assert.match(profile, /Série remise dans « À voir »', current, undo/);
+  assert.match(profile, /markMovieWatched\(current, updateShow\)/);
+  assert.match(profile, /markWatchRecordUnseen\(current, null, updateShow\)/);
   // Filtres au style des pastilles de l'accueil, « Non vus » compris.
   assert.match(profile, /aria-pressed=\{onlyUnseen\}/);
   assert.doesNotMatch(profile, /type="checkbox"/);

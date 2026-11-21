@@ -122,6 +122,13 @@ async function testWatchNextHarness(client, root) {
     await check(client, 'window.__watch18c.snapshot().filter(show=>show.tmdbId===281957 && show.mediaType==="movie").length===1', 'double clic Ajouter : une seule fiche exacte The Revenant suivie');
     await evaluate(client, 'window.__watch18c.releaseAddWrite()');
     await check(client, 'document.querySelector(\'[data-actor-credit="movie:281957"].actor-profile__todo-row .actor-profile__bookmark\')', 'The Revenant rejoint À voir dans la même fiche après ajout');
+    // #1102 revue P1 : l'état « À jour » annule une remise à zéro de série via le vrai toast.
+    await evaluate(client, 'window.__watch18c.completeActorSeries()');
+    await check(client, 'document.querySelector(\'[data-actor-credit="tv:10"] button[aria-label^="À jour"]\')', 'une série à jour expose son action');
+    await click(client, '[data-actor-credit="tv:10"] button[aria-label^="À jour"]');
+    await check(client, 'window.__watch18c.snapshot().find(show=>show.tmdbId===10)?.seenEpisodes.length===0 && window.__watch18c.toasts().some(toast=>toast.message==="Série remise dans « À voir »" && typeof toast.onUndo==="function")', 'remise à zéro : un bouton Annuler conserve la possibilité de récupérer la progression');
+    await evaluate(client, 'window.__watch18c.toasts().find(toast=>toast.message==="Série remise dans « À voir »").onUndo()');
+    await check(client, 'window.__watch18c.snapshot().find(show=>show.tmdbId===10)?.seenEpisodes.length===3 && window.__watch18c.snapshot().find(show=>show.tmdbId===10)?.status==="up_to_date"', 'Annuler restaure exactement les trois épisodes et le statut');
     await click(client, '.actor-profile__heart');
     await check(client, 'document.querySelector(".actor-profile__heart").getAttribute("aria-pressed")==="true"', 'favori écrit dans le vrai store partagé');
     await click(client, '.actor-profile__add');
