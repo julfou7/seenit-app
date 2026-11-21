@@ -27,3 +27,12 @@ test('la barre compacte reste stricte en CI et tolère la police système en loc
   assert.match(checks, /const BAR_MAX_HEIGHT = process\.env\.CI \? 80 : 100;/);
   assert.match(checks, /getBoundingClientRect\(\)\.height<=\$\{BAR_MAX_HEIGHT\}/);
 });
+
+// 21/11 : SEENIT_PWA_ONLY=1 ne lançait aucun harnais et affichait la réussite ; un nom inconnu fait désormais échouer le smoke.
+test('le smoke refuse un SEENIT_PWA_ONLY qui ne nomme aucun harnais', () => {
+  const smoke = readFileSync('scripts/pwa-browser-smoke.cjs', 'utf8');
+  assert.match(smoke, /function unknownPwaOnlyKeys\(only, groups\) \{\n  const known = new Set\(groups\.flat\(\)\.map\(\(\[key\]\) => key\)\);\n  return only\.filter\(key => !known\.has\(key\)\);\n\}/);
+  assert.match(smoke, /const unknownOnly = unknownPwaOnlyKeys\(only, buildLaneGroups\(config\)\);\n\s+if \(unknownOnly\.length\) throw new Error\(`SEENIT_PWA_ONLY inconnu/);
+  // Le garde passe avant le lancement des navigateurs.
+  assert.ok(smoke.indexOf('const unknownOnly') < smoke.indexOf('browsers = await Promise.all'));
+});

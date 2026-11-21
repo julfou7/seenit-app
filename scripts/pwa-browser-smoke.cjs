@@ -556,6 +556,12 @@ function resolveLaneCount(value, max) {
  * #722 : un harnais marqué `isolatedClock` (horloge virtuelle CDP) tourne dans un onglet neuf, refermé ensuite.
  * Le budget d'horloge virtuelle expiré laisse sinon l'onglet en pause et bloque le harnais suivant du client.
  */
+/** Harnais demandés par SEENIT_PWA_ONLY qui n'existent dans aucun couloir. */
+function unknownPwaOnlyKeys(only, groups) {
+  const known = new Set(groups.flat().map(([key]) => key));
+  return only.filter(key => !known.has(key));
+}
+
 async function runLane(client, tasks, timings, label, taskTimeoutMs = LANE_TASK_TIMEOUT_MS, openIsolatedClient) {
   const results = {};
   for (const [key, task, options] of tasks) {
@@ -700,6 +706,9 @@ async function main() {
     const only = String(process.env.SEENIT_PWA_ONLY || '').split(',').map(key => key.trim()).filter(Boolean);
     const groups = buildLaneGroups(config).map(tasks => only.length ? tasks.filter(([key]) => only.includes(key)) : tasks).filter(tasks => tasks.length > 0);
     if (only.length && process.env.CI) throw new Error('SEENIT_PWA_ONLY est réservé au diagnostic local.');
+    // Un nom inconnu (ex. SEENIT_PWA_ONLY=1) ne lançait aucun harnais et affichait quand même la réussite (21/11).
+    const unknownOnly = unknownPwaOnlyKeys(only, buildLaneGroups(config));
+    if (unknownOnly.length) throw new Error(`SEENIT_PWA_ONLY inconnu : ${unknownOnly.join(', ')}. Harnais : ${buildLaneGroups(config).flat().map(([key]) => key).join(', ')}.`);
     const lanes = resolveLaneCount(process.env.SEENIT_PWA_LANES, groups.length);
     const plan = lanes === 1 ? [groups.flat()] : groups;
     browsers = await Promise.all(plan.map(() => launchBrowser()));
@@ -779,6 +788,7 @@ module.exports = {
   runLane,
   setIsolatedCloseTimeoutForTests: ms => { ISOLATED_CLOSE_TIMEOUT_MS = ms; },
   buildLaneGroups,
+  unknownPwaOnlyKeys,
   resolveLaneCount,
   CdpClient,
   findNamedButton,
