@@ -124,7 +124,7 @@ export const tmdb = {
 
   getCollectionDetails: async () => ({ok:true,value:{parts:[]}}),
 
-  getPersonCredits: async () => { telemetry.actorRequests++; return { ok: true, value: { cast: [...Array.from({length:8},(_,i)=>({id:10+i,media_type:'tv',name:`Série ${i}`,character:'Bob'})),{id:100,media_type:'movie',title:'The Punisher : One Last Kill',character:'Mikey Walsh'},{id:999,media_type:'movie',title:'Film à ajouter',character:'Un rôle'}, {id:998,media_type:'movie',title:'Projet futur',release_date:'2027-01-15'}, {id:997,media_type:'tv',name:'Série future',first_air_date:'2026-12-18'}, ...Array.from({length:20},(_,i)=>({id:1000+i,media_type:i===19?'tv':'movie',title:`Filmographie ${i}`,character:'Personnage (voice)',release_date:'2020-01-01'}))].map(credit=>({...credit,poster_path:poster,backdrop_path:backdrop})) } }; },
+  getPersonCredits: async () => { telemetry.actorRequests++; return { ok: true, value: { cast: [...Array.from({length:8},(_,i)=>({id:10+i,media_type:'tv',name:`Série ${i}`,character:'Bob'})),{id:100,media_type:'movie',title:'The Punisher : One Last Kill',character:'Mikey Walsh'},{id:999,media_type:'movie',title:'Film à ajouter',character:'Un rôle'}, {id:998,media_type:'movie',title:'Projet futur',release_date:'2027-01-15'}, {id:997,media_type:'tv',name:'Série future',first_air_date:'2026-12-18'}, ...Array.from({length:20},(_,i)=>({id:i===2?281957:1000+i,media_type:i===19?'tv':'movie',title:i===2?'The Revenant':`Filmographie ${i}`,character:'Personnage (voice)',release_date:'2020-01-01'}))].map(credit=>({...credit,poster_path:poster,backdrop_path:backdrop})) } }; },
 
   getMovieDetails: async (id: number) => { telemetry.details.push(id); return { ok: true, value: tmdb.peekMediaDetails(id) }; },
 
