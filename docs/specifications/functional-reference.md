@@ -749,6 +749,8 @@ swipes de suppression/abandon sur les cartes.
   terminée ! » (ou « Série terminée ! » s'il ne reste rien à voir et que TMDB déclare la série finie).
   Ni le numéro du final, ni « Tout marquer vu », ni un décochage ne la déclenchent ; animation coupée
   par `prefers-reduced-motion`.
+  Depuis le 23/11, une saison dont un épisode est encore annoncé (date future ou inconnue) n'est pas
+  terminée : finir les épisodes déjà diffusés ne la célèbre pas.
 - Retour terrain du 15/11 : un même épisode n'est marqué qu'une fois à la fois (un tap répété pendant les
   lectures TMDB est ignoré ; la carte garde son animation « Vu »). Une carte « Continuer à regarder » à
   jour affiche « S03 · à jour » seulement si un épisode est annoncé dans la même saison, sinon

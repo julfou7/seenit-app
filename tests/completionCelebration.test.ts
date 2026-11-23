@@ -25,9 +25,13 @@ test('#436 aucun faux positif : épisode manquant, décochage, saison inconnue, 
   assert.equal(detectCompletionCelebration({ ...base, wasSeen: true, previousSeen: ['2x1', '2x2', '2x3'], nextSeen: new Set(['2x1', '2x2']) }), null);
   // Liste d'épisodes inconnue : pas d'heuristique sur le numéro.
   assert.equal(detectCompletionCelebration({ ...base, seasonEpisodes: null, previousSeen: ['2x1', '2x2'], nextSeen: new Set(['2x1', '2x2', '2x3']) }), null);
-  // 2x4 pas encore diffusé : finir les 3 diffusés suffit ; un épisode futur ne bloque pas.
+  // Retour terrain du 23/11 (Singapura S01, 4 vus sur 6) : un épisode encore annoncé, daté ou non, bloque la célébration.
   const withFuture = [...season2, { episode_number: 4, air_date: '2026-12-01' }];
-  assert.deepEqual(detectCompletionCelebration({ ...base, seasonEpisodes: withFuture, previousSeen: ['2x1', '2x2'], nextSeen: new Set(['2x1', '2x2', '2x3']) }), { kind: 'season', season: 2 });
+  assert.equal(detectCompletionCelebration({ ...base, seasonEpisodes: withFuture, previousSeen: ['2x1', '2x2'], nextSeen: new Set(['2x1', '2x2', '2x3']) }), null);
+  const withUndated = [...season2, { episode_number: 4, air_date: null }];
+  assert.equal(detectCompletionCelebration({ ...base, seasonEpisodes: withUndated, previousSeen: ['2x1', '2x2'], nextSeen: new Set(['2x1', '2x2', '2x3']) }), null);
+  // Le jour où le dernier épisode est diffusé et vu, la saison est bien célébrée.
+  assert.deepEqual(detectCompletionCelebration({ ...base, today: '2026-12-01', seasonEpisodes: withFuture, previousSeen: ['2x1', '2x2', '2x3'], nextSeen: new Set(['2x1', '2x2', '2x3', '2x4']) }), { kind: 'season', season: 2 });
   // Spéciaux (saison 0) exclus.
   assert.equal(detectCompletionCelebration({ ...base, season: 0, seasonEpisodes: [{ episode_number: 1, air_date: '2020-01-01' }], previousSeen: [], nextSeen: new Set(['0x1']) }), null);
 });

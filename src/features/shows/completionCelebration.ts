@@ -4,7 +4,7 @@ import { create } from 'zustand';
  * #436 — Célébration d'une fin réelle de saison, ou du final absolu d'une série.
  *
  * Elle se déclenche uniquement quand un marquage **individuel** « vu » fait passer la saison de
- * « au moins un épisode diffusé non vu » à « tous ses épisodes diffusés vus ». Jamais sur un
+ * « au moins un épisode non vu » à « tous ses épisodes vus », tous déjà diffusés. Jamais sur un
  * numéro de final, un titre ou une action de masse. Une saison dont la liste d'épisodes n'est
  * pas connue ne déclenche rien plutôt que de deviner.
  */
@@ -26,10 +26,11 @@ export function detectCompletionCelebration(input: {
 }): CompletionCelebration | null {
   const { season, wasSeen, previousSeen, nextSeen, seasonEpisodes, today, nextEpisodeToWatch, seriesEnded } = input;
   if (wasSeen || season <= 0 || !seasonEpisodes?.length) return null;
-  const aired = seasonEpisodes
-    .filter(episode => typeof episode.air_date === 'string' && episode.air_date.length >= 10 && episode.air_date.slice(0, 10) <= today)
-    .map(episode => `${season}x${episode.episode_number}`);
-  if (!aired.length) return null;
+  const isAired = (episode: CompletionEpisode) => typeof episode.air_date === 'string' && episode.air_date.length >= 10 && episode.air_date.slice(0, 10) <= today;
+  // Retour terrain du 23/11 (Singapura) : une saison dont un épisode est encore annoncé (date future ou inconnue)
+  // n'est pas terminée ; finir les épisodes déjà diffusés ne la célèbre pas.
+  if (seasonEpisodes.some(episode => !isAired(episode))) return null;
+  const aired = seasonEpisodes.map(episode => `${season}x${episode.episode_number}`);
   const before = new Set(previousSeen);
   const wasComplete = aired.every(key => before.has(key));
   const isComplete = aired.every(key => nextSeen.has(key));
