@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-23-001 | 2026-11-23 | « Saison 1 terminée ! » ne s'affiche plus tant qu'un épisode de la saison est encore annoncé (date future ou inconnue) ; retour terrain Singapura S01 (4 vus sur 6). | `#436` | active |
 | USR-2026-11-21-002 | 2026-11-21 | Fiche personnage refaite au style de l'app : parcours en cartes de l'Historique (sans l'heure), plus de gros bloc de titres sous l'interprète, barre de navigation présente, photos au lieu des initiales. | `SEENIT-DISCOVER-004` | active |
 | USR-2026-11-21-001 | 2026-11-21 | Retour terrain : la fiche personnage de Venom ne défile pas jusqu'en bas (dernière carte sous la barre Android) ; deux « Eddie Brock » identiques dans la recherche. | `SEENIT-DISCOVER-004` | active |
 | USR-2026-11-18-008 | 2026-11-18 | « Recocher en favoris doit tout réactiver par défaut, même celles que j'avais décochées manuellement » : remettre une série en favoris oublie les choix de cloche de ses épisodes. | `SEENIT-NOTIFICATION-009` | active |
