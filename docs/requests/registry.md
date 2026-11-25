@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-25-001 | 2026-11-25 | Une série sans aucun épisode vu depuis 3 ans (alors qu'il en reste à voir) est archivée automatiquement, avec une notification « archivée automatiquement pour inactivité » ; une série qui ne sort plus rien depuis 3 ans sans être finie est rangée en silence. | `SEENIT-DATA-008` | active |
 | USR-2026-11-23-001 | 2026-11-23 | « Saison 1 terminée ! » ne s'affiche plus tant qu'un épisode de la saison est encore annoncé (date future ou inconnue) ; retour terrain Singapura S01 (4 vus sur 6). | `#436` | active |
 | USR-2026-11-21-002 | 2026-11-21 | Fiche personnage refaite au style de l'app : parcours en cartes de l'Historique (sans l'heure), plus de gros bloc de titres sous l'interprète, barre de navigation présente, photos au lieu des initiales. | `SEENIT-DISCOVER-004` | active |
 | USR-2026-11-21-001 | 2026-11-21 | Retour terrain : la fiche personnage de Venom ne défile pas jusqu'en bas (dernière carte sous la barre Android) ; deux « Eddie Brock » identiques dans la recherche. | `SEENIT-DISCOVER-004` | active |

@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.352**
+Version applicative : **1.4.353**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -189,7 +189,15 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   levée ; un épisode seulement annoncé ne réactive rien (#304) ; (3) une archive **manuelle** est une intention
   distincte, mémorisée par `archiveSource: 'manual'` à l'archivage explicite et effacée au désarchivage ou au
   « Revoir » : la synchronisation ne la lève jamais, mais corrige tout de même `status`. Les séries archivées
-  avant cette règle n'ont pas de provenance : elles sont traitées comme automatiques. L'identité est
+  avant cette règle n'ont pas de provenance : elles sont traitées comme automatiques.
+  Décision du 25/11 : (4) une série commencée dont un épisode déjà diffusé reste à voir et dont aucun épisode n'a
+  été vu depuis 3 ans est archivée automatiquement pour inactivité (`archiveSource: 'inactivity'`,
+  `inactivityArchivedAt`) par la seule passe de masse de la synchronisation, qui l'annonce : une actualité
+  « Archivée automatiquement pour inactivité » par série dans la cloche et une notification système (groupée
+  au-delà d'une série) si les actualités sont activées. Elle reste archivée tant qu'aucun épisode n'est vu, revient
+  dès qu'un épisode l'est, et n'est jamais réarchivée pour la même inactivité si l'utilisateur la désarchive ;
+  (5) une série à jour, sans épisode annoncé, non déclarée finie par TMDB et dont le dernier épisode connu date
+  de plus de 3 ans est archivée en silence, et réactivée dès qu'un épisode est annoncé ou diffusé. L'identité est
   `mediaType + TMDB ID`, jamais le titre ; la réconciliation est idempotente et identique sur PWA et APK
   (même document Firestore).
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant

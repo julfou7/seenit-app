@@ -2,7 +2,7 @@ import { DialogLayer } from './ui/DialogLayer';
 import React, { useEffect, useState } from 'react';
 import { collection, query, orderBy, limit, onSnapshot, getDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { X, Ban, CheckCircle, Sparkles, Calendar, Tv, Eye, Layers, Flag, Play, Clapperboard } from 'lucide-react';
+import { X, Ban, CheckCircle, Sparkles, Calendar, Tv, Eye, Layers, Flag, Play, Clapperboard, Archive } from 'lucide-react';
 import { useShowsStore } from '../store/showsStore';
 import { tmdb } from '../features/shows/tmdb';
 import { TrailerModal } from './TrailerModal';
@@ -14,7 +14,7 @@ export const NEWS_FEED_LIMIT = 50;
 
 export interface ShowNews {
   id: string;
-  type: 'CANCELED' | 'RENEWED' | 'NEW_SEASON' | 'DATE_ANNOUNCED' | 'ENDED' | 'FINAL_SEASON';
+  type: 'CANCELED' | 'RENEWED' | 'NEW_SEASON' | 'DATE_ANNOUNCED' | 'ENDED' | 'FINAL_SEASON' | 'AUTO_ARCHIVED';
   showId: string;
   showTitle: string;
   message: string;
@@ -81,7 +81,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
           if (seasonNum) {
             const sRes = await tmdb.getSeasonDetails(showDetails.tmdbId, seasonNum);
             if (sRes.ok) {
-              const ytVideos = sRes.value.videos?.results?.filter((v: any) => v.site === 'YouTube') || [];
+              const ytVideos = sRes.value.videos?.results?.filter((v: { site?: string }) => v.site === 'YouTube') || [];
               if (ytVideos.length > 0) {
                 setNewsTrailerVideos(ytVideos);
                 return;
@@ -90,7 +90,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
           }
           const res = await tmdb.getShowDetails(showDetails.tmdbId);
           if (res.ok) {
-            const ytVideos = res.value.videos?.results?.filter((v: any) => v.site === 'YouTube') || [];
+            const ytVideos = res.value.videos?.results?.filter((v: { site?: string }) => v.site === 'YouTube') || [];
             if (ytVideos.length > 0) {
               setNewsTrailerVideos(ytVideos);
             }
@@ -253,6 +253,13 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-500/15 border border-zinc-500/30 text-zinc-300 text-[9px] font-extrabold uppercase tracking-wider">
             <Flag size={10} className="text-[#E5A93D]" />
             <span>TERMINÉE</span>
+          </span>
+        );
+      case 'AUTO_ARCHIVED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-500/15 border border-zinc-500/30 text-zinc-300 text-[9px] font-extrabold uppercase tracking-wider">
+            <Archive size={10} />
+            <span>ARCHIVÉE</span>
           </span>
         );
       case 'FINAL_SEASON':
