@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { getPlexSyncRetryAt } from '../features/plex/plexSyncRetry';
 import { useEffect, useRef } from 'react';
-import { reconcileArchive, reconcileSeriesStatus, selectFinishedShowsToRecheck } from '../features/shows/seriesRevival';
+import { type InactivityArchiveFields, isNewInactivityArchive, reconcileArchive, reconcileSeriesStatus, selectFinishedShowsToRecheck } from '../features/shows/seriesRevival';
 import { buildSeasonProgressEvidence, needsSeasonProgressRefresh, hasSeasonReleaseDue } from '../features/shows/seasonProgressEvidence';
 import { readEffectiveNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { readUserScopedJson } from '../lib/userIsolation';
@@ -57,24 +57,32 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
     const shows = showsSnap.docs.map(doc => ({ ...doc.data(), id: String(doc.id) } as Show & { tmdb_id?: number; seasons?: unknown[] }));
 
     // 0. MASS UPDATE PASS: Auto-archive or unarchive existing TV shows
+    // Retour du 25/11 : seule cette passe archive une série inactive depuis 3 ans, et elle seule l'annonce.
+    const inactivityArchived: typeof shows = [];
     for (const s of shows) {
       if (s.mediaType !== 'tv') continue;
       // SEENIT-DATA-008 : une archive manuelle n'est jamais levée par le calcul automatique.
-      const computedArchived = reconcileArchive(s, computeAutoArchiveStatus(s));
+      const passNow = Date.now();
+      const computedArchived = reconcileArchive(s, computeAutoArchiveStatus(s), { now: passNow, archiveInactive: true });
       if (s.isArchived !== computedArchived) {
         appLogger.info('system', `[SyncWorker] Mise à jour de l'archive de « ${s.title} » : isArchived = ${computedArchived}`);
+        const forInactivity = isNewInactivityArchive(s, computedArchived, passNow);
         try {
           await updateDoc(doc(db, 'users', userUid, 'shows', String(s.id)), {
             isArchived: computedArchived,
-            updatedAt: Date.now()
+            ...(forInactivity ? { archiveSource: 'inactivity', inactivityArchivedAt: passNow } : !computedArchived && (s as InactivityArchiveFields).archiveSource === 'inactivity' ? { archiveSource: null } : {}),
+            updatedAt: passNow
           });
           s.isArchived = computedArchived;
+          if (forInactivity) inactivityArchived.push(s);
           changesMade = true;
         } catch (err) {
           appLogger.error('system', `[SyncWorker] Error mass updating ${s.title}:`, { error: err instanceof Error ? err.message : String(err) });
         }
       }
     }
+
+    if (inactivityArchived.length) await announceInactivityArchives(userUid, inactivityArchived);
 
     // SEENIT-DATA-008 (#333) : une série terminée/archivée est revérifiée tous les 14 jours (12 par passage) pour
     // découvrir une nouvelle saison ; sans cela elle restait « Revoir la série » malgré des épisodes diffusés.
@@ -504,6 +512,29 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
   }
 }
 
+/**
+ * Retour du 25/11 : une actualité par série dans la cloche, et une seule notification système (groupée au-delà
+ * d'une série) qui dit que la série a été archivée automatiquement pour inactivité.
+ */
+async function announceInactivityArchives(userUid: string, archived: readonly Show[]) {
+  const description = (title: string) => `Aucun épisode de « ${title} » vu depuis plus de 3 ans : la série a été archivée automatiquement. Elle revient dès que tu regardes un épisode.`;
+  for (const show of archived) {
+    try {
+      await addDoc(collection(db, 'users', userUid, 'news'), { type: 'AUTO_ARCHIVED', showId: String(show.id), showTitle: show.title, message: 'Archivée automatiquement pour inactivité', description: description(show.title), createdAt: Date.now() });
+    } catch (newsErr) {
+      appLogger.error('system', '[SyncWorker] Error adding AUTO_ARCHIVED news:', { error: newsErr instanceof Error ? newsErr.message : String(newsErr) });
+    }
+  }
+  if (!readEffectiveNotificationPreferences(readUserScopedJson(userUid, 'notifications', null), Capacitor.getPlatform()).news) return;
+  const [first] = archived;
+  if (archived.length === 1) {
+    sendNativeNotification(first.title, { body: 'Série archivée automatiquement pour inactivité.', tag: `notif_${first.id}_inactivity`, ...buildNewsNotificationVisual(first.posterPath, first.backdropPath), showId: String(first.id), tmdbId: Number(first.tmdbId), mediaType: 'tv' });
+    return;
+  }
+  const names = archived.slice(0, 3).map(show => show.title).join(', ') + (archived.length > 3 ? '…' : '');
+  sendNativeNotification(`${archived.length} séries archivées`, { body: `Archivées automatiquement pour inactivité : ${names}`, tag: 'notif_inactivity_archive' });
+}
+
 export function useDetailsSyncWorker() {
   const lastRunRef = useRef(new Map<string, number>());
   const lastPlexRunRef = useRef(new Map<string, number>());
@@ -584,8 +615,8 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
     const showToSync: any = {
       ...dbShow,
       ...(localShow || {}),
-      seenEpisodes: localShow?.seenEpisodes?.length ? localShow.seenEpisodes : (dbShow as any).seenEpisodes || [],
-      episodeRecords: localShow?.episodeRecords ? localShow.episodeRecords : (dbShow as any).episodeRecords || {}
+      seenEpisodes: localShow?.seenEpisodes?.length ? localShow.seenEpisodes : (dbShow as Partial<Show>).seenEpisodes || [],
+      episodeRecords: localShow?.episodeRecords ? localShow.episodeRecords : (dbShow as Partial<Show>).episodeRecords || {}
     };
     if (!silent) setSyncStatus({ current: showToSync.title || 'Mise à jour', total: 1, pending: 1 });
 

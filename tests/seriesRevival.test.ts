@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
-import { hasAiredUnseenEpisode, looksFinished, reconcileArchive, reconcileSeriesStatus, selectFinishedShowsToRecheck, REVIVAL_RECHECK_MAX_PER_RUN } from '../src/features/shows/seriesRevival.ts';
+import { INACTIVITY_ARCHIVE_DAYS, hasAiredUnseenEpisode, isDormantSeries, isNewInactivityArchive, looksFinished, reconcileArchive, seriesInactivity, reconcileSeriesStatus, selectFinishedShowsToRecheck, REVIVAL_RECHECK_MAX_PER_RUN } from '../src/features/shows/seriesRevival.ts';
 
 // Vrai calcul d'archive automatique de `utils.ts` (seul `logStore` est remplacé : il tire le navigateur).
 const bundle = await build({ entryPoints: ['src/lib/utils.ts'], bundle: true, platform: 'node', format: 'esm', write: false,
@@ -70,7 +70,7 @@ test('SEENIT-DATA-008 la revérification des séries finies est périodique, bor
 
 test('SEENIT-DATA-008 la synchronisation et les archivages explicites utilisent la réconciliation', () => {
   const worker = readFileSync('src/hooks/useDetailsSyncWorker.ts', 'utf8');
-  assert.match(worker, /const computedArchived = reconcileArchive\(s, computeAutoArchiveStatus\(s\)\);/, 'la passe de masse respecte l’archive manuelle');
+  assert.match(worker, /const computedArchived = reconcileArchive\(s, computeAutoArchiveStatus\(s\), \{ now: passNow, archiveInactive: true \}\);/, 'la passe de masse respecte l’archive manuelle');
   assert.match(worker, /if \(finishedToRecheck\.has\(String\(s\.id\)\)\) return true;/, 'les séries finies sont revérifiées');
   assert.match(worker, /const reconciledStatus = reconcileSeriesStatus\(showToSync\.status, nextEpisodeToWatch, todayStr2\);/, 'la synchronisation manuelle d’une série aussi');
   assert.match(worker, /const finalStatus = reconcileSeriesStatus\(showToSync\.status, nextEpisodeToWatch, todayStr2\);/);
@@ -80,4 +80,58 @@ test('SEENIT-DATA-008 la synchronisation et les archivages explicites utilisent 
   const detail = readFileSync('src/screens/ShowDetailScreenCore.tsx', 'utf8');
   assert.match(detail, /isArchived: newArchived, archiveSource: newArchived \? 'manual' : undefined/, 'archivage depuis la fiche = intention manuelle');
   assert.match(detail, /isArchived: false, archiveSource: undefined, lastWatchedAt: now/, '« Revoir » efface la provenance');
+});
+
+test('SEENIT-DATA-008 retour du 25/11 : trois ans sans activité archivent la série, avec une seule annonce', () => {
+  const ago = (days: number) => now - days * DAY;
+  const started = (lastSeenDaysAgo: number, extra: Record<string, unknown> = {}) => ({
+    id: 'tv-1', mediaType: 'tv' as const, status: 'watching' as const, isArchived: false, createdAt: ago(2000),
+    seenEpisodes: ['1x1'], episodeRecords: { '1x1': { watchedAt: ago(lastSeenDaysAgo) } },
+    nextEpisodeToWatch: { season_number: 1, episode_number: 2, air_date: '2020-01-08' }, ...extra,
+  });
+  assert.equal(INACTIVITY_ARCHIVE_DAYS, 1095);
+  // Inactivité : un épisode diffusé reste à voir et rien n'est vu depuis plus de 3 ans.
+  assert.equal(seriesInactivity(started(1100), now).inactive, true);
+  assert.equal(seriesInactivity(started(1000), now).inactive, false, 'sous 3 ans : rien');
+  assert.equal(seriesInactivity(started(1100, { status: 'dropped' }), now).inactive, false, 'abandonnée : déjà rangée par l’utilisateur');
+  assert.equal(seriesInactivity(started(1100, { nextEpisodeToWatch: { season_number: 2, episode_number: 1, air_date: '2027-01-01' } }), now).inactive, false, 'à jour, épisode seulement annoncé : pas une inactivité');
+  assert.equal(seriesInactivity({ ...started(1100), seenEpisodes: [], episodeRecords: {} }, now).inactive, false, 'jamais commencée : jamais archivée pour inactivité');
+  // Seule la passe de masse archive une première fois, et elle annonce.
+  assert.equal(reconcileArchive(started(1100), false, { now }), false, 'une synchro de fiche n’archive pas en silence');
+  assert.equal(reconcileArchive(started(1100), false, { now, archiveInactive: true }), true);
+  assert.equal(isNewInactivityArchive(started(1100), true, now), true);
+  // Déjà archivée pour inactivité : reste archivée sans nouvelle annonce, même si TMDB annonce une suite.
+  const archived = started(1100, { isArchived: true, archiveSource: 'inactivity', inactivityArchivedAt: ago(10) });
+  assert.equal(reconcileArchive(archived, false, { now }), true);
+  assert.equal(isNewInactivityArchive(archived, true, now), false);
+  // Désarchivée à la main sans rien regarder depuis : jamais réarchivée pour la même inactivité.
+  const unarchived = { ...archived, isArchived: false, archiveSource: undefined };
+  assert.equal(reconcileArchive(unarchived, false, { now, archiveInactive: true }), false);
+  // Un épisode vu ensuite efface l'inactivité : la série revient.
+  const resumed = { ...archived, episodeRecords: { '1x1': { watchedAt: ago(5) } } };
+  assert.equal(reconcileArchive(resumed, false, { now, archiveInactive: true }), false);
+  // L'archive manuelle reste prioritaire.
+  assert.equal(reconcileArchive({ ...started(10), isArchived: true, archiveSource: 'manual' }, false, { now }), true);
+});
+
+test('SEENIT-DATA-008 retour du 25/11 : une série dormante depuis 3 ans est rangée en silence, un nouvel épisode la réactive', () => {
+  const dormant = { mediaType: 'tv' as const, status: 'watching' as const, tmdbStatus: 'Returning Series', nextEpisodeToWatch: null, nextEpisodeToAir: null,
+    seasonProgress: { '2': { season_number: 2, last_known_episode_air_date: '2023-05-01' } } } as never;
+  assert.equal(isDormantSeries(dormant, now), true);
+  assert.equal(reconcileArchive(dormant, false, { now }), true);
+  assert.equal(isDormantSeries({ ...(dormant as object), nextEpisodeToAir: { season_number: 3, episode_number: 1, air_date: '2027-01-01' } } as never, now), false, 'une suite annoncée la réactive');
+  assert.equal(isDormantSeries({ ...(dormant as object), seasonProgress: { '2': { season_number: 2, last_known_episode_air_date: '2025-05-01' } } } as never, now), false, 'diffusée il y a moins de 3 ans');
+  assert.equal(isDormantSeries({ ...(dormant as object), seasonProgress: {} } as never, now), false, 'date inconnue : rien deviné');
+  assert.equal(isDormantSeries({ ...(dormant as object), tmdbStatus: 'Ended' } as never, now), false, 'finie : déjà gérée par l’archive automatique');
+});
+
+test('SEENIT-DATA-008 retour du 25/11 : la passe de masse archive, marque et annonce une seule fois par inactivité', () => {
+  const worker = readFileSync('src/hooks/useDetailsSyncWorker.ts', 'utf8');
+  assert.match(worker, /reconcileArchive\(s, computeAutoArchiveStatus\(s\), \{ now: passNow, archiveInactive: true \}\)/);
+  assert.match(worker, /forInactivity \? \{ archiveSource: 'inactivity', inactivityArchivedAt: passNow \}/);
+  assert.match(worker, /if \(inactivityArchived\.length\) await announceInactivityArchives\(userUid, inactivityArchived\);/);
+  assert.match(worker, /type: 'AUTO_ARCHIVED'[^\n]*message: 'Archivée automatiquement pour inactivité'/);
+  assert.match(worker, /body: 'Série archivée automatiquement pour inactivité\.'/);
+  assert.match(worker, /`\$\{archived\.length\} séries archivées`/, 'plusieurs séries : une seule notification groupée');
+  assert.match(readFileSync('src/components/ShowNewsFeed.tsx', 'utf8'), /case 'AUTO_ARCHIVED':/);
 });
