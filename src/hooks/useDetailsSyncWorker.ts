@@ -395,7 +395,9 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
         });
 
         // SEENIT-DATA-008 : archive manuelle respectée ; `completed` redevient `watching` si un épisode diffusé reste à voir.
-        const finalArchived = reconcileArchive(showToSync, shouldBeArchived);
+        // Codex #1108 : la réconciliation lit l'état TMDB frais (pointeurs, statut, saisons), pas l'ancien document,
+        // sinon une série dormante qui reçoit un épisode resterait archivée jusqu'à la synchro suivante.
+        const finalArchived = reconcileArchive({ ...showToSync, nextEpisodeToWatch, nextEpisodeToAir, tmdbStatus: details.status, seriesEnded: isEnded, seasonProgress }, shouldBeArchived);
         const finalStatus = reconcileSeriesStatus(showToSync.status, nextEpisodeToWatch, todayStr2);
         const hasStatusChanged = finalStatus !== showToSync.status;
 
@@ -786,7 +788,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       updatedAt: Date.now(),
       seriesEnded: isEnded,
       tmdbStatus: details.status || null,
-      isArchived: reconcileArchive(showToSync, shouldBeArchived)
+      isArchived: reconcileArchive({ ...showToSync, nextEpisodeToWatch, nextEpisodeToAir, tmdbStatus: details.status, seriesEnded: isEnded, seasonProgress }, shouldBeArchived)
     };
     // SEENIT-DATA-008 : même réconciliation que la synchronisation automatique (archive manuelle respectée,
     // `completed` → `watching` si un épisode déjà diffusé reste à voir).

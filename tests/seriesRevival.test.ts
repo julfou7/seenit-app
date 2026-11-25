@@ -123,6 +123,13 @@ test('SEENIT-DATA-008 retour du 25/11 : une série dormante depuis 3 ans est ran
   assert.equal(isDormantSeries({ ...(dormant as object), seasonProgress: { '2': { season_number: 2, last_known_episode_air_date: '2025-05-01' } } } as never, now), false, 'diffusée il y a moins de 3 ans');
   assert.equal(isDormantSeries({ ...(dormant as object), seasonProgress: {} } as never, now), false, 'date inconnue : rien deviné');
   assert.equal(isDormantSeries({ ...(dormant as object), tmdbStatus: 'Ended' } as never, now), false, 'finie : déjà gérée par l’archive automatique');
+  // Codex #1108 : ancien document dormant + réponse TMDB fraîche annonçant un épisode → réactivée dès cette synchro.
+  const stale = { ...(dormant as object), isArchived: true } as never;
+  assert.equal(reconcileArchive({ ...(stale as object), nextEpisodeToAir: { season_number: 3, episode_number: 1, air_date: '2027-01-01' } } as never, false, { now }), false);
+  const worker = readFileSync('src/hooks/useDetailsSyncWorker.ts', 'utf8');
+  const fresh = /reconcileArchive\(\{ \.\.\.showToSync, nextEpisodeToWatch, nextEpisodeToAir, tmdbStatus: details\.status, seriesEnded: isEnded, seasonProgress \}, shouldBeArchived\)/g;
+  assert.equal(worker.match(fresh)?.length, 2, 'les deux synchros de fiche réconcilient avec l’état TMDB frais');
+  assert.doesNotMatch(worker, /reconcileArchive\(showToSync, /, 'jamais avec l’ancien document seul');
 });
 
 test('SEENIT-DATA-008 retour du 25/11 : la passe de masse archive, marque et annonce une seule fois par inactivité', () => {
