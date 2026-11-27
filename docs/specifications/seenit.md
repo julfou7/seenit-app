@@ -191,7 +191,9 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   « Revoir » : la synchronisation ne la lève jamais, mais corrige tout de même `status`. Les séries archivées
   avant cette règle n'ont pas de provenance : elles sont traitées comme automatiques.
   Décision du 25/11 : (4) une série commencée dont un épisode déjà diffusé reste à voir et dont aucun épisode n'a
-  été vu depuis 3 ans est archivée automatiquement pour inactivité (`archiveSource: 'inactivity'`,
+  été vu depuis 3 ans (trois années civiles comptées depuis le dernier épisode vu, jamais 3 × 365 jours ; une
+  série jamais commencée, terminée sans épisode restant ou sans date de visionnage connue n'est jamais concernée)
+  est archivée automatiquement pour inactivité (`archiveSource: 'inactivity'`,
   `inactivityArchivedAt`) par la seule passe de masse de la synchronisation, qui l'annonce : une actualité
   « Archivée automatiquement pour inactivité » par série dans la cloche et une notification système (groupée
   au-delà d'une série) si les actualités sont activées. Elle reste archivée tant qu'aucun épisode n'est vu, revient
@@ -202,7 +204,7 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   pas, et un toast permet d'annuler. L'annonce native reste dans le panneau tant que la série est archivée et en est
   retirée dès qu'elle revient ;
   (5) une série à jour, sans épisode annoncé, non déclarée finie par TMDB et dont le dernier épisode connu date
-  de plus de 3 ans est archivée en silence, et réactivée dès qu'un épisode est annoncé ou diffusé. L'identité est
+  de plus de 3 ans (même borne civile) est archivée en silence, et réactivée dès qu'un épisode est annoncé ou diffusé. L'identité est
   `mediaType + TMDB ID`, jamais le titre ; la réconciliation est idempotente et identique sur PWA et APK
   (même document Firestore).
 - Une réponse asynchrone capture l'UID et un epoch ; elle est ignorée si le compte change avant

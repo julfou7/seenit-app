@@ -14,7 +14,7 @@ export function seriesPause(show: Pick<Show, 'seenEpisodes' | 'episodeRecords' |
   const times = Object.entries(show.episodeRecords || {}).filter(([key]) => show.seenEpisodes?.includes(key)).map(([, record]) => resolveHistoryTimestamp(record?.watchedAt)?.watchedAt || 0);
   const at = started ? Math.max(0, ...times) || resolveHistoryTimestamp(show.lastWatchedAt)?.watchedAt : resolveHistoryTimestamp(show.createdAt)?.watchedAt;
   const days = at ? Math.floor((now - at) / 86_400_000) : 0;
-  return { started, days, duration: pauseDuration(days), description: started ? `En pause depuis ${pauseDuration(days).toLowerCase()}` : `Ajoutée il y a ${pauseDuration(days).toLowerCase()} · jamais commencée` };
+  return { started, at: at || null, days, duration: pauseDuration(days), description: started ? `En pause depuis ${pauseDuration(days).toLowerCase()}` : `Ajoutée il y a ${pauseDuration(days).toLowerCase()} · jamais commencée` };
 }
 export function seriesBadge(show: Show, episode: SeriesCardEpisode | null, progress: SeriesSeasonProgress, stale: boolean, today: string, now = Date.now()): SeriesBadge | null {
   if (stale) { const pause = seriesPause(show, now); return pause.days >= 60 ? { label: pause.duration, tone: pause.started ? 'pause' : 'never', icon: pause.started ? 'pause' : 'bookmark' } : null; }
