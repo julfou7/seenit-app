@@ -772,8 +772,8 @@ swipes de suppression/abandon sur les cartes.
   intacte (`SEENIT-DATA-008`, #333). Un épisode seulement annoncé ne réactive rien. Une archive **manuelle**
   (depuis l'accueil ou la fiche) est mémorisée et n'est jamais levée par la synchronisation.
 - Depuis le 25/11, une série commencée sans aucun épisode vu depuis 3 ans alors qu'il en reste à voir est
-  archivée automatiquement, avec une notification « archivée automatiquement pour inactivité » ; elle revient dès
-  qu'un épisode est vu. Une série qui ne sort plus rien depuis 3 ans sans être déclarée finie est rangée en silence.
+  archivée automatiquement (trois années civiles après le dernier épisode vu), avec une notification « archivée
+  automatiquement pour inactivité », une seule pour plusieurs séries ; elle revient dès qu'un épisode est vu. Une série qui ne sort plus rien depuis 3 ans sans être déclarée finie est rangée en silence.
 - Lorsque Téléchargements est activé, Sonarr existe au niveau série, saison ou épisode et le détail
   affiche sa disponibilité par saison/épisode.
 - Lorsque Téléchargements est désactivé, le détail d'épisode ne montre ni « Télécharger », ni

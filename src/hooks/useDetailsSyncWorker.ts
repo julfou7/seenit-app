@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 import { getPlexSyncRetryAt } from '../features/plex/plexSyncRetry';
 import { useEffect, useRef } from 'react';
-import { type InactivityArchiveFields, isNewInactivityArchive, reconcileArchive, reconcileSeriesStatus, selectFinishedShowsToRecheck } from '../features/shows/seriesRevival';
+import { type InactivityArchiveFields, inactivityArchiveNotification, isNewInactivityArchive, reconcileArchive, reconcileSeriesStatus, selectFinishedShowsToRecheck } from '../features/shows/seriesRevival';
 import { buildSeasonProgressEvidence, needsSeasonProgressRefresh, hasSeasonReleaseDue } from '../features/shows/seasonProgressEvidence';
 import { readEffectiveNotificationPreferences } from '../features/notifications/notificationPreferences.ts';
 import { readUserScopedJson } from '../lib/userIsolation';
@@ -255,7 +255,7 @@ export async function performDetailsSync(forceAll = false): Promise<{ success: b
           series_ended: isEnded
         } : null;
 
-        let nextEpisodeToAir: any = null;
+        let nextEpisodeToAir: (Record<string, unknown> & { season_number: number; episode_number: number; air_date: string }) | null = null;
         if (details.next_episode_to_air && (!details.next_episode_to_air.air_date || details.next_episode_to_air.air_date >= todayStr)) {
           const sNum = details.next_episode_to_air.season_number;
           nextEpisodeToAir = {
@@ -528,13 +528,13 @@ async function announceInactivityArchives(userUid: string, archived: readonly Sh
     }
   }
   if (!readEffectiveNotificationPreferences(readUserScopedJson(userUid, 'notifications', null), Capacitor.getPlatform()).news) return;
+  const notification = inactivityArchiveNotification(archived);
+  if (!notification) return;
+  const { title, ...rest } = notification;
   const [first] = archived;
-  if (archived.length === 1) {
-    sendNativeNotification(first.title, { body: 'Série archivée automatiquement pour inactivité.', tag: `notif_${first.id}_inactivity`, ...buildNewsNotificationVisual(first.posterPath, first.backdropPath), showId: String(first.id), tmdbId: Number(first.tmdbId), mediaType: 'tv' });
-    return;
-  }
-  const names = archived.slice(0, 3).map(show => show.title).join(', ') + (archived.length > 3 ? '…' : '');
-  sendNativeNotification(`${archived.length} séries archivées`, { body: `Archivées automatiquement pour inactivité : ${names}`, tag: 'notif_inactivity_archive' });
+  sendNativeNotification(title, archived.length === 1
+    ? { ...rest, ...buildNewsNotificationVisual(first.posterPath, first.backdropPath), tmdbId: Number(first.tmdbId), mediaType: 'tv' }
+    : rest);
 }
 
 export function useDetailsSyncWorker() {
