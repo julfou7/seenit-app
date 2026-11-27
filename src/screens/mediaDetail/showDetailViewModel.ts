@@ -46,7 +46,7 @@ export interface ShowDetailViewModel {
   /** Maquette DlFilm — annule ce téléchargement (même retrait que l'onglet Télécharger). */
   removeMovieDownload?: (item: LiveDownloadItem) => Promise<boolean>;
   isDownloadModalOpen: boolean; setIsDownloadModalOpen: (open: boolean) => void;
-  dropShow: () => unknown; followShow: () => unknown; resumeShow: () => unknown; rewatchShow: () => unknown;
+  dropShow: () => unknown; followShow: () => unknown; restoreShow: () => unknown; resumeShow: () => unknown; rewatchShow: () => unknown;
   handleAnimatedBack: () => void; handleDeleteShow: () => unknown; handleShare: () => Promise<unknown> | unknown; handleSyncSingle: () => unknown; handleWatchNextEpisode: () => void;
   effectiveTmdbId?: number | null; requestedMediaKey: string | null;
   epStatus: { isUpcoming: boolean; label: string } | null;

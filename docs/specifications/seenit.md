@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.354**
+Version applicative : **1.4.355**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -197,7 +197,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   `inactivityArchivedAt`) par la seule passe de masse de la synchronisation, qui l'annonce : une actualité
   « Archivée automatiquement pour inactivité » par série dans la cloche et une notification système (groupée
   au-delà d'une série) si les actualités sont activées. Elle reste archivée tant qu'aucun épisode n'est vu, revient
-  dès qu'un épisode l'est, et n'est jamais réarchivée pour la même inactivité si l'utilisateur la désarchive ;
+  dès qu'un épisode l'est, et n'est jamais réarchivée pour la même inactivité si l'utilisateur la désarchive.
+  Décision du 27/11 : « Désarchiver » est proposé sur l'actualité « ARCHIVÉE », comme action de la notification
+  Android d'une série, et sur la fiche à la place de « Revoir la série » (qui remet la progression à zéro) ; il lève
+  l'archive sans toucher à la progression, garde `inactivityArchivedAt` pour que la synchronisation ne la réarchive
+  pas, et un toast permet d'annuler. L'annonce native reste dans le panneau tant que la série est archivée et en est
+  retirée dès qu'elle revient ;
   (5) une série à jour, sans épisode annoncé, non déclarée finie par TMDB et dont le dernier épisode connu date
   de plus de 3 ans (même borne civile) est archivée en silence, et réactivée dès qu'un épisode est annoncé ou diffusé. L'identité est
   `mediaType + TMDB ID`, jamais le titre ; la réconciliation est idempotente et identique sur PWA et APK

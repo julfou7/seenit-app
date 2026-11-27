@@ -533,7 +533,7 @@ async function announceInactivityArchives(userUid: string, archived: readonly Sh
   const { title, ...rest } = notification;
   const [first] = archived;
   sendNativeNotification(title, archived.length === 1
-    ? { ...rest, ...buildNewsNotificationVisual(first.posterPath, first.backdropPath), tmdbId: Number(first.tmdbId), mediaType: 'tv' }
+    ? { ...rest, ...buildNewsNotificationVisual(first.posterPath, first.backdropPath), tmdbId: Number(first.tmdbId), mediaType: 'tv', allowUnarchive: true, reminderPurpose: 'inactivity_archive' }
     : rest);
 }
 
@@ -712,7 +712,7 @@ export async function syncSingleItem(showId: string, silent: boolean = false): P
       series_ended: isEnded
     } : null;
 
-    let nextEpisodeToAir: any = null;
+    let nextEpisodeToAir: (Record<string, unknown> & { season_number: number; episode_number: number; air_date: string }) | null = null;
     if (details.next_episode_to_air && (!details.next_episode_to_air.air_date || details.next_episode_to_air.air_date >= todayStr)) {
       const sNum = details.next_episode_to_air.season_number;
       nextEpisodeToAir = {

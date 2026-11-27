@@ -38,7 +38,6 @@ export interface MediaReminderNotificationOptions extends NativeNotificationOpti
   actionTitle?: string;
   allowTonight?: boolean;
   provider?: { id: number; name: string };
-  reminderPurpose?: 'tonight';
 }
 
 export function getMediaReminderNotificationId(tag: string): number {
@@ -137,7 +136,8 @@ export async function sendMediaReminderNotification(
     await ensureSeenItNotificationChannels();
 
     const resolvedId = resolveNotificationId(options);
-    if (options.allowMarkWatched || options.allowTonight || options.provider) {
+    const hasActions = Boolean(options.allowMarkWatched || options.allowTonight || options.provider || options.allowUnarchive);
+    if (hasActions) {
       await LocalNotifications.registerActionTypes({
         types: [{
           id: `EPISODE_NOTIF_ACTIONS_${resolvedId}`,
@@ -145,6 +145,8 @@ export async function sendMediaReminderNotification(
             ...(options.allowMarkWatched ? [{ id: 'mark_watched', title: options.actionTitle || '✓ Vu', foreground: true }] : []),
             ...(options.provider ? [{ id: 'open_provider', title: `Ouvrir ${options.provider.name}`, foreground: true }] : []),
             ...(options.allowTonight ? [{ id: 'remind_tonight', title: 'Ce soir', foreground: true }] : []),
+            // Retour du 27/11 : la notification d'archivage pour inactivité se désarchive d'un geste.
+            ...(options.allowUnarchive ? [{ id: 'unarchive', title: 'Désarchiver', foreground: true }] : []),
           ],
         }],
       }).catch(() => undefined);
@@ -186,7 +188,7 @@ export async function sendMediaReminderNotification(
       iconColor: '#E5A93D',
       largeIcon: iconUrl || undefined,
       attachments,
-      actionTypeId: options.allowMarkWatched || options.allowTonight || options.provider ? `EPISODE_NOTIF_ACTIONS_${resolvedId}` : undefined,
+      actionTypeId: hasActions ? `EPISODE_NOTIF_ACTIONS_${resolvedId}` : undefined,
       group: 'seenit',
       extra: {
         ownerUid,

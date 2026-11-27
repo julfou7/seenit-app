@@ -2,8 +2,11 @@ import { DialogLayer } from './ui/DialogLayer';
 import React, { useEffect, useState } from 'react';
 import { collection, query, orderBy, limit, onSnapshot, getDoc, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
-import { X, Ban, CheckCircle, Sparkles, Calendar, Tv, Eye, Layers, Flag, Play, Clapperboard, Archive } from 'lucide-react';
+import { X, Ban, CheckCircle, Sparkles, Calendar, Tv, Eye, Layers, Flag, Play, Clapperboard, Archive, ArchiveRestore } from 'lucide-react';
 import { useShowsStore } from '../store/showsStore';
+import { useShowActions } from '../hooks/useShows';
+import { isInactivityArchive } from '../features/shows/seriesRevival';
+import { restoreInactivityArchive } from '../features/shows/restoreInactivityArchive';
 import { tmdb } from '../features/shows/tmdb';
 import { TrailerModal } from './TrailerModal';
 import { readUserScopedJson, writeUserScopedJson } from '../lib/userIsolation';
@@ -105,6 +108,16 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
   }, [selectedNews]);
 
   const shows = useShowsStore((state) => state.shows);
+  const { updateShow } = useShowActions();
+  /** Retour du 27/11 : la série de l'actualité « ARCHIVÉE », tant qu'elle est encore rangée pour inactivité. */
+  const inactivityArchivedShow = (newsItem: ShowNews) => newsItem.type === 'AUTO_ARCHIVED'
+    ? shows.find(s => isInactivityArchive(s) && (s.id === newsItem.showId || s.tmdbId?.toString() === newsItem.showId)) || null
+    : null;
+  const handleRestore = async (newsItem: ShowNews) => {
+    const restored = await restoreInactivityArchive(inactivityArchivedShow(newsItem), updateShow).catch(() => false);
+    // L'actualité a rempli son rôle : elle quitte le fil comme « J'ai compris ».
+    if (restored) await markNewsAsRead(newsItem.id);
+  };
 
   const getShowDetails = (newsItem: ShowNews) => {
     // 1. Find matched show
@@ -462,7 +475,7 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
                       )}
 
                       {/* Networks logos */}
-                      {showDetails.networks && showDetails.networks.slice(0, 2).map((network: any, idx: number) => network.logo_path && (
+                      {showDetails.networks && showDetails.networks.slice(0, 2).map((network: { name?: string; logo_path?: string | null }, idx: number) => network.logo_path && (
                         <img
                           key={idx}
                           src={`https://image.tmdb.org/t/p/w92${network.logo_path}`}
@@ -530,6 +543,16 @@ export function ShowNewsFeed({ onNavigateToShow, onShowClick }: ShowNewsFeedProp
 
               {/* Actions */}
               <div className="flex flex-col gap-2.5 mt-1 w-full">
+                {inactivityArchivedShow(selectedNews) && (
+                  <button
+                    type="button"
+                    onClick={() => void handleRestore(selectedNews)}
+                    className="w-full h-12 px-4 rounded-2xl font-bold bg-gradient-to-r from-amber-500 via-amber-400 to-yellow-500 hover:from-amber-400 hover:to-yellow-400 active:scale-[0.98] text-black shadow-lg shadow-amber-500/25 text-xs sm:text-sm transition-all cursor-pointer touch-manipulation flex items-center justify-center gap-2"
+                  >
+                    <ArchiveRestore size={18} className="stroke-[2.5]" />
+                    Désarchiver
+                  </button>
+                )}
                 {newsTrailerVideos && newsTrailerVideos.length > 0 && (
                   <button
                     type="button"

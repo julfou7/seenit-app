@@ -2,6 +2,7 @@
 
 | ID | Date | Décision durable | Exigences / trace | Statut |
 |---|---|---|---|---|
+| USR-2026-11-27-002 | 2026-11-27 | Une série archivée automatiquement pour inactivité se désarchive depuis l'actualité « ARCHIVÉE », la notification et la fiche, sans perdre sa progression, et n'est pas réarchivée pour la même inactivité. | `SEENIT-DATA-008` | active |
 | USR-2026-11-27-001 | 2026-11-27 | Maquette « Ça revient » validée (« Oui, développe ») : sous Continuer à regarder, un aperçu d'À venir réservé à ce que tu aimes et où tu es à jour — retour d'une saison dont la précédente est vue, première d'une série de ta liste, finale d'une saison où tu es à jour ; 45 jours, cinq cartes, compte à rebours et cloche de l'épisode. | `SEENIT-UX-024` | active |
 | USR-2026-11-25-001 | 2026-11-25 | Une série sans aucun épisode vu depuis 3 ans (alors qu'il en reste à voir) est archivée automatiquement, avec une notification « archivée automatiquement pour inactivité » ; une série qui ne sort plus rien depuis 3 ans sans être finie est rangée en silence. | `SEENIT-DATA-008` | active |
 | USR-2026-11-23-001 | 2026-11-23 | « Saison 1 terminée ! » ne s'affiche plus tant qu'un épisode de la saison est encore annoncé (date future ou inconnue) ; retour terrain Singapura S01 (4 vus sur 6). | `#436` | active |

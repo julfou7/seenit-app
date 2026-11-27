@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "applicationVersion": "1.4.354",
+  "applicationVersion": "1.4.355",
   "specification": "docs/specifications/seenit.md",
   "requirements": [
     {
@@ -908,6 +908,18 @@
         {
           "file": "tests/seriesRevival.test.ts",
           "contains": "SEENIT-DATA-008 archivage pour inactivité : bornes des trois ans, séries finies ou jamais commencées, annonce groupée"
+        },
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 retour du 27/11 : « Désarchiver » rend la série sans perdre sa progression, et elle n’est pas réarchivée"
+        },
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 retour du 27/11 : la notification d’archivage reste tant que la série est archivée, et disparaît une fois désarchivée"
+        },
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 retour du 27/11 : « Désarchiver » est câblé sur l’actualité, la notification et la fiche"
         }
       ]
     },
