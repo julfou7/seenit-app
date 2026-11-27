@@ -12,12 +12,13 @@ import { SeenItBellRing } from './SeenItLogo';
  * Retour terrain du 09/11 : « la cloche reste jaune » — l'or est la couleur du rappel ; c'est le mode
  * téléchargement qui est bleu.
  */
-export function EpisodeReminderBell({ show, episode, variant = 'icon' }: { show: Show | null | undefined; episode: ReminderEpisode; variant?: 'icon' | 'overlay' }) {
+export function EpisodeReminderBell({ show, episode, variant = 'icon', subject }: { show: Show | null | undefined; episode: ReminderEpisode; variant?: 'icon' | 'overlay'; subject?: string }) {
   const { reminder, pending, toggle, available } = useEpisodeReminder(show, episode);
   if (!available) return null;
   const code = reminderEpisodeString(episode);
-  // Retour terrain du 18/11 (« une cloche = cet épisode seul ») : son nom accessible le dit.
-  const label = `${reminder ? 'Couper' : 'Activer'} le rappel de ${code}`;
+  // Retour terrain du 18/11 (« une cloche = cet épisode seul ») : son nom accessible le dit ; hors fiche
+  // (« Ça revient »), il nomme aussi la série.
+  const label = `${reminder ? 'Couper' : 'Activer'} le rappel de ${subject ? `${subject}, ` : ''}${code}`;
   const press = (event: React.MouseEvent) => { event.stopPropagation(); void toggle(); };
   // Retour terrain du 18/11 (« la cloche est trop grosse par rapport au Vu », « aussi épaisse que Vu et Télécharger ») :
   // dans la liste, la cloche seule, sans rond, au trait de l'anneau Vu (36 px, « un poil plus petit », dans une cible de 48 px), or si active ;

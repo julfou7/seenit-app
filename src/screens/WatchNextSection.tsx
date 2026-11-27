@@ -28,9 +28,12 @@ import './watchNext18c.css';
 import { HomeSwipeCard } from '../components/cards/HomeSwipeCard';
 import { HomeLayoutSwitch } from '../components/cards/HomeLayoutSwitch';
 import { HomeLoadMore } from '../components/cards/HomeLoadMore';
+import { ComingBackRail } from '../components/cards/ComingBackRail';
 
 interface Props {
   onExplore?: () => void;
+  /** « Tout À venir » de « Ça revient » : bascule sur l'onglet À venir. */
+  onUpcoming?: () => void;
   onPerson?: (id: number) => void;
   onOpenMedia?: (id: number, type: 'tv' | 'movie') => void;
   allShows: Show[];
@@ -66,7 +69,7 @@ const WatchSeriesItem = React.memo(function WatchSeriesItem({ show, today, layou
   return <ContinueWatchingCard show={show} today={today} layout={layout} animateSeen showStaleDetail={stale} lastMarkedEpisode={receipt}
     onMarkUnseen={onUnseen} onMarkAsSeen={onMark} onSeenFeedbackComplete={onComplete} onShowClick={onOpen} onEpisodeClick={onEpisode} actions={actions(show)} />;
 });
-export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
+export function WatchNextSection({ onExplore, onUpcoming, onOpenMedia, allShows, groups, movies, active, onOpen, onEpisode, onMarkSeries, onMarkMovie, onUnseen, actions }: Props) {
   const { index: actorIndex, metadata: actorMetadata } = useMovieActors(allShows, active);
   const favorites = useFavoritePeopleStore(state => state.people);
   const [actorSheet, setActorSheet] = useState<{ actor: TicketActor; origin: Show } | null>(null);
@@ -353,7 +356,9 @@ export function WatchNextSection({ onExplore, onOpenMedia, allShows, groups, mov
       </section>;
   };
   return <section className="watch-next-18c home-watch" aria-label="À regarder">
-    {[0, 1].map(renderSeriesGroup)}
+    {renderSeriesGroup(0)}
+    <ComingBackRail shows={allShows} today={today} onOpen={onOpen} onUpcoming={onUpcoming} />
+    {renderSeriesGroup(1)}
     {orderedMovies.length > 0 && <>
       <div className="home-section-heading"><h2><span className="home-section-name">Films à voir</span><span className="home-count">{movies.length}</span></h2><HomeLayoutSwitch label="Films" list={movieList} onChange={switchMovies} /></div>
       <div className="home-movie-sort" role="group" aria-label="Trier les films à voir">

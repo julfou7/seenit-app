@@ -117,7 +117,8 @@ test('SEENIT-NOTIFICATION-009 la cloche agit sur son seul épisode et montre les
   calls.prefs = undefined;
   const notifier = read('src/hooks/useRemindersNotifier.ts');
   assert.match(notifier, /if \(userPrefs\.release_today_tv \|\| isSpecificReminder \|\| s\.notificationsEnabled === true\) \{/, 'un épisode allumé est prévenu même sans « Sortie du jour »');
-  assert.match(read('src/components/EpisodeReminderBell.tsx'), /const label = `\$\{reminder \? 'Couper' : 'Activer'\} le rappel de \$\{code\}`;/, 'le nom accessible dit que la cloche agit sur cet épisode');
+  // « Ça revient » (SEENIT-UX-024) y ajoute le nom de la série, toujours suivi du code de l'épisode.
+  assert.match(read('src/components/EpisodeReminderBell.tsx'), /const label = `\$\{reminder \? 'Couper' : 'Activer'\} le rappel de \$\{subject \? `\$\{subject\}, ` : ''\}\$\{code\}`;/, 'le nom accessible dit que la cloche agit sur cet épisode');
 });
 
 // Retour terrain du 18/11 (« si je coupe E05 ça me coupe tout » ; « je mets E08 en cloche et tous les autres, avant et
