@@ -39,8 +39,20 @@ export function reconcileSeriesStatus(status: Show['status'], next: { air_date?:
 }
 
 /** Retour du 25/11 : trois ans sans activité (spectateur ou série) suffisent pour ranger une série automatiquement. */
-export const INACTIVITY_ARCHIVE_DAYS = 3 * 365;
-const DAY_MS = 86_400_000;
+export const INACTIVITY_ARCHIVE_YEARS = 3;
+
+/**
+ * Même instant, trois ans **civils** plus tôt (UTC). Un compte fixe de 3 × 365 jours archivait la série un jour
+ * avant son troisième anniversaire dès qu'un 29 février tombait dans l'intervalle. Un 29 février sans équivalent
+ * trois ans plus tôt devient le 28.
+ */
+export function inactivityCutoff(now: number): number {
+  const date = new Date(now);
+  const month = date.getUTCMonth();
+  date.setUTCFullYear(date.getUTCFullYear() - INACTIVITY_ARCHIVE_YEARS);
+  if (date.getUTCMonth() !== month) date.setUTCDate(0);
+  return date.getTime();
+}
 
 /** Retour du 25/11 : provenance de l'archive (`inactivity`) et date de l'archivage pour inactivité, stockées dans la fiche. */
 export interface InactivityArchiveFields { archiveSource?: 'manual' | 'inactivity'; inactivityArchivedAt?: number }
@@ -57,10 +69,10 @@ export function seriesInactivity(show: ArchiveShow, now = Date.now()): { inactiv
   if (show.mediaType !== 'tv' || show.status === 'dropped' || show.status === 'completed') return { inactive: false, lastActivity: null };
   // Les champs absents (ancienne fiche) sont tolérés par seriesPause.
   const pause = seriesPause(show as Pick<Show, 'seenEpisodes' | 'episodeRecords' | 'lastWatchedAt' | 'createdAt'>, now);
-  if (!pause.started) return { inactive: false, lastActivity: null };
-  const lastActivity = now - pause.days * DAY_MS;
+  // Commencée mais sans aucune date de visionnage connue : rien n'est deviné, la série n'est pas archivée.
+  if (!pause.started || !pause.at) return { inactive: false, lastActivity: null };
   const next = show.nextEpisodeToWatch as { air_date?: string | null } | null | undefined;
-  return { inactive: hasAiredUnseenEpisode(next, dayOf(now)) && pause.days >= INACTIVITY_ARCHIVE_DAYS, lastActivity };
+  return { inactive: hasAiredUnseenEpisode(next, dayOf(now)) && pause.at <= inactivityCutoff(now), lastActivity: pause.at };
 }
 
 /**
@@ -73,7 +85,7 @@ export function isDormantSeries(show: ArchiveShow, now = Date.now()): boolean {
   if (show.nextEpisodeToWatch || show.nextEpisodeToAir) return false;
   const dates = Object.values(show.seasonProgress || {}).map(season => season?.last_known_episode_air_date || '').filter(date => /^\d{4}-\d{2}-\d{2}$/.test(date)).sort();
   const last = dates.at(-1);
-  return Boolean(last) && Date.parse(last + 'T12:00:00Z') <= now - INACTIVITY_ARCHIVE_DAYS * DAY_MS;
+  return Boolean(last) && Date.parse(last + 'T12:00:00Z') <= inactivityCutoff(now);
 }
 
 /** L'archive pour inactivité déjà posée couvre-t-elle l'inactivité en cours ? (sinon l'utilisateur l'a levée puis rien vu) */
@@ -99,4 +111,18 @@ export function isNewInactivityArchive(show: ArchiveShow, archived: boolean, now
   if (!archived || show.isArchived) return false;
   const { inactive, lastActivity } = seriesInactivity(show, now);
   return inactive && !inactivityAlreadyHandled(show, lastActivity);
+}
+
+/**
+ * Retour du 25/11 : une seule notification système par passe. Une série : son titre et son affiche ; plusieurs :
+ * « N séries archivées » avec au plus trois titres. Aucune série : rien à annoncer.
+ */
+export function inactivityArchiveNotification(archived: readonly Pick<Show, 'id' | 'title'>[]): { title: string; body: string; tag: string; showId?: string } | null {
+  if (!archived.length) return null;
+  if (archived.length === 1) {
+    const [show] = archived;
+    return { title: show.title, body: 'Série archivée automatiquement pour inactivité.', tag: `notif_${show.id}_inactivity`, showId: String(show.id) };
+  }
+  const names = archived.slice(0, 3).map(show => show.title).join(', ') + (archived.length > 3 ? '…' : '');
+  return { title: `${archived.length} séries archivées`, body: `Archivées automatiquement pour inactivité : ${names}`, tag: 'notif_inactivity_archive' };
 }

@@ -904,6 +904,10 @@
         {
           "file": "tests/seriesRevival.test.ts",
           "contains": "SEENIT-DATA-008 retour du 25/11 : une série dormante depuis 3 ans est rangée en silence, un nouvel épisode la réactive"
+        },
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 archivage pour inactivité : bornes des trois ans, séries finies ou jamais commencées, annonce groupée"
         }
       ]
     },
