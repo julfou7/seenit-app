@@ -113,6 +113,23 @@ export function isNewInactivityArchive(show: ArchiveShow, archived: boolean, now
   return inactive && !inactivityAlreadyHandled(show, lastActivity);
 }
 
+/** Série rangée par la passe d'inactivité et toujours archivée : elle peut être désarchivée sans perdre sa progression. */
+export const isInactivityArchive = (show: InactivityArchiveFields & Partial<Pick<Show, 'mediaType' | 'isArchived'>> | null | undefined): boolean =>
+  Boolean(show && show.mediaType === 'tv' && show.isArchived === true && show.archiveSource === 'inactivity');
+
+/**
+ * Retour du 27/11 : « Désarchiver » lève l'archive pour inactivité sans toucher à la progression, et garde (ou pose)
+ * `inactivityArchivedAt` : la passe de masse voit alors cette inactivité comme déjà traitée et ne la réarchive pas.
+ */
+export function inactivityRestorePatch(show: InactivityArchiveFields, now = Date.now()) {
+  return { isArchived: false, archiveSource: undefined, inactivityArchivedAt: typeof show.inactivityArchivedAt === 'number' ? show.inactivityArchivedAt : now, updatedAt: now };
+}
+
+/** Annuler « Désarchiver » remet exactement l'archive pour inactivité d'avant, sans nouvelle annonce. */
+export function inactivityReArchivePatch(show: InactivityArchiveFields, now = Date.now()) {
+  return { isArchived: true, archiveSource: 'inactivity' as const, inactivityArchivedAt: typeof show.inactivityArchivedAt === 'number' ? show.inactivityArchivedAt : now, updatedAt: now };
+}
+
 /**
  * Retour du 25/11 : une seule notification système par passe. Une série : son titre et son affiche ; plusieurs :
  * « N séries archivées » avec au plus trois titres. Aucune série : rien à annoncer.

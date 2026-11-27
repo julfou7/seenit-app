@@ -776,6 +776,10 @@ swipes de suppression/abandon sur les cartes.
 - Depuis le 25/11, une série commencée sans aucun épisode vu depuis 3 ans alors qu'il en reste à voir est
   archivée automatiquement (trois années civiles après le dernier épisode vu), avec une notification « archivée
   automatiquement pour inactivité », une seule pour plusieurs séries ; elle revient dès qu'un épisode est vu. Une série qui ne sort plus rien depuis 3 ans sans être déclarée finie est rangée en silence.
+- Depuis le 27/11, une série archivée pour inactivité se récupère d'un geste avec « Désarchiver » : bouton de
+  l'actualité « ARCHIVÉE », action de la notification Android (série seule) et bouton principal / menu ⋮ de la fiche,
+  à la place de « Revoir la série ». La progression est intacte, le toast propose « Annuler », et la série n'est pas
+  réarchivée à la synchronisation suivante tant qu'aucun nouvel épisode n'a été vu puis délaissé 3 ans.
 - Lorsque Téléchargements est activé, Sonarr existe au niveau série, saison ou épisode et le détail
   affiche sa disponibilité par saison/épisode.
 - Lorsque Téléchargements est désactivé, le détail d'épisode ne montre ni « Télécharger », ni

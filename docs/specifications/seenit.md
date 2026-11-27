@@ -1,7 +1,7 @@
 # SeenIt — Spécification fonctionnelle et technique vivante
 
 Dernière mise à jour : 23 octobre 2026
-Version applicative : **1.4.354**
+Version applicative : **1.4.355**
 Plateformes : **PWA Web** et **APK Android Capacitor**
 Statut : source de vérité active ; les audits datés restent des archives de décision.
 
@@ -197,7 +197,12 @@ rapide. Une donnée incertaine doit rester non résolue plutôt que produire un 
   `inactivityArchivedAt`) par la seule passe de masse de la synchronisation, qui l'annonce : une actualité
   « Archivée automatiquement pour inactivité » par série dans la cloche et une notification système (groupée
   au-delà d'une série) si les actualités sont activées. Elle reste archivée tant qu'aucun épisode n'est vu, revient
-  dès qu'un épisode l'est, et n'est jamais réarchivée pour la même inactivité si l'utilisateur la désarchive ;
+  dès qu'un épisode l'est, et n'est jamais réarchivée pour la même inactivité si l'utilisateur la désarchive.
+  Décision du 27/11 : « Désarchiver » est proposé sur l'actualité « ARCHIVÉE », comme action de la notification
+  Android d'une série, et sur la fiche à la place de « Revoir la série » (qui remet la progression à zéro) ; il lève
+  l'archive sans toucher à la progression, garde `inactivityArchivedAt` pour que la synchronisation ne la réarchive
+  pas, et un toast permet d'annuler. L'annonce native reste dans le panneau tant que la série est archivée et en est
+  retirée dès qu'elle revient ;
   (5) une série à jour, sans épisode annoncé, non déclarée finie par TMDB et dont le dernier épisode connu date
   de plus de 3 ans (même borne civile) est archivée en silence, et réactivée dès qu'un épisode est annoncé ou diffusé. L'identité est
   `mediaType + TMDB ID`, jamais le titre ; la réconciliation est idempotente et identique sur PWA et APK
@@ -275,7 +280,7 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   « À jour · N saisons vues », « Dans ta liste », « À jour · N épisodes vus ») ; elle ouvre la fiche série, et
   « Tout À venir » ouvre l'onglet À venir. Le jour de la sortie, la série n'y est plus : elle suit les règles
   ci-dessus (Nouveautés ou Continuer à regarder).
-- **SEENIT-UX-025** — **Ça revient, sur les vraies données** (`USR-2026-11-27-002`) : un **retour** où la saison
+- **SEENIT-UX-025** — **Ça revient, sur les vraies données** (`USR-2026-11-27-003`) : un **retour** où la saison
   précédente est vue en entier s'annonce jusqu'à **120 jours** (les nouvelles saisons se datent des mois à
   l'avance) ; première et finale restent à 45 jours. Sous 45 jours, un **retour** dont la saison précédente est
   commencée mais pas finie, ou une **finale** d'une saison commencée où il reste des épisodes sortis, entre aussi,

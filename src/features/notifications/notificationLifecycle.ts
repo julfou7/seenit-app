@@ -16,6 +16,9 @@ export function isObsoleteMediaAlert(alert: DeliveredMediaAlert, uid: string, sh
   const show = shows.find(item => item.userId === uid && item.mediaType === data.mediaType
     && String(item.id) === String(data.showId));
   if (!show) return false;
+  // Retour du 27/11 : l'annonce d'archivage pour inactivité vit tant que la série est archivée (elle porte
+  // « Désarchiver ») ; elle devient obsolète dès que la série revient, jamais parce qu'elle est archivée.
+  if (data.reminderPurpose === 'inactivity_archive') return show.isArchived !== true;
   if (show.isArchived || show.status === 'dropped') return true;
   if (show.mediaType === 'movie') return show.notificationsEnabled === false || show.seenEpisodes.includes('movie');
   const season = Number(data.season), episode = Number(data.episode);

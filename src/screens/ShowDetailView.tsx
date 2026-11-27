@@ -2,7 +2,7 @@ import { arrSyncKey, notifyArrWrite } from '../store/arrSyncStore';
 import { DialogLayer } from '../components/ui/DialogLayer';
 import React, { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { tmdb, isMovieAtCinema, isMovieUpcoming } from '../features/shows/tmdb';
-import { ChevronLeft, Heart, MoreVertical, Play, RefreshCw, RotateCcw, Ban, Trash2, Share2 } from 'lucide-react';
+import { ChevronLeft, Heart, MoreVertical, Play, RefreshCw, RotateCcw, Ban, Trash2, Share2, ArchiveRestore } from 'lucide-react';
 import { DownloadMark } from '../components/SeenItLogo';
 import { cn, getTodayStr, openExternalUrl } from '../lib/utils';
 import { auth } from '../lib/firebase';
@@ -27,6 +27,7 @@ import { CastRows, RelationList, RelationsLoading, ThemesCard } from './mediaDet
 import { SeasonAverageChart, SeasonPanel, SeasonPills, SeriesProgressCard, seasonsOf } from './mediaDetail/seriesSections';
 import { MovieEndCard, VerifiedSimilarRail } from './mediaDetail/movieSections';
 import type { ShowDetailViewModel } from './mediaDetail/showDetailViewModel';
+import { isInactivityArchive } from '../features/shows/seriesRevival';
 import { DownloadModeBanner, DownloadModeBar, DownloadModeToggle, isEpisodePickable, isEpisodeProgrammable, seasonModeStates } from './mediaDetail/downloadMode';
 import { SeenItRing } from '../components/SeenItLogo';
 import { episodeDownloadPresentation } from '../features/downloads/episodeDownloadPresentation';
@@ -63,7 +64,7 @@ export function formatDuration(minutes?: number | null): string {
  * relations en frise et « Similaires, et pourquoi » (films). Les actions de cycle de vie restent dans ⋮.
  */
 export function ShowDetailView({ model }: ShowDetailViewProps) {
-  const { areThemesExpanded, backdropUrl, collectionData, collectionLoading, originBroadcaster, downloadTargetEpisode, downloadTargetSeason, dropShow, effectiveTmdbId, epStatus, expandedSeason, followShow, handleAnimatedBack, handleDeleteShow, handleShare, handleSyncSingle, handleWatchNextEpisode, hasSeenMedia, hasTrailer, isDownloadModalOpen, isExiting, isRefreshingPlex, isSeries, isSyncingSingle, isSynopsisExpanded, isUnreleased, keywords, loadSeason, mainScrollRef, nextEp, onShowClick, openEpisodeModal, openPersonModal, plexMediaInfo, posterPath, providers, providersFailed, ratingInfo, refreshPlexAvailability, releaseYear, remainingTimeMinutes, requestedMediaKey, resumeShow, rewatchShow, seasonsCache, seenCount, selectedEpisode, selectedPersonId, setAreThemesExpanded, setDownloadTargetEpisode, setDownloadTargetSeason, setIsDownloadModalOpen, setIsSynopsisExpanded, setSeasonsCache, setSelectedEpisode, setSelectedPersonId, setShowMenu, setTrailerModalVideos, show, showMenu, showToast, sortedProviders, title, tmdbDetails, toggleEpisodeSeen, toggleFavorite, toggleMovieSeen, togglePlanToWatchMovie, toggleSeasonSeen, totalEpisodes, trailerModalVideos, universeData, userPlatforms, ytVideos } = model;
+  const { areThemesExpanded, backdropUrl, collectionData, collectionLoading, originBroadcaster, downloadTargetEpisode, downloadTargetSeason, dropShow, effectiveTmdbId, epStatus, expandedSeason, followShow, handleAnimatedBack, handleDeleteShow, handleShare, handleSyncSingle, handleWatchNextEpisode, hasSeenMedia, hasTrailer, isDownloadModalOpen, isExiting, isRefreshingPlex, isSeries, isSyncingSingle, isSynopsisExpanded, isUnreleased, keywords, loadSeason, mainScrollRef, nextEp, onShowClick, openEpisodeModal, openPersonModal, plexMediaInfo, posterPath, providers, providersFailed, ratingInfo, refreshPlexAvailability, releaseYear, remainingTimeMinutes, requestedMediaKey, restoreShow, resumeShow, rewatchShow, seasonsCache, seenCount, selectedEpisode, selectedPersonId, setAreThemesExpanded, setDownloadTargetEpisode, setDownloadTargetSeason, setIsDownloadModalOpen, setIsSynopsisExpanded, setSeasonsCache, setSelectedEpisode, setSelectedPersonId, setShowMenu, setTrailerModalVideos, show, showMenu, showToast, sortedProviders, title, tmdbDetails, toggleEpisodeSeen, toggleFavorite, toggleMovieSeen, togglePlanToWatchMovie, toggleSeasonSeen, totalEpisodes, trailerModalVideos, universeData, userPlatforms, ytVideos } = model;
   const libraryShows = useShowsStore(state => state.shows);
   const downloadsEnabled = useDownloadConfigStore(isDownloadFeatureEnabled);
   const movieAvailable = !isSeries && Boolean(model.presence.radarrHasFile || model.presence.plexInfo?.available);
@@ -116,6 +117,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
   const seriesCta = (() => {
     if (!show) return <GoldCta label="Suivre la série" onClick={followShow} />;
     if (show.status === 'dropped') return <GoldCta label="Reprendre la série" onClick={resumeShow} />;
+    // Retour du 27/11 : une série archivée pour inactivité n'est pas finie ; « Revoir » remettrait tout à zéro.
+    if (isInactivityArchive(show)) return <GoldCta label={<span className="inline-flex items-center gap-2"><ArchiveRestore size={18} />Désarchiver</span>} sub="Reprendre où tu en étais" ariaLabel="Désarchiver la série" onClick={restoreShow} />;
     if (show.isArchived) return <GoldCta tone="done" label="Revoir la série" onClick={rewatchShow} />;
     if (!epStatus) return <GoldCta tone="done" label="✓ Série à jour" ariaLabel="Série à jour sur la diffusion" />;
     if (epStatus.isUpcoming) return <GoldCta tone="neutral" label={epStatus.label} sub="Ouvrir l’épisode" onClick={handleWatchNextEpisode} />;
@@ -406,7 +409,8 @@ export function ShowDetailView({ model }: ShowDetailViewProps) {
           {(!movieAvailable && (isSeries || !model.presence.loading)) ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); if (canUseDownloadMode) { enterDownloadMode(); return; } if (canUseFilmMode) { setFilmMode(true); return; } setDownloadTargetSeason(undefined); setDownloadTargetEpisode(undefined); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><DownloadMark size={22} className="shrink-0 text-[#E5A93D]" /><span className="min-w-0">Téléchargement{(canUseDownloadMode || canUseFilmMode) && menuSub(canUseFilmMode ? 'Mode téléchargement du film' : `Mode téléchargement${activeDownloads ? ` · ${activeDownloads} en cours` : ''}`)}</span></button> : <button type="button" role="menuitem" disabled={model.presence.loading} onClick={() => { setShowMenu(false); setIsDownloadModalOpen(true); }} className={cn(menuItem, 'text-zinc-100')}><DownloadMark size={22} className="shrink-0 text-[#E5A93D]" />{model.presence.loading ? 'Vérification de la disponibilité…' : 'Disponible · autre version'}</button>}
           {show && <>
             <span aria-hidden="true" className="mx-3.5 my-1 h-px bg-white/[0.07]" />
-            {show.isArchived ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? rewatchShow() : toggleMovieSeen(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Revoir la série' : 'Revoir le film'}</button>
+            {isInactivityArchive(show) ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); restoreShow(); }} className={cn(menuItem, 'text-zinc-100')}><ArchiveRestore size={18} className="text-[#F2C36B]" />Désarchiver la série</button>
+              : show.isArchived ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? rewatchShow() : toggleMovieSeen(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Revoir la série' : 'Revoir le film'}</button>
               : show.status === 'dropped' ? <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? resumeShow() : togglePlanToWatchMovie(); }} className={cn(menuItem, 'text-zinc-100')}><RotateCcw size={18} className="text-[#F2C36B]" />{isSeries ? 'Reprendre la série' : 'Ajouter à ma liste'}</button>
               : <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); isSeries ? dropShow() : togglePlanToWatchMovie(); }} className={cn(menuItem, 'text-zinc-100')}><Ban size={18} className="text-zinc-400" />{isSeries ? 'Abandonner la série' : 'Retirer de ma liste'}</button>}
             <button type="button" role="menuitem" onClick={(e) => { e.stopPropagation(); setShowMenu(false); handleDeleteShow(); }} className={cn(menuItem, 'text-red-300')}><Trash2 size={18} />{isSeries ? 'Supprimer la série' : 'Supprimer le film'}</button>
