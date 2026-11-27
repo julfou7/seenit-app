@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { Show } from '../src/types.ts';
-import { classifyComingBack, comingBackCountdown, comingBackDays, selectComingBack, COMING_BACK_HORIZON_DAYS } from '../src/features/watchlist/comingBack.ts';
+import { classifyComingBack, comingBackCountdown, comingBackDays, selectComingBack, COMING_BACK_HORIZON_DAYS, COMING_BACK_RETURN_HORIZON_DAYS } from '../src/features/watchlist/comingBack.ts';
 
 // Retour terrain du 27/11 (maquette validée) : « un aperçu de À venir sous Continuer à regarder […] une série qui
 // commence et dont j'ai vu la saison précédente, ou alors c'est la 1re : c'est un truc que j'aime et je suis à jour ».
@@ -34,7 +34,7 @@ test('SEENIT-UX-024 « Ça revient » : nouvelle saison d’une série dont la s
   assert.equal(classifyComingBack(lioness, today)?.reason, 'À jour · 2 saisons vues');
 
   const unfinished = series({ seenEpisodes: episodes(1, 9), seasonProgress: proof(1, 10) as Show['seasonProgress'], nextEpisodeToAir: next(2, 1, 3) });
-  assert.equal(classifyComingBack(unfinished, today), null, 'saison précédente pas finie');
+  assert.equal(classifyComingBack(unfinished, today)?.behind, 1, 'saison précédente pas finie : à rattraper (SEENIT-UX-025)');
 
   // Sans total prouvé, la saison est finie seulement s'il ne reste rien de sorti à voir.
   const upToDate = series({ seenEpisodes: episodes(1, 6), nextEpisodeToWatch: next(2, 1, 3), nextEpisodeToAir: next(2, 1, 3) });
@@ -55,7 +55,7 @@ test('SEENIT-UX-024 première d’une série pas commencée, finale d’une sais
   assert.equal(item?.label, 'Finale · saison 3');
   assert.equal(item?.reason, 'À jour · 7 épisodes vus');
 
-  assert.equal(classifyComingBack(series({ ...finale, seenEpisodes: episodes(3, 6) }), today), null, 'épisode 7 pas vu');
+  assert.equal(classifyComingBack(series({ ...finale, seenEpisodes: episodes(3, 6) }), today)?.reason, '1 épisode à rattraper', 'épisode 7 pas vu (SEENIT-UX-025)');
   assert.equal(classifyComingBack(series({ ...finale, nextEpisodeToAir: next(3, 5, 2) }), today), null, 'pas le dernier épisode de la saison');
   assert.equal(classifyComingBack(series({ ...finale, seasonProgress: proof(3, null) as Show['seasonProgress'] }), today), null, 'total de saison inconnu');
   // Un finale dont la date est connue suffit à prouver le total, même sans nombre d'épisodes annoncé.
@@ -65,7 +65,7 @@ test('SEENIT-UX-024 première d’une série pas commencée, finale d’une sais
   assert.equal(classifyComingBack(series({ seenEpisodes: episodes(2, 3), seasonProgress: proof(2, 8) as Show['seasonProgress'], nextEpisodeToAir: next(2, 4, 2) }), today), null);
 });
 
-test('SEENIT-UX-024 horizon de 45 jours, jamais le jour de la sortie ni film, archive ou abandon ; cinq au plus, la plus proche d’abord', () => {
+test('SEENIT-UX-024 horizon de 45 jours, jamais le jour de la sortie ni film, archive ou abandon ; huit au plus, la plus proche d’abord', () => {
   const base = { status: 'plan_to_watch' as const };
   assert.equal(classifyComingBack(series({ ...base, nextEpisodeToAir: next(1, 1, 0) }), today), null, 'le jour même, la série passe dans Nouveautés');
   assert.equal(classifyComingBack(series({ ...base, nextEpisodeToAir: next(1, 1, COMING_BACK_HORIZON_DAYS + 1) }), today), null);
@@ -75,8 +75,8 @@ test('SEENIT-UX-024 horizon de 45 jours, jamais le jour de la sortie ni film, ar
   assert.equal(classifyComingBack(series({ status: 'dropped', nextEpisodeToAir: next(1, 1, 5) }), today), null);
   assert.equal(classifyComingBack(series({ ...base, nextEpisodeToAir: { season_number: 1, episode_number: 1, air_date: null } }), today), null, 'sans date, rien');
 
-  const shows = [9, 2, 30, 5, 1, 12, 40].map((days, index) => series({ ...base, id: `s${index}`, title: `Série ${index}`, nextEpisodeToAir: next(1, 1, days) }));
-  assert.deepEqual(selectComingBack(shows, today).map(item => item.days), [1, 2, 5, 9, 12]);
+  const shows = [9, 2, 30, 5, 1, 12, 40, 7, 3, 20].map((days, index) => series({ ...base, id: `s${index}`, title: `Série ${index}`, nextEpisodeToAir: next(1, 1, days) }));
+  assert.deepEqual(selectComingBack(shows, today).map(item => item.days), [1, 2, 3, 5, 7, 9, 12, 20]);
 });
 
 test('SEENIT-UX-024 compte à rebours : « J-N » et sa semaine sous sept jours, sinon la date', () => {
@@ -99,4 +99,44 @@ test('SEENIT-UX-024 l’accueil place « Ça revient » entre Continuer à regar
   const card = readFileSync(new URL('../src/components/cards/ComingBackRail.tsx', import.meta.url), 'utf8');
   assert.match(card, /<EpisodeReminderBell show=\{show\} episode=\{episode\} subject=\{show\.title\} \/>/, 'la cloche de l’épisode, comme sur la fiche');
   assert.match(card, /if \(!items\.length\) return null;/, 'section masquée quand elle est vide');
+});
+
+// Retour terrain du 27/11 sur les vraies données : deux cartes seulement, alors que Daryl Dixon (à jour, 3 saisons) et
+// Présumé innocent (saison 1 vue) reviennent en février, que Loups garous revient dans 7 jours avec 8 épisodes de
+// saison 2 à voir et que la finale de Singapura sort dans 3 jours avec un épisode de retard.
+test('SEENIT-UX-025 un retour où tu es à jour s’annonce jusqu’à 120 jours ; première et finale restent à 45 jours', () => {
+  const daryl = series({ id: 'daryl', title: 'Daryl Dixon', seenEpisodes: [...episodes(1, 6), ...episodes(2, 6), ...episodes(3, 7)],
+    seasonProgress: { ...proof(1, 6), ...proof(2, 6), ...proof(3, 7), ...proof(4, null) } as Show['seasonProgress'], nextEpisodeToAir: next(4, 1, 87) });
+  const item = classifyComingBack(daryl, today);
+  assert.deepEqual([item?.kind, item?.label, item?.reason, item?.behind], ['return', 'Retour · saison 4', 'À jour · 3 saisons vues', 0]);
+  assert.ok(classifyComingBack(series({ ...daryl, nextEpisodeToAir: next(4, 1, COMING_BACK_RETURN_HORIZON_DAYS) }), today));
+  assert.equal(classifyComingBack(series({ ...daryl, nextEpisodeToAir: next(4, 1, COMING_BACK_RETURN_HORIZON_DAYS + 1) }), today), null);
+  assert.equal(classifyComingBack(series({ status: 'plan_to_watch', nextEpisodeToAir: next(1, 1, COMING_BACK_HORIZON_DAYS + 1) }), today), null, 'première au-delà de 45 jours');
+  const finale = series({ seenEpisodes: episodes(3, 7), seasonProgress: proof(3, 8) as Show['seasonProgress'], nextEpisodeToAir: next(3, 8, COMING_BACK_HORIZON_DAYS + 1) });
+  assert.equal(classifyComingBack(finale, today), null, 'finale au-delà de 45 jours');
+  // Le rattrapage reste à 45 jours : un retour lointain d'une saison pas finie, c'est Continuer à regarder.
+  const farBehind = series({ seenEpisodes: episodes(1, 3), seasonProgress: proof(1, 8) as Show['seasonProgress'], nextEpisodeToAir: next(2, 1, 60) });
+  assert.equal(classifyComingBack(farBehind, today), null);
+  // La plus proche d'abord : les retours lointains complètent le rail sans passer devant.
+  const soon = series({ id: 'soon', title: 'Bientôt', status: 'plan_to_watch', nextEpisodeToAir: next(1, 1, 20) });
+  assert.deepEqual(selectComingBack([daryl, soon], today).map(entry => entry.show.id), ['soon', 'daryl']);
+});
+
+test('SEENIT-UX-025 retour ou finale d’une saison commencée : le nombre d’épisodes à rattraper avant la sortie', () => {
+  const wolves = series({ id: 'wolves', title: 'Loups garous', seenEpisodes: [...episodes(1, 8), ...episodes(2, 2)],
+    seasonProgress: { ...proof(1, 8), ...proof(2, 10), ...proof(3, null) } as Show['seasonProgress'], nextEpisodeToAir: next(3, 1, 7) });
+  const back = classifyComingBack(wolves, today);
+  assert.deepEqual([back?.kind, back?.label, back?.reason, back?.behind], ['return', 'Retour · saison 3', '8 épisodes à rattraper', 8]);
+
+  const singapura = series({ id: 'singapura', title: 'Singapura', seenEpisodes: episodes(1, 4), seasonProgress: proof(1, 6) as Show['seasonProgress'], nextEpisodeToAir: next(1, 6, 3) });
+  const last = classifyComingBack(singapura, today);
+  assert.deepEqual([last?.kind, last?.label, last?.reason, last?.behind], ['finale', 'Finale · saison 1', '1 épisode à rattraper', 1]);
+
+  assert.equal(classifyComingBack(series({ ...wolves, seenEpisodes: episodes(1, 8) }), today), null, 'saison précédente jamais commencée');
+  assert.equal(classifyComingBack(series({ ...singapura, seenEpisodes: [] }), today), null, 'saison jamais commencée');
+  assert.equal(classifyComingBack(series({ ...wolves, seasonProgress: { ...proof(1, 8), ...proof(2, null) } as Show['seasonProgress'], totalAiredEpisodes: 18 }), today), null, 'sans total prouvé, pas de compte');
+  assert.equal(classifyComingBack(series({ ...singapura, nextEpisodeToAir: next(1, 5, 3) }), today), null, 'un épisode du milieu de saison n’entre pas');
+
+  const card = readFileSync(new URL('../src/components/cards/ComingBackRail.tsx', import.meta.url), 'utf8');
+  assert.match(card, /kind !== 'premiere' && !behind && <SeenItRing/, 'pas d’anneau Vu quand il reste des épisodes à voir');
 });

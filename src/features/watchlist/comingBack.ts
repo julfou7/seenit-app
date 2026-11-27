@@ -7,6 +7,10 @@ import { resolveWatchCardResume } from './watchCardResume.ts';
  * - retour : nouvelle saison datée d'une série dont tu as vu toute la saison précédente ;
  * - première : saison 1 d'une série de ta liste, pas encore commencée ;
  * - finale : dernier épisode de saison d'une série où tu es à jour.
+ * Retour terrain du 27/11 sur les vraies données :
+ * - un retour où tu es à jour s'annonce jusqu'à 120 jours (une nouvelle saison se date des mois avant) ;
+ * - dans les 45 jours, un retour ou une finale d'une saison commencée mais pas finie s'affiche aussi, avec le
+ *   nombre d'épisodes à rattraper avant la sortie.
  * Le jour de la sortie, la série quitte « Ça revient » pour Nouveautés ou Continuer à regarder (règles existantes).
  */
 export type ComingBackKind = 'return' | 'premiere' | 'finale';
@@ -28,10 +32,15 @@ export interface ComingBackItem {
   label: string;
   /** Pourquoi la série est là, avec les mots de l'interface. */
   reason: string;
+  /** Épisodes sortis à rattraper avant la sortie (0 : tu es à jour). */
+  behind: number;
 }
 
 export const COMING_BACK_HORIZON_DAYS = 45;
-export const COMING_BACK_LIMIT = 5;
+/** Un retour où tu es à jour s'annonce plus tôt : les nouvelles saisons sont datées des mois à l'avance. */
+export const COMING_BACK_RETURN_HORIZON_DAYS = 120;
+/** Huit cartes : avec les retours lointains et le rattrapage, cinq coupaient déjà une série à jour (27/11). */
+export const COMING_BACK_LIMIT = 8;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const KIND_ORDER: Record<ComingBackKind, number> = { return: 0, finale: 1, premiere: 2 };
@@ -90,6 +99,17 @@ function previousSeasonComplete(show: Show, seen: Set<string>, season: number, t
   return resolveWatchCardResume(show, today).episode === null;
 }
 
+/** Épisodes d'une saison commencée qui restent à voir, seulement si le total de la saison est prouvé. */
+function provenBehind(show: Show, seen: Set<string>, season: number, total: number | null = provenSeasonTotal(show.seasonProgress?.[String(season)])): number {
+  const watched = seenInSeason(seen, season);
+  if (watched === 0 || total === null) return 0;
+  return Math.max(0, total - watched);
+}
+
+function behindReason(behind: number): string {
+  return `${behind} épisode${behind > 1 ? 's' : ''} à rattraper`;
+}
+
 function returnReason(seen: Set<string>, previous: number): string {
   const allSeasonsStarted = previous >= 2 && Array.from({ length: previous }, (_, index) => index + 1).every(season => seenInSeason(seen, season) > 0);
   return allSeasonsStarted ? `À jour · ${previous} saisons vues` : `Saison ${previous} vue en entier`;
@@ -101,28 +121,39 @@ export function classifyComingBack(show: Show, today: string): ComingBackItem | 
   const episode = validPointer(show);
   if (!episode) return null;
   const days = comingBackDays(episode.air_date, today);
-  if (days < 1 || days > COMING_BACK_HORIZON_DAYS) return null;
+  if (days < 1 || days > COMING_BACK_RETURN_HORIZON_DAYS) return null;
+  const near = days <= COMING_BACK_HORIZON_DAYS;
   const seen = seenKeys(show);
   const { season_number: season, episode_number: number } = episode;
 
   if (season === 1 && number === 1 && seen.size === 0) {
-    return { show, kind: 'premiere', episode, days, label: 'Première', reason: 'Dans ta liste' };
+    return near ? { show, kind: 'premiere', episode, days, label: 'Première', reason: 'Dans ta liste', behind: 0 } : null;
   }
-  if (number === 1 && season >= 2 && previousSeasonComplete(show, seen, season - 1, today)) {
-    return { show, kind: 'return', episode, days, label: `Retour · saison ${season}`, reason: returnReason(seen, season - 1) };
-  }
-  if (number >= 2) {
-    const total = provenSeasonTotal(show.seasonProgress?.[String(season)] ?? show.nextEpisodeToAir);
-    const upToDate = Array.from({ length: number - 1 }, (_, index) => index + 1).every(previous => seen.has(`${season}x${previous}`));
-    if (total === number && upToDate) {
-      const watched = number - 1;
-      return { show, kind: 'finale', episode, days, label: `Finale · saison ${season}`, reason: `À jour · ${watched} épisode${watched > 1 ? 's' : ''} vu${watched > 1 ? 's' : ''}` };
+  if (number === 1 && season >= 2) {
+    const label = `Retour · saison ${season}`;
+    if (previousSeasonComplete(show, seen, season - 1, today)) {
+      return { show, kind: 'return', episode, days, label, reason: returnReason(seen, season - 1), behind: 0 };
     }
+    const behind = near ? provenBehind(show, seen, season - 1) : 0;
+    return behind > 0 ? { show, kind: 'return', episode, days, label, reason: behindReason(behind), behind } : null;
+  }
+  if (number >= 2 && near) {
+    const total = provenSeasonTotal(show.seasonProgress?.[String(season)] ?? show.nextEpisodeToAir);
+    if (total !== number) return null;
+    const label = `Finale · saison ${season}`;
+    const upToDate = Array.from({ length: number - 1 }, (_, index) => index + 1).every(previous => seen.has(`${season}x${previous}`));
+    if (upToDate) {
+      const watched = number - 1;
+      return { show, kind: 'finale', episode, days, label, reason: `À jour · ${watched} épisode${watched > 1 ? 's' : ''} vu${watched > 1 ? 's' : ''}`, behind: 0 };
+    }
+    // Les épisodes avant la finale, pas la finale elle-même : c'est elle qu'on attend.
+    const behind = provenBehind(show, seen, season, number - 1);
+    return behind > 0 ? { show, kind: 'finale', episode, days, label, reason: behindReason(behind), behind } : null;
   }
   return null;
 }
 
-/** Les cartes « Ça revient » : la sortie la plus proche d'abord, cinq au plus. */
+/** Les cartes « Ça revient » : la sortie la plus proche d'abord, huit au plus. */
 export function selectComingBack(shows: readonly Show[], today: string, limit = COMING_BACK_LIMIT): ComingBackItem[] {
   return shows.flatMap(show => { const item = classifyComingBack(show, today); return item ? [item] : []; })
     .sort((a, b) => a.days - b.days || KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.show.title.localeCompare(b.show.title, 'fr'))
