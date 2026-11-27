@@ -101,6 +101,11 @@ prévues ; ce dernier n'accorde aucune confiance à l'appelant et exige les preu
   as vu avant). Nouveautés est réservé aux saisons dont tu en es à
   l'épisode 1 (nouvelle saison ou série pas commencée, `SEENIT-UX-021`). Annuler un Vu qui avait fait passer
   une série de Nouveautés à Continuer la ramène aussitôt dans Nouveautés (`SEENIT-UX-018`).
+- Sous Continuer à regarder, « Ça revient » montre jusqu'à cinq séries de ta liste qui reviennent dans les 45
+  jours : nouvelle saison d'une série dont tu as vu toute la saison précédente, saison 1 d'une série pas encore
+  commencée, ou finale d'une saison où tu es à jour. Chaque carte donne le compte à rebours (« J-3 » et sa
+  semaine, ou la date), la cloche de l'épisode et la raison ; elle ouvre la fiche, « Tout À venir » ouvre
+  l'onglet À venir, et le jour de la sortie la série passe dans Nouveautés ou Continuer (`SEENIT-UX-024`).
 - Une synchro Plex delta sans nouveauté (aucun visionnage, Watchlist identique et déjà suivie) se termine
   juste après la réponse Plex, sans relecture de la bibliothèque (`SEENIT-PLEX-011`).
 - Le cache local du bon UID peut produire le premier rendu, puis Firestore serveur remplace ce rendu.

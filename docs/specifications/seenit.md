@@ -261,6 +261,18 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   Ordre : la dernière activité en tête — le dernier visionnage, ou la sortie d'un nouvel épisode depuis ce
   visionnage : un épisode sorti aujourd'hui passe devant ce qui a été vu avant, et ce qu'on regarde ensuite
   (ici ou ailleurs) repasse devant lui (`SEENIT-UX-018`).
+- **SEENIT-UX-024** — **Ça revient** (`USR-2026-11-27-001`, maquette validée), entre « Continuer à regarder »
+  et « Nouveautés » : les séries de la liste, ni archivées ni abandonnées, dont le prochain épisode annoncé
+  (`nextEpisodeToAir`) sort dans 1 à 45 jours et qui entrent dans l'un de ces cas :
+  **retour** (épisode 1 d'une saison 2 ou plus, la saison précédente vue en entier — par son total prouvé,
+  sinon parce qu'il ne reste rien de sorti à voir), **première** (épisode 1 de la saison 1, aucun épisode vu) ou
+  **finale** (dernier épisode, prouvé, d'une saison dont tous les épisodes précédents sont vus). La sortie la plus
+  proche d'abord, cinq cartes au plus ; section masquée si vide. Chaque carte porte son étiquette (« Retour ·
+  saison N », « Première », « Finale · saison N »), la cloche de cet épisode (`SEENIT-NOTIFICATION-009`), le compte
+  « J-N » et sa semaine en segments sous sept jours (sinon la date), et la raison (« Saison 1 vue en entier »,
+  « À jour · N saisons vues », « Dans ta liste », « À jour · N épisodes vus ») ; elle ouvre la fiche série, et
+  « Tout À venir » ouvre l'onglet À venir. Le jour de la sortie, la série n'y est plus : elle suit les règles
+  ci-dessus (Nouveautés ou Continuer à regarder).
 - **Pas vu depuis un moment** contient les séries candidates qui ne sont ni dans « Nouveautés » ni dans
   « Continuer à regarder ». Pour une série déjà commencée, cela correspond donc à un dernier visionnage
   **strictement supérieur à 60 jours** (`> 60 jours`). Une série jamais commencée et devenue trop ancienne

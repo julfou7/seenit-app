@@ -1,0 +1,29 @@
+/* « Ça revient » (maquette validée du 27/11) : cartes 262 × 236, image de la série, compte à rebours en or. */
+.coming-back .home-section-heading > .coming-back__all { gap:2px; font-size:14px; font-weight:800; color:#f2c36b; }
+.coming-back__rail { gap:10px; }
+.coming-back__rail > .coming-back__card { flex:0 0 262px; scroll-snap-align:start; }
+.coming-back__card { position:relative; width:262px; height:236px; border-radius:24px; overflow:hidden; isolation:isolate; background:linear-gradient(160deg,#3a2c14,#16130c 60%,#111114); box-shadow:inset 0 0 0 1px #ffffff1f,0 10px 28px #0008; color:#fff; }
+.coming-back__card--return { box-shadow:inset 0 0 0 1px #e5a93d59,0 10px 28px #0008; }
+.coming-back__image { position:absolute; inset:0; z-index:-2; width:100%; height:100%; object-fit:cover; }
+.coming-back__shade { position:absolute; inset:0; z-index:-1; background:linear-gradient(180deg,#0b0b0f33 0%,transparent 28%,#0b0b0fcc 70%,#0b0b0f); }
+.coming-back__open { position:absolute; inset:0; z-index:1; border:0; padding:0; background:transparent; border-radius:inherit; cursor:pointer; }
+.coming-back__open:focus-visible { outline:2px solid #f2c36b; outline-offset:-3px; }
+.coming-back__top { position:absolute; left:14px; right:4px; top:8px; z-index:2; display:flex; align-items:center; justify-content:space-between; pointer-events:none; }
+.coming-back__top > button { pointer-events:auto; }
+.coming-back__top > button svg { filter:drop-shadow(0 1px 3px #000c); }
+.coming-back__chip { display:inline-flex; align-items:center; height:26px; padding:0 10px; border-radius:9px; background:#0b0b0fb3; box-shadow:inset 0 0 0 1px #ffffff40; color:#fff; font-size:11.5px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+.coming-back__card--return .coming-back__chip { box-shadow:inset 0 0 0 1px #e5a93d80; color:#f2c36b; }
+.coming-back__card--premiere .coming-back__chip { box-shadow:inset 0 0 0 1px #7dd3fc80; color:#7dd3fc; }
+.coming-back__body { position:absolute; left:16px; right:16px; bottom:14px; z-index:2; display:flex; flex-direction:column; gap:6px; pointer-events:none; }
+.coming-back__when { display:flex; align-items:baseline; gap:8px; margin:0; min-width:0; }
+.coming-back__when > strong { font-size:30px; line-height:1; font-weight:800; letter-spacing:-.03em; color:#fff; white-space:nowrap; }
+.coming-back__when > span { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; font-weight:700; color:#d4d4d8; }
+.coming-back__when.is-near > strong { font-size:40px; letter-spacing:-.04em; color:#f2c36b; }
+.coming-back__when.is-near > span { color:#fff; }
+.coming-back__week { display:flex; gap:3px; }
+.coming-back__week > span { flex:1; height:6px; border-radius:3px; box-shadow:inset 0 0 0 1.5px #ffffff59; }
+.coming-back__week > span[data-elapsed] { background:#e5a93d; box-shadow:none; }
+.coming-back__title { margin:4px 0 0; font-size:18px; line-height:1.15; font-weight:800; color:#fff; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.coming-back__when:not(.is-near) + .coming-back__title { margin-top:10px; }
+.coming-back__reason { display:flex; align-items:center; gap:6px; min-width:0; font-size:12.5px; font-weight:600; color:#d4d4d8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.coming-back__reason > svg { flex-shrink:0; }

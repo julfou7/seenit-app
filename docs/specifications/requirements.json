@@ -4345,6 +4345,36 @@
       ]
     },
     {
+      "id": "SEENIT-UX-024",
+      "title": "Accueil : « Ça revient » — retour, première et finale des séries où tu es à jour, dans les 45 jours",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/comingBack.test.ts",
+          "contains": "SEENIT-UX-024 « Ça revient » : nouvelle saison d’une série dont la saison précédente est vue en entier"
+        },
+        {
+          "file": "tests/comingBack.test.ts",
+          "contains": "SEENIT-UX-024 première d’une série pas commencée, finale d’une saison où tu es à jour"
+        },
+        {
+          "file": "tests/comingBack.test.ts",
+          "contains": "SEENIT-UX-024 horizon de 45 jours, jamais le jour de la sortie ni film, archive ou abandon ; cinq au plus, la plus proche d’abord"
+        },
+        {
+          "file": "tests/comingBack.test.ts",
+          "contains": "SEENIT-UX-024 compte à rebours : « J-N » et sa semaine sous sept jours, sinon la date"
+        },
+        {
+          "file": "tests/comingBack.test.ts",
+          "contains": "SEENIT-UX-024 l’accueil place « Ça revient » entre Continuer à regarder et Nouveautés ; « Tout À venir » ouvre l’onglet"
+        }
+      ]
+    },
+    {
       "id": "SEENIT-PROFILE-005",
       "title": "Animations de Mes chiffres et Mon année une fois à l'entrée, sur transform et opacity",
       "targets": [

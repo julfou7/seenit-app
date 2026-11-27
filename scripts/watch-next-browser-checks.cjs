@@ -58,7 +58,25 @@ async function testWatchNextHarness(client, root) {
     await evaluate(client, 'window.__watch18c=undefined');
     await client.send('Page.navigate', { url: 'http://127.0.0.1:4173/__seenit-watch-next.html' });
     await check(client, 'window.__watch18c && document.querySelectorAll("#home-series-0 article").length===6 && document.querySelectorAll("[data-movie-ticket]").length===6', 'rails de six billets films');
-    await check(client, 'document.querySelectorAll(".home-series-section").length===3 && document.documentElement.scrollWidth<=innerWidth', 'trois sections distinctes sans débordement');
+    await check(client, 'document.querySelectorAll(".home-series-section").length===3 && !document.querySelector(".coming-back") && document.documentElement.scrollWidth<=innerWidth', 'trois sections distinctes sans débordement, « Ça revient » masqué quand il est vide');
+    // SEENIT-UX-024 : « Ça revient » entre Continuer à regarder et Nouveautés, carte de la maquette.
+    await evaluate(client, 'window.__watch18c.addComingBack()');
+    await check(client, 'document.querySelectorAll(".home-series-section").length===4 && document.documentElement.scrollWidth<=innerWidth', 'quatre sections sans débordement avec « Ça revient »');
+    await check(client, '[...document.querySelectorAll(".home-watch .home-section-name")].map(el=>el.textContent).slice(0,3).join("|")==="Continuer à regarder|Ça revient|Nouveautés"', 'Ça revient juste sous Continuer à regarder');
+    await check(client, '(()=>{const card=document.querySelector(".coming-back [data-coming-back=return]");const r=card?.getBoundingClientRect();return card && Math.round(r.width)===262 && Math.round(r.height)===236 && card.querySelector(".coming-back__chip").textContent==="Retour · saison 2" && getComputedStyle(card.querySelector(".coming-back__chip")).textTransform==="uppercase" && card.querySelector(".coming-back__when strong").textContent==="J-3" && card.querySelectorAll(".coming-back__week > span").length===7 && card.querySelectorAll(".coming-back__week > span[data-elapsed]").length===4 && card.querySelector(".coming-back__title").textContent==="Lioness" && card.querySelector(".coming-back__reason").textContent==="Saison 1 vue en entier" && card.querySelector(".coming-back__reason [data-brand-ring]")})()', 'carte Retour : étiquette, J-3 et sa semaine, titre, raison et anneau Vu');
+    await check(client, '(()=>{const bell=document.querySelector(".coming-back [data-episode-reminder=S02E01]");const r=bell?.getBoundingClientRect();return bell && bell.getAttribute("aria-label").includes("Lioness, S02E01") && r.width>=44 && r.height>=44 && document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)?.closest("[data-episode-reminder]")===bell})()', 'la cloche de l’épisode reste touchable au-dessus de la carte');
+    await evaluate(client, 'window.__comingBackBell=document.querySelector(".coming-back [data-episode-reminder=S02E01]").getAttribute("aria-pressed");window.__comingBackWrites=window.__watch18c.telemetry.writes.length');
+    await click(client, '.coming-back [data-episode-reminder=S02E01]');
+    await check(client, 'document.querySelector(".coming-back [data-episode-reminder=S02E01]").getAttribute("aria-pressed")!==window.__comingBackBell && window.__watch18c.telemetry.writes.slice(window.__comingBackWrites).some(write=>write.path.includes("reminders")) && !window.__watch18c.telemetry.opens.includes("tv:coming-back")', 'la cloche bascule le rappel de l’épisode sans ouvrir la fiche');
+    // Les contrôles Vu qui suivent comptent les écritures depuis le chargement : celle du rappel en sort.
+    await evaluate(client, 'window.__watch18c.telemetry.writes.splice(window.__comingBackWrites)');
+    await click(client, '.coming-back [data-coming-back=return] .coming-back__open');
+    await check(client, 'window.__watch18c.telemetry.opens.includes("tv:coming-back")', 'la carte ouvre la fiche série');
+    await click(client, '.coming-back__all');
+    await check(client, 'window.__watch18c.telemetry.opens.includes("upcoming")', '« Tout À venir » ouvre l’onglet À venir');
+    if (width===412) fs.writeFileSync(path.join(root,'quality-reports','coming-back-412.png'),Buffer.from((await client.send('Page.captureScreenshot',{format:'png'})).data,'base64'));
+    await evaluate(client, 'window.__watch18c.removeComingBack();window.__watch18c.telemetry.opens.length=0;window.scrollTo(0,0)');
+    await check(client, '!document.querySelector(".coming-back")', 'Ça revient retiré avant la suite des contrôles');
     await click(client, '#home-series-0 .home-load-more--tile');
     await check(client, 'document.querySelectorAll("#home-series-0 article").length===8', 'la tuile donne accès aux huit séries réelles');
     await click(client, '[aria-label="Continuer à regarder en liste"]');
