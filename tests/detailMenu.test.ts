@@ -10,7 +10,8 @@ test('SEENIT-UX-019 #879 le menu ⋮ des fiches est ancré sous son bouton, sans
   assert.match(menu, /<div role="menu" aria-label=\{`Actions pour \$\{title\}`\} data-anchored-menu style=\{\{ right: 'max\(12px, calc\(\(100vw - 28rem\) \/ 2 \+ 12px\)\)' \}\} className="absolute top-\[calc\(var\(--seenit-safe-area-top,env\(safe-area-inset-top,0px\)\)\+58px\)\] w-\[290px\]/, 'aligné sur le bord de la fiche, sous le bouton');
   assert.doesNotMatch(menu, /rounded-t-\[24px\]|slide-in-from-bottom|items-end/, 'plus de feuille qui monte du bas');
   // Toutes les actions existantes restent, annoncées comme éléments de menu ; Téléchargement indique le mode et l'activité.
-  assert.equal((menu.match(/role="menuitem"/g) || []).length, 8);
+  // Retour du 27/11 : « Désarchiver la série » s'ajoute pour une série archivée pour inactivité.
+  assert.equal((menu.match(/role="menuitem"/g) || []).length, 9);
   for (const label of ['Partager la fiche', 'Synchroniser', 'Téléchargement', 'Abandonner la série', 'Supprimer la série']) assert.ok(menu.includes(label), label);
   assert.match(menu, /menuSub\(canUseFilmMode \? 'Mode téléchargement du film' : `Mode téléchargement\$\{activeDownloads \? ` · \$\{activeDownloads\} en cours` : ''\}`\)/);
   // Maquette DlFilm : sur un film, l'entrée du menu ouvre le mode téléchargement du film.

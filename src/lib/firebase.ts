@@ -113,7 +113,8 @@ if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
       const payload = {
         type: notificationAction.actionId === 'mark_watched' ? 'QUICK_ACTION_MARK_WATCHED'
           : notificationAction.actionId === 'remind_tonight' ? 'QUICK_ACTION_REMIND_TONIGHT'
-          : notificationAction.actionId === 'open_provider' ? 'QUICK_ACTION_OPEN_PROVIDER' : 'NAVIGATE_SHOW',
+          : notificationAction.actionId === 'open_provider' ? 'QUICK_ACTION_OPEN_PROVIDER'
+          : notificationAction.actionId === 'unarchive' ? 'QUICK_ACTION_UNARCHIVE' : 'NAVIGATE_SHOW',
         showId: extra.showId,
         tmdbId: extra.tmdbId,
         mediaType: extra.mediaType || 'tv',
@@ -182,6 +183,10 @@ export interface NativeNotificationOptions extends NotificationOptions {
   notificationId?: number;
   renotify?: boolean;
   vibrate?: number[];
+  /** Android : bouton « Désarchiver » de la notification d'archivage pour inactivité (SEENIT-DATA-008). */
+  allowUnarchive?: boolean;
+  /** `tonight` : rappel « Ce soir » ; `inactivity_archive` : annonce d'archivage, retirée une fois la série revenue. */
+  reminderPurpose?: 'tonight' | 'inactivity_archive';
 }
 
 export function generateNotificationNumericId(str: string): number {

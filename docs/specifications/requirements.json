@@ -904,6 +904,18 @@
         {
           "file": "tests/seriesRevival.test.ts",
           "contains": "SEENIT-DATA-008 retour du 25/11 : une série dormante depuis 3 ans est rangée en silence, un nouvel épisode la réactive"
+        },
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 retour du 27/11 : « Désarchiver » rend la série sans perdre sa progression, et elle n’est pas réarchivée"
+        },
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 retour du 27/11 : la notification d’archivage reste tant que la série est archivée, et disparaît une fois désarchivée"
+        },
+        {
+          "file": "tests/seriesRevival.test.ts",
+          "contains": "SEENIT-DATA-008 retour du 27/11 : « Désarchiver » est câblé sur l’actualité, la notification et la fiche"
         }
       ]
     },

@@ -503,6 +503,15 @@ function MainApp() {
         return;
       }
 
+      // Retour du 27/11 : « Désarchiver » sur la notification d'archivage pour inactivité, puis la fiche s'ouvre.
+      if (data.type === 'QUICK_ACTION_UNARCHIVE' && data.ownerUid === auth.currentUser?.uid) {
+        const show = useShowsStore.getState().shows.find(item => item.id === String(data.showId) && item.userId === data.ownerUid);
+        if (!show) return;
+        void import('./features/shows/restoreInactivityArchive.ts').then(({ restoreInactivityArchive }) => restoreInactivityArchive(show, updateShow)).catch(() => undefined);
+        openShowSmooth(show.id, 'local', 'tv', Number(show.tmdbId) || undefined);
+        return;
+      }
+
       if (data.type === 'QUICK_ACTION_REMIND_TONIGHT' && data.ownerUid === auth.currentUser?.uid) {
         void Promise.all([import('./features/notifications/tonightReminder.ts'), import('./features/notifications/mediaReminderNotification.ts')]).then(async ([{ nextTonightReminder }, { sendMediaReminderNotification }]) => {
           const show = useShowsStore.getState().shows.find(item => item.id === String(data.showId) && item.userId === data.ownerUid);
