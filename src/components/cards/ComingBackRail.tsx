@@ -30,10 +30,10 @@ export function ComingBackRail({ shows, today, onOpen, onUpcoming }: Props) {
 }
 
 function ComingBackCard({ item, onOpen }: { item: ComingBackItem; onOpen: Props['onOpen'] }) {
-  const { show, kind, episode, days, label, reason } = item;
+  const { show, kind, episode, days, label, reason, behind } = item;
   const countdown = comingBackCountdown(episode.air_date, days);
   const backdrop = imageUrl(show.backdropPath || show.posterPath, 'w780');
-  return <div className={`coming-back__card coming-back__card--${kind}`} data-coming-back={kind}>
+  return <div className={`coming-back__card coming-back__card--${kind}`} data-coming-back={kind} data-behind={behind || undefined}>
     {backdrop && <img className="coming-back__image" src={backdrop} alt="" loading="lazy" decoding="async" />}
     <span className="coming-back__shade" aria-hidden="true" />
     <button type="button" className="coming-back__open" onClick={() => onOpen(show.id, 'tv')} aria-label={`${show.title} · ${label} · ${countdown.headline}, ${countdown.detail} · ${reason}`} />
@@ -45,7 +45,7 @@ function ComingBackCard({ item, onOpen }: { item: ComingBackItem; onOpen: Props[
       <p className={`coming-back__when${countdown.near ? ' is-near' : ''}`}><strong>{countdown.headline}</strong><span>{countdown.detail}</span></p>
       {countdown.near && <span className="coming-back__week">{Array.from({ length: 7 }, (_, index) => <span key={index} data-elapsed={index < countdown.elapsed || undefined} />)}</span>}
       <h3 className="coming-back__title">{show.title}</h3>
-      <span className="coming-back__reason">{kind !== 'premiere' && <SeenItRing size={15} />}{reason}</span>
+      <span className={`coming-back__reason${behind ? ' is-behind' : ''}`}>{kind !== 'premiere' && !behind && <SeenItRing size={15} />}{reason}</span>
     </div>
   </div>;
 }

@@ -274,12 +274,18 @@ Le classement actuel des séries sur la page d'accueil utilise un seuil de **60 
   **retour** (épisode 1 d'une saison 2 ou plus, la saison précédente vue en entier — par son total prouvé,
   sinon parce qu'il ne reste rien de sorti à voir), **première** (épisode 1 de la saison 1, aucun épisode vu) ou
   **finale** (dernier épisode, prouvé, d'une saison dont tous les épisodes précédents sont vus). La sortie la plus
-  proche d'abord, cinq cartes au plus ; section masquée si vide. Chaque carte porte son étiquette (« Retour ·
+  proche d'abord, huit cartes au plus (`SEENIT-UX-025`) ; section masquée si vide. Chaque carte porte son étiquette (« Retour ·
   saison N », « Première », « Finale · saison N »), la cloche de cet épisode (`SEENIT-NOTIFICATION-009`), le compte
   « J-N » et sa semaine en segments sous sept jours (sinon la date), et la raison (« Saison 1 vue en entier »,
   « À jour · N saisons vues », « Dans ta liste », « À jour · N épisodes vus ») ; elle ouvre la fiche série, et
   « Tout À venir » ouvre l'onglet À venir. Le jour de la sortie, la série n'y est plus : elle suit les règles
   ci-dessus (Nouveautés ou Continuer à regarder).
+- **SEENIT-UX-025** — **Ça revient, sur les vraies données** (`USR-2026-11-27-003`) : un **retour** où la saison
+  précédente est vue en entier s'annonce jusqu'à **120 jours** (les nouvelles saisons se datent des mois à
+  l'avance) ; première et finale restent à 45 jours. Sous 45 jours, un **retour** dont la saison précédente est
+  commencée mais pas finie, ou une **finale** d'une saison commencée où il reste des épisodes sortis, entre aussi,
+  avec pour raison « N épisodes à rattraper » (en or, sans l'anneau Vu) — seulement quand le total de la saison est
+  prouvé. Toujours la sortie la plus proche d'abord, désormais **huit cartes** au plus.
 - **Pas vu depuis un moment** contient les séries candidates qui ne sont ni dans « Nouveautés » ni dans
   « Continuer à regarder ». Pour une série déjà commencée, cela correspond donc à un dernier visionnage
   **strictement supérieur à 60 jours** (`> 60 jours`). Une série jamais commencée et devenue trop ancienne

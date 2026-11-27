@@ -27,3 +27,4 @@
 .coming-back__when:not(.is-near) + .coming-back__title { margin-top:10px; }
 .coming-back__reason { display:flex; align-items:center; gap:6px; min-width:0; font-size:12.5px; font-weight:600; color:#d4d4d8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .coming-back__reason > svg { flex-shrink:0; }
+.coming-back__reason.is-behind { color:#f2c36b; font-weight:700; }

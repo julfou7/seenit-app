@@ -4378,7 +4378,7 @@
         },
         {
           "file": "tests/comingBack.test.ts",
-          "contains": "SEENIT-UX-024 horizon de 45 jours, jamais le jour de la sortie ni film, archive ou abandon ; cinq au plus, la plus proche d’abord"
+          "contains": "SEENIT-UX-024 horizon de 45 jours, jamais le jour de la sortie ni film, archive ou abandon ; huit au plus, la plus proche d’abord"
         },
         {
           "file": "tests/comingBack.test.ts",
@@ -4387,6 +4387,24 @@
         {
           "file": "tests/comingBack.test.ts",
           "contains": "SEENIT-UX-024 l’accueil place « Ça revient » entre Continuer à regarder et Nouveautés ; « Tout À venir » ouvre l’onglet"
+        }
+      ]
+    },
+    {
+      "id": "SEENIT-UX-025",
+      "title": "Accueil : « Ça revient » annonce les retours où tu es à jour jusqu’à 120 jours et compte les épisodes à rattraper avant un retour ou une finale",
+      "targets": [
+        "pwa",
+        "apk"
+      ],
+      "tests": [
+        {
+          "file": "tests/comingBack.test.ts",
+          "contains": "SEENIT-UX-025 un retour où tu es à jour s’annonce jusqu’à 120 jours ; première et finale restent à 45 jours"
+        },
+        {
+          "file": "tests/comingBack.test.ts",
+          "contains": "SEENIT-UX-025 retour ou finale d’une saison commencée : le nombre d’épisodes à rattraper avant la sortie"
         }
       ]
     },
